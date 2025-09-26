@@ -31,6 +31,8 @@ export interface Verse {
   chapterNumber: number;
   verseNumber: number;
   text: string;
+  notes?: string[];
+  verseReferences?: {text: string, reference: string, position: number}[];
   isFavorite?: boolean;
 }
 

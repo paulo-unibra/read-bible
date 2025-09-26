@@ -43,6 +43,15 @@ export default function ChapterReaderScreen() {
   
   // Chapter selector modal state
   const [chapterSelectorVisible, setChapterSelectorVisible] = useState(false);
+  
+  // Notes modal state
+  const [notesModalVisible, setNotesModalVisible] = useState(false);
+  const [currentNotes, setCurrentNotes] = useState<string[]>([]);
+  
+  // Verse reference modal state
+  const [verseRefModalVisible, setVerseRefModalVisible] = useState(false);
+  const [currentVerseRef, setCurrentVerseRef] = useState<Verse | null>(null);
+  const [verseRefLoading, setVerseRefLoading] = useState(false);
 
   useEffect(() => {
     if (bibleId && bookId && currentChapter) {
@@ -198,6 +207,32 @@ export default function ChapterReaderScreen() {
     router.replace(`/chapter-reader?bibleId=${bibleId}&bookId=${bookId}&chapterNumber=${chapterNumber}`);
   };
 
+  const openNotes = (notes: string[]) => {
+    setCurrentNotes(notes);
+    setNotesModalVisible(true);
+  };
+
+  const openVerseReference = async (reference: string) => {
+    if (!bibleId) return;
+    
+    try {
+      setVerseRefLoading(true);
+      const verse = await bibleReaderService.getVerseByReference(bibleId, reference);
+      
+      if (verse) {
+        setCurrentVerseRef(verse);
+        setVerseRefModalVisible(true);
+      } else {
+        Alert.alert('Versículo não encontrado', `Não foi possível encontrar a referência: ${reference}`);
+      }
+    } catch (error) {
+      console.error('Error loading verse reference:', error);
+      Alert.alert('Erro', 'Falha ao carregar referência do versículo');
+    } finally {
+      setVerseRefLoading(false);
+    }
+  };
+
   const toggleFavorite = async (verse: Verse) => {
     if (!bibleId) return;
     
@@ -222,6 +257,7 @@ export default function ChapterReaderScreen() {
   const renderVerse = ({ item }: { item: Verse }) => {
     const favoriteKey = `${item.bookId}-${item.chapterNumber}-${item.verseNumber}`;
     const isFavorite = favorites.has(favoriteKey);
+    const hasNotes = item.notes && item.notes.length > 0;
     
     return (
       <View style={styles.verseContainer}>
@@ -229,15 +265,41 @@ export default function ChapterReaderScreen() {
           <View style={styles.verseNumberButton}>
             <Text style={styles.verseNumber}>{item.verseNumber}</Text>
           </View>
-          <TouchableOpacity onPress={() => toggleFavorite(item)}>
-            <Ionicons 
-              name={isFavorite ? "heart" : "heart-outline"} 
-              size={20} 
-              color={isFavorite ? "#f44336" : "#999"} 
-            />
-          </TouchableOpacity>
+          <View style={styles.verseActions}>
+            {hasNotes && (
+              <TouchableOpacity 
+                onPress={() => openNotes(item.notes!)}
+                style={styles.notesButton}
+              >
+                <Text style={styles.notesButtonText}>N</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity onPress={() => toggleFavorite(item)}>
+              <Ionicons 
+                name={isFavorite ? "heart" : "heart-outline"} 
+                size={20} 
+                color={isFavorite ? "#f44336" : "#999"} 
+              />
+            </TouchableOpacity>
+          </View>
         </View>
-        <Text style={styles.verseText}>{item.text}</Text>
+        <View style={styles.verseTextContainer}>
+          <Text style={styles.verseText}>{item.text}</Text>
+          {item.verseReferences && item.verseReferences.length > 0 && (
+            <View style={styles.verseReferencesContainer}>
+              <Text style={styles.referenceLabel}>Referências: </Text>
+              {item.verseReferences.map((ref, index) => (
+                <TouchableOpacity 
+                  key={index}
+                  onPress={() => openVerseReference(ref.reference)}
+                  style={styles.verseReferenceLink}
+                >
+                  <Text style={styles.verseReferenceLinkText}>{ref.text}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
       </View>
     );
   };
@@ -441,6 +503,77 @@ export default function ChapterReaderScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Notes Modal */}
+      <Modal
+        visible={notesModalVisible}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setNotesModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.notesModal}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Notas do Versículo</Text>
+              <TouchableOpacity onPress={() => setNotesModalVisible(false)}>
+                <Ionicons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.notesContent}>
+              {currentNotes.map((note, index) => {
+                const isLastItem = index === currentNotes.length - 1;
+                return (
+                  <View 
+                    key={index} 
+                    style={[
+                      styles.noteItem,
+                      isLastItem && styles.lastNoteItem
+                    ]}
+                  >
+                    <Text style={styles.noteText}>{note}</Text>
+                    {index < currentNotes.length - 1 && <View style={styles.noteDivider} />}
+                  </View>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Verse Reference Modal */}
+      <Modal
+        visible={verseRefModalVisible}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setVerseRefModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.notesModal}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Referência Bíblica</Text>
+              <TouchableOpacity onPress={() => setVerseRefModalVisible(false)}>
+                <Ionicons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.notesContent}>
+              {verseRefLoading ? (
+                <ActivityIndicator size="large" color="#2196F3" />
+              ) : currentVerseRef ? (
+                <View>
+                  <Text style={styles.referenceTitle}>
+                    {`${currentVerseRef.bookId} ${currentVerseRef.chapterNumber}:${currentVerseRef.verseNumber}`}
+                  </Text>
+                  <Text style={styles.noteText}>{currentVerseRef.text}</Text>
+                </View>
+              ) : (
+                <Text style={styles.noteText}>Versículo não encontrado.</Text>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -567,6 +700,24 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#2196F3',
   },
+  verseActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  notesButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#ff9800',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  notesButtonText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
   verseText: {
     fontSize: 16,
     color: '#333',
@@ -663,7 +814,8 @@ const styles = StyleSheet.create({
   },
   verseSelectorModal: {
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
     margin: 16,
     maxHeight: '75%',
     width: '95%',
@@ -671,6 +823,7 @@ const styles = StyleSheet.create({
   verseNumberGrid: {
     maxHeight: 450,
     paddingHorizontal: 4,
+    paddingBottom: 16,
   },
   verseNumbersContainer: {
     flexDirection: 'row',
@@ -698,5 +851,67 @@ const styles = StyleSheet.create({
   },
   currentChapterText: {
     color: '#fff',
+  },
+  notesModal: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+    margin: 16,
+    maxHeight: '85%',
+    width: '95%',
+  },
+  notesContent: {
+    maxHeight: 600,
+    padding: 16,
+    paddingBottom: 32,
+  },
+  noteItem: {
+    marginBottom: 16,
+  },
+  lastNoteItem: {
+    marginBottom: 24,
+  },
+  noteText: {
+    fontSize: 16,
+    color: '#333',
+    lineHeight: 24,
+  },
+  noteDivider: {
+    height: 1,
+    backgroundColor: '#e0e0e0',
+    marginTop: 16,
+  },
+  verseTextContainer: {
+    flex: 1,
+  },
+  verseReferencesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  referenceLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginRight: 4,
+  },
+  verseReferenceLink: {
+    marginRight: 8,
+    marginBottom: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    backgroundColor: '#e3f2fd',
+    borderRadius: 4,
+  },
+  verseReferenceLinkText: {
+    fontSize: 12,
+    color: '#2196F3',
+    fontWeight: '500',
+  },
+  referenceTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2196F3',
+    marginBottom: 8,
   },
 });

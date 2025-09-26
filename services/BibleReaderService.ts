@@ -5,6 +5,85 @@ import googleDriveService from './GoogleDriveService';
 export class BibleReaderService {
   private bibleConnections: Map<string, SQLite.SQLiteDatabase> = new Map();
 
+  // Parse HTML verse content to extract text, notes, and verse references
+  private parseVerseContent(htmlContent: string): { 
+    text: string; 
+    notes: string[]; 
+    verseReferences: {text: string, reference: string, position: number}[] 
+  } {
+    if (!htmlContent) return { text: '', notes: [], verseReferences: [] };
+
+    const notes: string[] = [];
+    const verseReferences: {text: string, reference: string, position: number}[] = [];
+    let cleanText = htmlContent;
+
+    // Remove title/introduction sections first
+    cleanText = cleanText
+      .replace(/<TS>.*?<Ts>/gs, '')
+      .replace(/<RF q=Introdução[^>]*>.*?<Rf>/gs, '');
+
+    // Extract notes (content with q=ℕ pattern - these are the main commentary notes)
+    const noteRegex = /<sup><RF q=ℕ>.*?<Rf><\/sup>/gs;
+    const noteMatches = cleanText.match(noteRegex);
+    
+    if (noteMatches) {
+      noteMatches.forEach(noteMatch => {
+        // Extract note content
+        const noteContentRegex = /<b><a href='[^']*'>([^<]*)<\/a> - ([^<]*)<\/b>(.*?)(?=<Rf><\/sup>|$)/s;
+        const contentMatch = noteMatch.match(noteContentRegex);
+        
+        if (contentMatch) {
+          const reference = contentMatch[1]; // e.g., "Gn 1:1"
+          const title = contentMatch[2]; // e.g., "NO PRINCÍPIO, CRIOU DEUS."
+          let content = contentMatch[3]
+            .replace(/<a class='bible' href='[^']*'>([^<]*)<\/a>/g, '$1') // Convert bible links to plain text
+            .replace(/<a href='[^']*'>([^<]*)<\/a>/g, '$1') // Convert other links to plain text
+            .replace(/<[^>]*>/g, '') // Remove remaining HTML tags
+            .trim();
+          
+          notes.push(`${reference} - ${title}\n\n${content}`);
+        }
+        
+        // Remove the entire note section from clean text
+        cleanText = cleanText.replace(noteMatch, '');
+      });
+    }
+
+    // Extract verse references (content with q=✜ pattern - these are cross-references)
+    const refRegex = /<sup><RF q=✜><b>[^<]*<\/b> - (.*?)<Rf><\/sup>/gs;
+    let refMatch: RegExpExecArray | null;
+    
+    while ((refMatch = refRegex.exec(cleanText)) !== null) {
+      const referencesHtml = refMatch[1];
+      const referenceLinks = referencesHtml.match(/<a href='b([^']+)'>([^<]+)<\/a>/g);
+      
+      if (referenceLinks) {
+        referenceLinks.forEach(link => {
+          const linkMatch = link.match(/<a href='b([^']+)'>([^<]+)<\/a>/);
+          if (linkMatch) {
+            const reference = linkMatch[1]; // e.g., "Pv 8:23"
+            const displayText = linkMatch[2]; // e.g., "Pv 8:23"
+            
+            verseReferences.push({
+              text: displayText,
+              reference: reference,
+              position: refMatch!.index || 0
+            });
+          }
+        });
+      }
+    }
+
+    // Remove all remaining HTML markup but preserve the basic text
+    cleanText = cleanText
+      .replace(/<sup><RF q=✜>.*?<Rf><\/sup>/gs, '') // Remove cross-reference sections
+      .replace(/<[^>]*>/g, ' ') // Remove all remaining HTML tags
+      .replace(/\s+/g, ' ') // Normalize whitespace
+      .trim();
+
+    return { text: cleanText, notes, verseReferences };
+  }
+
   async openBible(bibleId: string, fileName: string): Promise<void> {
     try {
       if (this.bibleConnections.has(bibleId)) {
@@ -166,13 +245,19 @@ export class BibleReaderService {
         [bookId, chapterNumber]
       );
       
-      return result.map((row: any) => ({
-        id: parseInt(`${bookId}${chapterNumber.toString().padStart(3, '0')}${row.Verse.toString().padStart(3, '0')}`),
-        bookId,
-        chapterNumber,
-        verseNumber: row.Verse,
-        text: row.Scripture,
-      }));
+      return result.map((row: any) => {
+        const parsedContent = this.parseVerseContent(row.Scripture);
+        
+        return {
+          id: parseInt(`${bookId}${chapterNumber.toString().padStart(3, '0')}${row.Verse.toString().padStart(3, '0')}`),
+          bookId,
+          chapterNumber,
+          verseNumber: row.Verse,
+          text: parsedContent.text,
+          notes: parsedContent.notes.length > 0 ? parsedContent.notes : undefined,
+          verseReferences: parsedContent.verseReferences.length > 0 ? parsedContent.verseReferences : undefined,
+        };
+      });
     } catch (error) {
       console.error('Error getting verses:', error);
       throw error;
@@ -214,8 +299,9 @@ export class BibleReaderService {
       );
 
       return result.map((row: any) => {
-        const text = row.Scripture;
-        const highlightedText = text.replace(
+        const parsedContent = this.parseVerseContent(row.Scripture);
+        const cleanText = parsedContent.text;
+        const highlightedText = cleanText.replace(
           new RegExp(searchTerm, 'gi'),
           (match: string) => `<mark>${match}</mark>`
         );
@@ -225,13 +311,61 @@ export class BibleReaderService {
           bookName: bookMap.get(row.Book) || `Book ${row.Book}`,
           chapterNumber: row.Chapter,
           verseNumber: row.Verse,
-          text,
+          text: cleanText,
           highlightedText,
         };
       });
     } catch (error) {
       console.error('Error searching verses:', error);
       throw error;
+    }
+  }
+
+  async getVerseByReference(bibleId: string, reference: string): Promise<Verse | null> {
+    // Parse reference like "Pv 8:23" or "Sl 33:6"
+    const refMatch = reference.match(/^([A-Za-z0-9\s]+)\s(\d+):(\d+)$/);
+    if (!refMatch) return null;
+
+    const bookAbbr = refMatch[1].trim();
+    const chapterNumber = parseInt(refMatch[2]);
+    const verseNumber = parseInt(refMatch[3]);
+
+    // Simple book abbreviation mapping
+    const bookMap: {[key: string]: number} = {
+      'Gn': 1, 'Ex': 2, 'Lv': 3, 'Nm': 4, 'Dt': 5,
+      'Pv': 20, 'Sl': 19, 'Is': 23, 'Jr': 24, 'Hb': 58,
+      'At': 44, 'Rm': 45, 'Cl': 51, 'Zc': 38
+    };
+
+    const bookId = bookMap[bookAbbr];
+    if (!bookId) return null;
+
+    const db = this.getBibleConnection(bibleId);
+    if (!db) return null;
+
+    try {
+      const result = await db.getAllAsync(
+        'SELECT * FROM Bible WHERE Book = ? AND Chapter = ? AND Verse = ? LIMIT 1',
+        [bookId, chapterNumber, verseNumber]
+      );
+
+      if (result.length === 0) return null;
+
+      const row = result[0] as any;
+      const parsedContent = this.parseVerseContent(row.Scripture);
+
+      return {
+        id: parseInt(`${bookId}${chapterNumber.toString().padStart(3, '0')}${row.Verse.toString().padStart(3, '0')}`),
+        bookId,
+        chapterNumber,
+        verseNumber: row.Verse,
+        text: parsedContent.text,
+        notes: parsedContent.notes.length > 0 ? parsedContent.notes : undefined,
+        verseReferences: parsedContent.verseReferences.length > 0 ? parsedContent.verseReferences : undefined,
+      };
+    } catch (error) {
+      console.error('Error getting verse by reference:', error);
+      return null;
     }
   }
 
