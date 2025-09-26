@@ -2,16 +2,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import bibleReaderService from '../services/BibleReaderService';
@@ -48,10 +48,18 @@ export default function ChapterReaderScreen() {
   const [notesModalVisible, setNotesModalVisible] = useState(false);
   const [currentNotes, setCurrentNotes] = useState<string[]>([]);
   
-  // Verse reference modal state
+  // Verse reference modal state (for single reference display)
   const [verseRefModalVisible, setVerseRefModalVisible] = useState(false);
   const [currentVerseRef, setCurrentVerseRef] = useState<Verse | null>(null);
   const [verseRefLoading, setVerseRefLoading] = useState(false);
+
+  // References modal state
+  const [referencesModalVisible, setReferencesModalVisible] = useState(false);
+  const [currentReferences, setCurrentReferences] = useState<{text: string, reference: string, position: number}[]>([]);
+  const [selectedReferenceIndex, setSelectedReferenceIndex] = useState(0);
+  const [selectedReferenceVerse, setSelectedReferenceVerse] = useState<Verse | null>(null);
+  const [referenceVerseLoading, setReferenceVerseLoading] = useState(false);
+  const [showAllReferences, setShowAllReferences] = useState(false);
 
   useEffect(() => {
     if (bibleId && bookId && currentChapter) {
@@ -212,7 +220,44 @@ export default function ChapterReaderScreen() {
     setNotesModalVisible(true);
   };
 
-  const openVerseReference = async (reference: string) => {
+  const openReferencesModal = async (references: {text: string, reference: string, position: number}[]) => {
+    if (!references || references.length === 0 || !bibleId) return;
+    
+    setCurrentReferences(references);
+    setSelectedReferenceIndex(0);
+    setShowAllReferences(false); // Reset to compact view
+    setReferencesModalVisible(true);
+    
+    // Load the first reference immediately
+    await loadSelectedReference(0, references);
+  };
+
+  const loadSelectedReference = async (index: number, references?: {text: string, reference: string, position: number}[]) => {
+    const refs = references || currentReferences;
+    if (index < 0 || index >= refs.length || !bibleId) return;
+    
+    try {
+      setReferenceVerseLoading(true);
+      const verse = await bibleReaderService.getVerseByReference(bibleId, refs[index].reference);
+      
+      if (verse) {
+        setSelectedReferenceVerse(verse);
+        setSelectedReferenceIndex(index);
+      }
+    } catch (error) {
+      console.error('Error loading selected reference:', error);
+      Alert.alert('Erro', 'Falha ao carregar referência do versículo');
+    } finally {
+      setReferenceVerseLoading(false);
+    }
+  };
+
+  const selectReference = async (index: number) => {
+    if (index === selectedReferenceIndex) return; // Already selected
+    await loadSelectedReference(index);
+  };
+
+  const openSingleReference = async (reference: string) => {
     if (!bibleId) return;
     
     try {
@@ -261,43 +306,40 @@ export default function ChapterReaderScreen() {
     
     return (
       <View style={styles.verseContainer}>
-        <View style={styles.verseRow}>
-          <View style={styles.verseTextWithNumber}>
-            <Text style={styles.verseText}>
-              <Text style={styles.verseNumber}>{item.verseNumber}</Text>
-              <Text> - {item.text}</Text>
-            </Text>
-          </View>
-          <View style={styles.verseActions}>
+        <Text style={styles.verseText}>
+          <Text style={styles.verseNumber}>{item.verseNumber}</Text>
+          <Text> - {item.text}</Text>
+        </Text>
+        
+        {/* Buttons row below the verse */}
+        {(hasNotes || (item.verseReferences && item.verseReferences.length > 0)) && (
+          <View style={styles.verseButtonsRow}>
             {hasNotes && (
               <TouchableOpacity 
+                style={styles.inlineButton}
                 onPress={() => openNotes(item.notes!)}
-                style={styles.notesButton}
               >
-                <Text style={styles.notesButtonText}>N</Text>
+                <Text style={styles.inlineButtonText}>N</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity onPress={() => toggleFavorite(item)}>
-              <Ionicons 
-                name={isFavorite ? "heart" : "heart-outline"} 
-                size={16} 
-                color={isFavorite ? "#f44336" : "#999"} 
-              />
-            </TouchableOpacity>
-          </View>
-        </View>
-        {item.verseReferences && item.verseReferences.length > 0 && (
-          <View style={styles.verseReferencesContainer}>
-            <Text style={styles.referenceLabel}>Referências: </Text>
-            {item.verseReferences.map((ref, index) => (
+            
+            {item.verseReferences && item.verseReferences.length > 0 && (
               <TouchableOpacity 
-                key={index}
-                onPress={() => openVerseReference(ref.reference)}
-                style={styles.verseReferenceLink}
+                style={styles.inlineButton}
+                onPress={() => openReferencesModal(item.verseReferences!)}
               >
-                <Text style={styles.verseReferenceLinkText}>{ref.text}</Text>
+                <Text style={styles.inlineButtonText}>→</Text>
               </TouchableOpacity>
-            ))}
+            )}
+            
+            <TouchableOpacity 
+              style={[styles.inlineButton, isFavorite && styles.favoriteButton]}
+              onPress={() => toggleFavorite(item)}
+            >
+              <Text style={[styles.inlineButtonText, isFavorite && styles.favoriteButtonText]}>
+                {isFavorite ? "♥" : "♡"}
+              </Text>
+            </TouchableOpacity>
           </View>
         )}
       </View>
@@ -536,6 +578,114 @@ export default function ChapterReaderScreen() {
         </View>
       </Modal>
 
+      {/* References Modal */}
+      <Modal
+        visible={referencesModalVisible}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setReferencesModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.referencesModal}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Referências Bíblicas</Text>
+              <TouchableOpacity onPress={() => setReferencesModalVisible(false)}>
+                <Ionicons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+            
+            {/* Reference Links */}
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              style={styles.referenceLinksContainer}
+              contentContainerStyle={styles.referenceLinksContent}
+            >
+              <View style={styles.referenceTabs}>
+                {currentReferences.length > 6 && !showAllReferences ? (
+                  // Compact view for many references
+                  <>
+                    {currentReferences.slice(0, 4).map((ref, index) => (
+                      <TouchableOpacity
+                        key={index}
+                        onPress={() => selectReference(index)}
+                        style={[
+                          styles.referenceTabCompact,
+                          index === selectedReferenceIndex && styles.selectedReferenceTab
+                        ]}
+                      >
+                        <Text style={[
+                          styles.referenceTabText,
+                          index === selectedReferenceIndex && styles.selectedReferenceTabText
+                        ]}>
+                          {ref.text}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                    <TouchableOpacity
+                      style={styles.moreReferencesTab}
+                      onPress={() => setShowAllReferences(true)}
+                    >
+                      <Text style={styles.moreReferencesText}>
+                        +{currentReferences.length - 4}
+                      </Text>
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  // Normal view for fewer references or when showing all
+                  currentReferences.map((ref, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      onPress={() => selectReference(index)}
+                      style={[
+                        currentReferences.length > 6 ? styles.referenceTabCompact : styles.referenceTab,
+                        index === selectedReferenceIndex && styles.selectedReferenceTab
+                      ]}
+                    >
+                      <Text style={[
+                        styles.referenceTabText,
+                        index === selectedReferenceIndex && styles.selectedReferenceTabText
+                      ]}>
+                        {ref.text}
+                      </Text>
+                    </TouchableOpacity>
+                  ))
+                )}
+              </View>
+            </ScrollView>
+            
+            {/* Reference Content */}
+            <ScrollView style={styles.referenceContent}>
+              {referenceVerseLoading ? (
+                <View style={styles.referenceLoadingContainer}>
+                  <ActivityIndicator size="large" color="#2196F3" />
+                  <Text style={styles.loadingText}>Carregando referência...</Text>
+                </View>
+              ) : selectedReferenceVerse ? (
+                <View style={styles.referenceVerseCard}>
+                  <View style={styles.referenceVerseHeader}>
+                    <Text style={styles.referenceVerseTitle}>
+                      {`${selectedReferenceVerse.bookId} ${selectedReferenceVerse.chapterNumber}:${selectedReferenceVerse.verseNumber}`}
+                    </Text>
+                    <TouchableOpacity 
+                      onPress={() => openSingleReference(currentReferences[selectedReferenceIndex].reference)}
+                      style={styles.expandButton}
+                    >
+                      <Ionicons name="expand-outline" size={16} color="#2196F3" />
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={styles.referenceVerseText}>{selectedReferenceVerse.text}</Text>
+                </View>
+              ) : (
+                <View style={styles.referenceErrorContainer}>
+                  <Text style={styles.referenceErrorText}>Versículo não encontrado.</Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
       {/* Verse Reference Modal */}
       <Modal
         visible={verseRefModalVisible}
@@ -665,15 +815,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#f0f0f0',
   },
-  verseRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-  },
-  verseTextWithNumber: {
-    flex: 1,
-    paddingRight: 8,
-  },
   verseNumber: {
     fontSize: 14,
     fontWeight: '600',
@@ -683,24 +824,37 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
     lineHeight: 24,
+    flexWrap: 'wrap',
   },
-  verseActions: {
+  verseButtonsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    paddingTop: 4,
+    paddingLeft: 20,
+    gap: 8,
   },
-  notesButton: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#ff9800',
-    justifyContent: 'center',
+  inlineButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#2196F3',
+    backgroundColor: '#f0f8ff',
+    minWidth: 24,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  notesButtonText: {
-    fontSize: 10,
+  inlineButtonText: {
+    fontSize: 12,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#2196F3',
+  },
+  favoriteButton: {
+    borderColor: '#f44336',
+    backgroundColor: '#fef0f0',
+  },
+  favoriteButtonText: {
+    color: '#f44336',
   },
   modalContainer: {
     flex: 1,
@@ -860,36 +1014,143 @@ const styles = StyleSheet.create({
     backgroundColor: '#e0e0e0',
     marginTop: 16,
   },
-  verseReferencesContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    marginTop: 6,
-    paddingHorizontal: 8,
-    paddingBottom: 6,
-  },
-  referenceLabel: {
-    fontSize: 12,
-    color: '#666',
-    marginRight: 4,
-  },
-  verseReferenceLink: {
-    marginRight: 8,
-    marginBottom: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    backgroundColor: '#e3f2fd',
-    borderRadius: 4,
-  },
-  verseReferenceLinkText: {
-    fontSize: 12,
-    color: '#2196F3',
-    fontWeight: '500',
-  },
   referenceTitle: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#2196F3',
     marginBottom: 8,
+  },
+  // References Modal Styles
+  referencesModal: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+    margin: 16,
+    maxHeight: '80%',
+    width: '95%',
+  },
+  referenceLinksContainer: {
+    maxHeight: 40,
+    backgroundColor: '#f8f9fa',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  referenceLinksContent: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    alignItems: 'center',
+  },
+  referenceTabs: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  referenceTab: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginRight: 4,
+    backgroundColor: '#e3f2fd',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#bbdefb',
+    minWidth: 35,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  referenceTabCompact: {
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    marginRight: 3,
+    backgroundColor: '#e3f2fd',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#bbdefb',
+    minWidth: 30,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  moreReferencesTab: {
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    minWidth: 30,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectedReferenceTab: {
+    backgroundColor: '#2196F3',
+    borderColor: '#2196F3',
+  },
+  referenceTabText: {
+    fontSize: 10,
+    color: '#2196F3',
+    fontWeight: '600',
+    textAlign: 'center',
+    lineHeight: 12,
+  },
+  selectedReferenceTabText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  moreReferencesText: {
+    fontSize: 9,
+    color: '#666',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  referenceContent: {
+    flex: 1,
+    padding: 16,
+  },
+  referenceLoadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  referenceVerseCard: {
+    backgroundColor: '#f8f9fa',
+    padding: 16,
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#2196F3',
+  },
+  referenceVerseHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  referenceVerseTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#2196F3',
+    flex: 1,
+  },
+  expandButton: {
+    padding: 4,
+    borderRadius: 4,
+    backgroundColor: '#e3f2fd',
+  },
+  referenceVerseText: {
+    fontSize: 16,
+    color: '#333',
+    lineHeight: 24,
+  },
+  referenceErrorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  referenceErrorText: {
+    fontSize: 16,
+    color: '#999',
+    textAlign: 'center',
   },
 });
