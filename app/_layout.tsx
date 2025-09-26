@@ -16,6 +16,10 @@ export default function RootLayout() {
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="bible-manager" options={{ title: 'Gerenciar Bíblias' }} />
+        <Stack.Screen name="free-reading" options={{ title: 'Leitura Livre' }} />
+        <Stack.Screen name="reading-plans" options={{ title: 'Planos de Leitura' }} />
+        <Stack.Screen name="settings" options={{ title: 'Configurações' }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>
       <StatusBar style="auto" />
