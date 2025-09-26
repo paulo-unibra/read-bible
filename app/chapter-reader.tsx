@@ -6,7 +6,9 @@ import {
   Alert,
   FlatList,
   Modal,
+  Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -63,6 +65,11 @@ export default function ChapterReaderScreen() {
     useState<Verse | null>(null);
   const [referenceVerseLoading, setReferenceVerseLoading] = useState(false);
   const [showAllReferences, setShowAllReferences] = useState(false);
+
+  // Selection and sharing state
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedVerses, setSelectedVerses] = useState<Set<string>>(new Set());
+  const [longPressVerse, setLongPressVerse] = useState<string | null>(null);
 
   useEffect(() => {
     if (bibleId && bookId && currentChapter) {
@@ -344,21 +351,134 @@ export default function ChapterReaderScreen() {
     }
   };
 
+  // Handle long press on verse
+  const handleVerseLongPress = (verse: Verse) => {
+    const verseKey = `${verse.bookId}-${verse.chapterNumber}-${verse.verseNumber}`;
+    setLongPressVerse(verseKey);
+    setSelectionMode(true);
+    
+    // Add the long-pressed verse to selection
+    const newSelected = new Set(selectedVerses);
+    newSelected.add(verseKey);
+    setSelectedVerses(newSelected);
+  };
+
+  // Handle verse selection in selection mode
+  const handleVerseSelection = (verse: Verse) => {
+    if (!selectionMode) return;
+    
+    const verseKey = `${verse.bookId}-${verse.chapterNumber}-${verse.verseNumber}`;
+    const newSelected = new Set(selectedVerses);
+    
+    if (newSelected.has(verseKey)) {
+      newSelected.delete(verseKey);
+    } else {
+      newSelected.add(verseKey);
+    }
+    
+    setSelectedVerses(newSelected);
+    
+    // Exit selection mode if no verses selected
+    if (newSelected.size === 0) {
+      setSelectionMode(false);
+      setLongPressVerse(null);
+    }
+  };
+
+  // Clear selection mode
+  const clearSelection = () => {
+    setSelectionMode(false);
+    setSelectedVerses(new Set());
+    setLongPressVerse(null);
+  };
+
+  // Share selected verses
+  const shareSelectedVerses = async () => {
+    if (selectedVerses.size === 0) return;
+
+    const selectedVersesData = verses.filter(verse => 
+      selectedVerses.has(`${verse.bookId}-${verse.chapterNumber}-${verse.verseNumber}`)
+    );
+
+    // Sort verses by verse number to maintain order
+    const sortedVerses = selectedVersesData.sort((a, b) => a.verseNumber - b.verseNumber);
+
+    // Format verses with number - text
+    const versesText = sortedVerses
+      .map(verse => `${verse.verseNumber} - ${verse.text}`)
+      .join('\n');
+
+    // Create verse range text
+    const verseNumbers = sortedVerses.map(v => v.verseNumber);
+    const verseRange = verseNumbers.length === 1 
+      ? verseNumbers[0].toString()
+      : `${Math.min(...verseNumbers)}-${Math.max(...verseNumbers)}`;
+
+    const shareText = `${versesText}
+
+${book?.name} ${verseRange}
+
+Aplicativo ReadBible
+Link do app: https://readbible.app`;
+
+    const shareTitle = selectedVerses.size === 1 
+      ? `Versículo ${book?.name} ${sortedVerses[0].chapterNumber}:${sortedVerses[0].verseNumber}`
+      : `${selectedVerses.size} versículos de ${book?.name} ${currentChapter}`;
+
+    try {
+      const result = await Share.share({
+        message: shareText,
+        title: shareTitle,
+      });
+
+      // Clear selection after successful share
+      if (result.action === Share.sharedAction) {
+        clearSelection();
+      }
+    } catch (error) {
+      console.error('Error sharing verses:', error);
+      Alert.alert('Erro', 'Não foi possível compartilhar os versículos');
+    }
+  };
+
   const renderVerse = ({ item }: { item: Verse }) => {
     const favoriteKey = `${item.bookId}-${item.chapterNumber}-${item.verseNumber}`;
     const isFavorite = favorites.has(favoriteKey);
     const hasNotes = item.notes && item.notes.length > 0;
+    const isSelected = selectedVerses.has(favoriteKey);
+    const isLongPressed = longPressVerse === favoriteKey;
 
     return (
-      <View style={styles.verseContainer}>
-        <Text style={styles.verseText}>
-          <Text style={styles.verseNumber}>{item.verseNumber}</Text>
-          <Text> - {item.text}</Text>
-        </Text>
+      <Pressable
+        style={[
+          styles.verseContainer,
+          isSelected && styles.verseContainerSelected
+        ]}
+        onPress={() => selectionMode ? handleVerseSelection(item) : undefined}
+        onLongPress={() => handleVerseLongPress(item)}
+        delayLongPress={500}
+      >
+        {/* Checkbox for selection mode */}
+        {selectionMode && (
+          <View style={styles.checkboxContainer}>
+            <View style={[
+              styles.checkbox,
+              isSelected && styles.checkboxSelected
+            ]}>
+              {isSelected && (
+                <Ionicons name="checkmark" size={14} color="#fff" />
+              )}
+            </View>
+          </View>
+        )}
 
-        {/* Buttons row below the verse */}
-        {(hasNotes ||
-          (item.verseReferences && item.verseReferences.length > 0)) && (
+        <View style={[styles.verseTextContainer, selectionMode && styles.verseTextWithCheckbox]}>
+          <Text style={styles.verseText}>
+            <Text style={styles.verseNumber}>{item.verseNumber}</Text>
+            <Text> - {item.text}</Text>
+          </Text>
+
+          {/* Buttons row below the verse */}
           <View style={styles.verseButtonsRow}>
             {hasNotes && (
               <TouchableOpacity
@@ -374,23 +494,26 @@ export default function ChapterReaderScreen() {
                 style={styles.inlineButton}
                 onPress={() => openReferencesModal(item.verseReferences!)}
               >
-                <Ionicons name="arrow-redo" size={14} color="#2196F3" />
+                <Ionicons name="git-branch" size={14} color="#2196F3" />
               </TouchableOpacity>
             )}
 
-            <TouchableOpacity
-              style={[styles.inlineButton, isFavorite && styles.favoriteButton]}
-              onPress={() => toggleFavorite(item)}
-            >
-              <Ionicons
-                name="heart"
-                size={14}
-                color={isFavorite ? "#f44336" : "#ccc"}
-              />
-            </TouchableOpacity>
+            {/* Favorite button - only show on long press */}
+            {isLongPressed && (
+              <TouchableOpacity
+                style={[styles.inlineButton, isFavorite && styles.favoriteButton]}
+                onPress={() => toggleFavorite(item)}
+              >
+                <Ionicons
+                  name="heart"
+                  size={14}
+                  color={isFavorite ? "#f44336" : "#ccc"}
+                />
+              </TouchableOpacity>
+            )}
           </View>
-        )}
-      </View>
+        </View>
+      </Pressable>
     );
   };
 
@@ -430,24 +553,46 @@ export default function ChapterReaderScreen() {
 
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle}>
-            {book?.name} {currentChapter}
+            {selectionMode ? `${selectedVerses.size} selecionado${selectedVerses.size !== 1 ? 's' : ''}` : `${book?.name} ${currentChapter}`}
           </Text>
-          <Text style={styles.headerSubtitle}>{bible?.name}</Text>
+          <Text style={styles.headerSubtitle}>
+            {selectionMode ? 'Toque para selecionar versículos' : bible?.name}
+          </Text>
         </View>
 
         <View style={styles.headerActions}>
-          <TouchableOpacity
-            onPress={() => setSearchModalVisible(true)}
-            style={styles.headerButton}
-          >
-            <Ionicons name="search" size={24} color="#333" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setChapterSelectorVisible(true)}
-            style={styles.headerButton}
-          >
-            <Ionicons name="list" size={24} color="#333" />
-          </TouchableOpacity>
+          {selectionMode && selectedVerses.size > 0 && (
+            <>
+              <TouchableOpacity
+                onPress={shareSelectedVerses}
+                style={styles.headerButton}
+              >
+                <Ionicons name="share-outline" size={24} color="#2196F3" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={clearSelection}
+                style={styles.headerButton}
+              >
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </>
+          )}
+          {!selectionMode && (
+            <>
+              <TouchableOpacity
+                onPress={() => setSearchModalVisible(true)}
+                style={styles.headerButton}
+              >
+                <Ionicons name="search" size={24} color="#333" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setChapterSelectorVisible(true)}
+                style={styles.headerButton}
+              >
+                <Ionicons name="list" size={24} color="#333" />
+              </TouchableOpacity>
+            </>
+          )}
         </View>
       </View>
 
@@ -917,6 +1062,34 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: "#f0f0f0",
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  verseContainerSelected: {
+    backgroundColor: '#e3f2fd',
+  },
+  checkboxContainer: {
+    marginRight: 8,
+    marginTop: 4,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderWidth: 2,
+    borderColor: '#2196F3',
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+  },
+  checkboxSelected: {
+    backgroundColor: '#2196F3',
+  },
+  verseTextContainer: {
+    flex: 1,
+  },
+  verseTextWithCheckbox: {
+    paddingRight: 8,
   },
   verseNumber: {
     fontSize: 14,
@@ -1054,7 +1227,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
     alignItems: "center",
-    height: 2300,
   },
   verseSelectorModal: {
     backgroundColor: "#fff",
@@ -1063,7 +1235,6 @@ const styles = StyleSheet.create({
     margin: 16,
     maxHeight: "75%",
     width: "95%",
-    flex: 1,
   },
   verseNumberGrid: {
     maxHeight: 450,
@@ -1075,8 +1246,6 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     padding: 12,
     justifyContent: "space-between",
-    flex: 1,
-    backgroundColor: "yellow",
   },
   verseNumberItem: {
     width: "22%",
@@ -1111,7 +1280,6 @@ const styles = StyleSheet.create({
     maxHeight: 600,
     padding: 16,
     paddingBottom: 32,
-    backgroundColor: "red",
   },
   noteItem: {
     marginBottom: 16,
