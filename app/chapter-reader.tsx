@@ -41,9 +41,8 @@ export default function ChapterReaderScreen() {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   
-  // Verse selector modal state
-  const [verseSelectorVisible, setVerseSelectorVisible] = useState(false);
-  const [selectedVerseId, setSelectedVerseId] = useState<number | null>(null);
+  // Chapter selector modal state
+  const [chapterSelectorVisible, setChapterSelectorVisible] = useState(false);
 
   useEffect(() => {
     if (bibleId && bookId && currentChapter) {
@@ -192,12 +191,11 @@ export default function ChapterReaderScreen() {
     router.replace(`/chapter-reader?bibleId=${bibleId}&bookId=${result.bookId}&chapterNumber=${result.chapterNumber}`);
   };
 
-  const scrollToVerse = (verseNumber: number) => {
-    setSelectedVerseId(verseNumber);
-    setVerseSelectorVisible(false);
+  const navigateToChapter = (chapterNumber: number) => {
+    setChapterSelectorVisible(false);
     
-    // Highlight the verse temporarily
-    setTimeout(() => setSelectedVerseId(null), 3000);
+    // Navigate to the selected chapter
+    router.replace(`/chapter-reader?bibleId=${bibleId}&bookId=${bookId}&chapterNumber=${chapterNumber}`);
   };
 
   const toggleFavorite = async (verse: Verse) => {
@@ -224,17 +222,13 @@ export default function ChapterReaderScreen() {
   const renderVerse = ({ item }: { item: Verse }) => {
     const favoriteKey = `${item.bookId}-${item.chapterNumber}-${item.verseNumber}`;
     const isFavorite = favorites.has(favoriteKey);
-    const isHighlighted = selectedVerseId === item.verseNumber;
     
     return (
-      <View style={[styles.verseContainer, isHighlighted && styles.highlightedVerse]}>
+      <View style={styles.verseContainer}>
         <View style={styles.verseHeader}>
-          <TouchableOpacity 
-            style={styles.verseNumberButton}
-            onPress={() => scrollToVerse(item.verseNumber)}
-          >
+          <View style={styles.verseNumberButton}>
             <Text style={styles.verseNumber}>{item.verseNumber}</Text>
-          </TouchableOpacity>
+          </View>
           <TouchableOpacity onPress={() => toggleFavorite(item)}>
             <Ionicons 
               name={isFavorite ? "heart" : "heart-outline"} 
@@ -296,7 +290,7 @@ export default function ChapterReaderScreen() {
             <Ionicons name="search" size={24} color="#333" />
           </TouchableOpacity>
           <TouchableOpacity 
-            onPress={() => setVerseSelectorVisible(true)} 
+            onPress={() => setChapterSelectorVisible(true)} 
             style={styles.headerButton}
           >
             <Ionicons name="list" size={24} color="#333" />
@@ -402,33 +396,46 @@ export default function ChapterReaderScreen() {
         </SafeAreaView>
       </Modal>
 
-      {/* Verse Selector Modal */}
+      {/* Chapter Selector Modal */}
       <Modal
-        visible={verseSelectorVisible}
+        visible={chapterSelectorVisible}
         animationType="fade"
         transparent
-        onRequestClose={() => setVerseSelectorVisible(false)}
+        onRequestClose={() => setChapterSelectorVisible(false)}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.verseSelectorModal}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Ir para Versículo</Text>
-              <TouchableOpacity onPress={() => setVerseSelectorVisible(false)}>
+              <Text style={styles.modalTitle}>Ir para Capítulo</Text>
+              <TouchableOpacity onPress={() => setChapterSelectorVisible(false)}>
                 <Ionicons name="close" size={24} color="#333" />
               </TouchableOpacity>
             </View>
             
             <ScrollView style={styles.verseNumberGrid}>
               <View style={styles.verseNumbersContainer}>
-                {verses.map((verse) => (
-                  <TouchableOpacity
-                    key={verse.id}
-                    style={styles.verseNumberItem}
-                    onPress={() => scrollToVerse(verse.verseNumber)}
-                  >
-                    <Text style={styles.verseNumberItemText}>{verse.verseNumber}</Text>
-                  </TouchableOpacity>
-                ))}
+                {Array.from({ length: totalChapters }, (_, index) => {
+                  const chapterNumber = index + 1;
+                  const isCurrentChapter = chapterNumber === currentChapter;
+                  
+                  return (
+                    <TouchableOpacity
+                      key={chapterNumber}
+                      style={[
+                        styles.verseNumberItem,
+                        isCurrentChapter && styles.currentChapterItem
+                      ]}
+                      onPress={() => navigateToChapter(chapterNumber)}
+                    >
+                      <Text style={[
+                        styles.verseNumberItemText,
+                        isCurrentChapter && styles.currentChapterText
+                      ]}>
+                        {chapterNumber}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </ScrollView>
           </View>
@@ -657,30 +664,39 @@ const styles = StyleSheet.create({
   verseSelectorModal: {
     backgroundColor: '#fff',
     borderRadius: 12,
-    margin: 20,
-    maxHeight: '80%',
-    width: '90%',
+    margin: 16,
+    maxHeight: '75%',
+    width: '95%',
   },
   verseNumberGrid: {
-    maxHeight: 400,
+    maxHeight: 450,
+    paddingHorizontal: 4,
   },
   verseNumbersContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    padding: 16,
+    padding: 12,
+    justifyContent: 'space-between',
   },
   verseNumberItem: {
-    width: 48,
+    width: '22%',
     height: 48,
     backgroundColor: '#f0f8ff',
-    borderRadius: 24,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
-    margin: 4,
+    marginBottom: 8,
+    marginHorizontal: 2,
   },
   verseNumberItemText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#2196F3',
+  },
+  currentChapterItem: {
+    backgroundColor: '#2196F3',
+  },
+  currentChapterText: {
+    color: '#fff',
   },
 });
