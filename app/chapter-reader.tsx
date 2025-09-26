@@ -261,9 +261,12 @@ export default function ChapterReaderScreen() {
     
     return (
       <View style={styles.verseContainer}>
-        <View style={styles.verseHeader}>
-          <View style={styles.verseNumberButton}>
-            <Text style={styles.verseNumber}>{item.verseNumber}</Text>
+        <View style={styles.verseRow}>
+          <View style={styles.verseTextWithNumber}>
+            <Text style={styles.verseText}>
+              <Text style={styles.verseNumber}>{item.verseNumber}</Text>
+              <Text> - {item.text}</Text>
+            </Text>
           </View>
           <View style={styles.verseActions}>
             {hasNotes && (
@@ -277,29 +280,26 @@ export default function ChapterReaderScreen() {
             <TouchableOpacity onPress={() => toggleFavorite(item)}>
               <Ionicons 
                 name={isFavorite ? "heart" : "heart-outline"} 
-                size={20} 
+                size={16} 
                 color={isFavorite ? "#f44336" : "#999"} 
               />
             </TouchableOpacity>
           </View>
         </View>
-        <View style={styles.verseTextContainer}>
-          <Text style={styles.verseText}>{item.text}</Text>
-          {item.verseReferences && item.verseReferences.length > 0 && (
-            <View style={styles.verseReferencesContainer}>
-              <Text style={styles.referenceLabel}>Referências: </Text>
-              {item.verseReferences.map((ref, index) => (
-                <TouchableOpacity 
-                  key={index}
-                  onPress={() => openVerseReference(ref.reference)}
-                  style={styles.verseReferenceLink}
-                >
-                  <Text style={styles.verseReferenceLinkText}>{ref.text}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-        </View>
+        {item.verseReferences && item.verseReferences.length > 0 && (
+          <View style={styles.verseReferencesContainer}>
+            <Text style={styles.referenceLabel}>Referências: </Text>
+            {item.verseReferences.map((ref, index) => (
+              <TouchableOpacity 
+                key={index}
+                onPress={() => openVerseReference(ref.reference)}
+                style={styles.verseReferenceLink}
+              >
+                <Text style={styles.verseReferenceLinkText}>{ref.text}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
       </View>
     );
   };
@@ -396,11 +396,6 @@ export default function ChapterReaderScreen() {
         keyExtractor={(item) => item.id.toString()}
         showsVerticalScrollIndicator={false}
         style={styles.versesList}
-        getItemLayout={(data, index) => ({
-          length: 120, // Approximate height
-          offset: 120 * index,
-          index,
-        })}
       />
 
       {/* Search Modal */}
@@ -662,66 +657,50 @@ const styles = StyleSheet.create({
   },
   versesList: {
     flex: 1,
-    paddingHorizontal: 16,
+    backgroundColor: '#fff',
   },
   verseContainer: {
-    backgroundColor: '#fff',
-    padding: 16,
-    marginVertical: 4,
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  highlightedVerse: {
-    backgroundColor: '#fff3cd',
-    borderLeftWidth: 4,
-    borderLeftColor: '#ffc107',
-  },
-  verseHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  verseNumberButton: {
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 12,
-    backgroundColor: '#e3f2fd',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#f0f0f0',
+  },
+  verseRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+  },
+  verseTextWithNumber: {
+    flex: 1,
+    paddingRight: 8,
   },
   verseNumber: {
     fontSize: 14,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: '#2196F3',
-  },
-  verseActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  notesButton: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#ff9800',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  notesButtonText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#fff',
   },
   verseText: {
     fontSize: 16,
     color: '#333',
     lineHeight: 24,
+  },
+  verseActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  notesButton: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#ff9800',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  notesButtonText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#fff',
   },
   modalContainer: {
     flex: 1,
@@ -881,14 +860,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#e0e0e0',
     marginTop: 16,
   },
-  verseTextContainer: {
-    flex: 1,
-  },
   verseReferencesContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 6,
+    paddingHorizontal: 8,
+    paddingBottom: 6,
   },
   referenceLabel: {
     fontSize: 12,
