@@ -52,10 +52,10 @@ export class BibleReaderService {
       return ' ';
     });
 
-    // Cross-reference groups (✚)
+    // Cross-reference groups (✚) - allow with or without <sup> wrapper
     interface CrossRefGroup { references: { text: string; reference: string }[] }
     const crossRefGroups: CrossRefGroup[] = [];
-    work = work.replace(/<sup><RF\s+q=✜>(.*?)<Rf><\/sup>/gis, (_f, inside) => {
+    work = work.replace(/(?:<sup>)?<RF\s+q=✜>(.*?)<Rf>(?:<\/sup>)?/gis, (_f, inside) => {
       const group: CrossRefGroup = { references: [] };
       const linkRegex = /<a[^>]*href='b([^']+)'[^>]*>(.*?)<\/a>/gi;
       let lm: RegExpExecArray | null;

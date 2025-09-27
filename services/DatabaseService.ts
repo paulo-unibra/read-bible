@@ -92,6 +92,7 @@ class DatabaseService {
     if (!this.db) throw new Error('Database not initialized');
     
     const result = await this.db.getAllAsync('SELECT * FROM bibles ORDER BY name');
+    console.log("BÍBLIAS NO BANCO", result.length);
     return result.map((row: any) => ({
       id: row.id as string,
       name: row.name as string,

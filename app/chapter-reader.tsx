@@ -1,11 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   FlatList,
   Modal,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Pressable,
   ScrollView,
   Share,
@@ -40,7 +43,7 @@ export default function ChapterReaderScreen() {
   const [verses, setVerses] = useState<Verse[]>([]);
   const [totalChapters, setTotalChapters] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  // Favoritos desativados temporariamente (estado removido)
   const [navigating, setNavigating] = useState(false); // Prevent rapid navigation
   const [isFirstOfBible, setIsFirstOfBible] = useState(false);
   const [isLastOfBible, setIsLastOfBible] = useState(false);
@@ -85,7 +88,44 @@ export default function ChapterReaderScreen() {
   // Selection and sharing state
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedVerses, setSelectedVerses] = useState<Set<string>>(new Set());
-  const [showFavoriteButtons, setShowFavoriteButtons] = useState(false);
+  // const [showFavoriteButtons, setShowFavoriteButtons] = useState(false); // removido (botão de favoritar desativado)
+
+  // --- Header animado (esconde ao descer, mostra ao subir) ---
+  const HEADER_HEIGHT = 38; // altura base
+  const headerHeightAnim = useRef(new Animated.Value(HEADER_HEIGHT)).current;
+  const headerOpacityAnim = useRef(new Animated.Value(1)).current;
+  const lastScrollY = useRef(0);
+  const headerVisibleRef = useRef(true);
+
+  const animateHeader = (show: boolean) => {
+    if (show === headerVisibleRef.current) return;
+    headerVisibleRef.current = show;
+    Animated.parallel([
+      Animated.timing(headerHeightAnim, {
+        toValue: show ? HEADER_HEIGHT : 0,
+        duration: 190,
+        useNativeDriver: false, // height não suporta native
+      }),
+      Animated.timing(headerOpacityAnim, {
+        toValue: show ? 1 : 0,
+        duration: 160,
+        useNativeDriver: false,
+      }),
+    ]).start();
+  };
+
+  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const y = e.nativeEvent.contentOffset.y;
+    const diff = y - lastScrollY.current;
+    if (diff > 10 && y > 30) {
+      // rolando para baixo
+      animateHeader(false);
+    } else if (diff < -10) {
+      // rolando para cima
+      animateHeader(true);
+    }
+    lastScrollY.current = y;
+  };
 
   useEffect(() => {
     if (bibleId && currentBookId) {
@@ -576,42 +616,13 @@ export default function ChapterReaderScreen() {
     }
   };
 
-  const toggleFavorite = async (verse: Verse) => {
-    if (!bibleId) return;
-
-    try {
-      const favoriteKey = `${verse.bookId}-${verse.chapterNumber}-${verse.verseNumber}`;
-
-      if (favorites.has(favoriteKey)) {
-        await DatabaseService.removeFromFavorites(
-          bibleId,
-          verse.bookId,
-          verse.chapterNumber,
-          verse.verseNumber
-        );
-        favorites.delete(favoriteKey);
-      } else {
-        await DatabaseService.addToFavorites(
-          bibleId,
-          verse.bookId,
-          verse.chapterNumber,
-          verse.verseNumber
-        );
-        favorites.add(favoriteKey);
-      }
-
-      setFavorites(new Set(favorites));
-    } catch (error) {
-      console.error("Error toggling favorite:", error);
-      Alert.alert("Erro", "Falha ao alterar favorito");
-    }
-  };
+  // toggleFavorite removido (favoritos desativados por enquanto)
 
   // Handle long press on verse
   const handleVerseLongPress = (verse: Verse) => {
     const verseKey = `${verse.bookId}-${verse.chapterNumber}-${verse.verseNumber}`;
     setSelectionMode(true);
-    setShowFavoriteButtons(true);
+  // setShowFavoriteButtons(true); // desativado
 
     // Add the long-pressed verse to selection
     const newSelected = new Set(selectedVerses);
@@ -637,7 +648,7 @@ export default function ChapterReaderScreen() {
     // Exit selection mode if no verses selected
     if (newSelected.size === 0) {
       setSelectionMode(false);
-      setShowFavoriteButtons(false);
+  // setShowFavoriteButtons(false); // desativado
     }
   };
 
@@ -645,12 +656,21 @@ export default function ChapterReaderScreen() {
   const clearSelection = () => {
     setSelectionMode(false);
     setSelectedVerses(new Set());
-    setShowFavoriteButtons(false);
+  // setShowFavoriteButtons(false); // desativado
   };
 
   // Share selected verses
   const shareSelectedVerses = async () => {
     if (selectedVerses.size === 0) return;
+
+    // Limpa símbolos especiais (referências ✚ e notas ℕ) antes de compartilhar
+    const cleanVerseText = (text: string) => {
+      return text
+        .replace(/[✚ℕ]/g, "") // remove símbolos
+        .replace(/\s{2,}/g, " ") // colapsa múltiplos espaços
+        .replace(/\s+([.,;:!?])/g, "$1") // remove espaço antes de pontuação comum
+        .trim();
+    };
 
     const selectedVersesData = verses.filter((verse) =>
       selectedVerses.has(
@@ -665,7 +685,7 @@ export default function ChapterReaderScreen() {
 
     // Format verses with number - text
     const versesText = sortedVerses
-      .map((verse) => `${verse.verseNumber} - ${verse.text}`)
+      .map((verse) => `${verse.verseNumber} - ${cleanVerseText(verse.text)}`)
       .join("\n");
 
     // Create verse range text
@@ -703,97 +723,54 @@ Link do app: https://readbible.app`;
     }
   };
 
-  const renderVerseText = (text: string) => {
-    const parts = [];
-    let lastIndex = 0;
-
-    // Find symbols and style them differently
+  // Função para renderizar texto do versículo com símbolos clicáveis (✚ referências / ℕ notas)
+  const renderVerseText = (text: string, verse: Verse) => {
+    const parts: React.ReactNode[] = [];
+    let cursor = 0;
     const symbolRegex = /([✚ℕ])/g;
-    let match;
-
+    let match: RegExpExecArray | null;
     while ((match = symbolRegex.exec(text)) !== null) {
-      // Add text before symbol
-      if (match.index > lastIndex) {
+      if (match.index > cursor) {
         parts.push(
-          <Text key={`text-${lastIndex}`}>
-            {text.substring(lastIndex, match.index)}
+          <Text key={`seg-${cursor}`}>{text.substring(cursor, match.index)}</Text>
+        );
+      }
+      const symbol = match[1];
+      if (symbol === '✚') {
+        const pos = match.index;
+        const refsAtPos = verse.verseReferences?.filter(r => r.position === pos) || verse.verseReferences || [];
+        parts.push(
+          <Text
+            key={`ref-${pos}`}
+            onPress={() => refsAtPos.length && openReferencesModal(refsAtPos as any)}
+            style={{ color: '#1b5e20', fontWeight: 'bold', fontSize: 13 }}>
+            {symbol}
+          </Text>
+        );
+      } else if (symbol === 'ℕ') {
+        parts.push(
+          <Text
+            key={`note-${match.index}`}
+            onPress={() => verse.notes && verse.notes.length && openNotes(verse.notes)}
+            style={{ color: '#1565c0', fontWeight: 'bold', fontSize: 13 }}>
+            ℕ
           </Text>
         );
       }
-
-      // Add styled symbol
-      const symbol = match[1];
-      const color = symbol === "✚" ? "#4CAF50" : "#2196F3"; // Green for cross-refs, blue for notes
-
-      parts.push(
-        <Text
-          key={`symbol-${match.index}`}
-          style={{ color, fontWeight: "bold", fontSize: 12 }}
-        >
-          {symbol}
-        </Text>
-      );
-
-      lastIndex = match.index + match[0].length;
+      cursor = match.index + match[0].length;
     }
-
-    // Add remaining text
-    if (lastIndex < text.length) {
-      parts.push(
-        <Text key={`text-${lastIndex}`}>{text.substring(lastIndex)}</Text>
-      );
+    if (cursor < text.length) {
+      parts.push(<Text key={`tail-${cursor}`}>{text.substring(cursor)}</Text>);
     }
-
-    return parts.length > 0 ? parts : <Text>{text}</Text>;
+    return <>{parts}</>;
   };
 
+  // Renderização dos títulos já com estilo neutro
   const renderTitleText = (titleText: string, level: number = 1) => {
-    // Base styles based on level
-    const levelColors = {
-      1: "#2196F3",
-      2: "#4CAF50",
-      3: "#FF9800",
-    };
-    const levelSizes = {
-      1: 16,
-      2: 15,
-      3: 14,
-    };
-
-    const baseColor =
-      levelColors[level as keyof typeof levelColors] || levelColors[1];
-    const fontSize =
-      levelSizes[level as keyof typeof levelSizes] || levelSizes[1];
-
-    // Check if title has the "Introdução | Title" format
-    if (titleText.includes(" | ")) {
-      const [introLabel, mainTitle] = titleText.split(" | ");
-      return (
-        <Text style={{ fontSize }}>
-          <Text
-            style={{
-              textDecorationLine: "underline",
-              color: "#4CAF50",
-              fontWeight: "bold",
-            }}
-          >
-            {introLabel}
-          </Text>
-          <Text style={{ color: baseColor, fontStyle: "italic" }}>
-            {" | " + mainTitle}
-          </Text>
-        </Text>
-      );
-    }
+    const levelSizes: Record<number, number> = { 1: 16, 2: 15, 3: 14 };
+    const levelColors: Record<number, string> = { 1: '#444', 2: '#555', 3: '#666' };
     return (
-      <Text
-        style={{
-          color: baseColor,
-          fontStyle: "italic",
-          fontSize,
-          fontWeight: "bold",
-        }}
-      >
+      <Text style={{ fontSize: levelSizes[level] || 20, fontWeight: '700', color: levelColors[level] || '#555' }}>
         {titleText}
       </Text>
     );
@@ -801,96 +778,61 @@ Link do app: https://readbible.app`;
 
   const renderVerse = ({ item }: { item: Verse }) => {
     const favoriteKey = `${item.bookId}-${item.chapterNumber}-${item.verseNumber}`;
-    const isFavorite = favorites.has(favoriteKey);
-    const hasNotes = item.notes && item.notes.length > 0;
     const isSelected = selectedVerses.has(favoriteKey);
-
     return (
-      <Pressable
+      <View
         style={[
           styles.verseContainer,
-          isSelected && styles.verseContainerSelected,
+          { flexDirection: 'column' }, // títulos acima
         ]}
-        onPress={() => (selectionMode ? handleVerseSelection(item) : undefined)}
-        onLongPress={() => handleVerseLongPress(item)}
-        delayLongPress={500}
       >
-        {/* Checkbox for selection mode */}
-        {selectionMode && (
-          <View style={styles.checkboxContainer}>
-            <View
-              style={[styles.checkbox, isSelected && styles.checkboxSelected]}
-            >
-              {isSelected && (
-                <Ionicons name="checkmark" size={14} color="#fff" />
-              )}
-            </View>
-          </View>
-        )}
-
-        {/* Verse titles (if exist) */}
-        <View style={{
-          flexDirection: "column",
-        }}>
-          {item.titles &&
-            item.titles.map((title, index) => (
+        {/* TÍTULOS (fora da área clicável) */}
+        {item.titles && item.titles.length > 0 && (
+          <View style={{ marginBottom: 6 }}>
+            {item.titles.map((title, index) => (
               <View key={index} style={styles.verseTitleContainer}>
                 {renderTitleText(title.text, title.level)}
               </View>
             ))}
+          </View>
+        )}
+
+        {/* ÁREA CLICÁVEL APENAS DO VERSÍCULO */}
+        <Pressable
+          style={[
+            { flexDirection: 'row', alignItems: 'flex-start' },
+            isSelected && styles.verseContainerSelected,
+          ]}
+          onPress={() => (selectionMode ? handleVerseSelection(item) : undefined)}
+          onLongPress={() => handleVerseLongPress(item)}
+          delayLongPress={500}
+        >
+          {selectionMode && (
+            <View style={styles.checkboxColumn}>
+              <View style={styles.checkboxContainer}>
+                <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
+                  {isSelected && <Ionicons name="checkmark" size={14} color="#fff" />}
+                </View>
+              </View>
+            </View>
+          )}
 
           <View
             style={[
               styles.verseTextContainer,
               selectionMode && styles.verseTextWithCheckbox,
+              { flex: 1 },
             ]}
           >
             <Text style={styles.verseText}>
               <Text style={styles.verseNumber}>{item.verseNumber}</Text>
-              <Text> - </Text>
-              {renderVerseText(item.text)}
+              <Text style={{ fontWeight: 'bold', color: '#222' }}> - </Text>
+              {renderVerseText(item.text, item)}
             </Text>
-
-            {/* Buttons row below the verse */}
-            <View style={styles.verseButtonsRow}>
-              {hasNotes && (
-                <TouchableOpacity
-                  style={styles.inlineButton}
-                  onPress={() => openNotes(item.notes!)}
-                >
-                  <Ionicons name="document-text" size={14} color="#64b5f6" />
-                </TouchableOpacity>
-              )}
-
-              {item.verseReferences && item.verseReferences.length > 0 && (
-                <TouchableOpacity
-                  style={styles.inlineButton}
-                  onPress={() => openReferencesModal(item.verseReferences!)}
-                >
-                  <Ionicons name="git-branch" size={14} color="#81c784" />
-                </TouchableOpacity>
-              )}
-
-              {/* Favorite button - show when favorite buttons are visible */}
-              {showFavoriteButtons && (
-                <TouchableOpacity
-                  style={[
-                    styles.inlineButton,
-                    isFavorite && styles.favoriteButton,
-                  ]}
-                  onPress={() => toggleFavorite(item)}
-                >
-                  <Ionicons
-                    name="heart"
-                    size={14}
-                    color={isFavorite ? "#e57373" : "#bdbdbd"}
-                  />
-                </TouchableOpacity>
-              )}
-            </View>
+            <View style={styles.verseButtonsRow}>{/* vazio (refs/notas inline) */}</View>
           </View>
-        </View>
-      </Pressable>
+        </Pressable>
+      </View>
     );
   };
 
@@ -984,12 +926,19 @@ Link do app: https://readbible.app`;
         </View>
       </View>
 
-      {/* Fixed Chapter Header */}
-      <View style={styles.fixedChapterHeader}>
-        <Text style={styles.chapterTitle}>
-          {book?.name} {currentChapter}
-        </Text>
-      </View>
+      {/* Animated Chapter Header (oculta ao rolar para baixo) */}
+      <Animated.View
+        style={[
+          styles.fixedChapterHeader,
+          { height: headerHeightAnim, opacity: headerOpacityAnim, overflow: 'hidden' },
+        ]}
+      >
+        <View style={{ flex: 1, justifyContent: 'center' }}>
+          <Text style={styles.chapterTitle}>
+            {book?.name} {currentChapter}
+          </Text>
+        </View>
+      </Animated.View>
 
       {/* Verses List */}
       <FlatList
@@ -998,7 +947,12 @@ Link do app: https://readbible.app`;
         keyExtractor={(item) => item.id.toString()}
         showsVerticalScrollIndicator={false}
         style={styles.versesList}
-        contentContainerStyle={styles.versesListContent}
+        contentContainerStyle={[
+          styles.versesListContent,
+          { paddingTop: (headerVisibleRef.current ? 8 : 8) + 0 },
+        ]}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
       />
 
       {/* Floating Navigation Buttons */}
@@ -1472,6 +1426,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#f5f5f5",
   },
+  checkboxColumn: {
+    marginRight: 8,
+    alignItems: 'center',
+    paddingTop: 4,
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -1631,6 +1590,26 @@ const styles = StyleSheet.create({
   favoriteButton: {
     borderColor: "#ffebee",
     backgroundColor: "#fff5f5",
+  },
+  favoriteBelowButton: {
+    marginTop: 6,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#f8f9fa',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 1.5,
+    elevation: 2,
+  },
+  favoriteBelowButtonActive: {
+    backgroundColor: '#ffe5e5',
+    borderColor: '#ffcdd2',
   },
   favoriteButtonText: {
     fontSize: 12,
@@ -1994,7 +1973,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   versesListContent: {
-    paddingTop: 60, // Space for fixed chapter header
+    paddingTop: 0,
     paddingBottom: 120, // Space for floating navigation buttons
   },
 
@@ -2041,15 +2020,9 @@ const styles = StyleSheet.create({
   },
 
   fixedChapterHeader: {
-    position: "sticky",
-    top: 0,
     paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
-    backgroundColor: "#f8f9fa",
-    zIndex: 10,
-    elevation: 3,
+    paddingVertical: 4,
+    backgroundColor: "#fff",
   },
 
   chapterTitle: {
@@ -2068,7 +2041,7 @@ const styles = StyleSheet.create({
   },
 
   verseTitleContainer: {
-    marginBottom: 2,
+    marginBottom: 5,
   },
 
   verseTitleLevel2: {
