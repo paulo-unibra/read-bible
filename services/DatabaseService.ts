@@ -66,6 +66,15 @@ class DatabaseService {
         completedDate TEXT,
         FOREIGN KEY (planId) REFERENCES reading_plans (id)
       );
+
+      CREATE TABLE IF NOT EXISTS reading_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        bibleId TEXT NOT NULL,
+        bookId INTEGER NOT NULL,
+        chapterNumber INTEGER NOT NULL,
+        lastReadDate TEXT DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(bibleId, bookId, chapterNumber)
+      );
     `);
   }
 
@@ -174,6 +183,51 @@ class DatabaseService {
     );
     
     return !!result;
+  }
+
+  // Reading history management
+  async saveLastReading(bibleId: string, bookId: number, chapterNumber: number): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+    
+    await this.db.runAsync(
+      'INSERT OR REPLACE INTO reading_history (bibleId, bookId, chapterNumber, lastReadDate) VALUES (?, ?, ?, ?)',
+      [bibleId, bookId, chapterNumber, new Date().toISOString()]
+    );
+    
+    // Also save as preferred settings
+    await this.saveSetting('lastReadBibleId', bibleId);
+    await this.saveSetting('lastReadBookId', bookId.toString());
+    await this.saveSetting('lastReadChapter', chapterNumber.toString());
+  }
+
+  async getLastReading(): Promise<{ bibleId: string; bookId: number; chapterNumber: number } | null> {
+    if (!this.db) throw new Error('Database not initialized');
+    
+    const result = await this.db.getFirstAsync(
+      'SELECT bibleId, bookId, chapterNumber FROM reading_history ORDER BY lastReadDate DESC LIMIT 1'
+    ) as { bibleId: string; bookId: number; chapterNumber: number } | null;
+    
+    return result;
+  }
+
+  async getDefaultReading(): Promise<{ bibleId: string; bookId: number; chapterNumber: number } | null> {
+    if (!this.db) throw new Error('Database not initialized');
+    
+    // First try to get the first available Bible
+    const bibles = await this.getBibles();
+    const downloadedBibles = bibles.filter(b => b.isDownloaded);
+    
+    if (downloadedBibles.length === 0) {
+      return null;
+    }
+    
+    // For now, return the first Bible with first book, first chapter
+    // TODO: We could import BibleReaderService here to get the actual first book ID
+    return {
+      bibleId: downloadedBibles[0].id,
+      bookId: 1, // This should be dynamically determined
+      chapterNumber: 1
+    };
   }
 
   async ensureSampleBible(): Promise<void> {

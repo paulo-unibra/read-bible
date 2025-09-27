@@ -31,8 +31,13 @@ export interface Verse {
   chapterNumber: number;
   verseNumber: number;
   text: string;
+  titles?: {level: number, text: string}[];
   notes?: string[];
   verseReferences?: {text: string, reference: string, position: number}[];
+  crossReferences?: string[];
+  strongNumbers?: {type: 'greek' | 'hebrew', number: string, position: number}[];
+  interlinear?: {hebrew?: string, greek?: string, transliteration?: string, translation?: string}[];
+  formatting?: {type: 'italic' | 'bold' | 'underline' | 'jesus' | 'ot_quote' | 'strikethrough', start: number, end: number, text: string}[];
   isFavorite?: boolean;
 }
 

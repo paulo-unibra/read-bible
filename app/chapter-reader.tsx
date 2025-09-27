@@ -15,7 +15,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import bibleReaderService from "../services/BibleReaderService";
 import DatabaseService from "../services/DatabaseService";
 import { Bible, Book, SearchResult, Verse } from "../types";
@@ -39,6 +42,8 @@ export default function ChapterReaderScreen() {
   const [loading, setLoading] = useState(true);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [navigating, setNavigating] = useState(false); // Prevent rapid navigation
+  const [isFirstOfBible, setIsFirstOfBible] = useState(false);
+  const [isLastOfBible, setIsLastOfBible] = useState(false);
 
   // Search modal state
   const [searchModalVisible, setSearchModalVisible] = useState(false);
@@ -48,6 +53,14 @@ export default function ChapterReaderScreen() {
 
   // Chapter selector modal state
   const [chapterSelectorVisible, setChapterSelectorVisible] = useState(false);
+
+  // Bible selector modal state
+  const [bibleSelectorVisible, setBibleSelectorVisible] = useState(false);
+  const [availableBibles, setAvailableBibles] = useState<Bible[]>([]);
+
+  // Book selector modal state
+  const [bookSelectorVisible, setBookSelectorVisible] = useState(false);
+  const [availableBooks, setAvailableBooks] = useState<Book[]>([]);
 
   // Notes modal state
   const [notesModalVisible, setNotesModalVisible] = useState(false);
@@ -76,13 +89,13 @@ export default function ChapterReaderScreen() {
 
   useEffect(() => {
     if (bibleId && currentBookId) {
-      console.log("USE EFFECT CHAMANDO INICIALIZE")
+      console.log("USE EFFECT CHAMANDO INICIALIZE");
       initializeReader();
     }
   }, [bibleId, currentBookId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const initializeReader = async () => {
-    console.log("INICIANDO LEITOR")
+    console.log("INICIANDO LEITOR");
     try {
       setLoading(true);
 
@@ -103,7 +116,10 @@ export default function ChapterReaderScreen() {
       setBook(currentBook);
 
       // Get chapters to determine total count
-      const chapters = await bibleReaderService.getChapters(bibleId, currentBookId);
+      const chapters = await bibleReaderService.getChapters(
+        bibleId,
+        currentBookId
+      );
       setTotalChapters(chapters.length);
 
       // Load current chapter verses
@@ -111,6 +127,21 @@ export default function ChapterReaderScreen() {
 
       // Load favorites
       await loadFavorites();
+
+      // Update navigation state
+      await updateNavigationState();
+
+      // Save current reading position
+      try {
+        await DatabaseService.saveLastReading(
+          bibleId,
+          currentBookId,
+          currentChapter
+        );
+      } catch (error) {
+        console.error("Error saving reading position:", error);
+        // Don't show alert for this, just log the error
+      }
     } catch (error) {
       console.error("Error initializing reader:", error);
       Alert.alert("Erro", "Falha ao carregar capítulo");
@@ -153,12 +184,12 @@ export default function ChapterReaderScreen() {
   };
 
   const navigateChapter = async (direction: "prev" | "next") => {
-    console.log("NAVEGANDO CAPITULO", direction)
+    console.log("NAVEGANDO CAPITULO", direction);
     // Prevent rapid navigation that can cause crashes
     if (navigating || loading) return;
-    
+
     setNavigating(true);
-    
+
     try {
       let newChapter = currentChapter;
 
@@ -182,7 +213,7 @@ export default function ChapterReaderScreen() {
 
       if (newChapter > 0 && newChapter <= totalChapters) {
         setCurrentChapter(newChapter);
-        
+
         // Load verses for the new chapter directly from database
         const versesData = await bibleReaderService.getVerses(
           bibleId,
@@ -190,11 +221,15 @@ export default function ChapterReaderScreen() {
           newChapter
         );
         setVerses(versesData);
+
+        // Update navigation state
+        await updateNavigationState();
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
       console.error("Error navigating chapter:", error);
-      
+
       Alert.alert(
         "Erro de Navegação",
         `Falha ao navegar para o capítulo: ${errorMessage}`,
@@ -205,10 +240,122 @@ export default function ChapterReaderScreen() {
     }
   };
 
+  // Update navigation state based on current position
+  const updateNavigationState = async () => {
+    try {
+      const books = await bibleReaderService.getBooks(bibleId);
+      const firstBook = books[0];
+      const lastBook = books[books.length - 1];
+
+      // Check if at first book and first chapter
+      const atFirstOfBible =
+        currentBookId === firstBook?.id && currentChapter === 1;
+      setIsFirstOfBible(atFirstOfBible);
+
+      // Check if at last book and last chapter
+      if (currentBookId === lastBook?.id) {
+        const chapters = await bibleReaderService.getChapters(
+          bibleId,
+          lastBook.id
+        );
+        const atLastOfBible = currentChapter === chapters.length;
+        setIsLastOfBible(atLastOfBible);
+      } else {
+        setIsLastOfBible(false);
+      }
+    } catch (error) {
+      console.error("Error updating navigation state:", error);
+    }
+  };
+
+  const openBibleSelector = async () => {
+    try {
+      const bibles = await DatabaseService.getBibles();
+      setAvailableBibles(bibles);
+      setBibleSelectorVisible(true);
+    } catch (error) {
+      console.error("Error loading bibles:", error);
+      Alert.alert("Erro", "Falha ao carregar versões da Bíblia");
+    }
+  };
+
+  const selectBible = async (selectedBible: Bible) => {
+    if (selectedBible.id === bibleId) {
+      setBibleSelectorVisible(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setBibleSelectorVisible(false);
+
+      // Navigate to the same book and chapter in the new Bible
+      router.replace(
+        `/chapter-reader?bibleId=${selectedBible.id}&bookId=${currentBookId}&chapterNumber=${currentChapter}`
+      );
+    } catch (error) {
+      console.error("Error switching Bible:", error);
+      Alert.alert("Erro", "Falha ao trocar versão da Bíblia");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openBookSelector = async () => {
+    try {
+      const books = await bibleReaderService.getBooks(bibleId);
+      setAvailableBooks(books);
+      setBookSelectorVisible(true);
+    } catch (error) {
+      console.error("Error loading books:", error);
+      Alert.alert("Erro", "Falha ao carregar livros da Bíblia");
+    }
+  };
+
+  const selectBook = async (selectedBook: Book) => {
+    if (selectedBook.id === currentBookId) {
+      setBookSelectorVisible(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setBookSelectorVisible(false);
+
+      // Load the new book with chapter 1
+      setBook(selectedBook);
+      setCurrentBookId(selectedBook.id);
+      setCurrentChapter(1);
+
+      // Get chapters for the new book
+      const chapters = await bibleReaderService.getChapters(
+        bibleId,
+        selectedBook.id
+      );
+      setTotalChapters(chapters.length);
+
+      // Load verses for the new book's first chapter
+      const versesData = await bibleReaderService.getVerses(
+        bibleId,
+        selectedBook.id,
+        1
+      );
+      setVerses(versesData);
+
+      // Update navigation state
+      await updateNavigationState();
+    } catch (error) {
+      console.error("Error switching book:", error);
+      Alert.alert("Erro", "Falha ao trocar livro");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const navigateToAdjacentBook = async (direction: "prev" | "next") => {
     try {
       setLoading(true);
-      
+
       const books = await bibleReaderService.getBooks(bibleId);
       const currentBookIndex = books.findIndex((b) => b.id === currentBookId);
 
@@ -237,7 +384,7 @@ export default function ChapterReaderScreen() {
       setCurrentBookId(newBook.id);
       setCurrentChapter(newChapter);
       setTotalChapters(newBookChapters.length);
-      
+
       // Load verses for the new book/chapter
       const versesData = await bibleReaderService.getVerses(
         bibleId,
@@ -245,7 +392,9 @@ export default function ChapterReaderScreen() {
         newChapter
       );
       setVerses(versesData);
-      
+
+      // Update navigation state
+      await updateNavigationState();
     } catch (error) {
       console.error("Error navigating to adjacent book:", error);
       Alert.alert("Erro", "Falha ao navegar para o livro adjacente");
@@ -288,16 +437,19 @@ export default function ChapterReaderScreen() {
         if (newBook) {
           setBook(newBook);
           setCurrentBookId(newBook.id);
-          
+
           // Get chapters count for the new book
-          const chapters = await bibleReaderService.getChapters(bibleId, result.bookId);
+          const chapters = await bibleReaderService.getChapters(
+            bibleId,
+            result.bookId
+          );
           setTotalChapters(chapters.length);
         }
       }
-      
+
       // Update current chapter
       setCurrentChapter(result.chapterNumber);
-      
+
       // Load verses for the search result chapter
       const versesData = await bibleReaderService.getVerses(
         bibleId,
@@ -305,7 +457,6 @@ export default function ChapterReaderScreen() {
         result.chapterNumber
       );
       setVerses(versesData);
-      
     } catch (error) {
       console.error("Error navigating to search result:", error);
       Alert.alert("Erro", "Falha ao navegar para o resultado da busca");
@@ -315,26 +466,31 @@ export default function ChapterReaderScreen() {
   };
 
   const navigateToChapter = async (chapterNumber: number) => {
-    if (!bibleId || !currentBookId || chapterNumber < 1 || chapterNumber > totalChapters) return;
-    
+    if (
+      !bibleId ||
+      !currentBookId ||
+      chapterNumber < 1 ||
+      chapterNumber > totalChapters
+    )
+      return;
+
     try {
       setLoading(true);
-      
+
       // Update current chapter state
       setCurrentChapter(chapterNumber);
-      
+
       // Load verses for the new chapter directly
       const versesData = await bibleReaderService.getVerses(
         bibleId,
         currentBookId,
         chapterNumber
       );
-      
+
       setVerses(versesData);
-      
+
       // Close the chapter selector modal
       setChapterSelectorVisible(false);
-      
     } catch (error) {
       console.error("Error navigating to chapter:", error);
       Alert.alert("Erro", "Falha ao carregar o capítulo");
@@ -456,7 +612,7 @@ export default function ChapterReaderScreen() {
     const verseKey = `${verse.bookId}-${verse.chapterNumber}-${verse.verseNumber}`;
     setSelectionMode(true);
     setShowFavoriteButtons(true);
-    
+
     // Add the long-pressed verse to selection
     const newSelected = new Set(selectedVerses);
     newSelected.add(verseKey);
@@ -466,18 +622,18 @@ export default function ChapterReaderScreen() {
   // Handle verse selection in selection mode
   const handleVerseSelection = (verse: Verse) => {
     if (!selectionMode) return;
-    
+
     const verseKey = `${verse.bookId}-${verse.chapterNumber}-${verse.verseNumber}`;
     const newSelected = new Set(selectedVerses);
-    
+
     if (newSelected.has(verseKey)) {
       newSelected.delete(verseKey);
     } else {
       newSelected.add(verseKey);
     }
-    
+
     setSelectedVerses(newSelected);
-    
+
     // Exit selection mode if no verses selected
     if (newSelected.size === 0) {
       setSelectionMode(false);
@@ -496,23 +652,28 @@ export default function ChapterReaderScreen() {
   const shareSelectedVerses = async () => {
     if (selectedVerses.size === 0) return;
 
-    const selectedVersesData = verses.filter(verse => 
-      selectedVerses.has(`${verse.bookId}-${verse.chapterNumber}-${verse.verseNumber}`)
+    const selectedVersesData = verses.filter((verse) =>
+      selectedVerses.has(
+        `${verse.bookId}-${verse.chapterNumber}-${verse.verseNumber}`
+      )
     );
 
     // Sort verses by verse number to maintain order
-    const sortedVerses = selectedVersesData.sort((a, b) => a.verseNumber - b.verseNumber);
+    const sortedVerses = selectedVersesData.sort(
+      (a, b) => a.verseNumber - b.verseNumber
+    );
 
     // Format verses with number - text
     const versesText = sortedVerses
-      .map(verse => `${verse.verseNumber} - ${verse.text}`)
-      .join('\n');
+      .map((verse) => `${verse.verseNumber} - ${verse.text}`)
+      .join("\n");
 
     // Create verse range text
-    const verseNumbers = sortedVerses.map(v => v.verseNumber);
-    const verseRange = verseNumbers.length === 1 
-      ? verseNumbers[0].toString()
-      : `${Math.min(...verseNumbers)}-${Math.max(...verseNumbers)}`;
+    const verseNumbers = sortedVerses.map((v) => v.verseNumber);
+    const verseRange =
+      verseNumbers.length === 1
+        ? verseNumbers[0].toString()
+        : `${Math.min(...verseNumbers)}-${Math.max(...verseNumbers)}`;
 
     const shareText = `${versesText}
 
@@ -521,9 +682,10 @@ ${book?.name} ${verseRange}
 Aplicativo ReadBible
 Link do app: https://readbible.app`;
 
-    const shareTitle = selectedVerses.size === 1 
-      ? `Versículo ${book?.name} ${sortedVerses[0].chapterNumber}:${sortedVerses[0].verseNumber}`
-      : `${selectedVerses.size} versículos de ${book?.name} ${currentChapter}`;
+    const shareTitle =
+      selectedVerses.size === 1
+        ? `Versículo ${book?.name} ${sortedVerses[0].chapterNumber}:${sortedVerses[0].verseNumber}`
+        : `${selectedVerses.size} versículos de ${book?.name} ${currentChapter}`;
 
     try {
       const result = await Share.share({
@@ -536,9 +698,105 @@ Link do app: https://readbible.app`;
         clearSelection();
       }
     } catch (error) {
-      console.error('Error sharing verses:', error);
-      Alert.alert('Erro', 'Não foi possível compartilhar os versículos');
+      console.error("Error sharing verses:", error);
+      Alert.alert("Erro", "Não foi possível compartilhar os versículos");
     }
+  };
+
+  const renderVerseText = (text: string) => {
+    const parts = [];
+    let lastIndex = 0;
+
+    // Find symbols and style them differently
+    const symbolRegex = /([✚ℕ])/g;
+    let match;
+
+    while ((match = symbolRegex.exec(text)) !== null) {
+      // Add text before symbol
+      if (match.index > lastIndex) {
+        parts.push(
+          <Text key={`text-${lastIndex}`}>
+            {text.substring(lastIndex, match.index)}
+          </Text>
+        );
+      }
+
+      // Add styled symbol
+      const symbol = match[1];
+      const color = symbol === "✚" ? "#4CAF50" : "#2196F3"; // Green for cross-refs, blue for notes
+
+      parts.push(
+        <Text
+          key={`symbol-${match.index}`}
+          style={{ color, fontWeight: "bold", fontSize: 12 }}
+        >
+          {symbol}
+        </Text>
+      );
+
+      lastIndex = match.index + match[0].length;
+    }
+
+    // Add remaining text
+    if (lastIndex < text.length) {
+      parts.push(
+        <Text key={`text-${lastIndex}`}>{text.substring(lastIndex)}</Text>
+      );
+    }
+
+    return parts.length > 0 ? parts : <Text>{text}</Text>;
+  };
+
+  const renderTitleText = (titleText: string, level: number = 1) => {
+    // Base styles based on level
+    const levelColors = {
+      1: "#2196F3",
+      2: "#4CAF50",
+      3: "#FF9800",
+    };
+    const levelSizes = {
+      1: 16,
+      2: 15,
+      3: 14,
+    };
+
+    const baseColor =
+      levelColors[level as keyof typeof levelColors] || levelColors[1];
+    const fontSize =
+      levelSizes[level as keyof typeof levelSizes] || levelSizes[1];
+
+    // Check if title has the "Introdução | Title" format
+    if (titleText.includes(" | ")) {
+      const [introLabel, mainTitle] = titleText.split(" | ");
+      return (
+        <Text style={{ fontSize }}>
+          <Text
+            style={{
+              textDecorationLine: "underline",
+              color: "#4CAF50",
+              fontWeight: "bold",
+            }}
+          >
+            {introLabel}
+          </Text>
+          <Text style={{ color: baseColor, fontStyle: "italic" }}>
+            {" | " + mainTitle}
+          </Text>
+        </Text>
+      );
+    }
+    return (
+      <Text
+        style={{
+          color: baseColor,
+          fontStyle: "italic",
+          fontSize,
+          fontWeight: "bold",
+        }}
+      >
+        {titleText}
+      </Text>
+    );
   };
 
   const renderVerse = ({ item }: { item: Verse }) => {
@@ -551,19 +809,18 @@ Link do app: https://readbible.app`;
       <Pressable
         style={[
           styles.verseContainer,
-          isSelected && styles.verseContainerSelected
+          isSelected && styles.verseContainerSelected,
         ]}
-        onPress={() => selectionMode ? handleVerseSelection(item) : undefined}
+        onPress={() => (selectionMode ? handleVerseSelection(item) : undefined)}
         onLongPress={() => handleVerseLongPress(item)}
         delayLongPress={500}
       >
         {/* Checkbox for selection mode */}
         {selectionMode && (
           <View style={styles.checkboxContainer}>
-            <View style={[
-              styles.checkbox,
-              isSelected && styles.checkboxSelected
-            ]}>
+            <View
+              style={[styles.checkbox, isSelected && styles.checkboxSelected]}
+            >
               {isSelected && (
                 <Ionicons name="checkmark" size={14} color="#fff" />
               )}
@@ -571,45 +828,66 @@ Link do app: https://readbible.app`;
           </View>
         )}
 
-        <View style={[styles.verseTextContainer, selectionMode && styles.verseTextWithCheckbox]}>
-          <Text style={styles.verseText}>
-            <Text style={styles.verseNumber}>{item.verseNumber}</Text>
-            <Text> - {item.text}</Text>
-          </Text>
+        {/* Verse titles (if exist) */}
+        <View style={{
+          flexDirection: "column",
+        }}>
+          {item.titles &&
+            item.titles.map((title, index) => (
+              <View key={index} style={styles.verseTitleContainer}>
+                {renderTitleText(title.text, title.level)}
+              </View>
+            ))}
 
-          {/* Buttons row below the verse */}
-          <View style={styles.verseButtonsRow}>
-            {hasNotes && (
-              <TouchableOpacity
-                style={styles.inlineButton}
-                onPress={() => openNotes(item.notes!)}
-              >
-                <Ionicons name="document-text" size={14} color="#64b5f6" />
-              </TouchableOpacity>
-            )}
+          <View
+            style={[
+              styles.verseTextContainer,
+              selectionMode && styles.verseTextWithCheckbox,
+            ]}
+          >
+            <Text style={styles.verseText}>
+              <Text style={styles.verseNumber}>{item.verseNumber}</Text>
+              <Text> - </Text>
+              {renderVerseText(item.text)}
+            </Text>
 
-            {item.verseReferences && item.verseReferences.length > 0 && (
-              <TouchableOpacity
-                style={styles.inlineButton}
-                onPress={() => openReferencesModal(item.verseReferences!)}
-              >
-                <Ionicons name="git-branch" size={14} color="#81c784" />
-              </TouchableOpacity>
-            )}
+            {/* Buttons row below the verse */}
+            <View style={styles.verseButtonsRow}>
+              {hasNotes && (
+                <TouchableOpacity
+                  style={styles.inlineButton}
+                  onPress={() => openNotes(item.notes!)}
+                >
+                  <Ionicons name="document-text" size={14} color="#64b5f6" />
+                </TouchableOpacity>
+              )}
 
-            {/* Favorite button - show when favorite buttons are visible */}
-            {showFavoriteButtons && (
-              <TouchableOpacity
-                style={[styles.inlineButton, isFavorite && styles.favoriteButton]}
-                onPress={() => toggleFavorite(item)}
-              >
-                <Ionicons
-                  name="heart"
-                  size={14}
-                  color={isFavorite ? "#e57373" : "#bdbdbd"}
-                />
-              </TouchableOpacity>
-            )}
+              {item.verseReferences && item.verseReferences.length > 0 && (
+                <TouchableOpacity
+                  style={styles.inlineButton}
+                  onPress={() => openReferencesModal(item.verseReferences!)}
+                >
+                  <Ionicons name="git-branch" size={14} color="#81c784" />
+                </TouchableOpacity>
+              )}
+
+              {/* Favorite button - show when favorite buttons are visible */}
+              {showFavoriteButtons && (
+                <TouchableOpacity
+                  style={[
+                    styles.inlineButton,
+                    isFavorite && styles.favoriteButton,
+                  ]}
+                  onPress={() => toggleFavorite(item)}
+                >
+                  <Ionicons
+                    name="heart"
+                    size={14}
+                    color={isFavorite ? "#e57373" : "#bdbdbd"}
+                  />
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         </View>
       </Pressable>
@@ -651,11 +929,10 @@ Link do app: https://readbible.app`;
         </TouchableOpacity>
 
         <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>
-            {selectionMode ? `${selectedVerses.size} selecionado${selectedVerses.size !== 1 ? 's' : ''}` : `${book?.name} ${currentChapter}`}
-          </Text>
           <Text style={styles.headerSubtitle}>
-            {selectionMode ? 'Toque para selecionar versículos' : bible?.name}
+            {selectionMode
+              ? "Toque para selecionar versículos"
+              : bible?.abbreviation}
           </Text>
         </View>
 
@@ -685,6 +962,18 @@ Link do app: https://readbible.app`;
                 <Ionicons name="search" size={24} color="#333" />
               </TouchableOpacity>
               <TouchableOpacity
+                onPress={openBookSelector}
+                style={styles.headerButton}
+              >
+                <Ionicons name="library" size={24} color="#333" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={openBibleSelector}
+                style={styles.headerButton}
+              >
+                <Ionicons name="book" size={24} color="#333" />
+              </TouchableOpacity>
+              <TouchableOpacity
                 onPress={() => setChapterSelectorVisible(true)}
                 style={styles.headerButton}
               >
@@ -693,6 +982,13 @@ Link do app: https://readbible.app`;
             </>
           )}
         </View>
+      </View>
+
+      {/* Fixed Chapter Header */}
+      <View style={styles.fixedChapterHeader}>
+        <Text style={styles.chapterTitle}>
+          {book?.name} {currentChapter}
+        </Text>
       </View>
 
       {/* Verses List */}
@@ -706,45 +1002,49 @@ Link do app: https://readbible.app`;
       />
 
       {/* Floating Navigation Buttons */}
-      <View style={[
-        styles.floatingNavigation,
-        { bottom: Math.max(30, insets.bottom + 20) } // Dynamic positioning based on safe area
-      ]}>
+      <View
+        style={[
+          styles.floatingNavigation,
+          { bottom: Math.max(30, insets.bottom + 20) }, // Dynamic positioning based on safe area
+        ]}
+      >
         <TouchableOpacity
           style={[
             styles.floatingNavButton,
-            (currentChapter === 1 || navigating || loading) && styles.floatingNavButtonDisabled,
+            (isFirstOfBible || navigating || loading) &&
+              styles.floatingNavButtonDisabled,
           ]}
           onPress={() => {
             if (!navigating && !loading) {
               navigateChapter("prev");
             }
           }}
-          disabled={currentChapter === 1 || navigating || loading}
+          disabled={isFirstOfBible || navigating || loading}
         >
           <Ionicons
             name="chevron-back"
             size={24}
-            color={(currentChapter === 1 || navigating || loading) ? "#ccc" : "#2196F3"}
+            color={isFirstOfBible || navigating || loading ? "#ccc" : "#2196F3"}
           />
         </TouchableOpacity>
 
         <TouchableOpacity
           style={[
             styles.floatingNavButton,
-            (currentChapter === totalChapters || navigating || loading) && styles.floatingNavButtonDisabled,
+            (isLastOfBible || navigating || loading) &&
+              styles.floatingNavButtonDisabled,
           ]}
           onPress={() => {
             if (!navigating && !loading) {
               navigateChapter("next");
             }
           }}
-          disabled={currentChapter === totalChapters || navigating || loading}
+          disabled={isLastOfBible || navigating || loading}
         >
           <Ionicons
             name="chevron-forward"
             size={24}
-            color={(currentChapter === totalChapters || navigating || loading) ? "#ccc" : "#2196F3"}
+            color={isLastOfBible || navigating || loading ? "#ccc" : "#2196F3"}
           />
         </TouchableOpacity>
       </View>
@@ -1058,6 +1358,111 @@ Link do app: https://readbible.app`;
           </View>
         </View>
       </Modal>
+
+      {/* Bible Selector Modal */}
+      <Modal
+        visible={bibleSelectorVisible}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setBibleSelectorVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.selectorModal}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Escolher Versão da Bíblia</Text>
+              <TouchableOpacity onPress={() => setBibleSelectorVisible(false)}>
+                <Ionicons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+
+            <FlatList
+              data={availableBibles}
+              keyExtractor={(item) => item.id}
+              showsVerticalScrollIndicator={false}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.selectorItem,
+                    item.id === bibleId && styles.selectedSelectorItem,
+                  ]}
+                  onPress={() => selectBible(item)}
+                >
+                  <View style={styles.selectorItemContent}>
+                    <Text
+                      style={[
+                        styles.selectorItemTitle,
+                        item.id === bibleId && styles.selectedSelectorItemTitle,
+                      ]}
+                    >
+                      {item.name}
+                    </Text>
+                    <Text style={styles.selectorItemSubtitle}>
+                      {item.abbreviation} • {item.language.toUpperCase()}
+                    </Text>
+                  </View>
+                  {item.id === bibleId && (
+                    <Ionicons name="checkmark" size={24} color="#2196F3" />
+                  )}
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* Book Selector Modal */}
+      <Modal
+        visible={bookSelectorVisible}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setBookSelectorVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.selectorModal}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Escolher Livro</Text>
+              <TouchableOpacity onPress={() => setBookSelectorVisible(false)}>
+                <Ionicons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+
+            <FlatList
+              data={availableBooks}
+              keyExtractor={(item) => item.id.toString()}
+              showsVerticalScrollIndicator={false}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.selectorItem,
+                    item.id === currentBookId && styles.selectedSelectorItem,
+                  ]}
+                  onPress={() => selectBook(item)}
+                >
+                  <View style={styles.selectorItemContent}>
+                    <Text
+                      style={[
+                        styles.selectorItemTitle,
+                        item.id === currentBookId &&
+                          styles.selectedSelectorItemTitle,
+                      ]}
+                    >
+                      {item.name}
+                    </Text>
+                    <Text style={styles.selectorItemSubtitle}>
+                      {item.testament === "old"
+                        ? "Antigo Testamento"
+                        : "Novo Testamento"}
+                    </Text>
+                  </View>
+                  {item.id === currentBookId && (
+                    <Ionicons name="checkmark" size={24} color="#2196F3" />
+                  )}
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1081,7 +1486,6 @@ const styles = StyleSheet.create({
   },
   headerCenter: {
     flex: 1,
-    alignItems: "center",
   },
   headerTitle: {
     fontSize: 18,
@@ -1092,6 +1496,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#666",
     marginTop: 2,
+    textAlign: "left",
   },
   headerActions: {
     flexDirection: "row",
@@ -1153,11 +1558,11 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: "#f0f0f0",
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
   },
   verseContainerSelected: {
-    backgroundColor: '#e3f2fd',
+    backgroundColor: "#e3f2fd",
   },
   checkboxContainer: {
     marginRight: 8,
@@ -1167,18 +1572,16 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderWidth: 2,
-    borderColor: '#2196F3',
+    borderColor: "#2196F3",
     borderRadius: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#fff',
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#fff",
   },
   checkboxSelected: {
-    backgroundColor: '#2196F3',
+    backgroundColor: "#2196F3",
   },
-  verseTextContainer: {
-    flex: 1,
-  },
+  verseTextContainer: {},
   verseTextWithCheckbox: {
     paddingRight: 8,
   },
@@ -1405,12 +1808,12 @@ const styles = StyleSheet.create({
   },
   // References Modal Styles
   referencesModal: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderTopLeftRadius: 12,
     borderTopRightRadius: 12,
     margin: 16,
     width: "95%",
-    maxHeight: '75%',
+    maxHeight: "75%",
   },
   referenceLinksContainer: {
     maxHeight: 45,
@@ -1493,21 +1896,21 @@ const styles = StyleSheet.create({
   },
   referenceLoadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingVertical: 60,
     paddingHorizontal: 20,
   },
   referenceVerseCard: {
-    backgroundColor: '#f8f9fa',
+    backgroundColor: "#f8f9fa",
     padding: 16,
     marginBottom: 12,
     marginHorizontal: 4,
     borderRadius: 12,
     borderLeftWidth: 4,
-    borderLeftColor: '#2196F3',
+    borderLeftColor: "#2196F3",
     minHeight: 80,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 1,
@@ -1540,8 +1943,8 @@ const styles = StyleSheet.create({
   },
   referenceErrorContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingVertical: 60,
     paddingHorizontal: 20,
   },
@@ -1552,15 +1955,15 @@ const styles = StyleSheet.create({
   },
   // Floating Navigation Styles
   floatingNavigation: {
-    position: 'absolute',
-    left: '50%',
+    position: "absolute",
+    left: "50%",
     marginLeft: -67, // Half of the component width (8+50+16+50+8 = 132, so -66)
-    flexDirection: 'row',
-    backgroundColor: '#fff',
+    flexDirection: "row",
+    backgroundColor: "#fff",
     borderRadius: 30,
     paddingHorizontal: 8,
     paddingVertical: 8,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 2,
@@ -1574,10 +1977,10 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: '#f8f9fa',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
+    backgroundColor: "#f8f9fa",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 1,
@@ -1587,10 +1990,94 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   floatingNavButtonDisabled: {
-    backgroundColor: '#e9ecef',
+    backgroundColor: "#e9ecef",
     opacity: 0.5,
   },
   versesListContent: {
+    paddingTop: 60, // Space for fixed chapter header
     paddingBottom: 120, // Space for floating navigation buttons
+  },
+
+  // Bible/Book Selector Modal Styles
+  selectorModal: {
+    backgroundColor: "white",
+    borderRadius: 12,
+    maxHeight: "80%",
+    width: "85%",
+    overflow: "hidden",
+  },
+
+  selectorItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+
+  selectedSelectorItem: {
+    backgroundColor: "#e3f2fd",
+  },
+
+  selectorItemContent: {
+    flex: 1,
+  },
+
+  selectorItemTitle: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: "#333",
+    marginBottom: 4,
+  },
+
+  selectedSelectorItemTitle: {
+    color: "#2196F3",
+    fontWeight: "600",
+  },
+
+  selectorItemSubtitle: {
+    fontSize: 12,
+    color: "#666",
+  },
+
+  fixedChapterHeader: {
+    position: "sticky",
+    top: 0,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e0e0e0",
+    backgroundColor: "#f8f9fa",
+    zIndex: 10,
+    elevation: 3,
+  },
+
+  chapterTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#666",
+    textAlign: "center",
+  },
+
+  verseTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#2196F3",
+    marginBottom: 2, // Reduced from 8 to bring closer to verse
+    fontStyle: "italic",
+  },
+
+  verseTitleContainer: {
+    marginBottom: 2,
+  },
+
+  verseTitleLevel2: {
+    fontSize: 15,
+    color: "#4CAF50",
+  },
+
+  verseTitleLevel3: {
+    fontSize: 14,
+    color: "#FF9800",
   },
 });

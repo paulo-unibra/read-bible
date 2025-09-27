@@ -52,6 +52,45 @@ export default function HomeScreen() {
     }
   };
 
+  const startFreeReading = async () => {
+    try {
+      // First check if there are downloaded bibles
+      const bibles = await DatabaseService.getBibles();
+      const downloadedBibles = bibles.filter(b => b.isDownloaded);
+      
+      if (downloadedBibles.length === 0) {
+        Alert.alert(
+          'Nenhuma Bíblia Disponível', 
+          'Você precisa baixar pelo menos uma Bíblia para começar a leitura.',
+          [
+            { text: 'Cancelar', style: 'cancel' },
+            { text: 'Baixar Bíblias', onPress: () => router.push('/bible-manager') }
+          ]
+        );
+        return;
+      }
+      
+      // Try to get last reading position
+      let lastReading = await DatabaseService.getLastReading();
+      
+      // If no last reading, use first available Bible with book 1, chapter 1
+      if (!lastReading) {
+        lastReading = {
+          bibleId: downloadedBibles[0].id,
+          bookId: 1,
+          chapterNumber: 1
+        };
+      }
+      
+      // Navigate directly to chapter reader
+      router.push(`/chapter-reader?bibleId=${lastReading.bibleId}&bookId=${lastReading.bookId}&chapterNumber=${lastReading.chapterNumber}`);
+      
+    } catch (error) {
+      console.error('Error starting free reading:', error);
+      Alert.alert('Erro', 'Falha ao iniciar leitura livre');
+    }
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -126,7 +165,7 @@ export default function HomeScreen() {
           
           <TouchableOpacity 
             style={styles.actionCard}
-            onPress={() => router.push('/free-reading')}
+            onPress={startFreeReading}
           >
             <View style={styles.actionIcon}>
               <Ionicons name="book-outline" size={32} color="#2196F3" />
