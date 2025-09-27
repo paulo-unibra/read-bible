@@ -15,7 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import bibleReaderService from "../services/BibleReaderService";
 import DatabaseService from "../services/DatabaseService";
 import { Bible, Book, SearchResult, Verse } from "../types";
@@ -23,19 +23,22 @@ import { Bible, Book, SearchResult, Verse } from "../types";
 export default function ChapterReaderScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const insets = useSafeAreaInsets();
 
   // URL params: bibleId, bookId, chapterNumber
   const bibleId = params.bibleId as string;
-  const bookId = parseInt(params.bookId as string);
+  const initialBookId = parseInt(params.bookId as string);
   const initialChapter = parseInt(params.chapterNumber as string);
 
   const [bible, setBible] = useState<Bible | null>(null);
   const [book, setBook] = useState<Book | null>(null);
+  const [currentBookId, setCurrentBookId] = useState(initialBookId);
   const [currentChapter, setCurrentChapter] = useState(initialChapter);
   const [verses, setVerses] = useState<Verse[]>([]);
   const [totalChapters, setTotalChapters] = useState(0);
   const [loading, setLoading] = useState(true);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const [navigating, setNavigating] = useState(false); // Prevent rapid navigation
 
   // Search modal state
   const [searchModalVisible, setSearchModalVisible] = useState(false);
@@ -69,20 +72,23 @@ export default function ChapterReaderScreen() {
   // Selection and sharing state
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedVerses, setSelectedVerses] = useState<Set<string>>(new Set());
-  const [longPressVerse, setLongPressVerse] = useState<string | null>(null);
+  const [showFavoriteButtons, setShowFavoriteButtons] = useState(false);
 
   useEffect(() => {
-    if (bibleId && bookId && currentChapter) {
+    if (bibleId && currentBookId) {
+      console.log("USE EFFECT CHAMANDO INICIALIZE")
       initializeReader();
     }
-  }, [bibleId, bookId, currentChapter]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [bibleId, currentBookId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const initializeReader = async () => {
+    console.log("INICIANDO LEITOR")
     try {
       setLoading(true);
 
       // Get bible info
       const bibles = await DatabaseService.getBibles();
+      console.log("ACHOU AS BIBLIAS", bibles.length);
       const currentBible = bibles.find((b) => b.id === bibleId);
       if (!currentBible) throw new Error("Bible not found");
       setBible(currentBible);
@@ -92,12 +98,12 @@ export default function ChapterReaderScreen() {
 
       // Get book info and total chapters
       const books = await bibleReaderService.getBooks(bibleId);
-      const currentBook = books.find((b) => b.id === bookId);
+      const currentBook = books.find((b) => b.id === currentBookId);
       if (!currentBook) throw new Error("Book not found");
       setBook(currentBook);
 
       // Get chapters to determine total count
-      const chapters = await bibleReaderService.getChapters(bibleId, bookId);
+      const chapters = await bibleReaderService.getChapters(bibleId, currentBookId);
       setTotalChapters(chapters.length);
 
       // Load current chapter verses
@@ -115,12 +121,12 @@ export default function ChapterReaderScreen() {
   };
 
   const loadChapterVerses = async () => {
-    if (!bibleId || !bookId || !currentChapter) return;
+    if (!bibleId || !currentBookId || !currentChapter) return;
 
     try {
       const versesData = await bibleReaderService.getVerses(
         bibleId,
-        bookId,
+        currentBookId,
         currentChapter
       );
       setVerses(versesData);
@@ -133,47 +139,78 @@ export default function ChapterReaderScreen() {
   const loadFavorites = async () => {
     if (!bibleId) return;
 
-    try {
-      const favoritesData = await DatabaseService.getFavorites(bibleId);
-      const favoritesSet = new Set(
-        favoritesData.map(
-          (fav) => `${fav.bookId}-${fav.chapterNumber}-${fav.verseNumber}`
-        )
-      );
-      setFavorites(favoritesSet);
-    } catch (error) {
-      console.error("Error loading favorites:", error);
-    }
+    // try {
+    //   const favoritesData = await DatabaseService.getFavorites(bibleId);
+    //   const favoritesSet = new Set(
+    //     favoritesData.map(
+    //       (fav) => `${fav.bookId}-${fav.chapterNumber}-${fav.verseNumber}`
+    //     )
+    //   );
+    //   setFavorites(favoritesSet);
+    // } catch (error) {
+    //   console.error("Error loading favorites:", error);
+    // }
   };
 
   const navigateChapter = async (direction: "prev" | "next") => {
-    let newChapter = currentChapter;
+    console.log("NAVEGANDO CAPITULO", direction)
+    // Prevent rapid navigation that can cause crashes
+    if (navigating || loading) return;
+    
+    setNavigating(true);
+    
+    try {
+      let newChapter = currentChapter;
 
-    if (direction === "prev") {
-      if (currentChapter > 1) {
-        newChapter = currentChapter - 1;
+      if (direction === "prev") {
+        if (currentChapter > 1) {
+          newChapter = currentChapter - 1;
+        } else {
+          // Go to previous book's last chapter
+          await navigateToAdjacentBook("prev");
+          return;
+        }
       } else {
-        // Go to previous book's last chapter
-        await navigateToAdjacentBook("prev");
-        return;
+        if (currentChapter < totalChapters) {
+          newChapter = currentChapter + 1;
+        } else {
+          // Go to next book's first chapter
+          await navigateToAdjacentBook("next");
+          return;
+        }
       }
-    } else {
-      if (currentChapter < totalChapters) {
-        newChapter = currentChapter + 1;
-      } else {
-        // Go to next book's first chapter
-        await navigateToAdjacentBook("next");
-        return;
+
+      if (newChapter > 0 && newChapter <= totalChapters) {
+        setCurrentChapter(newChapter);
+        
+        // Load verses for the new chapter directly from database
+        const versesData = await bibleReaderService.getVerses(
+          bibleId,
+          currentBookId,
+          newChapter
+        );
+        setVerses(versesData);
       }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error("Error navigating chapter:", error);
+      
+      Alert.alert(
+        "Erro de Navegação",
+        `Falha ao navegar para o capítulo: ${errorMessage}`,
+        [{ text: "OK" }]
+      );
+    } finally {
+      setNavigating(false);
     }
-
-    setCurrentChapter(newChapter);
   };
 
   const navigateToAdjacentBook = async (direction: "prev" | "next") => {
     try {
+      setLoading(true);
+      
       const books = await bibleReaderService.getBooks(bibleId);
-      const currentBookIndex = books.findIndex((b) => b.id === bookId);
+      const currentBookIndex = books.findIndex((b) => b.id === currentBookId);
 
       let newBookIndex =
         direction === "prev" ? currentBookIndex - 1 : currentBookIndex + 1;
@@ -195,12 +232,25 @@ export default function ChapterReaderScreen() {
       );
       const newChapter = direction === "prev" ? newBookChapters.length : 1;
 
-      // Navigate to new book/chapter
-      router.replace(
-        `/chapter-reader?bibleId=${bibleId}&bookId=${newBook.id}&chapterNumber=${newChapter}`
+      // Update states directly without router navigation
+      setBook(newBook);
+      setCurrentBookId(newBook.id);
+      setCurrentChapter(newChapter);
+      setTotalChapters(newBookChapters.length);
+      
+      // Load verses for the new book/chapter
+      const versesData = await bibleReaderService.getVerses(
+        bibleId,
+        newBook.id,
+        newChapter
       );
+      setVerses(versesData);
+      
     } catch (error) {
       console.error("Error navigating to adjacent book:", error);
+      Alert.alert("Erro", "Falha ao navegar para o livro adjacente");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -223,24 +273,74 @@ export default function ChapterReaderScreen() {
     }
   };
 
-  const navigateToSearchResult = (result: SearchResult) => {
+  const navigateToSearchResult = async (result: SearchResult) => {
     setSearchModalVisible(false);
     setSearchQuery("");
     setSearchResults([]);
 
-    // Navigate to the chapter containing the search result
-    router.replace(
-      `/chapter-reader?bibleId=${bibleId}&bookId=${result.bookId}&chapterNumber=${result.chapterNumber}`
-    );
+    try {
+      setLoading(true);
+
+      // If it's a different book, load the new book info
+      if (result.bookId !== currentBookId) {
+        const books = await bibleReaderService.getBooks(bibleId);
+        const newBook = books.find((b) => b.id === result.bookId);
+        if (newBook) {
+          setBook(newBook);
+          setCurrentBookId(newBook.id);
+          
+          // Get chapters count for the new book
+          const chapters = await bibleReaderService.getChapters(bibleId, result.bookId);
+          setTotalChapters(chapters.length);
+        }
+      }
+      
+      // Update current chapter
+      setCurrentChapter(result.chapterNumber);
+      
+      // Load verses for the search result chapter
+      const versesData = await bibleReaderService.getVerses(
+        bibleId,
+        result.bookId,
+        result.chapterNumber
+      );
+      setVerses(versesData);
+      
+    } catch (error) {
+      console.error("Error navigating to search result:", error);
+      Alert.alert("Erro", "Falha ao navegar para o resultado da busca");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const navigateToChapter = (chapterNumber: number) => {
-    setChapterSelectorVisible(false);
-
-    // Navigate to the selected chapter
-    router.replace(
-      `/chapter-reader?bibleId=${bibleId}&bookId=${bookId}&chapterNumber=${chapterNumber}`
-    );
+  const navigateToChapter = async (chapterNumber: number) => {
+    if (!bibleId || !currentBookId || chapterNumber < 1 || chapterNumber > totalChapters) return;
+    
+    try {
+      setLoading(true);
+      
+      // Update current chapter state
+      setCurrentChapter(chapterNumber);
+      
+      // Load verses for the new chapter directly
+      const versesData = await bibleReaderService.getVerses(
+        bibleId,
+        currentBookId,
+        chapterNumber
+      );
+      
+      setVerses(versesData);
+      
+      // Close the chapter selector modal
+      setChapterSelectorVisible(false);
+      
+    } catch (error) {
+      console.error("Error navigating to chapter:", error);
+      Alert.alert("Erro", "Falha ao carregar o capítulo");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const openNotes = (notes: string[]) => {
@@ -354,8 +454,8 @@ export default function ChapterReaderScreen() {
   // Handle long press on verse
   const handleVerseLongPress = (verse: Verse) => {
     const verseKey = `${verse.bookId}-${verse.chapterNumber}-${verse.verseNumber}`;
-    setLongPressVerse(verseKey);
     setSelectionMode(true);
+    setShowFavoriteButtons(true);
     
     // Add the long-pressed verse to selection
     const newSelected = new Set(selectedVerses);
@@ -381,7 +481,7 @@ export default function ChapterReaderScreen() {
     // Exit selection mode if no verses selected
     if (newSelected.size === 0) {
       setSelectionMode(false);
-      setLongPressVerse(null);
+      setShowFavoriteButtons(false);
     }
   };
 
@@ -389,7 +489,7 @@ export default function ChapterReaderScreen() {
   const clearSelection = () => {
     setSelectionMode(false);
     setSelectedVerses(new Set());
-    setLongPressVerse(null);
+    setShowFavoriteButtons(false);
   };
 
   // Share selected verses
@@ -446,7 +546,6 @@ Link do app: https://readbible.app`;
     const isFavorite = favorites.has(favoriteKey);
     const hasNotes = item.notes && item.notes.length > 0;
     const isSelected = selectedVerses.has(favoriteKey);
-    const isLongPressed = longPressVerse === favoriteKey;
 
     return (
       <Pressable
@@ -485,7 +584,7 @@ Link do app: https://readbible.app`;
                 style={styles.inlineButton}
                 onPress={() => openNotes(item.notes!)}
               >
-                <Ionicons name="document-text" size={14} color="#2196F3" />
+                <Ionicons name="document-text" size={14} color="#64b5f6" />
               </TouchableOpacity>
             )}
 
@@ -494,12 +593,12 @@ Link do app: https://readbible.app`;
                 style={styles.inlineButton}
                 onPress={() => openReferencesModal(item.verseReferences!)}
               >
-                <Ionicons name="git-branch" size={14} color="#2196F3" />
+                <Ionicons name="git-branch" size={14} color="#81c784" />
               </TouchableOpacity>
             )}
 
-            {/* Favorite button - only show on long press */}
-            {isLongPressed && (
+            {/* Favorite button - show when favorite buttons are visible */}
+            {showFavoriteButtons && (
               <TouchableOpacity
                 style={[styles.inlineButton, isFavorite && styles.favoriteButton]}
                 onPress={() => toggleFavorite(item)}
@@ -507,7 +606,7 @@ Link do app: https://readbible.app`;
                 <Ionicons
                   name="heart"
                   size={14}
-                  color={isFavorite ? "#f44336" : "#ccc"}
+                  color={isFavorite ? "#e57373" : "#bdbdbd"}
                 />
               </TouchableOpacity>
             )}
@@ -596,59 +695,6 @@ Link do app: https://readbible.app`;
         </View>
       </View>
 
-      {/* Navigation Bar */}
-      <View style={styles.navigationBar}>
-        <TouchableOpacity
-          style={[
-            styles.navButton,
-            currentChapter === 1 && styles.navButtonDisabled,
-          ]}
-          onPress={() => navigateChapter("prev")}
-          disabled={currentChapter === 1}
-        >
-          <Ionicons
-            name="chevron-back"
-            size={20}
-            color={currentChapter === 1 ? "#ccc" : "#2196F3"}
-          />
-          <Text
-            style={[
-              styles.navButtonText,
-              currentChapter === 1 && styles.navButtonTextDisabled,
-            ]}
-          >
-            Anterior
-          </Text>
-        </TouchableOpacity>
-
-        <Text style={styles.chapterInfo}>
-          Capítulo {currentChapter} de {totalChapters}
-        </Text>
-
-        <TouchableOpacity
-          style={[
-            styles.navButton,
-            currentChapter === totalChapters && styles.navButtonDisabled,
-          ]}
-          onPress={() => navigateChapter("next")}
-          disabled={currentChapter === totalChapters}
-        >
-          <Text
-            style={[
-              styles.navButtonText,
-              currentChapter === totalChapters && styles.navButtonTextDisabled,
-            ]}
-          >
-            Próximo
-          </Text>
-          <Ionicons
-            name="chevron-forward"
-            size={20}
-            color={currentChapter === totalChapters ? "#ccc" : "#2196F3"}
-          />
-        </TouchableOpacity>
-      </View>
-
       {/* Verses List */}
       <FlatList
         data={verses}
@@ -656,7 +702,52 @@ Link do app: https://readbible.app`;
         keyExtractor={(item) => item.id.toString()}
         showsVerticalScrollIndicator={false}
         style={styles.versesList}
+        contentContainerStyle={styles.versesListContent}
       />
+
+      {/* Floating Navigation Buttons */}
+      <View style={[
+        styles.floatingNavigation,
+        { bottom: Math.max(30, insets.bottom + 20) } // Dynamic positioning based on safe area
+      ]}>
+        <TouchableOpacity
+          style={[
+            styles.floatingNavButton,
+            (currentChapter === 1 || navigating || loading) && styles.floatingNavButtonDisabled,
+          ]}
+          onPress={() => {
+            if (!navigating && !loading) {
+              navigateChapter("prev");
+            }
+          }}
+          disabled={currentChapter === 1 || navigating || loading}
+        >
+          <Ionicons
+            name="chevron-back"
+            size={24}
+            color={(currentChapter === 1 || navigating || loading) ? "#ccc" : "#2196F3"}
+          />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.floatingNavButton,
+            (currentChapter === totalChapters || navigating || loading) && styles.floatingNavButtonDisabled,
+          ]}
+          onPress={() => {
+            if (!navigating && !loading) {
+              navigateChapter("next");
+            }
+          }}
+          disabled={currentChapter === totalChapters || navigating || loading}
+        >
+          <Ionicons
+            name="chevron-forward"
+            size={24}
+            color={(currentChapter === totalChapters || navigating || loading) ? "#ccc" : "#2196F3"}
+          />
+        </TouchableOpacity>
+      </View>
 
       {/* Search Modal */}
       <Modal
@@ -1105,20 +1196,29 @@ const styles = StyleSheet.create({
   verseButtonsRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingTop: 4,
-    paddingLeft: 20,
-    gap: 8,
+    paddingTop: 6,
+    paddingLeft: 16,
+    gap: 6,
+    marginTop: 2,
   },
   inlineButton: {
     flexDirection: "row",
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 28,
+    height: 24,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#2196F3",
-    backgroundColor: "#f0f8ff",
+    borderColor: "#e3f2fd",
+    backgroundColor: "#f8f9fa",
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    elevation: 1,
   },
   inlineButtonText: {
     fontSize: 12,
@@ -1126,8 +1226,8 @@ const styles = StyleSheet.create({
     color: "#2196F3",
   },
   favoriteButton: {
-    borderColor: "#f44336",
-    backgroundColor: "#fef0f0",
+    borderColor: "#ffebee",
+    backgroundColor: "#fff5f5",
   },
   favoriteButtonText: {
     fontSize: 12,
@@ -1449,5 +1549,48 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#999",
     textAlign: "center",
+  },
+  // Floating Navigation Styles
+  floatingNavigation: {
+    position: 'absolute',
+    left: '50%',
+    marginLeft: -67, // Half of the component width (8+50+16+50+8 = 132, so -66)
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderRadius: 30,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    gap: 16,
+  },
+  floatingNavButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#f8f9fa',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.18,
+    shadowRadius: 1.0,
+    elevation: 1,
+  },
+  floatingNavButtonDisabled: {
+    backgroundColor: '#e9ecef',
+    opacity: 0.5,
+  },
+  versesListContent: {
+    paddingBottom: 120, // Space for floating navigation buttons
   },
 });

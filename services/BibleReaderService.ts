@@ -229,6 +229,7 @@ export class BibleReaderService {
 
   async getVerses(bibleId: string, bookId: number, chapterNumber: number): Promise<Verse[]> {
     const db = this.getBibleConnection(bibleId);
+    console.log("CARREGOU O BANCO")
     
     // If it's the sample bible, return sample data
     if (bibleId === 'sample-bible') {
@@ -238,14 +239,17 @@ export class BibleReaderService {
     if (!db) {
       throw new Error('Database connection is null');
     }
-    
+
     try {
       const result = await db.getAllAsync(
         'SELECT * FROM Bible WHERE Book = ? AND Chapter = ? ORDER BY Verse',
         [bookId, chapterNumber]
       );
+
+      console.log("VEIO OS VERSICULOS", result.length);
       
       return result.map((row: any) => {
+        console.log("PROCESSANDO UM VERSICULO")
         const parsedContent = this.parseVerseContent(row.Scripture);
         
         return {
