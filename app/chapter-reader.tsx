@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -53,6 +53,31 @@ export default function ChapterReaderScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [searchTestamentFilter, setSearchTestamentFilter] = useState<'all' | 'ot' | 'nt'>('all');
+  const [rawSearchResults, setRawSearchResults] = useState<SearchResult[] | null>(null);
+  const [searchCounts, setSearchCounts] = useState<{ all: number; ot: number; nt: number }>({ all: 0, ot: 0, nt: 0 });
+  const [bookTestamentMap, setBookTestamentMap] = useState<Map<number, 'old' | 'new'> | null>(null);
+
+  // Constrói mapa de testamentos de forma resiliente (suporta bases não padronizadas)
+  const buildTestamentMap = (booksList: Book[]): Map<number, 'old' | 'new'> => {
+    const map = new Map<number, 'old' | 'new'>();
+    if (!booksList || booksList.length === 0) return map;
+    // Se já vem com campo testament confiável e ambos presentes, usa direto
+    const oldCount = booksList.filter(b => b.testament === 'old').length;
+    const newCount = booksList.filter(b => b.testament === 'new').length;
+    if (oldCount > 0 && newCount > 0) {
+      booksList.forEach(b => map.set(b.id, b.testament));
+      return map;
+    }
+    // Heurística: localizar início do NT pelo primeiro livro que combine com Mateus / Matthew
+    let newStartIndex = booksList.findIndex(b => /Mateus|Matthew/i.test(b.name));
+    if (newStartIndex === -1) {
+      // fallback clássico: 39 (0-based => índice 39 significa depois de 39 livros AT) mas só se tamanho >= 66
+      if (booksList.length >= 66) newStartIndex = 39; else newStartIndex = Math.round(booksList.length * 0.6);
+    }
+    booksList.forEach((b, idx) => map.set(b.id, idx < newStartIndex ? 'old' : 'new'));
+    return map;
+  };
 
   // Chapter selector modal state
   const [chapterSelectorVisible, setChapterSelectorVisible] = useState(false);
@@ -446,17 +471,53 @@ export default function ChapterReaderScreen() {
     }
   };
 
+  const applySearchFilter = useCallback((filter: 'all' | 'ot' | 'nt', source: SearchResult[], localMap?: Map<number, 'old' | 'new'> | null) => {
+    if (!source) return [] as SearchResult[];
+    if (filter === 'all') return source;
+    const mapRef = localMap ?? bookTestamentMap;
+    return source.filter(r => {
+      const testament = mapRef?.get(r.bookId);
+      if (testament) return filter === 'ot' ? testament === 'old' : testament === 'new';
+      return filter === 'ot' ? r.bookId <= 39 : r.bookId > 39;
+    });
+  }, [bookTestamentMap]);
+
   const handleSearch = async () => {
     if (!searchQuery.trim() || !bibleId) return;
 
     try {
       setSearchLoading(true);
-      const results = await bibleReaderService.searchVerses(
+      // Garantir mapa local (mesmo que setState seja async)
+      let localMap = bookTestamentMap;
+      if (!localMap) {
+        try {
+          const booksForMap = await bibleReaderService.getBooks(bibleId);
+          localMap = buildTestamentMap(booksForMap);
+          setBookTestamentMap(localMap);
+        } catch {
+          console.warn('Não foi possível carregar mapa de testamentos agora, usando fallback heurístico.');
+        }
+      }
+
+      let results = await bibleReaderService.searchVerses(
         bibleId,
         searchQuery.trim(),
         50
       );
-      setSearchResults(results);
+      // Guardar bruto
+      setRawSearchResults(results);
+      // Calcular contagens
+      const otCount = results.filter(r => {
+        const t = localMap?.get(r.bookId);
+        return t ? t === 'old' : r.bookId <= 39;
+      }).length;
+      const ntCount = results.filter(r => {
+        const t = localMap?.get(r.bookId);
+        return t ? t === 'new' : r.bookId > 39;
+      }).length;
+      setSearchCounts({ all: results.length, ot: otCount, nt: ntCount });
+      // Aplicar filtro atual
+      setSearchResults(applySearchFilter(searchTestamentFilter, results, localMap));
     } catch (error) {
       console.error("Error searching:", error);
       Alert.alert("Erro", "Falha ao realizar busca");
@@ -464,6 +525,13 @@ export default function ChapterReaderScreen() {
       setSearchLoading(false);
     }
   };
+
+  // Reaplicar filtro quando usuário troca (sem refazer query)
+  useEffect(() => {
+    if (rawSearchResults) {
+      setSearchResults(applySearchFilter(searchTestamentFilter, rawSearchResults));
+    }
+  }, [searchTestamentFilter, rawSearchResults, applySearchFilter]);
 
   const navigateToSearchResult = async (result: SearchResult) => {
     setSearchModalVisible(false);
@@ -1041,6 +1109,29 @@ Link do app: https://readbible.app`;
                 <Ionicons name="search" size={20} color="#fff" />
               )}
             </TouchableOpacity>
+          </View>
+
+          {/* Filtros de Testamento */}
+          <View style={styles.testamentFilterBar}>
+            {([
+              { key: 'all', label: 'Tudo', count: searchCounts.all },
+              { key: 'ot', label: 'AT', count: searchCounts.ot },
+              { key: 'nt', label: 'NT', count: searchCounts.nt },
+            ] as const).map(f => {
+              const active = searchTestamentFilter === f.key;
+              return (
+                <TouchableOpacity
+                  key={f.key}
+                  style={[styles.testamentFilterButton, active && styles.testamentFilterButtonActive]}
+                  onPress={() => setSearchTestamentFilter(f.key)}
+                  disabled={searchLoading}
+                >
+                  <Text style={[styles.testamentFilterText, active && styles.testamentFilterTextActive]}>
+                    {f.label}{rawSearchResults ? ` (${f.count})` : ''}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
           <FlatList
@@ -1696,6 +1787,36 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#333",
     lineHeight: 22,
+  },
+  testamentFilterBar: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    paddingTop: 4,
+    gap: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  testamentFilterButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 18,
+    backgroundColor: '#f0f4f8',
+    borderWidth: 1,
+    borderColor: '#d0d7de',
+  },
+  testamentFilterButtonActive: {
+    backgroundColor: '#2196F3',
+    borderColor: '#2196F3',
+  },
+  testamentFilterText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#2196F3',
+  },
+  testamentFilterTextActive: {
+    color: '#fff',
   },
   emptyState: {
     alignItems: "center",

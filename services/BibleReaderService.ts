@@ -8,6 +8,8 @@ export class BibleReaderService {
   // Parse HTML verse content to extract text, notes, and verse references
   private parseVerseContent(htmlContent: string): { 
     text: string; 
+    verseOnlyText: string; // texto sem notas (exclui conteúdo e marcadores de notas)
+    verseSearchText: string; // texto para busca (sem notas, símbolos de refs, strong numbers, duplicação de espaços)
     titles: {level: number, text: string}[];
     notes: string[]; 
     verseReferences: {text: string, reference: string, position: number}[];
@@ -17,7 +19,7 @@ export class BibleReaderService {
     formatting: {type: 'italic' | 'bold' | 'underline' | 'jesus' | 'ot_quote' | 'strikethrough', start: number, end: number, text: string}[];
   } {
     if (!htmlContent) {
-      return { text: '', titles: [], notes: [], verseReferences: [], crossReferences: [], strongNumbers: [], interlinear: [], formatting: [] };
+      return { text: '', verseOnlyText: '', verseSearchText: '', titles: [], notes: [], verseReferences: [], crossReferences: [], strongNumbers: [], interlinear: [], formatting: [] };
     }
 
     const titles: { level: number; text: string }[] = [];
@@ -190,7 +192,15 @@ export class BibleReaderService {
       }
     }
 
-    return { text: finalText, titles, notes, verseReferences, crossReferences, strongNumbers, interlinear, formatting };
+    const verseOnlyText = finalText.replace(/[ℕ]/g, ' ').replace(/\s+/g, ' ').trim();
+    // Versão para busca: remove símbolos de notas, cruzetas, números fortes G/H, e colchetes residuais
+    const verseSearchText = verseOnlyText
+      .replace(/[✚]/g, ' ') // remove símbolo de referência cruzada
+      .replace(/\bG\d+\b/gi, ' ') // strong patterns greek
+      .replace(/\bH\d+\b/gi, ' ') // strong patterns hebrew
+      .replace(/\[[^\]]+\]/g, ' ') // possíveis marcações de notas remanescentes
+      .replace(/\s+/g, ' ').trim();
+    return { text: finalText, verseOnlyText, verseSearchText, titles, notes, verseReferences, crossReferences, strongNumbers, interlinear, formatting };
   }
 
   async openBible(bibleId: string, fileName: string): Promise<void> {
@@ -399,36 +409,151 @@ export class BibleReaderService {
     }
     
     try {
+      const termOriginal = searchTerm.trim();
+      if (!termOriginal) return [];
+      // frase completa tratada como LIKE '%texto%' (ignorando símbolos/notas)
+      const termNorm = this.cleanForSearch(termOriginal); // já minúsculo e sem diacríticos
+      if (!termNorm) return [];
+      const termWords = termNorm.split(' ').filter(Boolean); // para highlight flexível
       const books = await this.getBooks(bibleId);
       const bookMap = new Map(books.map(book => [book.id, book.name]));
 
-      const searchPattern = `%${searchTerm}%`;
-      const result = await db.getAllAsync(
-        'SELECT Book, Chapter, Verse, Scripture FROM Bible WHERE Scripture LIKE ? LIMIT ?',
-        [searchPattern, limit]
+      // Tamanho dinâmico de pool de candidatos: termos curtos exigem mais versos para filtrar depois
+      const baseMultiplier = termNorm.length <= 5 ? 20 : 5; // palavra curta como "jesus" aparece muito
+      let rawLimit = limit * baseMultiplier;
+      const searchPatternLower = `%${termNorm}%`;
+      let candidates = await db.getAllAsync(
+        'SELECT Book, Chapter, Verse, Scripture FROM Bible WHERE LOWER(Scripture) LIKE ? LIMIT ?',
+        [searchPatternLower, rawLimit]
       );
 
-      return result.map((row: any) => {
-        const parsedContent = this.parseVerseContent(row.Scripture);
-        const cleanText = parsedContent.text;
-        const highlightedText = cleanText.replace(
-          new RegExp(searchTerm, 'gi'),
-          (match: string) => `<mark>${match}</mark>`
+      // Fallback: se nada veio (talvez por PRAGMA case_sensitive_like ou diacríticos não removidos no banco), buscar mais amplo
+      if (candidates.length === 0) {
+        rawLimit = limit * 30;
+        candidates = await db.getAllAsync(
+          'SELECT Book, Chapter, Verse, Scripture FROM Bible LIMIT ?',
+          [rawLimit]
         );
+      }
+
+      const scored = candidates.map((row: any) => {
+        const parsed = this.parseVerseContent(row.Scripture);
+        const verseDisplay = parsed.text; // manter texto completo (pode mostrar notas/ símbolos se necessários visualmente)
+        const searchBase = (parsed.verseSearchText || parsed.verseOnlyText || parsed.text);
+        const norm = this.cleanForSearch(searchBase);
+
+        // Critério principal: substring direta (LIKE) no texto normalizado
+        if (!norm.includes(termNorm)) {
+          // Tentar padrão flexível (aceita símbolos entre palavras) apenas se múltiplas palavras
+          if (termWords.length > 1) {
+            const flex = this.buildFlexibleMultiWordPattern(termWords);
+            if (!flex.test(verseDisplay)) return null;
+          } else {
+            return null;
+          }
+        }
+
+        // Contagem de ocorrências para ranque
+        let occurrences = 0;
+        if (norm.includes(termNorm)) {
+          const reOcc = new RegExp(this.escapeRegExp(termNorm), 'g');
+            const tmp = norm.match(reOcc);
+          occurrences = tmp ? tmp.length : 1;
+        }
+
+        // Posição da primeira ocorrência (quanto mais cedo, melhor)
+        const firstIdx = norm.indexOf(termNorm);
+        const positionScore = firstIdx >= 0 ? Math.max(0, 500 - firstIdx) : 0;
+
+        // Highlight: tentar padrão flexível multi-palavra primeiro
+        let highlightedText = verseDisplay;
+        if (termWords.length > 1) {
+          const flexPattern = this.buildFlexibleMultiWordPattern(termWords);
+          highlightedText = highlightedText.replace(flexPattern, (m: string) => `<mark>${m}</mark>`);
+        }
+        // Se nada marcado ainda, marcar substring(s) direta(s) aproximadas
+        if (!/<mark>/.test(highlightedText)) {
+          highlightedText = highlightedText.replace(new RegExp(this.escapeRegExp(termOriginal), 'gi'), m => `<mark>${m}</mark>`);
+        }
+        // Se ainda não marcou (por símbolos no meio), marcar cada palavra separada
+        if (!/<mark>/.test(highlightedText)) {
+          highlightedText = termWords.reduce((acc, w) => acc.replace(new RegExp(this.escapeRegExp(w), 'gi'), mm => `<mark>${mm}</mark>`), highlightedText);
+        }
+
+  const score = occurrences * 400 + positionScore;
 
         return {
           bookId: row.Book,
           bookName: bookMap.get(row.Book) || `Book ${row.Book}`,
           chapterNumber: row.Chapter,
           verseNumber: row.Verse,
-          text: cleanText,
+          text: verseDisplay,
           highlightedText,
-        };
-      });
+          _score: score,
+          _stats: { occurrences, firstIdx }
+        } as SearchResult & { _score: number; _stats: any };
+      })
+      .filter((r): r is SearchResult & { _score: number; _stats: any } => !!r)
+      .sort((a, b) => b._score - a._score)
+      .slice(0, limit)
+      .map(({ _score, _stats, ...rest }) => rest);
+
+      return scored;
     } catch (error) {
       console.error('Error searching verses:', error);
       throw error;
     }
+  }
+
+  // Utilidades de similaridade / normalização
+  private normalizeText(text: string): string {
+    return text
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '')
+      .replace(/\s+/g, ' ') // espaços simples
+      .trim();
+  }
+
+  // Remove símbolos/pontuação usados no texto bíblico que não devem afetar a busca
+  private cleanForSearch(text: string): string {
+    return this.normalizeText(
+      text
+        .replace(/[+✚ℕ*·.,;:!?'"“”‘’()\[\]{}<>\-—–_/|\\^§@#$%&=~`]+/g, ' ')
+    ).replace(/\s+/g, ' ');
+  }
+
+  private buildFlexibleMultiWordPattern(words: string[]): RegExp {
+    if (words.length === 0) return /$a/; // nunca casa
+    const sym = "[+✚ℕ*·.,;:!?\\'\"“”‘’()\[\]{}<>\-—–_/|\\^§@#$%&=~`]*"; // símbolos a ignorar entre letras
+    const parts = words.map(w => this.escapeRegExp(w));
+    // Permite qualquer combinação de espaços ou símbolos entre palavras
+    const pattern = parts.join(`${sym}(?:\s+${sym})?`);
+    return new RegExp(pattern, 'gi');
+  }
+
+  private escapeRegExp(str: string): string {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  private levenshtein(a: string, b: string): number {
+    if (a === b) return 0;
+    const al = a.length, bl = b.length;
+    if (al === 0) return bl; if (bl === 0) return al;
+    const dp = new Array(bl + 1);
+    for (let j = 0; j <= bl; j++) dp[j] = j;
+    for (let i = 1; i <= al; i++) {
+      let prev = i - 1;
+      dp[0] = i;
+      for (let j = 1; j <= bl; j++) {
+        const tmp = dp[j];
+        dp[j] = a[i - 1] === b[j - 1]
+          ? prev
+          : Math.min(prev + 1, dp[j] + 1, dp[j - 1] + 1);
+        prev = tmp;
+      }
+    }
+    return dp[bl];
   }
 
   async getVerseByReference(bibleId: string, reference: string): Promise<Verse | null> {
