@@ -1,14 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Animated,
   FlatList,
   Modal,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
   Pressable,
   ScrollView,
   Share,
@@ -53,29 +50,45 @@ export default function ChapterReaderScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
-  const [searchTestamentFilter, setSearchTestamentFilter] = useState<'all' | 'ot' | 'nt'>('all');
-  const [rawSearchResults, setRawSearchResults] = useState<SearchResult[] | null>(null);
-  const [searchCounts, setSearchCounts] = useState<{ all: number; ot: number; nt: number }>({ all: 0, ot: 0, nt: 0 });
-  const [bookTestamentMap, setBookTestamentMap] = useState<Map<number, 'old' | 'new'> | null>(null);
+  const [searchTestamentFilter, setSearchTestamentFilter] = useState<
+    "all" | "ot" | "nt"
+  >("all");
+  const [rawSearchResults, setRawSearchResults] = useState<
+    SearchResult[] | null
+  >(null);
+  const [searchCounts, setSearchCounts] = useState<{
+    all: number;
+    ot: number;
+    nt: number;
+  }>({ all: 0, ot: 0, nt: 0 });
+  const [bookTestamentMap, setBookTestamentMap] = useState<Map<
+    number,
+    "old" | "new"
+  > | null>(null);
 
   // Constrói mapa de testamentos de forma resiliente (suporta bases não padronizadas)
-  const buildTestamentMap = (booksList: Book[]): Map<number, 'old' | 'new'> => {
-    const map = new Map<number, 'old' | 'new'>();
+  const buildTestamentMap = (booksList: Book[]): Map<number, "old" | "new"> => {
+    const map = new Map<number, "old" | "new">();
     if (!booksList || booksList.length === 0) return map;
     // Se já vem com campo testament confiável e ambos presentes, usa direto
-    const oldCount = booksList.filter(b => b.testament === 'old').length;
-    const newCount = booksList.filter(b => b.testament === 'new').length;
+    const oldCount = booksList.filter((b) => b.testament === "old").length;
+    const newCount = booksList.filter((b) => b.testament === "new").length;
     if (oldCount > 0 && newCount > 0) {
-      booksList.forEach(b => map.set(b.id, b.testament));
+      booksList.forEach((b) => map.set(b.id, b.testament));
       return map;
     }
     // Heurística: localizar início do NT pelo primeiro livro que combine com Mateus / Matthew
-    let newStartIndex = booksList.findIndex(b => /Mateus|Matthew/i.test(b.name));
+    let newStartIndex = booksList.findIndex((b) =>
+      /Mateus|Matthew/i.test(b.name)
+    );
     if (newStartIndex === -1) {
       // fallback clássico: 39 (0-based => índice 39 significa depois de 39 livros AT) mas só se tamanho >= 66
-      if (booksList.length >= 66) newStartIndex = 39; else newStartIndex = Math.round(booksList.length * 0.6);
+      if (booksList.length >= 66) newStartIndex = 39;
+      else newStartIndex = Math.round(booksList.length * 0.6);
     }
-    booksList.forEach((b, idx) => map.set(b.id, idx < newStartIndex ? 'old' : 'new'));
+    booksList.forEach((b, idx) =>
+      map.set(b.id, idx < newStartIndex ? "old" : "new")
+    );
     return map;
   };
 
@@ -115,42 +128,8 @@ export default function ChapterReaderScreen() {
   const [selectedVerses, setSelectedVerses] = useState<Set<string>>(new Set());
   // const [showFavoriteButtons, setShowFavoriteButtons] = useState(false); // removido (botão de favoritar desativado)
 
-  // --- Header animado (esconde ao descer, mostra ao subir) ---
-  const HEADER_HEIGHT = 38; // altura base
-  const headerHeightAnim = useRef(new Animated.Value(HEADER_HEIGHT)).current;
-  const headerOpacityAnim = useRef(new Animated.Value(1)).current;
-  const lastScrollY = useRef(0);
-  const headerVisibleRef = useRef(true);
-
-  const animateHeader = (show: boolean) => {
-    if (show === headerVisibleRef.current) return;
-    headerVisibleRef.current = show;
-    Animated.parallel([
-      Animated.timing(headerHeightAnim, {
-        toValue: show ? HEADER_HEIGHT : 0,
-        duration: 190,
-        useNativeDriver: false, // height não suporta native
-      }),
-      Animated.timing(headerOpacityAnim, {
-        toValue: show ? 1 : 0,
-        duration: 160,
-        useNativeDriver: false,
-      }),
-    ]).start();
-  };
-
-  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const y = e.nativeEvent.contentOffset.y;
-    const diff = y - lastScrollY.current;
-    if (diff > 10 && y > 30) {
-      // rolando para baixo
-      animateHeader(false);
-    } else if (diff < -10) {
-      // rolando para cima
-      animateHeader(true);
-    }
-    lastScrollY.current = y;
-  };
+  // Header fixo (animação removida conforme solicitação)
+  const HEADER_HEIGHT = 38; // altura mantida para consistência
 
   useEffect(() => {
     if (bibleId && currentBookId) {
@@ -160,7 +139,7 @@ export default function ChapterReaderScreen() {
   }, [bibleId, currentBookId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const initializeReader = async () => {
-    console.log('---------------------')
+    console.log("---------------------");
     console.log("INICIANDO LEITOR");
     try {
       setLoading(true);
@@ -199,7 +178,12 @@ export default function ChapterReaderScreen() {
 
       // Save current reading position
       try {
-        console.log("SALVANDO POSIÇÃO DE LEITURA", bibleId, currentBookId, currentChapter);
+        console.log(
+          "SALVANDO POSIÇÃO DE LEITURA",
+          bibleId,
+          currentBookId,
+          currentChapter
+        );
         await DatabaseService.saveLastReading(
           bibleId,
           currentBookId,
@@ -338,7 +322,7 @@ export default function ChapterReaderScreen() {
   const openBibleSelector = async () => {
     try {
       const bibles = await DatabaseService.getBibles();
-      console.log("PASSOU openBibleSelector")
+      console.log("PASSOU openBibleSelector");
       setAvailableBibles(bibles);
       setBibleSelectorVisible(true);
     } catch (error) {
@@ -471,16 +455,24 @@ export default function ChapterReaderScreen() {
     }
   };
 
-  const applySearchFilter = useCallback((filter: 'all' | 'ot' | 'nt', source: SearchResult[], localMap?: Map<number, 'old' | 'new'> | null) => {
-    if (!source) return [] as SearchResult[];
-    if (filter === 'all') return source;
-    const mapRef = localMap ?? bookTestamentMap;
-    return source.filter(r => {
-      const testament = mapRef?.get(r.bookId);
-      if (testament) return filter === 'ot' ? testament === 'old' : testament === 'new';
-      return filter === 'ot' ? r.bookId <= 39 : r.bookId > 39;
-    });
-  }, [bookTestamentMap]);
+  const applySearchFilter = useCallback(
+    (
+      filter: "all" | "ot" | "nt",
+      source: SearchResult[],
+      localMap?: Map<number, "old" | "new"> | null
+    ) => {
+      if (!source) return [] as SearchResult[];
+      if (filter === "all") return source;
+      const mapRef = localMap ?? bookTestamentMap;
+      return source.filter((r) => {
+        const testament = mapRef?.get(r.bookId);
+        if (testament)
+          return filter === "ot" ? testament === "old" : testament === "new";
+        return filter === "ot" ? r.bookId <= 39 : r.bookId > 39;
+      });
+    },
+    [bookTestamentMap]
+  );
 
   const SEARCH_RESULTS_LIMIT = 1000; // limite padrão de resultados exibidos na busca (aumentado de 100 para 1000)
 
@@ -497,7 +489,9 @@ export default function ChapterReaderScreen() {
           localMap = buildTestamentMap(booksForMap);
           setBookTestamentMap(localMap);
         } catch {
-          console.warn('Não foi possível carregar mapa de testamentos agora, usando fallback heurístico.');
+          console.warn(
+            "Não foi possível carregar mapa de testamentos agora, usando fallback heurístico."
+          );
         }
       }
 
@@ -509,17 +503,19 @@ export default function ChapterReaderScreen() {
       // Guardar bruto
       setRawSearchResults(results);
       // Calcular contagens
-      const otCount = results.filter(r => {
+      const otCount = results.filter((r) => {
         const t = localMap?.get(r.bookId);
-        return t ? t === 'old' : r.bookId <= 39;
+        return t ? t === "old" : r.bookId <= 39;
       }).length;
-      const ntCount = results.filter(r => {
+      const ntCount = results.filter((r) => {
         const t = localMap?.get(r.bookId);
-        return t ? t === 'new' : r.bookId > 39;
+        return t ? t === "new" : r.bookId > 39;
       }).length;
       setSearchCounts({ all: results.length, ot: otCount, nt: ntCount });
       // Aplicar filtro atual
-      setSearchResults(applySearchFilter(searchTestamentFilter, results, localMap));
+      setSearchResults(
+        applySearchFilter(searchTestamentFilter, results, localMap)
+      );
     } catch (error) {
       console.error("Error searching:", error);
       Alert.alert("Erro", "Falha ao realizar busca");
@@ -531,7 +527,9 @@ export default function ChapterReaderScreen() {
   // Reaplicar filtro quando usuário troca (sem refazer query)
   useEffect(() => {
     if (rawSearchResults) {
-      setSearchResults(applySearchFilter(searchTestamentFilter, rawSearchResults));
+      setSearchResults(
+        applySearchFilter(searchTestamentFilter, rawSearchResults)
+      );
     }
   }, [searchTestamentFilter, rawSearchResults, applySearchFilter]);
 
@@ -695,7 +693,7 @@ export default function ChapterReaderScreen() {
   const handleVerseLongPress = (verse: Verse) => {
     const verseKey = `${verse.bookId}-${verse.chapterNumber}-${verse.verseNumber}`;
     setSelectionMode(true);
-  // setShowFavoriteButtons(true); // desativado
+    // setShowFavoriteButtons(true); // desativado
 
     // Add the long-pressed verse to selection
     const newSelected = new Set(selectedVerses);
@@ -721,7 +719,7 @@ export default function ChapterReaderScreen() {
     // Exit selection mode if no verses selected
     if (newSelected.size === 0) {
       setSelectionMode(false);
-  // setShowFavoriteButtons(false); // desativado
+      // setShowFavoriteButtons(false); // desativado
     }
   };
 
@@ -729,7 +727,7 @@ export default function ChapterReaderScreen() {
   const clearSelection = () => {
     setSelectionMode(false);
     setSelectedVerses(new Set());
-  // setShowFavoriteButtons(false); // desativado
+    // setShowFavoriteButtons(false); // desativado
   };
 
   // Share selected verses
@@ -805,27 +803,38 @@ Link do app: https://readbible.app`;
     while ((match = symbolRegex.exec(text)) !== null) {
       if (match.index > cursor) {
         parts.push(
-          <Text key={`seg-${cursor}`}>{text.substring(cursor, match.index)}</Text>
+          <Text key={`seg-${cursor}`}>
+            {text.substring(cursor, match.index)}
+          </Text>
         );
       }
       const symbol = match[1];
-      if (symbol === '✚') {
+      if (symbol === "✚") {
         const pos = match.index;
-        const refsAtPos = verse.verseReferences?.filter(r => r.position === pos) || verse.verseReferences || [];
+        const refsAtPos =
+          verse.verseReferences?.filter((r) => r.position === pos) ||
+          verse.verseReferences ||
+          [];
         parts.push(
           <Text
             key={`ref-${pos}`}
-            onPress={() => refsAtPos.length && openReferencesModal(refsAtPos as any)}
-            style={{ color: '#1b5e20', fontWeight: 'bold', fontSize: 13 }}>
+            onPress={() =>
+              refsAtPos.length && openReferencesModal(refsAtPos as any)
+            }
+            style={{ color: "#1b5e20", fontWeight: "bold", fontSize: 13 }}
+          >
             {symbol}
           </Text>
         );
-      } else if (symbol === 'ℕ') {
+      } else if (symbol === "ℕ") {
         parts.push(
           <Text
             key={`note-${match.index}`}
-            onPress={() => verse.notes && verse.notes.length && openNotes(verse.notes)}
-            style={{ color: '#1565c0', fontWeight: 'bold', fontSize: 13 }}>
+            onPress={() =>
+              verse.notes && verse.notes.length && openNotes(verse.notes)
+            }
+            style={{ color: "#1565c0", fontWeight: "bold", fontSize: 13 }}
+          >
             ℕ
           </Text>
         );
@@ -841,9 +850,19 @@ Link do app: https://readbible.app`;
   // Renderização dos títulos já com estilo neutro
   const renderTitleText = (titleText: string, level: number = 1) => {
     const levelSizes: Record<number, number> = { 1: 16, 2: 15, 3: 14 };
-    const levelColors: Record<number, string> = { 1: '#444', 2: '#555', 3: '#666' };
+    const levelColors: Record<number, string> = {
+      1: "#444",
+      2: "#555",
+      3: "#666",
+    };
     return (
-      <Text style={{ fontSize: levelSizes[level] || 20, fontWeight: '700', color: levelColors[level] || '#555' }}>
+      <Text
+        style={{
+          fontSize: levelSizes[level] || 20,
+          fontWeight: "700",
+          color: levelColors[level] || "#555",
+        }}
+      >
         {titleText}
       </Text>
     );
@@ -856,7 +875,7 @@ Link do app: https://readbible.app`;
       <View
         style={[
           styles.verseContainer,
-          { flexDirection: 'column' }, // títulos acima
+          { flexDirection: "column" }, // títulos acima
         ]}
       >
         {/* TÍTULOS (fora da área clicável) */}
@@ -873,18 +892,27 @@ Link do app: https://readbible.app`;
         {/* ÁREA CLICÁVEL APENAS DO VERSÍCULO */}
         <Pressable
           style={[
-            { flexDirection: 'row', alignItems: 'flex-start' },
+            { flexDirection: "row", alignItems: "flex-start" },
             isSelected && styles.verseContainerSelected,
           ]}
-          onPress={() => (selectionMode ? handleVerseSelection(item) : undefined)}
+          onPress={() =>
+            selectionMode ? handleVerseSelection(item) : undefined
+          }
           onLongPress={() => handleVerseLongPress(item)}
           delayLongPress={500}
         >
           {selectionMode && (
             <View style={styles.checkboxColumn}>
               <View style={styles.checkboxContainer}>
-                <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
-                  {isSelected && <Ionicons name="checkmark" size={14} color="#fff" />}
+                <View
+                  style={[
+                    styles.checkbox,
+                    isSelected && styles.checkboxSelected,
+                  ]}
+                >
+                  {isSelected && (
+                    <Ionicons name="checkmark" size={14} color="#fff" />
+                  )}
                 </View>
               </View>
             </View>
@@ -899,10 +927,12 @@ Link do app: https://readbible.app`;
           >
             <Text style={styles.verseText}>
               <Text style={styles.verseNumber}>{item.verseNumber}</Text>
-              <Text style={{ fontWeight: 'bold', color: '#222' }}> - </Text>
+              <Text style={{ fontWeight: "bold", color: "#222" }}> - </Text>
               {renderVerseText(item.text, item)}
             </Text>
-            <View style={styles.verseButtonsRow}>{/* vazio (refs/notas inline) */}</View>
+            <View style={styles.verseButtonsRow}>
+              {/* vazio (refs/notas inline) */}
+            </View>
           </View>
         </Pressable>
       </View>
@@ -942,14 +972,6 @@ Link do app: https://readbible.app`;
         >
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
-
-        <View style={styles.headerCenter}>
-          <Text style={styles.headerSubtitle}>
-            {selectionMode
-              ? "Toque para selecionar versículos"
-              : bible?.abbreviation}
-          </Text>
-        </View>
 
         <View style={styles.headerActions}>
           {selectionMode && selectedVerses.size > 0 && (
@@ -999,19 +1021,23 @@ Link do app: https://readbible.app`;
         </View>
       </View>
 
-      {/* Animated Chapter Header (oculta ao rolar para baixo) */}
-      <Animated.View
-        style={[
-          styles.fixedChapterHeader,
-          { height: headerHeightAnim, opacity: headerOpacityAnim, overflow: 'hidden' },
-        ]}
-      >
-        <View style={{ flex: 1, justifyContent: 'center' }}>
-          <Text style={styles.chapterTitle}>
+      {/* Chapter Header fixo */}
+      <View style={[styles.fixedChapterHeader, { minHeight: HEADER_HEIGHT }]}>
+        <View style={styles.chapterHeaderContent}>
+          <Text
+            style={styles.chapterTitle}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
             {book?.name} {currentChapter}
           </Text>
+          {bible?.abbreviation ? (
+            <View style={styles.versionBadge}>
+              <Text style={styles.versionBadgeText}>{bible.abbreviation}</Text>
+            </View>
+          ) : null}
         </View>
-      </Animated.View>
+      </View>
 
       {/* Verses List */}
       <FlatList
@@ -1020,12 +1046,7 @@ Link do app: https://readbible.app`;
         keyExtractor={(item) => item.id.toString()}
         showsVerticalScrollIndicator={false}
         style={styles.versesList}
-        contentContainerStyle={[
-          styles.versesListContent,
-          { paddingTop: (headerVisibleRef.current ? 8 : 8) + 0 },
-        ]}
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
+        contentContainerStyle={[styles.versesListContent, { paddingTop: 8 }]}
       />
 
       {/* Floating Navigation Buttons */}
@@ -1115,21 +1136,32 @@ Link do app: https://readbible.app`;
 
           {/* Filtros de Testamento */}
           <View style={styles.testamentFilterBar}>
-            {([
-              { key: 'all', label: 'Tudo', count: searchCounts.all },
-              { key: 'ot', label: 'AT', count: searchCounts.ot },
-              { key: 'nt', label: 'NT', count: searchCounts.nt },
-            ] as const).map(f => {
+            {(
+              [
+                { key: "all", label: "Tudo", count: searchCounts.all },
+                { key: "ot", label: "AT", count: searchCounts.ot },
+                { key: "nt", label: "NT", count: searchCounts.nt },
+              ] as const
+            ).map((f) => {
               const active = searchTestamentFilter === f.key;
               return (
                 <TouchableOpacity
                   key={f.key}
-                  style={[styles.testamentFilterButton, active && styles.testamentFilterButtonActive]}
+                  style={[
+                    styles.testamentFilterButton,
+                    active && styles.testamentFilterButtonActive,
+                  ]}
                   onPress={() => setSearchTestamentFilter(f.key)}
                   disabled={searchLoading}
                 >
-                  <Text style={[styles.testamentFilterText, active && styles.testamentFilterTextActive]}>
-                    {f.label}{rawSearchResults ? ` (${f.count})` : ''}
+                  <Text
+                    style={[
+                      styles.testamentFilterText,
+                      active && styles.testamentFilterTextActive,
+                    ]}
+                  >
+                    {f.label}
+                    {rawSearchResults ? ` (${f.count})` : ""}
                   </Text>
                 </TouchableOpacity>
               );
@@ -1524,7 +1556,7 @@ const styles = StyleSheet.create({
   },
   checkboxColumn: {
     marginRight: 8,
-    alignItems: 'center',
+    alignItems: "center",
     paddingTop: 4,
   },
   header: {
@@ -1692,20 +1724,20 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: "#f8f9fa",
     borderWidth: 1,
-    borderColor: '#e0e0e0',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
+    borderColor: "#e0e0e0",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.15,
     shadowRadius: 1.5,
     elevation: 2,
   },
   favoriteBelowButtonActive: {
-    backgroundColor: '#ffe5e5',
-    borderColor: '#ffcdd2',
+    backgroundColor: "#ffe5e5",
+    borderColor: "#ffcdd2",
   },
   favoriteButtonText: {
     fontSize: 12,
@@ -1791,34 +1823,34 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   testamentFilterBar: {
-    flexDirection: 'row',
-    backgroundColor: '#fff',
+    flexDirection: "row",
+    backgroundColor: "#fff",
     paddingHorizontal: 16,
     paddingBottom: 8,
     paddingTop: 4,
     gap: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: "#e0e0e0",
   },
   testamentFilterButton: {
     paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 18,
-    backgroundColor: '#f0f4f8',
+    backgroundColor: "#f0f4f8",
     borderWidth: 1,
-    borderColor: '#d0d7de',
+    borderColor: "#d0d7de",
   },
   testamentFilterButtonActive: {
-    backgroundColor: '#2196F3',
-    borderColor: '#2196F3',
+    backgroundColor: "#2196F3",
+    borderColor: "#2196F3",
   },
   testamentFilterText: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#2196F3',
+    fontWeight: "600",
+    color: "#2196F3",
   },
   testamentFilterTextActive: {
-    color: '#fff',
+    color: "#fff",
   },
   emptyState: {
     alignItems: "center",
@@ -2149,6 +2181,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 4,
     backgroundColor: "#fff",
+  },
+
+  chapterHeaderContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+
+  versionBadge: {
+    backgroundColor: "#4b4f52ff",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 16,
+    shadowColor: "#000",
+    shadowOpacity: 0.18,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+
+  versionBadgeText: {
+    color: "#fff",
+    fontWeight: "700",
+    letterSpacing: 0.5,
+    fontSize: 13,
   },
 
   chapterTitle: {
