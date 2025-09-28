@@ -46,7 +46,6 @@ class DatabaseService {
       this.healthFailures = 0;
       this.lastHealthOk = now;
     } catch (err: any) {
-      const msg = String(err?.message || err);
       if (this.isNativePrepareNPE(err)) {
         this.healthFailures += 1;
         const failureCount = this.healthFailures;
@@ -202,16 +201,22 @@ class DatabaseService {
       while (attempt < 2) {
         try {
           const rows = await this.db!.getAllAsync('SELECT * FROM bibles ORDER BY name');
-          const mapped = rows.map((row: any) => ({
-            id: row.id as string,
-            name: row.name as string,
-            abbreviation: row.abbreviation as string,
-            language: row.language as string,
-            fileName: row.fileName as string,
-            isDownloaded: Boolean(row.isDownloaded),
-            downloadDate: row.downloadDate as string | undefined,
-            size: row.size as number | undefined,
-          }));
+          const mapped = rows.map((row: any) => {
+            // Limpar extensões indesejadas no nome exibido (.bbl, .bbl.db, .db)
+            let displayName = String(row.name || '');
+            displayName = displayName.replace(/\.bbl(?:\.db)?$/i, '');
+            displayName = displayName.replace(/\.db$/i, '');
+            return {
+              id: row.id as string,
+              name: displayName,
+              abbreviation: row.abbreviation as string,
+              language: row.language as string,
+              fileName: row.fileName as string,
+              isDownloaded: Boolean(row.isDownloaded),
+              downloadDate: row.downloadDate as string | undefined,
+              size: row.size as number | undefined,
+            };
+          });
           this.biblesCache = { data: mapped, updatedAt: Date.now() };
           console.log('BÍBLIAS NO BANCO', mapped.length);
           console.log('----------------------');

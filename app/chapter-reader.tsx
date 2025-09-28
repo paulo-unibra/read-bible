@@ -33,7 +33,8 @@ export default function ChapterReaderScreen() {
   const initialBookId = parseInt(params.bookId as string);
   const initialChapter = parseInt(params.chapterNumber as string);
 
-  // Removido estado de bible (não utilizado diretamente no header após ajustes)
+  // Abreviação da Bíblia atual para exibir no header
+  const [bibleAbbrev, setBibleAbbrev] = useState<string>('');
   const [book, setBook] = useState<Book | null>(null);
   const [currentBookId, setCurrentBookId] = useState(initialBookId);
   const [currentChapter, setCurrentChapter] = useState(initialChapter);
@@ -150,12 +151,22 @@ export default function ChapterReaderScreen() {
   };
 
   const isDark = readerTheme === 'dark';
-  const verseTextDynamic = { fontSize: applyFontScale(16), color: isDark ? '#ececec' : '#333', lineHeight: applyFontScale(24) } as const;
+  // Paleta ajustada para suavizar o branco e links no modo escuro
+  const colorScheme = {
+    verseText: isDark ? '#d4d4d4' : '#333',
+    verseNumber: isDark ? '#7fb4e8' : '#2196F3',
+    refSymbol: isDark ? '#6fa87b' : '#1b5e20',
+    noteSymbol: isDark ? '#6a8fbf' : '#1565c0',
+    dash: isDark ? '#b0b0b0' : '#222',
+    icon: isDark ? '#e0e6ed' : '#2196F3', // ícone claro suave no dark
+    iconInactive: isDark ? '#b0b6bd' : '#666', // ícone inativo no dark
+  } as const;
+  const verseTextDynamic = { fontSize: applyFontScale(16), color: colorScheme.verseText, lineHeight: applyFontScale(24) } as const;
   const screenBackground = { backgroundColor: isDark ? '#121212' : '#f5f5f5' };
   const versesListBg = { backgroundColor: isDark ? '#121212' : '#fff' };
   const headerBg = { backgroundColor: isDark ? '#1d1d1d' : '#fff', borderBottomColor: isDark ? '#2b2b2b' : '#e0e0e0' };
   const chapterHeaderBg = { backgroundColor: isDark ? '#1d1d1d' : '#fff' };
-  const iconColor = isDark ? '#e0e0e0' : '#333';
+  const iconColor = colorScheme.icon;
 
   const openSettings = () => setSettingsModalVisible(true);
   const closeSettings = () => setSettingsModalVisible(false);
@@ -195,9 +206,9 @@ export default function ChapterReaderScreen() {
       // Get bible info
       const bibles = await DatabaseService.getBibles();
       console.log("ACHOU AS BIBLIAS", bibles.length);
-      const currentBible = bibles.find((b) => b.id === bibleId);
-      if (!currentBible) throw new Error("Bible not found");
-  // estado bible removido; mantemos somente currentBible local
+  const currentBible = bibles.find((b) => b.id === bibleId);
+  if (!currentBible) throw new Error("Bible not found");
+  setBibleAbbrev(currentBible.abbreviation || '');
 
       // Open bible connection
       await bibleReaderService.openBible(bibleId, currentBible.fileName);
@@ -869,7 +880,7 @@ Link do app: https://readbible.app`;
             onPress={() =>
               refsAtPos.length && openReferencesModal(refsAtPos as any)
             }
-            style={{ color: "#1b5e20", fontWeight: "bold", fontSize: 13 }}
+            style={{ color: colorScheme.refSymbol, fontWeight: "600", fontSize: 13 }}
           >
             {symbol}
           </Text>
@@ -881,7 +892,7 @@ Link do app: https://readbible.app`;
             onPress={() =>
               verse.notes && verse.notes.length && openNotes(verse.notes)
             }
-            style={{ color: "#1565c0", fontWeight: "bold", fontSize: 13 }}
+            style={{ color: colorScheme.noteSymbol, fontWeight: "600", fontSize: 13 }}
           >
             ℕ
           </Text>
@@ -898,17 +909,15 @@ Link do app: https://readbible.app`;
   // Renderização dos títulos já com estilo neutro
   const renderTitleText = (titleText: string, level: number = 1) => {
     const levelSizes: Record<number, number> = { 1: 16, 2: 15, 3: 14 };
-    const levelColors: Record<number, string> = {
-      1: "#444",
-      2: "#555",
-      3: "#666",
-    };
+    const lightColors: Record<number, string> = { 1: '#444', 2: '#555', 3: '#666' };
+    const darkColors: Record<number, string> = { 1: '#e0e0e0', 2: '#cfcfcf', 3: '#bdbdbd' };
+    const palette = isDark ? darkColors : lightColors;
     return (
       <Text
         style={{
-          fontSize: levelSizes[level] || 20,
-          fontWeight: "700",
-          color: levelColors[level] || "#555",
+          fontSize: applyFontScale(levelSizes[level] || 20),
+          fontWeight: '700',
+          color: palette[level] || (isDark ? '#d0d0d0' : '#555'),
         }}
       >
         {titleText}
@@ -976,8 +985,8 @@ Link do app: https://readbible.app`;
             ]}
           >
             <Text style={[styles.verseText, verseTextDynamic]}>
-              <Text style={styles.verseNumber}>{item.verseNumber}</Text>
-              <Text style={{ fontWeight: "bold", color: "#222" }}> - </Text>
+              <Text style={[styles.verseNumber, isDark && { color: colorScheme.verseNumber }]}>{item.verseNumber}</Text>
+              <Text style={{ fontWeight: "bold", color: colorScheme.dash }}> - </Text>
               {renderVerseText(item.text, item)}
             </Text>
             <View style={styles.verseButtonsRow}>
@@ -1016,12 +1025,19 @@ Link do app: https://readbible.app`;
     <SafeAreaView style={[styles.container, screenBackground]}>
       {/* Header */}
       <View style={[styles.header, headerBg]}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={styles.backButton}
-        >
-          <Ionicons name="arrow-back" size={24} color={iconColor} />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backButton}
+          >
+              <Ionicons name="arrow-back" size={24} color={iconColor} />
+          </TouchableOpacity>
+          {bibleAbbrev ? (
+            <View style={styles.versionHeaderBadge}>
+              <Text style={styles.versionHeaderBadgeText}>{bibleAbbrev}</Text>
+            </View>
+          ) : null}
+        </View>
 
         <View style={styles.headerActions}>
           {selectionMode && selectedVerses.size > 0 && (
@@ -1030,13 +1046,13 @@ Link do app: https://readbible.app`;
                 onPress={shareSelectedVerses}
                 style={styles.headerButton}
               >
-                <Ionicons name="share-outline" size={24} color="#2196F3" />
+                  <Ionicons name="share-outline" size={24} color={iconColor} />
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={clearSelection}
                 style={styles.headerButton}
               >
-                <Ionicons name="close" size={24} color="#666" />
+                  <Ionicons name="close" size={24} color={colorScheme.iconInactive} />
               </TouchableOpacity>
             </>
           )}
@@ -1046,25 +1062,25 @@ Link do app: https://readbible.app`;
                 onPress={() => setSearchModalVisible(true)}
                 style={styles.headerButton}
               >
-                <Ionicons name="search" size={24} color={iconColor} />
+                  <Ionicons name="search" size={24} color={iconColor} />
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={openBookSelector}
                 style={styles.headerButton}
               >
-                <Ionicons name="library" size={24} color={iconColor} />
+                  <Ionicons name="library" size={24} color={iconColor} />
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={openBibleSelector}
                 style={styles.headerButton}
               >
-                <Ionicons name="book" size={24} color={iconColor} />
+                  <Ionicons name="book" size={24} color={iconColor} />
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => setChapterSelectorVisible(true)}
                 style={styles.headerButton}
               >
-                <Ionicons name="list" size={24} color={iconColor} />
+                  <Ionicons name="list" size={24} color={iconColor} />
               </TouchableOpacity>
             </>
           )}
@@ -1101,14 +1117,22 @@ Link do app: https://readbible.app`;
       <View
         style={[
           styles.floatingNavigation,
-          { bottom: Math.max(30, insets.bottom + 20) }, // Dynamic positioning based on safe area
+          {
+            bottom: Math.max(30, insets.bottom + 20),
+            backgroundColor: isDark ? '#1e1e1e' : '#fff',
+            borderWidth: isDark ? 1 : 0,
+            borderColor: isDark ? '#2b2b2b' : 'transparent'
+          },
         ]}
       >
         <TouchableOpacity
           style={[
             styles.floatingNavButton,
-            (isFirstOfBible || navigating || loading) &&
+            isDark && { backgroundColor: '#2a2a2a' },
+            (isFirstOfBible || navigating || loading) && [
               styles.floatingNavButtonDisabled,
+              isDark && { backgroundColor: '#333' },
+            ],
           ]}
           onPress={() => {
             if (!navigating && !loading) {
@@ -1117,18 +1141,25 @@ Link do app: https://readbible.app`;
           }}
           disabled={isFirstOfBible || navigating || loading}
         >
-          <Ionicons
-            name="chevron-back"
-            size={24}
-            color={isFirstOfBible || navigating || loading ? "#ccc" : "#2196F3"}
-          />
+            <Ionicons
+              name="chevron-back"
+              size={24}
+              color={
+                isFirstOfBible || navigating || loading
+                  ? colorScheme.iconInactive
+                  : colorScheme.icon
+              }
+            />
         </TouchableOpacity>
 
         <TouchableOpacity
           style={[
             styles.floatingNavButton,
-            (isLastOfBible || navigating || loading) &&
+            isDark && { backgroundColor: '#2a2a2a' },
+            (isLastOfBible || navigating || loading) && [
               styles.floatingNavButtonDisabled,
+              isDark && { backgroundColor: '#333' },
+            ],
           ]}
           onPress={() => {
             if (!navigating && !loading) {
@@ -1137,11 +1168,15 @@ Link do app: https://readbible.app`;
           }}
           disabled={isLastOfBible || navigating || loading}
         >
-          <Ionicons
-            name="chevron-forward"
-            size={24}
-            color={isLastOfBible || navigating || loading ? "#ccc" : "#2196F3"}
-          />
+            <Ionicons
+              name="chevron-forward"
+              size={24}
+              color={
+                isLastOfBible || navigating || loading
+                  ? colorScheme.iconInactive
+                  : colorScheme.icon
+              }
+            />
         </TouchableOpacity>
       </View>
 
@@ -1156,7 +1191,7 @@ Link do app: https://readbible.app`;
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Buscar Versículos</Text>
             <TouchableOpacity onPress={() => setSearchModalVisible(false)}>
-              <Ionicons name="close" size={24} color="#333" />
+                <Ionicons name="close" size={24} color={iconColor} />
             </TouchableOpacity>
           </View>
 
@@ -1252,7 +1287,7 @@ Link do app: https://readbible.app`;
               <TouchableOpacity
                 onPress={() => setChapterSelectorVisible(false)}
               >
-                <Ionicons name="close" size={24} color="#333" />
+                  <Ionicons name="close" size={24} color={iconColor} />
               </TouchableOpacity>
             </View>
 
@@ -1300,7 +1335,7 @@ Link do app: https://readbible.app`;
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Notas do Versículo</Text>
               <TouchableOpacity onPress={() => setNotesModalVisible(false)}>
-                <Ionicons name="close" size={24} color="#333" />
+                  <Ionicons name="close" size={24} color={iconColor} />
               </TouchableOpacity>
             </View>
 
@@ -1343,7 +1378,7 @@ Link do app: https://readbible.app`;
               <TouchableOpacity
                 onPress={() => setReferencesModalVisible(false)}
               >
-                <Ionicons name="close" size={24} color="#333" />
+                  <Ionicons name="close" size={24} color={iconColor} />
               </TouchableOpacity>
             </View>
 
@@ -1465,10 +1500,10 @@ Link do app: https://readbible.app`;
         <View style={styles.modalOverlay}>
           <View style={styles.notesModal}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Referência Bíblica</Text>
-              <TouchableOpacity onPress={() => setVerseRefModalVisible(false)}>
-                <Ionicons name="close" size={24} color="#333" />
-              </TouchableOpacity>
+                <Text style={styles.modalTitle}>Referência Bíblica</Text>
+                <TouchableOpacity onPress={() => setVerseRefModalVisible(false)}>
+                  <Ionicons name="close" size={24} color={iconColor} />
+                </TouchableOpacity>
             </View>
 
             <ScrollView style={styles.notesContent}>
@@ -1497,11 +1532,11 @@ Link do app: https://readbible.app`;
         onRequestClose={() => setBibleSelectorVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.selectorModal}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Escolher Versão da Bíblia</Text>
+          <View style={[styles.selectorModal, isDark && { backgroundColor: '#1e1e1e' }]}>
+            <View style={[styles.modalHeader, isDark && { backgroundColor: '#1d1d1d', borderBottomColor: '#2b2b2b' }]}>
+              <Text style={[styles.modalTitle, isDark && { color: '#e0e0e0' }]}>Escolher Versão da Bíblia</Text>
               <TouchableOpacity onPress={() => setBibleSelectorVisible(false)}>
-                <Ionicons name="close" size={24} color="#333" />
+                  <Ionicons name="close" size={24} color={iconColor} />
               </TouchableOpacity>
             </View>
 
@@ -1509,32 +1544,37 @@ Link do app: https://readbible.app`;
               data={availableBibles}
               keyExtractor={(item) => item.id}
               showsVerticalScrollIndicator={false}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[
-                    styles.selectorItem,
-                    item.id === bibleId && styles.selectedSelectorItem,
-                  ]}
-                  onPress={() => selectBible(item)}
-                >
-                  <View style={styles.selectorItemContent}>
-                    <Text
-                      style={[
-                        styles.selectorItemTitle,
-                        item.id === bibleId && styles.selectedSelectorItemTitle,
-                      ]}
-                    >
-                      {item.name}
-                    </Text>
-                    <Text style={styles.selectorItemSubtitle}>
-                      {item.abbreviation} • {item.language.toUpperCase()}
-                    </Text>
-                  </View>
-                  {item.id === bibleId && (
-                    <Ionicons name="checkmark" size={24} color="#2196F3" />
-                  )}
-                </TouchableOpacity>
-              )}
+              renderItem={({ item }) => {
+                const selected = item.id === bibleId;
+                return (
+                  <TouchableOpacity
+                    style={[
+                      styles.selectorItem,
+                      isDark && { borderBottomColor: '#2a2a2a' },
+                      selected && (isDark ? { backgroundColor: '#263850' } : styles.selectedSelectorItem),
+                    ]}
+                    onPress={() => selectBible(item)}
+                  >
+                    <View style={styles.selectorItemContent}>
+                      <Text
+                        style={[
+                          styles.selectorItemTitle,
+                          isDark && { color: '#e0e0e0' },
+                          selected && (isDark ? { color: '#90caf9', fontWeight: '600' } : styles.selectedSelectorItemTitle),
+                        ]}
+                      >
+                        {item.name}
+                      </Text>
+                      <Text style={[styles.selectorItemSubtitle, isDark && { color: '#b0b0b0' }] }>
+                        {item.abbreviation} • {item.language.toUpperCase()}
+                      </Text>
+                    </View>
+                    {selected && (
+                      <Ionicons name="checkmark" size={24} color={isDark ? '#90caf9' : '#2196F3'} />
+                    )}
+                  </TouchableOpacity>
+                );
+              }}
             />
           </View>
         </View>
@@ -1548,11 +1588,11 @@ Link do app: https://readbible.app`;
         onRequestClose={() => setBookSelectorVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.selectorModal}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Escolher Livro</Text>
+          <View style={[styles.selectorModal, isDark && { backgroundColor: '#1e1e1e' }]}>
+            <View style={[styles.modalHeader, isDark && { backgroundColor: '#1d1d1d', borderBottomColor: '#2b2b2b' }]}>
+              <Text style={[styles.modalTitle, isDark && { color: '#e0e0e0' }]}>Escolher Livro</Text>
               <TouchableOpacity onPress={() => setBookSelectorVisible(false)}>
-                <Ionicons name="close" size={24} color="#333" />
+                  <Ionicons name="close" size={24} color={iconColor} />
               </TouchableOpacity>
             </View>
 
@@ -1560,35 +1600,37 @@ Link do app: https://readbible.app`;
               data={availableBooks}
               keyExtractor={(item) => item.id.toString()}
               showsVerticalScrollIndicator={false}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[
-                    styles.selectorItem,
-                    item.id === currentBookId && styles.selectedSelectorItem,
-                  ]}
-                  onPress={() => selectBook(item)}
-                >
-                  <View style={styles.selectorItemContent}>
-                    <Text
-                      style={[
-                        styles.selectorItemTitle,
-                        item.id === currentBookId &&
-                          styles.selectedSelectorItemTitle,
-                      ]}
-                    >
-                      {item.name}
-                    </Text>
-                    <Text style={styles.selectorItemSubtitle}>
-                      {item.testament === "old"
-                        ? "Antigo Testamento"
-                        : "Novo Testamento"}
-                    </Text>
-                  </View>
-                  {item.id === currentBookId && (
-                    <Ionicons name="checkmark" size={24} color="#2196F3" />
-                  )}
-                </TouchableOpacity>
-              )}
+              renderItem={({ item }) => {
+                const selected = item.id === currentBookId;
+                return (
+                  <TouchableOpacity
+                    style={[
+                      styles.selectorItem,
+                      isDark && { borderBottomColor: '#2a2a2a' },
+                      selected && (isDark ? { backgroundColor: '#263850' } : styles.selectedSelectorItem),
+                    ]}
+                    onPress={() => selectBook(item)}
+                  >
+                    <View style={styles.selectorItemContent}>
+                      <Text
+                        style={[
+                          styles.selectorItemTitle,
+                          isDark && { color: '#e0e0e0' },
+                          selected && (isDark ? { color: '#90caf9', fontWeight: '600' } : styles.selectedSelectorItemTitle),
+                        ]}
+                      >
+                        {item.name}
+                      </Text>
+                      <Text style={[styles.selectorItemSubtitle, isDark && { color: '#b0b0b0' }] }>
+                        {item.testament === 'old' ? 'Antigo Testamento' : 'Novo Testamento'}
+                      </Text>
+                    </View>
+                    {selected && (
+                      <Ionicons name="checkmark" size={24} color={isDark ? '#90caf9' : '#2196F3'} />
+                    )}
+                  </TouchableOpacity>
+                );
+              }}
             />
           </View>
         </View>
@@ -2298,6 +2340,19 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0.5,
     fontSize: 13,
+  },
+  versionHeaderBadge: {
+    marginLeft: 4,
+    backgroundColor: '#2196F3',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 14,
+  },
+  versionHeaderBadgeText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 13,
+    letterSpacing: 0.5
   },
 
   chapterTitle: {

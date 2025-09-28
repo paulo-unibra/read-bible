@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DatabaseService from '../services/DatabaseService';
@@ -71,6 +71,31 @@ export default function SettingsScreen() {
     saveSetting('theme', newTheme);
   };
 
+  // Dynamic theme + font scaling used also in chapter reader
+  const isDark = theme === 'dark';
+  const applyFontScale = useCallback((base: number) => {
+    switch (fontSize) {
+      case 'small': return base * 0.9;
+      case 'large': return base * 1.2;
+      default: return base;
+    }
+  }, [fontSize]);
+
+  const colors = {
+    bg: isDark ? '#121212' : '#f5f5f5',
+    headerBg: isDark ? '#1d1d1d' : '#fff',
+    sectionBg: isDark ? '#1e1e1e' : '#fff',
+    border: isDark ? '#2b2b2b' : '#e0e0e0',
+    cardBorder: isDark ? '#2b2b2b' : '#ddd',
+    textPrimary: isDark ? '#e0e0e0' : '#333',
+    textSecondary: isDark ? '#b0b0b0' : '#666',
+    accent: isDark ? '#90caf9' : '#2196F3',
+    selectedBg: isDark ? '#263850' : '#2196F3',
+    dangerBg: isDark ? '#3a1f1f' : '#fff5f5',
+    dangerBorder: isDark ? '#873838' : '#f44336',
+    dangerText: isDark ? '#ff8a80' : '#f44336',
+  } as const;
+
   const handleNotificationToggle = async (enabled: boolean) => {
     try {
       setNotificationsEnabled(enabled);
@@ -128,19 +153,19 @@ export default function SettingsScreen() {
 
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
+      <View style={[styles.header, { backgroundColor: colors.headerBg, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
+          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Configurações</Text>
+        <Text style={[styles.headerTitle, { color: colors.textPrimary, fontSize: applyFontScale(20) }]}>Configurações</Text>
       </View>
 
-      <ScrollView style={styles.content}>
+      <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 40 }}>
         {/* Bible Selection */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Bíblia Preferida</Text>
-          <Text style={styles.sectionDescription}>
+        <View style={[styles.section, { backgroundColor: colors.sectionBg }]}>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Bíblia Preferida</Text>
+          <Text style={[styles.sectionDescription, { color: colors.textSecondary }] }>
             Selecione a versão da Bíblia que será usada por padrão
           </Text>
           
@@ -151,40 +176,49 @@ export default function SettingsScreen() {
                   key={bible.id}
                   style={[
                     styles.option,
-                    selectedBibleId === bible.id && styles.selectedOption
+                    {
+                      borderColor: colors.cardBorder,
+                      backgroundColor: colors.sectionBg,
+                    },
+                    selectedBibleId === bible.id && {
+                      backgroundColor: colors.selectedBg,
+                      borderColor: colors.selectedBg,
+                    }
                   ]}
                   onPress={() => handleBibleChange(bible.id)}
                 >
                   <View style={styles.optionContent}>
                     <Text style={[
                       styles.optionTitle,
-                      selectedBibleId === bible.id && styles.selectedOptionText
+                      { color: colors.textPrimary, fontSize: applyFontScale(16) },
+                      selectedBibleId === bible.id && { color: '#fff' }
                     ]}>
                       {bible.name}
                     </Text>
                     <Text style={[
                       styles.optionSubtitle,
-                      selectedBibleId === bible.id && styles.selectedOptionText
+                      { color: colors.textSecondary, fontSize: applyFontScale(14) },
+                      selectedBibleId === bible.id && { color: '#fff' }
                     ]}>
                       {bible.language} • {bible.abbreviation}
                     </Text>
                   </View>
                   {selectedBibleId === bible.id && (
-                    <Ionicons name="checkmark-circle" size={24} color="#fff" />
+                    <Ionicons name="checkmark-circle" size={24} color={isDark ? '#fff' : '#fff'} />
                   )}
                 </TouchableOpacity>
               ))}
             </View>
           ) : (
-            <Text style={styles.noBiblesText}>
+            <Text style={[styles.noBiblesText, { color: colors.textSecondary }]}>
               Nenhuma Bíblia baixada. Vá para &quot;Gerenciar Bíblias&quot; para baixar uma versão.
             </Text>
           )}
         </View>
 
         {/* Font Size */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Tamanho da Fonte</Text>
+        <View style={[styles.section, { backgroundColor: colors.sectionBg }]}>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Tamanho da Fonte</Text>
           <View style={styles.optionsContainer}>
             {[
               { key: 'small', label: 'Pequena' },
@@ -195,13 +229,15 @@ export default function SettingsScreen() {
                 key={option.key}
                 style={[
                   styles.option,
-                  fontSize === option.key && styles.selectedOption
+                  { borderColor: colors.cardBorder, backgroundColor: colors.sectionBg },
+                  fontSize === option.key && { backgroundColor: colors.selectedBg, borderColor: colors.selectedBg }
                 ]}
                 onPress={() => handleFontSizeChange(option.key as any)}
               >
                 <Text style={[
                   styles.optionTitle,
-                  fontSize === option.key && styles.selectedOptionText
+                  { color: colors.textPrimary, fontSize: applyFontScale(16) },
+                  fontSize === option.key && { color: '#fff' }
                 ]}>
                   {option.label}
                 </Text>
@@ -214,8 +250,8 @@ export default function SettingsScreen() {
         </View>
 
         {/* Theme */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Tema</Text>
+        <View style={[styles.section, { backgroundColor: colors.sectionBg }]}>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Tema</Text>
           <View style={styles.optionsContainer}>
             {[
               { key: 'light', label: 'Claro' },
@@ -225,13 +261,15 @@ export default function SettingsScreen() {
                 key={option.key}
                 style={[
                   styles.option,
-                  theme === option.key && styles.selectedOption
+                  { borderColor: colors.cardBorder, backgroundColor: colors.sectionBg },
+                  theme === option.key && { backgroundColor: colors.selectedBg, borderColor: colors.selectedBg }
                 ]}
                 onPress={() => handleThemeChange(option.key as any)}
               >
                 <Text style={[
                   styles.optionTitle,
-                  theme === option.key && styles.selectedOptionText
+                  { color: colors.textPrimary, fontSize: applyFontScale(16) },
+                  theme === option.key && { color: '#fff' }
                 ]}>
                   {option.label}
                 </Text>
@@ -244,10 +282,10 @@ export default function SettingsScreen() {
         </View>
 
         {/* Notifications */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Notificações Diárias</Text>
+        <View style={[styles.section, { backgroundColor: colors.sectionBg }]}>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Notificações Diárias</Text>
           <View style={styles.switchContainer}>
-            <Text style={styles.switchLabel}>Receber lembretes diários</Text>
+            <Text style={[styles.switchLabel, { color: colors.textPrimary, fontSize: applyFontScale(16) }]}>Receber lembretes diários</Text>
             <Switch
               value={notificationsEnabled}
               onValueChange={handleNotificationToggle}
@@ -258,31 +296,31 @@ export default function SettingsScreen() {
           
           {notificationsEnabled && (
             <TouchableOpacity style={styles.timeSelector} onPress={handleTimeChange}>
-              <Text style={styles.timeLabel}>Horário da notificação</Text>
+              <Text style={[styles.timeLabel, { color: colors.textPrimary, fontSize: applyFontScale(16) }]}>Horário da notificação</Text>
               <View style={styles.timeValue}>
-                <Text style={styles.timeText}>{notificationTime}</Text>
-                <Ionicons name="chevron-forward" size={20} color="#999" />
+                <Text style={[styles.timeText, { color: colors.accent, fontSize: applyFontScale(16) }]}>{notificationTime}</Text>
+                <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
               </View>
             </TouchableOpacity>
           )}
         </View>
 
         {/* Data Management */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Gerenciar Dados</Text>
-          <TouchableOpacity style={styles.dangerButton} onPress={clearAllData}>
-            <Ionicons name="trash-outline" size={24} color="#f44336" />
-            <Text style={styles.dangerButtonText}>Limpar Todos os Dados</Text>
+        <View style={[styles.section, { backgroundColor: colors.sectionBg }]}>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Gerenciar Dados</Text>
+          <TouchableOpacity style={[styles.dangerButton, { backgroundColor: colors.dangerBg, borderColor: colors.dangerBorder }]} onPress={clearAllData}>
+            <Ionicons name="trash-outline" size={24} color={colors.dangerText} />
+            <Text style={[styles.dangerButtonText, { color: colors.dangerText, fontSize: applyFontScale(16) }]}>Limpar Todos os Dados</Text>
           </TouchableOpacity>
         </View>
 
         {/* App Info */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Sobre o App</Text>
+        <View style={[styles.section, { backgroundColor: colors.sectionBg }]}>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Sobre o App</Text>
           <View style={styles.infoContainer}>
-            <Text style={styles.infoText}>ReadBible v1.0.0</Text>
-            <Text style={styles.infoText}>Aplicativo para estudo da Bíblia</Text>
-            <Text style={styles.infoText}>com planos de leitura organizados</Text>
+            <Text style={[styles.infoText, { color: colors.textSecondary }]}>{`ReadBible v1.0.0`}</Text>
+            <Text style={[styles.infoText, { color: colors.textSecondary }]}>Aplicativo para estudo da Bíblia</Text>
+            <Text style={[styles.infoText, { color: colors.textSecondary }]}>com planos de leitura organizados</Text>
           </View>
         </View>
       </ScrollView>

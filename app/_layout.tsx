@@ -1,29 +1,40 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
-
-import { useColorScheme } from '@/hooks/use-color-scheme';
-
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
+import {
+  DarkTheme,
+  DefaultTheme,
+  ThemeProvider,
+} from "@react-navigation/native";
+import { Stack } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import { useEffect, useState } from "react";
+import "react-native-reanimated";
+import DatabaseService from "../services/DatabaseService";
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  // Preferência do usuário, não apenas sistema
+  const [userTheme, setUserTheme] = useState<"light" | "dark">("light");
+  useEffect(() => {
+    (async () => {
+      const theme = await DatabaseService.getSetting("theme");
+      if (theme === "dark" || theme === "light") setUserTheme(theme);
+    })();
+  }, []);
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <ThemeProvider value={userTheme === "dark" ? DarkTheme : DefaultTheme}>
       <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="explore" options={{ headerShown: false }} />
         <Stack.Screen name="bible-manager" options={{ headerShown: false }} />
         <Stack.Screen name="free-reading" options={{ headerShown: false }} />
         <Stack.Screen name="chapter-reader" options={{ headerShown: false }} />
         <Stack.Screen name="reading-plans" options={{ headerShown: false }} />
         <Stack.Screen name="settings" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', headerShown: false }} />
+        <Stack.Screen
+          name="modal"
+          options={{ presentation: "modal", headerShown: false }}
+        />
       </Stack>
-      <StatusBar style="auto" />
+      <StatusBar style={userTheme === "dark" ? "inverted" : 'inverted'} />
     </ThemeProvider>
   );
 }

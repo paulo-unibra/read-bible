@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Logo } from '../../components/logo';
@@ -13,10 +13,32 @@ export default function HomeScreen() {
   const [activePlans, setActivePlans] = useState<ReadingPlan[]>([]);
   const [todayReading, setTodayReading] = useState<ReadingPlanDay | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fontSizePref, setFontSizePref] = useState<'small' | 'medium' | 'large'>('medium');
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
   useEffect(() => {
     initializeApp();
   }, []);
+
+  // Recarrega apenas aparência (tema / fonte) ao voltar para a tela
+  useFocusEffect(
+    useCallback(() => {
+      let mounted = true;
+      (async () => {
+        try {
+          const userFont = (await DatabaseService.getSetting('fontSize')) as 'small' | 'medium' | 'large' | null;
+            const userTheme = (await DatabaseService.getSetting('theme')) as 'light' | 'dark' | null;
+            if (mounted) {
+              if (userFont) setFontSizePref(userFont);
+              if (userTheme) setTheme(userTheme);
+            }
+        } catch (e) {
+          console.warn('Falha ao recarregar aparência:', e);
+        }
+      })();
+      return () => { mounted = false; };
+    }, [])
+  );
 
   const initializeApp = async () => {
     try {
@@ -31,6 +53,11 @@ export default function HomeScreen() {
         const reading = await readingPlanService.getTodayReading(plans[0].id);
         setTodayReading(reading);
       }
+      // carregar preferências de aparência
+      const userFont = (await DatabaseService.getSetting('fontSize')) as 'small' | 'medium' | 'large' | null;
+      const userTheme = (await DatabaseService.getSetting('theme')) as 'light' | 'dark' | null;
+      if (userFont) setFontSizePref(userFont);
+      if (userTheme) setTheme(userTheme);
     } catch (error) {
       console.error('Error initializing app:', error);
       Alert.alert('Erro', 'Falha ao inicializar o aplicativo');
@@ -38,6 +65,32 @@ export default function HomeScreen() {
       setLoading(false);
     }
   };
+
+  const applyFontScale = useCallback((base: number) => {
+    switch (fontSizePref) {
+      case 'small': return base * 0.9;
+      case 'large': return base * 1.2;
+      default: return base;
+    }
+  }, [fontSizePref]);
+
+  const isDark = theme === 'dark';
+  const colors = {
+    bg: isDark ? '#121212' : '#f5f5f5',
+    headerBg: isDark ? '#1d1d1d' : '#fff',
+    border: isDark ? '#2b2b2b' : '#e0e0e0',
+    card: isDark ? '#1e1e1e' : '#fff',
+    surfaceAlt: isDark ? '#2a2a2a' : '#f0f0f0',
+    textPrimary: isDark ? '#e0e0e0' : '#333',
+    textSecondary: isDark ? '#b0b0b0' : '#666',
+    accent: isDark ? '#90caf9' : '#2196F3',
+    success: isDark ? '#81c784' : '#4CAF50',
+    progressTrack: isDark ? '#2c2c2c' : '#e0e0e0',
+    progressFill: isDark ? '#4CAF50' : '#4CAF50',
+    iconMuted: isDark ? '#aaaaaa' : '#666',
+    iconForward: isDark ? '#888' : '#999',
+    emptyIcon: isDark ? '#555' : '#ccc',
+  } as const;
 
   const handleMarkReadingComplete = async () => {
     if (!todayReading) return;
@@ -96,35 +149,35 @@ export default function HomeScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
         <View style={styles.centerContent}>
-          <Text style={styles.loadingText}>Carregando...</Text>
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Carregando...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
+      <ScrollView style={styles.scrollView} contentContainerStyle={{ paddingBottom: 40 }}>
         {/* Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { backgroundColor: colors.headerBg, borderBottomColor: colors.border }]}>
           <Logo size={36} />
           <TouchableOpacity 
             style={styles.settingsButton}
             onPress={() => router.push('/settings')}
           >
-            <Ionicons name="settings-outline" size={24} color="#666" />
+            <Ionicons name="settings-outline" size={24} color={colors.iconMuted} />
           </TouchableOpacity>
         </View>
 
         {/* Today's Reading Card */}
         {todayReading ? (
-          <View style={styles.todayCard}>
-            <Text style={styles.todayTitle}>Leitura de Hoje</Text>
+          <View style={[styles.todayCard, { backgroundColor: colors.card, borderLeftColor: colors.accent, shadowOpacity: isDark ? 0.3 : 0.1 }]}>
+            <Text style={[styles.todayTitle, { color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Leitura de Hoje</Text>
             <View style={styles.readingInfo}>
               {todayReading.readings.map((reading, index) => (
-                <Text key={index} style={styles.readingText}>
+                <Text key={index} style={[styles.readingText, { color: colors.textSecondary, fontSize: applyFontScale(16) }]}>
                   {reading.bookName} {reading.startChapter}
                   {reading.endChapter !== reading.startChapter && `-${reading.endChapter}`}
                 </Text>
@@ -137,104 +190,104 @@ export default function HomeScreen() {
                 onPress={handleMarkReadingComplete}
               >
                 <Ionicons name="checkmark-circle" size={20} color="#fff" />
-                <Text style={styles.completeButtonText}>Marcar como Lida</Text>
+                <Text style={[styles.completeButtonText, { fontSize: applyFontScale(16) }]}>Marcar como Lida</Text>
               </TouchableOpacity>
             ) : (
               <View style={styles.completedBadge}>
-                <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
-                <Text style={styles.completedText}>Concluída</Text>
+                <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+                <Text style={[styles.completedText, { color: colors.success, fontSize: applyFontScale(16) }]}>Concluída</Text>
               </View>
             )}
           </View>
         ) : (
-          <View style={styles.noReadingCard}>
-            <Ionicons name="calendar-outline" size={48} color="#ccc" />
-            <Text style={styles.noReadingTitle}>Nenhuma leitura programada</Text>
-            <Text style={styles.noReadingText}>
+          <View style={[styles.noReadingCard, { backgroundColor: colors.card, shadowOpacity: isDark ? 0.3 : 0.1 }]}>
+            <Ionicons name="calendar-outline" size={48} color={colors.emptyIcon} />
+            <Text style={[styles.noReadingTitle, { color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Nenhuma leitura programada</Text>
+            <Text style={[styles.noReadingText, { color: colors.textSecondary, fontSize: applyFontScale(14), lineHeight: applyFontScale(20) }]}>
               Crie um plano de leitura para começar sua jornada bíblica
             </Text>
             <TouchableOpacity 
               style={styles.createPlanButton}
               onPress={() => router.push('/reading-plans')}
             >
-              <Text style={styles.createPlanButtonText}>Criar Plano</Text>
+              <Text style={[styles.createPlanButtonText, { fontSize: applyFontScale(16) }]}>Criar Plano</Text>
             </TouchableOpacity>
           </View>
         )}
 
         {/* Quick Actions */}
         <View style={styles.actionsSection}>
-          <Text style={styles.sectionTitle}>Modo de Leitura</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary, fontSize: applyFontScale(20) }]}>Modo de Leitura</Text>
           
           <TouchableOpacity 
-            style={styles.actionCard}
+            style={[styles.actionCard, { backgroundColor: colors.card, shadowOpacity: isDark ? 0.25 : 0.1 }]}
             onPress={startFreeReading}
           >
-            <View style={styles.actionIcon}>
-              <Ionicons name="book-outline" size={32} color="#2196F3" />
+            <View style={[styles.actionIcon, { backgroundColor: colors.surfaceAlt }]}>
+              <Ionicons name="book-outline" size={32} color={colors.accent} />
             </View>
             <View style={styles.actionContent}>
-              <Text style={styles.actionTitle}>Leitura Livre</Text>
-              <Text style={styles.actionDescription}>
+              <Text style={[styles.actionTitle, { color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Leitura Livre</Text>
+              <Text style={[styles.actionDescription, { color: colors.textSecondary, fontSize: applyFontScale(14) }]}>
                 Navegue por livros, capítulos e versículos
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#999" />
+            <Ionicons name="chevron-forward" size={20} color={colors.iconForward} />
           </TouchableOpacity>
 
           <TouchableOpacity 
-            style={styles.actionCard}
+            style={[styles.actionCard, { backgroundColor: colors.card, shadowOpacity: isDark ? 0.25 : 0.1 }]}
             onPress={() => router.push('/reading-plans')}
           >
-            <View style={styles.actionIcon}>
-              <Ionicons name="calendar-outline" size={32} color="#FF9800" />
+            <View style={[styles.actionIcon, { backgroundColor: colors.surfaceAlt }]}>
+              <Ionicons name="calendar-outline" size={32} color={isDark ? '#ffb74d' : '#FF9800'} />
             </View>
             <View style={styles.actionContent}>
-              <Text style={styles.actionTitle}>Planos de Leitura</Text>
-              <Text style={styles.actionDescription}>
+              <Text style={[styles.actionTitle, { color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Planos de Leitura</Text>
+              <Text style={[styles.actionDescription, { color: colors.textSecondary, fontSize: applyFontScale(14) }]}>
                 Siga cronogramas organizados de estudo
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#999" />
+            <Ionicons name="chevron-forward" size={20} color={colors.iconForward} />
           </TouchableOpacity>
         </View>
 
         {/* Bible Management */}
         <View style={styles.actionsSection}>
-          <Text style={styles.sectionTitle}>Gerenciar Bíblias</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary, fontSize: applyFontScale(20) }]}>Gerenciar Bíblias</Text>
           
           <TouchableOpacity 
-            style={styles.actionCard}
+            style={[styles.actionCard, { backgroundColor: colors.card, shadowOpacity: isDark ? 0.25 : 0.1 }]}
             onPress={() => router.push('/bible-manager')}
           >
-            <View style={styles.actionIcon}>
-              <Ionicons name="download-outline" size={32} color="#4CAF50" />
+            <View style={[styles.actionIcon, { backgroundColor: colors.surfaceAlt }]}>
+              <Ionicons name="download-outline" size={32} color={isDark ? '#81c784' : '#4CAF50'} />
             </View>
             <View style={styles.actionContent}>
-              <Text style={styles.actionTitle}>Baixar Bíblias</Text>
-              <Text style={styles.actionDescription}>
+              <Text style={[styles.actionTitle, { color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Baixar Bíblias</Text>
+              <Text style={[styles.actionDescription, { color: colors.textSecondary, fontSize: applyFontScale(14) }]}>
                 Gerencie suas versões da Bíblia
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#999" />
+            <Ionicons name="chevron-forward" size={20} color={colors.iconForward} />
           </TouchableOpacity>
         </View>
 
         {/* Active Plans Summary */}
         {activePlans.length > 0 && (
           <View style={styles.plansSection}>
-            <Text style={styles.sectionTitle}>Planos Ativos</Text>
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary, fontSize: applyFontScale(20) }]}>Planos Ativos</Text>
             {activePlans.map(plan => (
-              <View key={plan.id} style={styles.planSummary}>
-                <Text style={styles.planName}>{plan.name}</Text>
-                <Text style={styles.planProgress}>
+              <View key={plan.id} style={[styles.planSummary, { backgroundColor: colors.card, shadowOpacity: isDark ? 0.25 : 0.1 }] }>
+                <Text style={[styles.planName, { color: colors.textPrimary, fontSize: applyFontScale(16) }]}>{plan.name}</Text>
+                <Text style={[styles.planProgress, { color: colors.textSecondary, fontSize: applyFontScale(14) }]}>
                   {plan.completedDays}/{plan.totalDays} dias
                 </Text>
-                <View style={styles.progressBar}>
+                <View style={[styles.progressBar, { backgroundColor: colors.progressTrack }]}>
                   <View 
                     style={[
                       styles.progressFill, 
-                      { width: `${(plan.completedDays / plan.totalDays) * 100}%` }
+                      { width: `${(plan.completedDays / plan.totalDays) * 100}%`, backgroundColor: colors.progressFill }
                     ]} 
                   />
                 </View>
@@ -250,7 +303,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f5f5f5', // overridden dynamically
   },
   scrollView: {
     flex: 1,
@@ -269,9 +322,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#fff',
+    backgroundColor: '#fff', // dynamic
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: '#e0e0e0', // dynamic
   },
   headerTitle: {
     fontSize: 28,
@@ -287,13 +340,10 @@ const styles = StyleSheet.create({
     padding: 20,
     borderRadius: 12,
     borderLeftWidth: 4,
-    borderLeftColor: '#2196F3',
+    borderLeftColor: '#2196F3', // dynamic
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1, // dynamic override
     shadowRadius: 3.84,
     elevation: 5,
   },
@@ -354,11 +404,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderRadius: 12,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1, // dynamic override
     shadowRadius: 3.84,
     elevation: 3,
   },
@@ -392,6 +439,11 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1, // dynamic override
+    shadowRadius: 3.84,
+    elevation: 3,
   },
   planName: {
     fontSize: 16,
@@ -421,11 +473,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1, // dynamic override
     shadowRadius: 3.84,
     elevation: 3,
   },
