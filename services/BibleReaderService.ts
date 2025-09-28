@@ -384,7 +384,7 @@ export class BibleReaderService {
     }
   }
 
-  async searchVerses(bibleId: string, searchTerm: string, limit: number = 100): Promise<SearchResult[]> {
+  async searchVerses(bibleId: string, searchTerm: string, limit: number = 1000): Promise<SearchResult[]> {
     const db = this.getBibleConnection(bibleId);
     
     // If it's the sample bible, return sample search results
@@ -409,34 +409,38 @@ export class BibleReaderService {
     }
     
     try {
-      const termOriginal = searchTerm.trim();
-      if (!termOriginal) return [];
-      // frase completa tratada como LIKE '%texto%' (ignorando símbolos/notas)
-      const termNorm = this.cleanForSearch(termOriginal); // já minúsculo e sem diacríticos
-      if (!termNorm) return [];
-      const termWords = termNorm.split(' ').filter(Boolean); // para highlight flexível
+  const termOriginal = searchTerm.trim();
+  if (!termOriginal) return [];
+  const lowerOriginal = termOriginal.toLowerCase(); // preserva acentos para LIKE primário
+  // Versão normalizada (sem acentos / símbolos) para matching interno
+  const termNorm = this.cleanForSearch(termOriginal);
+  if (!termNorm) return [];
+  const termWords = termNorm.split(' ').filter(Boolean);
       const books = await this.getBooks(bibleId);
       const bookMap = new Map(books.map(book => [book.id, book.name]));
 
       // Tamanho dinâmico de pool de candidatos: termos curtos exigem mais versos para filtrar depois
-      const baseMultiplier = termNorm.length <= 5 ? 20 : 5; // palavra curta como "jesus" aparece muito
-      let rawLimit = limit * baseMultiplier;
-      const searchPatternLower = `%${termNorm}%`;
+  const isSingleWord = termWords.length === 1;
+  const baseMultiplier = termNorm.length <= 5 ? 20 : 5;
+  // Para palavra única muito curta, pegar praticamente tudo de cara para não perder ocorrências raras
+  let rawLimit = (isSingleWord && termNorm.length <= 5) ? 40000 : limit * baseMultiplier;
+      const searchPatternOriginal = `%${lowerOriginal}%`;
       let candidates = await db.getAllAsync(
         'SELECT Book, Chapter, Verse, Scripture FROM Bible WHERE LOWER(Scripture) LIKE ? LIMIT ?',
-        [searchPatternLower, rawLimit]
+        [searchPatternOriginal, rawLimit]
       );
 
       // Fallback: se nada veio (talvez por PRAGMA case_sensitive_like ou diacríticos não removidos no banco), buscar mais amplo
       if (candidates.length === 0) {
-        rawLimit = limit * 30;
+        // Fallback total: carrega todos os versos (31k aprox) e filtra em memória com normalização
+        rawLimit = 40000; // acima do total de versos típico
         candidates = await db.getAllAsync(
           'SELECT Book, Chapter, Verse, Scripture FROM Bible LIMIT ?',
           [rawLimit]
         );
       }
 
-      const scored = candidates.map((row: any) => {
+      let scored = candidates.map((row: any) => {
         const parsed = this.parseVerseContent(row.Scripture);
         const verseDisplay = parsed.text; // manter texto completo (pode mostrar notas/ símbolos se necessários visualmente)
         const searchBase = (parsed.verseSearchText || parsed.verseOnlyText || parsed.text);
@@ -497,6 +501,43 @@ export class BibleReaderService {
       .sort((a, b) => b._score - a._score)
       .slice(0, limit)
       .map(({ _score, _stats, ...rest }) => rest);
+
+      // Fallback adicional: se nada encontrado para palavra única curta, fazer varredura completa filtrando norma
+      if (scored.length === 0 && isSingleWord && termNorm.length <= 6) {
+        try {
+          const allRows = await db.getAllAsync('SELECT Book, Chapter, Verse, Scripture FROM Bible');
+          scored = allRows.map((row: any) => {
+            const parsed = this.parseVerseContent(row.Scripture);
+            const verseDisplay = parsed.text;
+            const searchBase = parsed.verseSearchText || parsed.verseOnlyText || parsed.text;
+            const norm = this.cleanForSearch(searchBase);
+            if (!norm.includes(termNorm)) return null;
+            const firstIdx = norm.indexOf(termNorm);
+            const occurrences = (norm.match(new RegExp(this.escapeRegExp(termNorm), 'g')) || []).length;
+            let highlightedText = verseDisplay.replace(new RegExp(this.escapeRegExp(termOriginal), 'gi'), m => `<mark>${m}</mark>`);
+            if (!/<mark>/.test(highlightedText)) {
+              highlightedText = highlightedText.replace(new RegExp(this.escapeRegExp(termNorm), 'gi'), m => `<mark>${m}</mark>`);
+            }
+            const score = occurrences * 400 + Math.max(0, 500 - firstIdx);
+            return {
+              bookId: row.Book,
+              bookName: bookMap.get(row.Book) || `Book ${row.Book}`,
+              chapterNumber: row.Chapter,
+              verseNumber: row.Verse,
+              text: verseDisplay,
+              highlightedText,
+              _score: score,
+              _stats: { occurrences, firstIdx }
+            } as SearchResult & { _score: number; _stats: any };
+          })
+          .filter((r): r is SearchResult & { _score: number; _stats: any } => !!r)
+          .sort((a, b) => b._score - a._score)
+          .slice(0, limit)
+          .map(({ _score, _stats, ...rest }) => rest);
+        } catch (e) {
+          console.warn('Fallback full scan search failed:', e);
+        }
+      }
 
       return scored;
     } catch (error) {

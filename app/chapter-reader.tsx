@@ -482,6 +482,8 @@ export default function ChapterReaderScreen() {
     });
   }, [bookTestamentMap]);
 
+  const SEARCH_RESULTS_LIMIT = 1000; // limite padrão de resultados exibidos na busca (aumentado de 100 para 1000)
+
   const handleSearch = async () => {
     if (!searchQuery.trim() || !bibleId) return;
 
@@ -502,7 +504,7 @@ export default function ChapterReaderScreen() {
       let results = await bibleReaderService.searchVerses(
         bibleId,
         searchQuery.trim(),
-        50
+        SEARCH_RESULTS_LIMIT
       );
       // Guardar bruto
       setRawSearchResults(results);

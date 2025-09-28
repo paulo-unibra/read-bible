@@ -107,7 +107,7 @@ export default function FreeReadingScreen() {
     
     try {
       setLoading(true);
-      const results = await bibleReaderService.searchVerses(selectedBible.id, searchQuery.trim());
+  const results = await bibleReaderService.searchVerses(selectedBible.id, searchQuery.trim(), 1000);
       setSearchResults(results);
       setViewMode('search');
     } catch (error) {
