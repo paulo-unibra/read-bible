@@ -49,7 +49,7 @@ export default function FreeReadingScreen() {
         Alert.alert('Aviso', 'Você precisa baixar pelo menos uma Bíblia para usar o modo de leitura livre.');
       }
     } catch (error) {
-      console.error('Error loading bibles:', error);
+      console.error('Error loading bibles 2:', error);
       Alert.alert('Erro', 'Falha ao carregar Bíblias');
     } finally {
       setLoading(false);

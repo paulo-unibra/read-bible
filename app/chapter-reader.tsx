@@ -135,6 +135,7 @@ export default function ChapterReaderScreen() {
   }, [bibleId, currentBookId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const initializeReader = async () => {
+    console.log('---------------------')
     console.log("INICIANDO LEITOR");
     try {
       setLoading(true);
@@ -173,6 +174,7 @@ export default function ChapterReaderScreen() {
 
       // Save current reading position
       try {
+        console.log("SALVANDO POSIÇÃO DE LEITURA", bibleId, currentBookId, currentChapter);
         await DatabaseService.saveLastReading(
           bibleId,
           currentBookId,
@@ -311,10 +313,11 @@ export default function ChapterReaderScreen() {
   const openBibleSelector = async () => {
     try {
       const bibles = await DatabaseService.getBibles();
+      console.log("PASSOU openBibleSelector")
       setAvailableBibles(bibles);
       setBibleSelectorVisible(true);
     } catch (error) {
-      console.error("Error loading bibles:", error);
+      console.error("Error loading bibles 1:", error);
       Alert.alert("Erro", "Falha ao carregar versões da Bíblia");
     }
   };

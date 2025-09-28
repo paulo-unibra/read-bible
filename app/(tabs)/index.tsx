@@ -70,8 +70,11 @@ export default function HomeScreen() {
         return;
       }
       
+      console.log("VAI INICIAR LEITURA LIVRE");
       // Try to get last reading position
       let lastReading = await DatabaseService.getLastReading();
+
+      console.log('ÚLTIMA LEITURA', lastReading);
       
       // If no last reading, use first available Bible with book 1, chapter 1
       if (!lastReading) {
