@@ -33,7 +33,7 @@ export default function ChapterReaderScreen() {
   const initialBookId = parseInt(params.bookId as string);
   const initialChapter = parseInt(params.chapterNumber as string);
 
-  const [bible, setBible] = useState<Bible | null>(null);
+  // Removido estado de bible (não utilizado diretamente no header após ajustes)
   const [book, setBook] = useState<Book | null>(null);
   const [currentBookId, setCurrentBookId] = useState(initialBookId);
   const [currentChapter, setCurrentChapter] = useState(initialChapter);
@@ -123,6 +123,54 @@ export default function ChapterReaderScreen() {
   const [referenceVerseLoading, setReferenceVerseLoading] = useState(false);
   const [showAllReferences, setShowAllReferences] = useState(false);
 
+  // Reader Preferences (fonte e tema)
+  const [readerFontSize, setReaderFontSize] = useState<'small' | 'medium' | 'large'>('medium');
+  const [readerTheme, setReaderTheme] = useState<'light' | 'dark'>('light');
+  const [settingsModalVisible, setSettingsModalVisible] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const fs = (await DatabaseService.getSetting('fontSize')) as 'small' | 'medium' | 'large' | null;
+        const th = (await DatabaseService.getSetting('theme')) as 'light' | 'dark' | null;
+        if (fs) setReaderFontSize(fs);
+        if (th) setReaderTheme(th);
+      } catch (e) {
+        console.warn('Falha ao carregar preferências de leitura', e);
+      }
+    })();
+  }, []);
+
+  const applyFontScale = (base: number) => {
+    switch (readerFontSize) {
+      case 'small': return base * 0.9;
+      case 'large': return base * 1.2;
+      default: return base;
+    }
+  };
+
+  const isDark = readerTheme === 'dark';
+  const verseTextDynamic = { fontSize: applyFontScale(16), color: isDark ? '#ececec' : '#333', lineHeight: applyFontScale(24) } as const;
+  const screenBackground = { backgroundColor: isDark ? '#121212' : '#f5f5f5' };
+  const versesListBg = { backgroundColor: isDark ? '#121212' : '#fff' };
+  const headerBg = { backgroundColor: isDark ? '#1d1d1d' : '#fff', borderBottomColor: isDark ? '#2b2b2b' : '#e0e0e0' };
+  const chapterHeaderBg = { backgroundColor: isDark ? '#1d1d1d' : '#fff' };
+  const iconColor = isDark ? '#e0e0e0' : '#333';
+
+  const openSettings = () => setSettingsModalVisible(true);
+  const closeSettings = () => setSettingsModalVisible(false);
+  const saveSettings = async (fs: 'small' | 'medium' | 'large', theme: 'light' | 'dark') => {
+    try {
+      setReaderFontSize(fs);
+      setReaderTheme(theme);
+      await DatabaseService.saveSetting('fontSize', fs);
+      await DatabaseService.saveSetting('theme', theme);
+    } catch (e) {
+      console.error('Erro salvando preferências:', e);
+      Alert.alert('Erro', 'Falha ao salvar preferências');
+    }
+  };
+
   // Selection and sharing state
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedVerses, setSelectedVerses] = useState<Set<string>>(new Set());
@@ -149,7 +197,7 @@ export default function ChapterReaderScreen() {
       console.log("ACHOU AS BIBLIAS", bibles.length);
       const currentBible = bibles.find((b) => b.id === bibleId);
       if (!currentBible) throw new Error("Bible not found");
-      setBible(currentBible);
+  // estado bible removido; mantemos somente currentBible local
 
       // Open bible connection
       await bibleReaderService.openBible(bibleId, currentBible.fileName);
@@ -876,6 +924,7 @@ Link do app: https://readbible.app`;
         style={[
           styles.verseContainer,
           { flexDirection: "column" }, // títulos acima
+          isDark && { backgroundColor: '#121212' },
         ]}
       >
         {/* TÍTULOS (fora da área clicável) */}
@@ -894,6 +943,7 @@ Link do app: https://readbible.app`;
           style={[
             { flexDirection: "row", alignItems: "flex-start" },
             isSelected && styles.verseContainerSelected,
+            isSelected && isDark && { backgroundColor: '#263850' },
           ]}
           onPress={() =>
             selectionMode ? handleVerseSelection(item) : undefined
@@ -925,7 +975,7 @@ Link do app: https://readbible.app`;
               { flex: 1 },
             ]}
           >
-            <Text style={styles.verseText}>
+            <Text style={[styles.verseText, verseTextDynamic]}>
               <Text style={styles.verseNumber}>{item.verseNumber}</Text>
               <Text style={{ fontWeight: "bold", color: "#222" }}> - </Text>
               {renderVerseText(item.text, item)}
@@ -963,14 +1013,14 @@ Link do app: https://readbible.app`;
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, screenBackground]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, headerBg]}>
         <TouchableOpacity
           onPress={() => router.back()}
           style={styles.backButton}
         >
-          <Ionicons name="arrow-back" size={24} color="#333" />
+          <Ionicons name="arrow-back" size={24} color={iconColor} />
         </TouchableOpacity>
 
         <View style={styles.headerActions}>
@@ -996,25 +1046,25 @@ Link do app: https://readbible.app`;
                 onPress={() => setSearchModalVisible(true)}
                 style={styles.headerButton}
               >
-                <Ionicons name="search" size={24} color="#333" />
+                <Ionicons name="search" size={24} color={iconColor} />
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={openBookSelector}
                 style={styles.headerButton}
               >
-                <Ionicons name="library" size={24} color="#333" />
+                <Ionicons name="library" size={24} color={iconColor} />
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={openBibleSelector}
                 style={styles.headerButton}
               >
-                <Ionicons name="book" size={24} color="#333" />
+                <Ionicons name="book" size={24} color={iconColor} />
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => setChapterSelectorVisible(true)}
                 style={styles.headerButton}
               >
-                <Ionicons name="list" size={24} color="#333" />
+                <Ionicons name="list" size={24} color={iconColor} />
               </TouchableOpacity>
             </>
           )}
@@ -1022,20 +1072,18 @@ Link do app: https://readbible.app`;
       </View>
 
       {/* Chapter Header fixo */}
-      <View style={[styles.fixedChapterHeader, { minHeight: HEADER_HEIGHT }]}>
+      <View style={[styles.fixedChapterHeader, chapterHeaderBg, { minHeight: HEADER_HEIGHT }]}>
         <View style={styles.chapterHeaderContent}>
           <Text
-            style={styles.chapterTitle}
+            style={[styles.chapterTitle, { color: isDark ? '#ddd' : '#666' }]}
             numberOfLines={1}
             adjustsFontSizeToFit
           >
             {book?.name} {currentChapter}
           </Text>
-          {bible?.abbreviation ? (
-            <View style={styles.versionBadge}>
-              <Text style={styles.versionBadgeText}>{bible.abbreviation}</Text>
-            </View>
-          ) : null}
+          <TouchableOpacity onPress={openSettings} style={styles.settingsButton} accessibilityLabel="Abrir configurações de leitura">
+            <Ionicons name="settings-outline" size={22} color={isDark ? '#ddd' : '#555'} />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -1045,7 +1093,7 @@ Link do app: https://readbible.app`;
         renderItem={renderVerse}
         keyExtractor={(item) => item.id.toString()}
         showsVerticalScrollIndicator={false}
-        style={styles.versesList}
+        style={[styles.versesList, versesListBg]}
         contentContainerStyle={[styles.versesListContent, { paddingTop: 8 }]}
       />
 
@@ -1542,6 +1590,49 @@ Link do app: https://readbible.app`;
                 </TouchableOpacity>
               )}
             />
+          </View>
+        </View>
+      </Modal>
+
+      {/* Settings Modal */}
+      <Modal
+        visible={settingsModalVisible}
+        animationType="fade"
+        transparent
+        onRequestClose={closeSettings}
+      >
+        <View style={styles.settingsOverlay}>
+          <View style={[styles.settingsModal, { backgroundColor: isDark ? '#1f1f1f' : '#fff' }]}>            
+            <Text style={[styles.settingsTitle, { color: isDark ? '#fafafa' : '#222' }]}>Configurações de Leitura</Text>
+            <Text style={[styles.settingsSectionLabel, { color: isDark ? '#ddd' : '#333' }]}>Tamanho da Fonte</Text>
+            <View style={styles.settingsRow}>
+              {(['small','medium','large'] as const).map(opt => (
+                <TouchableOpacity
+                  key={opt}
+                  onPress={() => saveSettings(opt, readerTheme)}
+                  style={[styles.optionChip, readerFontSize === opt && styles.optionChipActive]}
+                >
+                  <Text style={[styles.optionChipText, readerFontSize === opt && styles.optionChipTextActive]}>{opt === 'small' ? 'Pequena' : opt === 'medium' ? 'Média' : 'Grande'}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={[styles.settingsSectionLabel, { marginTop: 18, color: isDark ? '#ddd' : '#333' }]}>Tema</Text>
+            <View style={styles.settingsRow}>
+              {(['light','dark'] as const).map(opt => (
+                <TouchableOpacity
+                  key={opt}
+                  onPress={() => saveSettings(readerFontSize, opt)}
+                  style={[styles.optionChip, readerTheme === opt && styles.optionChipActive]}
+                >
+                  <Text style={[styles.optionChipText, readerTheme === opt && styles.optionChipTextActive]}>{opt === 'light' ? 'Claro' : 'Escuro'}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <View style={styles.settingsFooter}>
+              <TouchableOpacity onPress={closeSettings} style={styles.closeSettingsButton}>
+                <Text style={styles.closeSettingsText}>Fechar</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -2215,6 +2306,11 @@ const styles = StyleSheet.create({
     color: "#666",
     textAlign: "center",
   },
+  settingsButton: {
+    padding: 6,
+    borderRadius: 20,
+    backgroundColor: 'transparent'
+  },
 
   verseTitle: {
     fontSize: 16,
@@ -2237,4 +2333,72 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#FF9800",
   },
+  // Settings Modal Styles
+  settingsOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  settingsModal: {
+    width: '88%',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 8
+  },
+  settingsTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    marginBottom: 12
+  },
+  settingsSectionLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 4,
+    marginBottom: 8
+  },
+  settingsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8
+  },
+  optionChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 22,
+    backgroundColor: '#f0f4f7',
+    borderWidth: 1,
+    borderColor: '#d0d7de'
+  },
+  optionChipActive: {
+    backgroundColor: '#2196F3',
+    borderColor: '#2196F3'
+  },
+  optionChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#2196F3'
+  },
+  optionChipTextActive: {
+    color: '#fff'
+  },
+  settingsFooter: {
+    marginTop: 28,
+    alignItems: 'flex-end'
+  },
+  closeSettingsButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: '#2196F3',
+    borderRadius: 24
+  },
+  closeSettingsText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600'
+  }
 });
