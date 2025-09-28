@@ -90,14 +90,14 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={[styles.container,{ backgroundColor: colors.bg }]}> 
+      {/* Header fixo */}
+      <View style={[styles.header,{ backgroundColor: colors.headerBg, borderBottomColor: colors.border }]}> 
+        <Logo size={36} />
+        <TouchableOpacity style={styles.settingsButton} onPress={() => router.push('/settings')}>
+          <Ionicons name="settings-outline" size={24} color={colors.iconMuted} />
+        </TouchableOpacity>
+      </View>
       <ScrollView style={styles.scrollView} contentContainerStyle={{ paddingBottom: 40 }}>
-        <View style={[styles.header,{ backgroundColor: colors.headerBg, borderBottomColor: colors.border }]}>
-          <Logo size={36} />
-          <TouchableOpacity style={styles.settingsButton} onPress={() => router.push('/settings')}>
-            <Ionicons name="settings-outline" size={24} color={colors.iconMuted} />
-          </TouchableOpacity>
-        </View>
-
         {todayReading ? (
           <View style={[styles.todayCard,{ backgroundColor: colors.card, borderLeftColor: colors.accent, shadowOpacity: isDark ? 0.3 : 0.1 }]}> 
             <Text style={[styles.todayTitle,{ color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Leitura de Hoje</Text>
