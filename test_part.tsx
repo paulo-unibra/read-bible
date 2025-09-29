@@ -1359,83 +1359,108 @@ import { Bible, Book, SearchResult, Verse } from "../types";
         {/* Book Selector Modal (agora inclui capítulos) */}
         <Modal
           visible={bookSelectorVisible}
-          animationType="fade"
+          animationType="slide"
           transparent
           onRequestClose={() => setBookSelectorVisible(false)}
         >
           <View style={styles.modalOverlay}>
             <View
               style={[
-                styles.selectorModal,
+                styles.enhancedSelectorModal,
                 isDark && { backgroundColor: "#1e1e1e" },
               ]}
             >
               <View
                 style={[
-                  styles.modalHeader,
+                  styles.enhancedModalHeader,
                   isDark && {
                     backgroundColor: "#1d1d1d",
                     borderBottomColor: "#2b2b2b",
                   },
                 ]}
               >
-                <Text style={[styles.modalTitle, isDark && { color: "#e0e0e0" }]}>
-                  Escolher Livro e Capítulo
-                </Text>
-                <TouchableOpacity onPress={() => setBookSelectorVisible(false)}>
+                <View style={styles.headerContent}>
+                  <Ionicons
+                    name="library"
+                    size={24}
+                    color={isDark ? "#90caf9" : "#2196F3"}
+                    style={styles.headerIcon}
+                  />
+                  <Text style={[styles.enhancedModalTitle, isDark && { color: "#e0e0e0" }]}>
+                    Escolher Livro e Capítulo
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setBookSelectorVisible(false)}
+                  style={styles.closeButton}
+                >
                   <Ionicons name="close" size={24} color={iconColor} />
                 </TouchableOpacity>
               </View>
-              
-              <View style={styles.booksContainer}>
 
+              <View style={styles.enhancedBooksContainer}>
                 {/* Coluna dos Livros */}
-                <View style={styles.booksColumn}>
-                  <Text
-                    style={[styles.columnTitle, isDark && { color: "#e0e0e0" }]}
+                <View style={styles.enhancedBooksColumn}>
+                  <View
+                    style={[
+                      styles.enhancedColumnHeader,
+                      isDark && { backgroundColor: "#252525" },
+                    ]}
                   >
-                    Livros
-                  </Text>
+                    <Ionicons
+                      name="book"
+                      size={18}
+                      color={isDark ? "#90caf9" : "#2196F3"}
+                    />
+                    <Text
+                      style={[styles.enhancedColumnTitle, isDark && { color: "#e0e0e0" }]}
+                    >
+                      Livros
+                    </Text>
+                  </View>
                   <FlatList
                     data={availableBooks}
                     keyExtractor={(item) => item.id.toString()}
-                    showsVerticalScrollIndicator={true}
-                    style={styles.booksList}
+                    showsVerticalScrollIndicator={false}
+                    style={styles.enhancedBooksList}
                     renderItem={({ item }) => {
                       console.log("[DEBUG] Renderizando livro:", item.name);
                       const selected = item.id === selectedBookInModal?.id;
                       return (
                         <TouchableOpacity
                           style={[
-                            styles.selectorItem,
+                            styles.enhancedSelectorItem,
                             isDark && { borderBottomColor: "#2a2a2a" },
                             selected &&
                               (isDark
                                 ? { backgroundColor: "#263850" }
-                                : styles.selectedSelectorItem),
+                                : styles.enhancedSelectedSelectorItem),
                           ]}
                           onPress={() => selectBookInModal(item)}
+                          activeOpacity={0.7}
                         >
-                          <View style={styles.selectorItemContent}>
+                          <View style={styles.enhancedSelectorItemContent}>
                             <Text
                               style={[
-                                styles.selectorItemTitle,
+                                styles.enhancedSelectorItemTitle,
                                 isDark && { color: "#e0e0e0" },
                                 selected &&
                                   (isDark
                                     ? { color: "#90caf9", fontWeight: "600" }
-                                    : styles.selectedSelectorItemTitle),
+                                    : styles.enhancedSelectedSelectorItemTitle),
                               ]}
                             >
                               {item.name}
                             </Text>
                           </View>
                           {selected && (
-                            <Ionicons
-                              name="checkmark"
-                              size={24}
-                              color={isDark ? "#90caf9" : "#2196F3"}
-                            />
+                            <View style={styles.checkmarkContainer}>
+                              <Ionicons
+                                name="checkmark-circle"
+                                size={20}
+                                color={isDark ? "#90caf9" : "#2196F3"}
+                              />
+                            </View>
                           )}
                         </TouchableOpacity>
                       );
@@ -1444,20 +1469,31 @@ import { Bible, Book, SearchResult, Verse } from "../types";
                 </View>
 
                 {/* Coluna dos Capítulos */}
-                <View style={styles.chaptersColumn}>
-                  <Text
-                    style={[styles.columnTitle, isDark && { color: "#e0e0e0" }]}
+                <View style={styles.enhancedChaptersColumn}>
+                  <View
+                    style={[
+                      styles.enhancedColumnHeader,
+                      isDark && { backgroundColor: "#252525" },
+                    ]}
                   >
-                    Capítulos{" "}
-                    {selectedBookInModal ? `- ${selectedBookInModal.name}` : ""}
-                  </Text>
+                    <Ionicons
+                      name="list"
+                      size={18}
+                      color={isDark ? "#90caf9" : "#2196F3"}
+                    />
+                    <Text
+                      style={[styles.enhancedColumnTitle, isDark && { color: "#e0e0e0" }]}
+                    >
+                      Capítulos {selectedBookInModal ? `- ${selectedBookInModal.name}` : ""}
+                    </Text>
+                  </View>
 
                   {loadingChapters ? (
-                    <View style={styles.loadingChapters}>
-                      <ActivityIndicator size="small" color="#2196F3" />
+                    <View style={styles.enhancedLoadingChapters}>
+                      <ActivityIndicator size="large" color="#2196F3" />
                       <Text
                         style={[
-                          styles.loadingText,
+                          styles.enhancedLoadingText,
                           isDark && { color: "#b0b0b0" },
                         ]}
                       >
@@ -1468,8 +1504,8 @@ import { Bible, Book, SearchResult, Verse } from "../types";
                     <FlatList
                       data={chaptersForSelectedBook}
                       keyExtractor={(item) => item.toString()}
-                      showsVerticalScrollIndicator={true}
-                      contentContainerStyle={styles.chaptersGrid}
+                      showsVerticalScrollIndicator={false}
+                      contentContainerStyle={styles.enhancedChaptersGrid}
                       renderItem={({ item: chapterNumber }) => {
                         const isCurrentChapter =
                           selectedBookInModal.id === currentBookId &&
@@ -1477,9 +1513,9 @@ import { Bible, Book, SearchResult, Verse } from "../types";
                         return (
                           <TouchableOpacity
                             style={[
-                              styles.chapterNumberItem,
+                              styles.enhancedChapterNumberItem,
                               isDark && { backgroundColor: "#2a2a2a" },
-                              isCurrentChapter && styles.currentChapterItem,
+                              isCurrentChapter && styles.enhancedCurrentChapterItem,
                             ]}
                             onPress={() => {
                               setBookSelectorVisible(false);
@@ -1489,29 +1525,39 @@ import { Bible, Book, SearchResult, Verse } from "../types";
                                 selectBook(selectedBookInModal);
                               }
                             }}
+                            activeOpacity={0.7}
                           >
                             <Text
                               style={[
-                                styles.chapterNumberText,
+                                styles.enhancedChapterNumberText,
                                 isDark && { color: "#e0e0e0" },
-                                isCurrentChapter && styles.currentChapterText,
+                                isCurrentChapter && styles.enhancedCurrentChapterText,
                               ]}
                             >
                               {chapterNumber}
                             </Text>
+                            {isCurrentChapter && (
+                              <View style={styles.currentChapterIndicator}>
+                                <Ionicons
+                                  name="radio-button-on"
+                                  size={12}
+                                  color="#fff"
+                                />
+                              </View>
+                            )}
                           </TouchableOpacity>
                         );
                       }}
                     />
                   ) : (
-                    <View style={styles.emptyChapters}>
+                    <View style={styles.enhancedEmptyChapters}>
                       <Ionicons
                         name="book-outline"
                         size={48}
                         color={isDark ? "#555" : "#ccc"}
                       />
                       <Text
-                        style={[styles.emptyText, isDark && { color: "#b0b0b0" }]}
+                        style={[styles.enhancedEmptyText, isDark && { color: "#b0b0b0" }]}
                       >
                         Selecione um livro para ver os capítulos
                       </Text>
@@ -1922,11 +1968,11 @@ import { Bible, Book, SearchResult, Verse } from "../types";
                   );
                 }}
               />
-            </View>
-          </View>
-        </Modal> */}
+        </View>
+      </View>
+    </Modal>
 
-        {/* Settings Modal */}
+    {/* Settings Modal */}
         <Modal
           visible={settingsModalVisible}
           animationType="fade"
@@ -2026,830 +2072,3 @@ import { Bible, Book, SearchResult, Verse } from "../types";
   }
 
   const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: "#f5f5f5",
-    },
-    checkboxColumn: {
-      marginRight: 8,
-      alignItems: "center",
-      paddingTop: 4,
-    },
-    header: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      padding: 16,
-      backgroundColor: "#fff",
-      borderBottomWidth: 1,
-      borderBottomColor: "#e0e0e0",
-    },
-    backButton: {
-      padding: 8,
-    },
-    headerCenter: {
-      flex: 1,
-    },
-    headerTitle: {
-      fontSize: 18,
-      fontWeight: "bold",
-      color: "#333",
-    },
-    headerSubtitle: {
-      fontSize: 12,
-      color: "#666",
-      marginTop: 2,
-      textAlign: "left",
-    },
-    headerActions: {
-      flexDirection: "row",
-    },
-    headerButton: {
-      padding: 8,
-      marginLeft: 8,
-    },
-    navigationBar: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      padding: 16,
-      backgroundColor: "#fff",
-      borderBottomWidth: 1,
-      borderBottomColor: "#e0e0e0",
-    },
-    navButton: {
-      flexDirection: "row",
-      alignItems: "center",
-      paddingHorizontal: 16,
-      paddingVertical: 8,
-      borderRadius: 20,
-      backgroundColor: "#f0f8ff",
-    },
-    navButtonDisabled: {
-      backgroundColor: "#f5f5f5",
-    },
-    navButtonText: {
-      fontSize: 14,
-      fontWeight: "600",
-      color: "#2196F3",
-      marginHorizontal: 4,
-    },
-    navButtonTextDisabled: {
-      color: "#ccc",
-    },
-    chapterInfo: {
-      fontSize: 14,
-      color: "#666",
-      fontWeight: "500",
-    },
-    centerContent: {
-      flex: 1,
-      justifyContent: "center",
-      alignItems: "center",
-    },
-    loadingText: {
-      marginTop: 16,
-      fontSize: 16,
-      color: "#666",
-    },
-    versesList: {
-      flex: 1,
-      backgroundColor: "#fff",
-    },
-    verseContainer: {
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: "#f0f0f0",
-      flexDirection: "row",
-      alignItems: "flex-start",
-    },
-    verseContainerSelected: {
-      backgroundColor: "#e3f2fd",
-    },
-    checkboxContainer: {
-      marginRight: 8,
-      marginTop: 4,
-    },
-    checkbox: {
-      width: 20,
-      height: 20,
-      borderWidth: 2,
-      borderColor: "#2196F3",
-      borderRadius: 4,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: "#fff",
-    },
-    checkboxSelected: {
-      backgroundColor: "#2196F3",
-    },
-    verseTextContainer: {},
-    verseTextWithCheckbox: {
-      paddingRight: 8,
-    },
-    verseNumber: {
-      fontSize: 14,
-      fontWeight: "600",
-      color: "#2196F3",
-    },
-    verseText: {
-      fontSize: 16,
-      color: "#333",
-      lineHeight: 24,
-      flexWrap: "wrap",
-    },
-    verseButtonsRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      paddingTop: 6,
-      paddingLeft: 16,
-      gap: 6,
-      marginTop: 2,
-    },
-    inlineButton: {
-      flexDirection: "row",
-      width: 28,
-      height: 24,
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: "#e3f2fd",
-      backgroundColor: "#f8f9fa",
-      alignItems: "center",
-      justifyContent: "center",
-      shadowColor: "#000",
-      shadowOffset: {
-        width: 0,
-        height: 1,
-      },
-      shadowOpacity: 0.1,
-      shadowRadius: 1,
-      elevation: 1,
-    },
-    inlineButtonText: {
-      fontSize: 12,
-      fontWeight: "bold",
-      color: "#2196F3",
-    },
-    favoriteButton: {
-      borderColor: "#ffebee",
-      backgroundColor: "#fff5f5",
-    },
-    favoriteBelowButton: {
-      marginTop: 6,
-      width: 28,
-      height: 28,
-      borderRadius: 14,
-      backgroundColor: "#f8f9fa",
-      borderWidth: 1,
-      borderColor: "#e0e0e0",
-      alignItems: "center",
-      justifyContent: "center",
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.15,
-      shadowRadius: 1.5,
-      elevation: 2,
-    },
-    favoriteBelowButtonActive: {
-      backgroundColor: "#ffe5e5",
-      borderColor: "#ffcdd2",
-    },
-    favoriteButtonText: {
-      fontSize: 12,
-      fontWeight: "bold",
-      color: "#f44336",
-    },
-    unfavoriteButtonText: {
-      fontSize: 12,
-      fontWeight: "bold",
-      color: "#ccc",
-    },
-    modalContainer: {
-      flex: 1,
-      backgroundColor: "#f5f5f5",
-    },
-    modalHeader: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      padding: 16,
-      backgroundColor: "#fff",
-      borderBottomWidth: 1,
-      borderBottomColor: "#e0e0e0",
-    },
-    modalTitle: {
-      fontSize: 18,
-      fontWeight: "bold",
-      color: "#333",
-    },
-    searchContainer: {
-      flexDirection: "row",
-      backgroundColor: "#fff",
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: "#e0e0e0",
-    },
-    searchInput: {
-      flex: 1,
-      height: 40,
-      borderWidth: 1,
-      borderColor: "#ddd",
-      borderRadius: 20,
-      paddingHorizontal: 16,
-      backgroundColor: "#f8f8f8",
-    },
-    searchButton: {
-      width: 40,
-      height: 40,
-      backgroundColor: "#2196F3",
-      borderRadius: 20,
-      justifyContent: "center",
-      alignItems: "center",
-      marginLeft: 8,
-    },
-    searchResultsList: {
-      flex: 1,
-      paddingHorizontal: 16,
-    },
-    searchResultContainer: {
-      backgroundColor: "#fff",
-      padding: 16,
-      marginVertical: 4,
-      borderRadius: 8,
-      shadowColor: "#000",
-      shadowOffset: {
-        width: 0,
-        height: 1,
-      },
-      shadowOpacity: 0.1,
-      shadowRadius: 2,
-      elevation: 2,
-    },
-    searchResultRef: {
-      fontSize: 14,
-      fontWeight: "bold",
-      color: "#2196F3",
-      marginBottom: 4,
-    },
-    searchResultText: {
-      fontSize: 16,
-      color: "#333",
-      lineHeight: 22,
-    },
-    testamentFilterBar: {
-      flexDirection: "row",
-      backgroundColor: "#fff",
-      paddingHorizontal: 16,
-      paddingBottom: 8,
-      paddingTop: 4,
-      gap: 8,
-      borderBottomWidth: 1,
-      borderBottomColor: "#e0e0e0",
-    },
-    testamentFilterButton: {
-      paddingHorizontal: 14,
-      paddingVertical: 6,
-      borderRadius: 18,
-      backgroundColor: "#f0f4f8",
-      borderWidth: 1,
-      borderColor: "#d0d7de",
-    },
-    testamentFilterButtonActive: {
-      backgroundColor: "#2196F3",
-      borderColor: "#2196F3",
-    },
-    testamentFilterText: {
-      fontSize: 13,
-      fontWeight: "600",
-      color: "#2196F3",
-    },
-    testamentFilterTextActive: {
-      color: "#fff",
-    },
-    emptyState: {
-      alignItems: "center",
-      paddingVertical: 48,
-    },
-    modalOverlay: {
-      flex: 1,
-      backgroundColor: "rgba(0,0,0,0.5)",
-      justifyContent: "center",
-      alignItems: "center",
-    },
-    verseSelectorModal: {
-      backgroundColor: "#fff",
-      borderTopLeftRadius: 12,
-      borderTopRightRadius: 12,
-      margin: 16,
-      maxHeight: "75%",
-      width: "95%",
-    },
-    verseNumberGrid: {
-      maxHeight: 450,
-      paddingHorizontal: 4,
-      paddingBottom: 16,
-    },
-    verseNumbersContainer: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      padding: 12,
-      justifyContent: "space-between",
-    },
-    verseNumberItem: {
-      width: "22%",
-      height: 48,
-      backgroundColor: "#f0f8ff",
-      borderRadius: 8,
-      justifyContent: "center",
-      alignItems: "center",
-      marginBottom: 8,
-      marginHorizontal: 2,
-    },
-    verseNumberItemText: {
-      fontSize: 16,
-      fontWeight: "600",
-      color: "#2196F3",
-    },
-    currentChapterItem: {
-      backgroundColor: "#2196F3",
-    },
-    currentChapterText: {
-      color: "#fff",
-    },
-    notesModal: {
-      backgroundColor: "#fff",
-      borderTopLeftRadius: 12,
-      borderTopRightRadius: 12,
-      margin: 16,
-      maxHeight: "85%",
-      width: "95%",
-    },
-    notesContent: {
-      maxHeight: 600,
-      padding: 16,
-      paddingBottom: 32,
-    },
-    noteItem: {
-      marginBottom: 16,
-    },
-    lastNoteItem: {
-      marginBottom: 24,
-    },
-    noteText: {
-      fontSize: 16,
-      color: "#333",
-      lineHeight: 24,
-    },
-    noteDivider: {
-      height: 1,
-      backgroundColor: "#e0e0e0",
-      marginTop: 16,
-    },
-    referenceTitle: {
-      fontSize: 16,
-      fontWeight: "bold",
-      color: "#2196F3",
-      marginBottom: 8,
-    },
-    // References Modal Styles
-    referencesModal: {
-      backgroundColor: "#fff",
-      borderTopLeftRadius: 12,
-      borderTopRightRadius: 12,
-      margin: 16,
-      width: "95%",
-      maxHeight: "75%",
-    },
-    referenceLinksContainer: {
-      maxHeight: 45,
-      backgroundColor: "#f8f9fa",
-      borderBottomWidth: 1,
-      borderBottomColor: "#e0e0e0",
-    },
-    referenceLinksContent: {
-      paddingHorizontal: 10,
-      paddingVertical: 6,
-      alignItems: "center",
-    },
-    referenceTabs: {
-      flexDirection: "row",
-      alignItems: "center",
-    },
-    referenceTab: {
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      marginRight: 4,
-      backgroundColor: "#e3f2fd",
-      borderRadius: 10,
-      borderWidth: 1,
-      borderColor: "#bbdefb",
-      minWidth: 35,
-      height: 28,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    referenceTabCompact: {
-      paddingHorizontal: 6,
-      paddingVertical: 3,
-      marginRight: 3,
-      backgroundColor: "#e3f2fd",
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: "#bbdefb",
-      minWidth: 30,
-      height: 24,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    moreReferencesTab: {
-      paddingHorizontal: 6,
-      paddingVertical: 3,
-      backgroundColor: "#f5f5f5",
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: "#ddd",
-      minWidth: 30,
-      height: 24,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    selectedReferenceTab: {
-      backgroundColor: "#2196F3",
-      borderColor: "#2196F3",
-    },
-    referenceTabText: {
-      fontSize: 10,
-      color: "#2196F3",
-      fontWeight: "600",
-      textAlign: "center",
-      lineHeight: 12,
-    },
-    selectedReferenceTabText: {
-      color: "#fff",
-      fontWeight: "600",
-    },
-    moreReferencesText: {
-      fontSize: 9,
-      color: "#666",
-      fontWeight: "500",
-      textAlign: "center",
-    },
-    referenceContent: {
-      flex: 1,
-      padding: 16,
-      minHeight: 100,
-    },
-    referenceLoadingContainer: {
-      flex: 1,
-      justifyContent: "center",
-      alignItems: "center",
-      paddingVertical: 60,
-      paddingHorizontal: 20,
-    },
-    referenceVerseCard: {
-      backgroundColor: "#f8f9fa",
-      padding: 16,
-      marginBottom: 12,
-      marginHorizontal: 4,
-      borderRadius: 12,
-      borderLeftWidth: 4,
-      borderLeftColor: "#2196F3",
-      minHeight: 80,
-      shadowColor: "#000",
-      shadowOffset: {
-        width: 0,
-        height: 1,
-      },
-      shadowOpacity: 0.1,
-      shadowRadius: 2,
-      elevation: 2,
-    },
-    referenceVerseHeader: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: 8,
-    },
-    referenceVerseTitle: {
-      fontSize: 16,
-      fontWeight: "bold",
-      color: "#2196F3",
-      flex: 1,
-    },
-    expandButton: {
-      padding: 4,
-      borderRadius: 4,
-      backgroundColor: "#e3f2fd",
-    },
-    referenceVerseText: {
-      fontSize: 18,
-      color: "#333",
-      lineHeight: 26,
-    },
-    referenceErrorContainer: {
-      flex: 1,
-      justifyContent: "center",
-      alignItems: "center",
-      paddingVertical: 60,
-      paddingHorizontal: 20,
-    },
-    referenceErrorText: {
-      fontSize: 16,
-      color: "#999",
-      textAlign: "center",
-    },
-    // Floating Navigation Styles
-    floatingNavigation: {
-      position: "absolute",
-      left: "50%",
-      marginLeft: -67, // Half of the component width (8+50+16+50+8 = 132, so -66)
-      flexDirection: "row",
-      backgroundColor: "#fff",
-      borderRadius: 30,
-      paddingHorizontal: 8,
-      paddingVertical: 8,
-      shadowColor: "#000",
-      shadowOffset: {
-        width: 0,
-        height: 2,
-      },
-      shadowOpacity: 0.25,
-      shadowRadius: 3.84,
-      elevation: 5,
-      gap: 16,
-    },
-    floatingNavButton: {
-      width: 50,
-      height: 50,
-      borderRadius: 25,
-      backgroundColor: "#f8f9fa",
-      justifyContent: "center",
-      alignItems: "center",
-      shadowColor: "#000",
-      shadowOffset: {
-        width: 0,
-        height: 1,
-      },
-      shadowOpacity: 0.18,
-      shadowRadius: 1.0,
-      elevation: 1,
-    },
-    floatingNavButtonDisabled: {
-      backgroundColor: "#e9ecef",
-      opacity: 0.5,
-    },
-    versesListContent: {
-      paddingTop: 0,
-      paddingBottom: 120, // Space for floating navigation buttons
-    },
-
-    // Bible/Book Selector Modal Styles
-    selectorModal: {
-      backgroundColor: "white",
-      borderRadius: 12,
-      height: "80%",
-      width: "85%",
-      overflow: "hidden",
-    },
-
-    selectorItem: {
-      flexDirection: "row",
-      alignItems: "center",
-      padding: 16,
-      borderBottomWidth: 1,
-      borderBottomColor: "#f0f0f0",
-    },
-
-    selectedSelectorItem: {
-      backgroundColor: "#e3f2fd",
-    },
-
-    selectorItemContent: {
-      flex: 1,
-    },
-
-    selectorItemTitle: {
-      fontSize: 16,
-      fontWeight: "500",
-      color: "#333",
-      marginBottom: 4,
-    },
-
-    selectedSelectorItemTitle: {
-      color: "#2196F3",
-      fontWeight: "600",
-    },
-
-    selectorItemSubtitle: {
-      fontSize: 12,
-      color: "#666",
-    },
-
-    fixedChapterHeader: {
-      paddingHorizontal: 16,
-      paddingVertical: 4,
-      backgroundColor: "#fff",
-    },
-
-    chapterHeaderContent: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: 8,
-    },
-
-    versionBadge: {
-      backgroundColor: "#4b4f52ff",
-      paddingHorizontal: 10,
-      paddingVertical: 4,
-      borderRadius: 16,
-      shadowColor: "#000",
-      shadowOpacity: 0.18,
-      shadowRadius: 3,
-      shadowOffset: { width: 0, height: 2 },
-      elevation: 2,
-    },
-
-    versionBadgeText: {
-      color: "#fff",
-      fontWeight: "700",
-      letterSpacing: 0.5,
-      fontSize: 13,
-    },
-    versionHeaderBadge: {
-      marginLeft: 4,
-      backgroundColor: "#2196F3",
-      paddingHorizontal: 10,
-      paddingVertical: 4,
-      borderRadius: 14,
-    },
-    versionHeaderBadgeText: {
-      color: "#fff",
-      fontWeight: "600",
-      fontSize: 13,
-      letterSpacing: 0.5,
-    },
-
-    chapterTitle: {
-      fontSize: 18,
-      fontWeight: "600",
-      color: "#666",
-      textAlign: "center",
-    },
-    settingsButton: {
-      padding: 6,
-      borderRadius: 20,
-      backgroundColor: "transparent",
-    },
-
-    verseTitle: {
-      fontSize: 16,
-      fontWeight: "bold",
-      color: "#2196F3",
-      marginBottom: 2, // Reduced from 8 to bring closer to verse
-      fontStyle: "italic",
-    },
-
-    verseTitleContainer: {
-      marginBottom: 5,
-    },
-
-    verseTitleLevel2: {
-      fontSize: 15,
-      color: "#4CAF50",
-    },
-
-    verseTitleLevel3: {
-      fontSize: 14,
-      color: "#FF9800",
-    },
-    // Settings Modal Styles
-    settingsOverlay: {
-      flex: 1,
-      backgroundColor: "rgba(0,0,0,0.5)",
-      justifyContent: "center",
-      alignItems: "center",
-    },
-    settingsModal: {
-      width: "88%",
-      borderRadius: 16,
-      padding: 20,
-      shadowColor: "#000",
-      shadowOpacity: 0.3,
-      shadowRadius: 8,
-      shadowOffset: { width: 0, height: 4 },
-      elevation: 8,
-    },
-    settingsTitle: {
-      fontSize: 20,
-      fontWeight: "600",
-      marginBottom: 12,
-    },
-    settingsSectionLabel: {
-      fontSize: 14,
-      fontWeight: "600",
-      marginTop: 4,
-      marginBottom: 8,
-    },
-    settingsRow: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 8,
-    },
-    optionChip: {
-      paddingHorizontal: 14,
-      paddingVertical: 8,
-      borderRadius: 22,
-      backgroundColor: "#f0f4f7",
-      borderWidth: 1,
-      borderColor: "#d0d7de",
-    },
-    optionChipActive: {
-      backgroundColor: "#2196F3",
-      borderColor: "#2196F3",
-    },
-    optionChipText: {
-      fontSize: 13,
-      fontWeight: "600",
-      color: "#2196F3",
-    },
-    optionChipTextActive: {
-      color: "#fff",
-    },
-    settingsFooter: {
-      marginTop: 28,
-      alignItems: "flex-end",
-    },
-    closeSettingsButton: {
-      paddingHorizontal: 20,
-      paddingVertical: 10,
-      backgroundColor: "#2196F3",
-      borderRadius: 24,
-    },
-    closeSettingsText: {
-      color: "#fff",
-      fontSize: 14,
-      fontWeight: "600",
-    },
-
-    booksContainer: {
-      flexDirection: "row",
-      flex: 1,
-    },
-    booksColumn: {
-      flex: 1,
-      borderRightWidth: 1,
-      borderRightColor: "#e0e0e0",
-    },
-    chaptersColumn: {
-      flex: 1,
-      padding: 8,
-    },
-    columnTitle: {
-      fontSize: 16,
-      fontWeight: "600",
-      padding: 16,
-      paddingBottom: 8,
-      color: "#333",
-    },
-    booksList: {
-      flex: 1,
-    },
-    chaptersGrid: {
-      padding: 8,
-    },
-    chapterNumberItem: {
-      width: "100%",
-      height: 50,
-      backgroundColor: "#f0f8ff",
-      borderRadius: 8,
-      justifyContent: "center",
-      alignItems: "center",
-      margin: 4,
-    },
-    chapterNumberText: {
-      fontSize: 16,
-      fontWeight: "600",
-      color: "#2196F3",
-    },
-    loadingChapters: {
-      flex: 1,
-      justifyContent: "center",
-      alignItems: "center",
-      padding: 20,
-    },
-    emptyChapters: {
-      flex: 1,
-      justifyContent: "center",
-      alignItems: "center",
-      padding: 20,
-    },
-    emptyText: {
-      marginTop: 16,
-      fontSize: 14,
-      color: "#999",
-      textAlign: "center",
-    },
-  });

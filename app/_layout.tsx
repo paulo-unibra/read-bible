@@ -34,7 +34,7 @@ export default function RootLayout() {
           options={{ presentation: "modal", headerShown: false }}
         />
       </Stack>
-      <StatusBar style={userTheme === "dark" ? "inverted" : 'inverted'} />
+  <StatusBar style={userTheme === "dark" ? "light" : "dark"} />
     </ThemeProvider>
   );
 }

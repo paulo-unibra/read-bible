@@ -1359,83 +1359,108 @@ import { Bible, Book, SearchResult, Verse } from "../types";
         {/* Book Selector Modal (agora inclui capítulos) */}
         <Modal
           visible={bookSelectorVisible}
-          animationType="fade"
+          animationType="slide"
           transparent
           onRequestClose={() => setBookSelectorVisible(false)}
         >
           <View style={styles.modalOverlay}>
             <View
               style={[
-                styles.selectorModal,
+                styles.enhancedSelectorModal,
                 isDark && { backgroundColor: "#1e1e1e" },
               ]}
             >
               <View
                 style={[
-                  styles.modalHeader,
+                  styles.enhancedModalHeader,
                   isDark && {
                     backgroundColor: "#1d1d1d",
                     borderBottomColor: "#2b2b2b",
                   },
                 ]}
               >
-                <Text style={[styles.modalTitle, isDark && { color: "#e0e0e0" }]}>
-                  Escolher Livro e Capítulo
-                </Text>
-                <TouchableOpacity onPress={() => setBookSelectorVisible(false)}>
+                <View style={styles.headerContent}>
+                  <Ionicons
+                    name="library"
+                    size={24}
+                    color={isDark ? "#90caf9" : "#2196F3"}
+                    style={styles.headerIcon}
+                  />
+                  <Text style={[styles.enhancedModalTitle, isDark && { color: "#e0e0e0" }]}>
+                    Escolher Livro e Capítulo
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setBookSelectorVisible(false)}
+                  style={styles.closeButton}
+                >
                   <Ionicons name="close" size={24} color={iconColor} />
                 </TouchableOpacity>
               </View>
-              
-              <View style={styles.booksContainer}>
 
+              <View style={styles.enhancedBooksContainer}>
                 {/* Coluna dos Livros */}
-                <View style={styles.booksColumn}>
-                  <Text
-                    style={[styles.columnTitle, isDark && { color: "#e0e0e0" }]}
+                <View style={styles.enhancedBooksColumn}>
+                  <View
+                    style={[
+                      styles.enhancedColumnHeader,
+                      isDark && { backgroundColor: "#252525" },
+                    ]}
                   >
-                    Livros
-                  </Text>
+                    <Ionicons
+                      name="book"
+                      size={18}
+                      color={isDark ? "#90caf9" : "#2196F3"}
+                    />
+                    <Text
+                      style={[styles.enhancedColumnTitle, isDark && { color: "#e0e0e0" }]}
+                    >
+                      Livros
+                    </Text>
+                  </View>
                   <FlatList
                     data={availableBooks}
                     keyExtractor={(item) => item.id.toString()}
-                    showsVerticalScrollIndicator={true}
-                    style={styles.booksList}
+                    showsVerticalScrollIndicator={false}
+                    style={styles.enhancedBooksList}
                     renderItem={({ item }) => {
                       console.log("[DEBUG] Renderizando livro:", item.name);
                       const selected = item.id === selectedBookInModal?.id;
                       return (
                         <TouchableOpacity
                           style={[
-                            styles.selectorItem,
+                            styles.enhancedSelectorItem,
                             isDark && { borderBottomColor: "#2a2a2a" },
                             selected &&
                               (isDark
                                 ? { backgroundColor: "#263850" }
-                                : styles.selectedSelectorItem),
+                                : styles.enhancedSelectedSelectorItem),
                           ]}
                           onPress={() => selectBookInModal(item)}
+                          activeOpacity={0.7}
                         >
-                          <View style={styles.selectorItemContent}>
+                          <View style={styles.enhancedSelectorItemContent}>
                             <Text
                               style={[
-                                styles.selectorItemTitle,
+                                styles.enhancedSelectorItemTitle,
                                 isDark && { color: "#e0e0e0" },
                                 selected &&
                                   (isDark
                                     ? { color: "#90caf9", fontWeight: "600" }
-                                    : styles.selectedSelectorItemTitle),
+                                    : styles.enhancedSelectedSelectorItemTitle),
                               ]}
                             >
                               {item.name}
                             </Text>
                           </View>
                           {selected && (
-                            <Ionicons
-                              name="checkmark"
-                              size={24}
-                              color={isDark ? "#90caf9" : "#2196F3"}
-                            />
+                            <View style={styles.checkmarkContainer}>
+                              <Ionicons
+                                name="checkmark-circle"
+                                size={20}
+                                color={isDark ? "#90caf9" : "#2196F3"}
+                              />
+                            </View>
                           )}
                         </TouchableOpacity>
                       );
@@ -1444,20 +1469,31 @@ import { Bible, Book, SearchResult, Verse } from "../types";
                 </View>
 
                 {/* Coluna dos Capítulos */}
-                <View style={styles.chaptersColumn}>
-                  <Text
-                    style={[styles.columnTitle, isDark && { color: "#e0e0e0" }]}
+                <View style={styles.enhancedChaptersColumn}>
+                  <View
+                    style={[
+                      styles.enhancedColumnHeader,
+                      isDark && { backgroundColor: "#252525" },
+                    ]}
                   >
-                    Capítulos{" "}
-                    {selectedBookInModal ? `- ${selectedBookInModal.name}` : ""}
-                  </Text>
+                    <Ionicons
+                      name="list"
+                      size={18}
+                      color={isDark ? "#90caf9" : "#2196F3"}
+                    />
+                    <Text
+                      style={[styles.enhancedColumnTitle, isDark && { color: "#e0e0e0" }]}
+                    >
+                      Capítulos {selectedBookInModal ? `- ${selectedBookInModal.name}` : ""}
+                    </Text>
+                  </View>
 
                   {loadingChapters ? (
-                    <View style={styles.loadingChapters}>
-                      <ActivityIndicator size="small" color="#2196F3" />
+                    <View style={styles.enhancedLoadingChapters}>
+                      <ActivityIndicator size="large" color="#2196F3" />
                       <Text
                         style={[
-                          styles.loadingText,
+                          styles.enhancedLoadingText,
                           isDark && { color: "#b0b0b0" },
                         ]}
                       >
@@ -1468,8 +1504,8 @@ import { Bible, Book, SearchResult, Verse } from "../types";
                     <FlatList
                       data={chaptersForSelectedBook}
                       keyExtractor={(item) => item.toString()}
-                      showsVerticalScrollIndicator={true}
-                      contentContainerStyle={styles.chaptersGrid}
+                      showsVerticalScrollIndicator={false}
+                      contentContainerStyle={styles.enhancedChaptersGrid}
                       renderItem={({ item: chapterNumber }) => {
                         const isCurrentChapter =
                           selectedBookInModal.id === currentBookId &&
@@ -1477,9 +1513,9 @@ import { Bible, Book, SearchResult, Verse } from "../types";
                         return (
                           <TouchableOpacity
                             style={[
-                              styles.chapterNumberItem,
+                              styles.enhancedChapterNumberItem,
                               isDark && { backgroundColor: "#2a2a2a" },
-                              isCurrentChapter && styles.currentChapterItem,
+                              isCurrentChapter && styles.enhancedCurrentChapterItem,
                             ]}
                             onPress={() => {
                               setBookSelectorVisible(false);
@@ -1489,29 +1525,39 @@ import { Bible, Book, SearchResult, Verse } from "../types";
                                 selectBook(selectedBookInModal);
                               }
                             }}
+                            activeOpacity={0.7}
                           >
                             <Text
                               style={[
-                                styles.chapterNumberText,
+                                styles.enhancedChapterNumberText,
                                 isDark && { color: "#e0e0e0" },
-                                isCurrentChapter && styles.currentChapterText,
+                                isCurrentChapter && styles.enhancedCurrentChapterText,
                               ]}
                             >
                               {chapterNumber}
                             </Text>
+                            {isCurrentChapter && (
+                              <View style={styles.currentChapterIndicator}>
+                                <Ionicons
+                                  name="radio-button-on"
+                                  size={12}
+                                  color="#fff"
+                                />
+                              </View>
+                            )}
                           </TouchableOpacity>
                         );
                       }}
                     />
                   ) : (
-                    <View style={styles.emptyChapters}>
+                    <View style={styles.enhancedEmptyChapters}>
                       <Ionicons
                         name="book-outline"
                         size={48}
                         color={isDark ? "#555" : "#ccc"}
                       />
                       <Text
-                        style={[styles.emptyText, isDark && { color: "#b0b0b0" }]}
+                        style={[styles.enhancedEmptyText, isDark && { color: "#b0b0b0" }]}
                       >
                         Selecione um livro para ver os capítulos
                       </Text>
@@ -2846,10 +2892,224 @@ import { Bible, Book, SearchResult, Verse } from "../types";
       alignItems: "center",
       padding: 20,
     },
-    emptyText: {
+    // Enhanced Modal Styles
+    enhancedSelectorModal: {
+      backgroundColor: "white",
+      borderRadius: 20,
+      height: "85%",
+      width: "90%",
+      overflow: "hidden",
+      shadowColor: "#000",
+      shadowOffset: {
+        width: 0,
+        height: 10,
+      },
+      shadowOpacity: 0.25,
+      shadowRadius: 10,
+      elevation: 10,
+    },
+
+    enhancedModalHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      padding: 20,
+      backgroundColor: "#fff",
+      borderBottomWidth: 1,
+      borderBottomColor: "#f0f0f0",
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+    },
+
+    headerContent: {
+      flexDirection: "row",
+      alignItems: "center",
+      flex: 1,
+    },
+
+    headerIcon: {
+      marginRight: 12,
+    },
+
+    enhancedModalTitle: {
+      fontSize: 20,
+      fontWeight: "700",
+      color: "#333",
+      letterSpacing: 0.5,
+    },
+
+    closeButton: {
+      padding: 8,
+      borderRadius: 20,
+      backgroundColor: "#f5f5f5",
+    },
+
+    enhancedBooksContainer: {
+      flexDirection: "row",
+      flex: 1,
+    },
+
+    enhancedBooksColumn: {
+      flex: 1,
+      borderRightWidth: 1,
+      borderRightColor: "#e8e8e8",
+    },
+
+    enhancedChaptersColumn: {
+      flex: 1,
+      padding: 0,
+    },
+
+    enhancedColumnHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      padding: 16,
+      paddingBottom: 12,
+      backgroundColor: "#fafafa",
+      borderBottomWidth: 1,
+      borderBottomColor: "#e8e8e8",
+    },
+
+    enhancedColumnTitle: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: "#333",
+      marginLeft: 8,
+      letterSpacing: 0.3,
+    },
+
+    enhancedBooksList: {
+      flex: 1,
+    },
+
+    enhancedSelectorItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      padding: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: "#f5f5f5",
+      backgroundColor: "#fff",
+    },
+
+    enhancedSelectedSelectorItem: {
+      backgroundColor: "#e3f2fd",
+      borderLeftWidth: 4,
+      borderLeftColor: "#2196F3",
+    },
+
+    enhancedSelectorItemContent: {
+      flex: 1,
+    },
+
+    enhancedSelectorItemTitle: {
+      fontSize: 16,
+      fontWeight: "500",
+      color: "#333",
+    },
+
+    enhancedSelectedSelectorItemTitle: {
+      color: "#2196F3",
+      fontWeight: "600",
+    },
+
+    checkmarkContainer: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: "#fff",
+      alignItems: "center",
+      justifyContent: "center",
+      shadowColor: "#000",
+      shadowOffset: {
+        width: 0,
+        height: 1,
+      },
+      shadowOpacity: 0.1,
+      shadowRadius: 2,
+      elevation: 2,
+    },
+
+    enhancedChaptersGrid: {
+      padding: 12,
+    },
+
+    enhancedChapterNumberItem: {
+      width: "100%",
+      height: 50,
+      backgroundColor: "#f8f9fa",
+      borderRadius: 12,
+      justifyContent: "center",
+      alignItems: "center",
+      marginBottom: 8,
+      borderWidth: 1,
+      borderColor: "#e9ecef",
+      position: "relative",
+    },
+
+    enhancedCurrentChapterItem: {
+      backgroundColor: "#2196F3",
+      borderColor: "#1976d2",
+      shadowColor: "#2196F3",
+      shadowOffset: {
+        width: 0,
+        height: 2,
+      },
+      shadowOpacity: 0.3,
+      shadowRadius: 4,
+      elevation: 4,
+    },
+
+    enhancedChapterNumberText: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: "#495057",
+    },
+
+    enhancedCurrentChapterText: {
+      color: "#fff",
+      fontWeight: "700",
+    },
+
+    currentChapterIndicator: {
+      position: "absolute",
+      top: -5,
+      right: -5,
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      backgroundColor: "#4caf50",
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 2,
+      borderColor: "#fff",
+    },
+
+    enhancedLoadingChapters: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 20,
+    },
+
+    enhancedLoadingText: {
+      marginTop: 16,
+      fontSize: 14,
+      color: "#666",
+      textAlign: "center",
+    },
+
+    enhancedEmptyChapters: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 20,
+    },
+
+    enhancedEmptyText: {
       marginTop: 16,
       fontSize: 14,
       color: "#999",
       textAlign: "center",
+      lineHeight: 20,
     },
   });
