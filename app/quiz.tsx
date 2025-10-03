@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useTheme } from '@react-navigation/native';
+import { useTheme } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
@@ -12,16 +12,23 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { Colors } from '../constants/theme';
-import QuizService, { Quiz, QuizSession } from "../services/QuizService";
+import {
+    SafeAreaView,
+    useSafeAreaInsets,
+} from "react-native-safe-area-context";
+import { Colors } from "../constants/theme";
+import QuizService, {
+    Quiz,
+    QuizResult,
+    QuizSession,
+} from "../services/QuizService";
 
 export default function QuizScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const insets = useSafeAreaInsets();
   const navTheme = useTheme();
-  const colorScheme = navTheme.dark ? 'dark' : 'light';
+  const colorScheme = navTheme.dark ? "dark" : "light";
   const theme = Colors[colorScheme];
 
   const bookId = parseInt(params.bookId as string);
@@ -66,17 +73,17 @@ export default function QuizScreen() {
 
       console.log("Quiz loaded:");
 
-      const data = {
+      // Corrigir shuffle: manter array, não transformar em objeto
+      const shuffled: Quiz = {
         ...quizData,
-        questions: {
-          ...quizData.questions.map((question) => ({
-            ...question,
-            alternativas: question.alternativas.sort(() => Math.random() - 0.5),
-          })),
-        },
+        questions: quizData.questions.map((q) => ({
+          ...q,
+          // clona antes de embaralhar para não mutar original
+          alternativas: [...q.alternativas].sort(() => Math.random() - 0.5),
+        })),
       };
 
-      setSession(QuizService.createQuizSession(data));
+      setSession(QuizService.createQuizSession(shuffled));
       setQuestionStartTime(Date.now());
     } catch (error) {
       console.error("Error loading quiz:", error);
@@ -126,21 +133,45 @@ export default function QuizScreen() {
             const currentSession = sessionRef.current;
             if (currentSession) {
               const timeSpent = Date.now() - questionStartTimeRef.current;
-              const updatedSession = QuizService.answerQuestion(
-                currentSession,
-                "",
-                timeSpent
+              const cq =
+                currentSession.quiz.questions[
+                  currentSession.currentQuestionIndex
+                ];
+              const timeoutResult: QuizResult = {
+                questionId: cq.id,
+                pergunta: cq.pergunta,
+                respostaEscolhida: "",
+                respostaCorreta: cq.respostaCorreta,
+                correct: false,
+                timeSpent,
+              };
+              const isLast =
+                currentSession.currentQuestionIndex ===
+                currentSession.quiz.questions.length - 1;
+              setSession((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      results: [...prev.results, timeoutResult],
+                      isCompleted: isLast,
+                    }
+                  : prev
               );
-              setSession(updatedSession);
-
-              if (updatedSession.isCompleted) {
+              if (isLast) {
                 setShowResult(true);
               } else {
-                setTimeout(() => {
-                  setSelectedAnswer(null);
-                  setTimeLeft(30);
-                  progressAnimation.setValue(0);
-                }, 100);
+                // avanço imediato em timeout (sem feedback)
+                setSession((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        currentQuestionIndex: prev.currentQuestionIndex + 1,
+                      }
+                    : prev
+                );
+                setSelectedAnswer(null);
+                setTimeLeft(30);
+                progressAnimation.setValue(0);
               }
             }
             return 0;
@@ -182,33 +213,68 @@ export default function QuizScreen() {
     session,
   ]);
 
+  // Se a sessão marcou concluído mas ainda não trocou para resultado (evita frame com índice fora do array)
+  useEffect(() => {
+    if (session?.isCompleted && !showResult) {
+      setShowResult(true);
+    }
+  }, [session?.isCompleted, showResult]);
+
   const handleAnswerSelect = (answer: string) => {
     if (selectedAnswer || !session) return;
 
-    // Parar o timer
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
 
-    setSelectedAnswer(answer);
-
+    const currentQuestion =
+      session.quiz.questions[session.currentQuestionIndex];
     const timeSpent = Date.now() - questionStartTime;
-    const updatedSession = QuizService.answerQuestion(
-      session,
-      answer,
-      timeSpent
-    );
-    setSession(updatedSession);
+    const isCorrect = answer === currentQuestion.respostaCorreta;
 
-    // Mostrar feedback visual por 1 segundo antes de avançar
+    const result: QuizResult = {
+      questionId: currentQuestion.id,
+      pergunta: currentQuestion.pergunta,
+      respostaEscolhida: answer,
+      respostaCorreta: currentQuestion.respostaCorreta,
+      correct: isCorrect,
+      timeSpent,
+    };
+
+    setSelectedAnswer(answer); // exibir feedback
+
+    // Adiciona resultado sem avançar ainda
+    setSession((prev) =>
+      prev
+        ? {
+            ...prev,
+            results: [...prev.results, result],
+            isCompleted:
+              prev.currentQuestionIndex === prev.quiz.questions.length - 1,
+          }
+        : prev
+    );
+
+    const isLast =
+      session.currentQuestionIndex === session.quiz.questions.length - 1;
+
     setTimeout(() => {
-      if (updatedSession.isCompleted) {
+      if (isLast) {
         setShowResult(true);
       } else {
+        // Avança só agora
+        setSession((prev) =>
+          prev
+            ? {
+                ...prev,
+                currentQuestionIndex: prev.currentQuestionIndex + 1,
+              }
+            : prev
+        );
         nextQuestion();
       }
-    }, 1000);
+    }, 1000); // 1s de feedback
   };
 
   const restartQuiz = () => {
@@ -229,35 +295,33 @@ export default function QuizScreen() {
   };
 
   const getAnswerStyle = (answer: string) => {
-    if (!selectedAnswer) return styles.answerButton;
-
+    if (!selectedAnswer || !session) return styles.answerButton;
+    const currentQuestion =
+      session.quiz.questions[session.currentQuestionIndex];
     if (answer === selectedAnswer) {
-      const currentQuestion =
-        session?.quiz.questions[session.currentQuestionIndex - 1];
-      return answer === currentQuestion?.respostaCorreta
+      return answer === currentQuestion.respostaCorreta
         ? styles.answerButtonCorrect
         : styles.answerButtonWrong;
     }
-
-    // Mostrar resposta correta se a selecionada estava errada
-    const currentQuestion =
-      session?.quiz.questions[session.currentQuestionIndex - 1];
     if (
-      selectedAnswer !== currentQuestion?.respostaCorreta &&
-      answer === currentQuestion?.respostaCorreta
+      selectedAnswer !== currentQuestion.respostaCorreta &&
+      answer === currentQuestion.respostaCorreta
     ) {
       return styles.answerButtonCorrect;
     }
-    
     return styles.answerButtonDisabled;
   };
 
   if (loading) {
     return (
-  <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}> 
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.background }]}
+      >
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color={theme.tint} />
-          <Text style={[styles.loadingText, { color: theme.text }]}>Carregando questionário...</Text>
+          <Text style={[styles.loadingText, { color: theme.text }]}>
+            Carregando questionário...
+          </Text>
         </View>
       </SafeAreaView>
     );
@@ -265,9 +329,13 @@ export default function QuizScreen() {
 
   if (!quiz || !session) {
     return (
-  <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}> 
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.background }]}
+      >
         <View style={styles.centerContent}>
-          <Text style={[styles.errorText, { color: '#f44336' }]}>Erro ao carregar questionário</Text>
+          <Text style={[styles.errorText, { color: "#f44336" }]}>
+            Erro ao carregar questionário
+          </Text>
           <TouchableOpacity
             style={[styles.retryButton, { backgroundColor: theme.tint }]}
             onPress={() => router.back()}
@@ -285,34 +353,72 @@ export default function QuizScreen() {
     const wrong = score.total - score.correct;
 
     return (
-  <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}> 
-        <TouchableOpacity onPress={() => router.back()} style={[styles.fabBackButton, { top: insets.top + 8, backgroundColor: colorScheme === 'dark' ? '#222' : '#ffffffee' }]}> 
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.background }]}
+      >
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={[
+            styles.fabBackButton,
+            {
+              top: insets.top + 8,
+              backgroundColor: colorScheme === "dark" ? "#222" : "#ffffffee",
+            },
+          ]}
+        >
           <Ionicons name="close" size={26} color={theme.tint} />
         </TouchableOpacity>
 
         <View style={styles.resultContainer}>
-          <Text style={[styles.resultTitle, { color: theme.text }]}>{quiz.name}</Text>
+          <Text style={[styles.resultTitle, { color: theme.text }]}>
+            {quiz.name}
+          </Text>
 
-          <View style={[styles.scoreCard, { backgroundColor: colorScheme === 'dark' ? '#1e1e1e' : '#fff' }]}>
-            <Text style={[styles.scoreText, { color: theme.tint }]}>{score.correct}/{score.total}</Text>
-            <Text style={[styles.percentageText, { color: theme.text }]}>{score.percentage}%</Text>
+          <View
+            style={[
+              styles.scoreCard,
+              { backgroundColor: colorScheme === "dark" ? "#1e1e1e" : "#fff" },
+            ]}
+          >
+            <Text style={[styles.scoreText, { color: theme.tint }]}>
+              {score.correct}/{score.total}
+            </Text>
+            <Text style={[styles.percentageText, { color: theme.text }]}>
+              {score.percentage}%
+            </Text>
             <View style={styles.inlineResultCounts}>
               <Text style={styles.correctCount}>✔ {score.correct}</Text>
               <Text style={styles.wrongCount}>✖ {wrong}</Text>
             </View>
           </View>
 
-          <Text style={[styles.messageText, { color: theme.text }]}>{message}</Text>
+          <Text style={[styles.messageText, { color: theme.text }]}>
+            {message}
+          </Text>
 
           <View style={styles.statsContainer}>
-            <View style={styles.statItem}>
-              <Text style={[styles.statLabel, { color: theme.text }]}>Tempo Total</Text>
+            <View
+              style={{
+                ...styles.statItem,
+                backgroundColor: colorScheme === "dark" ? "#1e1e1e" : "#fff",
+              }}
+            >
+              <Text style={[styles.statLabel, { color: theme.text }]}>
+                Tempo Total
+              </Text>
               <Text style={[styles.statValue, { color: theme.text }]}>
                 {Math.round(score.totalTime / 1000)}s
               </Text>
             </View>
-            <View style={styles.statItem}>
-              <Text style={[styles.statLabel, { color: theme.text }]}>Tempo Médio</Text>
+            <View
+              style={{
+                ...styles.statItem,
+                backgroundColor: colorScheme === "dark" ? "#1e1e1e" : "#fff",
+              }}
+            >
+              <Text style={[styles.statLabel, { color: theme.text }]}>
+                Tempo Médio
+              </Text>
               <Text style={[styles.statValue, { color: theme.text }]}>
                 {Math.round(score.averageTime / 1000)}s
               </Text>
@@ -321,7 +427,7 @@ export default function QuizScreen() {
 
           <View style={styles.resultButtons}>
             <TouchableOpacity
-              style={[styles.restartButton, { backgroundColor: '#FF9800' }]}
+              style={[styles.restartButton, { backgroundColor: "#FF9800" }]}
               onPress={restartQuiz}
             >
               <Ionicons name="refresh" size={20} color="#fff" />
@@ -329,7 +435,7 @@ export default function QuizScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.finishButton, { backgroundColor: '#4CAF50' }]}
+              style={[styles.finishButton, { backgroundColor: "#4CAF50" }]}
               onPress={() => router.back()}
             >
               <Ionicons name="checkmark" size={20} color="#fff" />
@@ -341,29 +447,60 @@ export default function QuizScreen() {
     );
   }
 
-  const currentQuestion = session.quiz.questions[session.currentQuestionIndex];
-  const correctCount = session.results.filter(r => r.correct).length;
-  const wrongCount = session.results.filter(r => !r.correct).length;
+  // Proteger contra índice fora do intervalo enquanto estado visual troca
+  const safeIndex = Math.min(
+    session.currentQuestionIndex,
+    Math.max(0, session.quiz.questions.length - 1)
+  );
+  const currentQuestion = session.quiz.questions[safeIndex];
+  const correctCount = session.results.filter((r) => r.correct).length;
+  const wrongCount = session.results.filter((r) => !r.correct).length;
   const progress =
     ((session.currentQuestionIndex + 1) / session.quiz.questions.length) * 100;
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}> 
-      <TouchableOpacity onPress={() => router.back()} style={[styles.fabBackButton, { top: insets.top + 8, backgroundColor: colorScheme === 'dark' ? '#222' : '#ffffffee' }]}> 
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: theme.background }]}
+    >
+      <TouchableOpacity
+        onPress={() => router.back()}
+        style={[
+          styles.fabBackButton,
+          {
+            top: insets.top + 8,
+            backgroundColor: colorScheme === "dark" ? "#222" : "#ffffffee",
+          },
+        ]}
+      >
         <Ionicons name="close" size={26} color={theme.tint} />
       </TouchableOpacity>
 
       {/* Progress Bar */}
-      <View style={[styles.progressContainer, { paddingTop: insets.top + 56, backgroundColor: theme.background }]}> 
+      <View
+        style={[
+          styles.progressContainer,
+          { paddingTop: insets.top + 56, backgroundColor: theme.background },
+        ]}
+      >
         <View style={styles.progressRow}>
-          <Text style={[styles.quizTitle, { color: theme.text }]} numberOfLines={1}>{quiz.name}</Text>
+          <Text
+            style={[styles.quizTitle, { color: theme.text }]}
+            numberOfLines={1}
+          >
+            {quiz.name}
+          </Text>
           <View style={styles.inlineCounts}>
             <Text style={styles.correctCount}>✔ {correctCount}</Text>
             <Text style={styles.wrongCount}>✖ {wrongCount}</Text>
           </View>
         </View>
         <View style={styles.progressBar}>
-          <View style={[styles.progressFill, { width: `${progress}%`, backgroundColor: theme.tint }]} />
+          <View
+            style={[
+              styles.progressFill,
+              { width: `${progress}%`, backgroundColor: theme.tint },
+            ]}
+          />
         </View>
         <Text style={styles.progressText}>
           {session.currentQuestionIndex + 1} de {session.quiz.questions.length}
@@ -371,11 +508,17 @@ export default function QuizScreen() {
       </View>
 
       {/* Timer */}
-  <View style={[styles.timerContainer, { backgroundColor: theme.background }]}> 
+      <View
+        style={[styles.timerContainer, { backgroundColor: theme.background }]}
+      >
         <Animated.View
           style={[
             styles.timerCircle,
-            { transform: [{ scale: timerAnimation }], borderColor: theme.tint, backgroundColor: colorScheme === 'dark' ? '#1f1f1f' : '#f0f8ff' },
+            {
+              transform: [{ scale: timerAnimation }],
+              borderColor: theme.tint,
+              backgroundColor: colorScheme === "dark" ? "#1f1f1f" : "#f0f8ff",
+            },
           ]}
         >
           <Text
@@ -401,23 +544,41 @@ export default function QuizScreen() {
       </View>
 
       {/* Question */}
-      <View style={[styles.questionContainer, { backgroundColor: colorScheme === 'dark' ? '#1e1e1e' : '#fff' }]}> 
-        <Text style={[styles.questionText, { color: theme.text }]}>{currentQuestion.pergunta}</Text>
+      <View
+        style={[
+          styles.questionContainer,
+          { backgroundColor: colorScheme === "dark" ? "#1e1e1e" : "#fff" },
+        ]}
+      >
+        <Text style={[styles.questionText, { color: theme.text }]}>
+          {currentQuestion.pergunta}
+        </Text>
       </View>
 
       {/* Answers */}
-      <ScrollView style={styles.answersContainer} contentContainerStyle={[styles.answersContent, { paddingBottom: insets.bottom + 32 }]}> 
+      <ScrollView
+        style={styles.answersContainer}
+        contentContainerStyle={[
+          styles.answersContent,
+          { paddingBottom: insets.bottom + 32 },
+        ]}
+      >
         {currentQuestion.alternativas.map((answer, index) => (
           <TouchableOpacity
             key={index}
             style={[
               getAnswerStyle(answer),
-              !selectedAnswer && { backgroundColor: colorScheme === 'dark' ? '#222' : '#fff', borderColor: colorScheme === 'dark' ? '#333' : '#e0e0e0' },
+              !selectedAnswer && {
+                backgroundColor: colorScheme === "dark" ? "#222" : "#fff",
+                borderColor: colorScheme === "dark" ? "#333" : "#e0e0e0",
+              },
             ]}
             onPress={() => handleAnswerSelect(answer)}
             disabled={!!selectedAnswer}
           >
-            <Text style={[styles.answerText, { color: theme.text }]}>{answer}</Text>
+            <Text style={[styles.answerText, { color: theme.text }]}>
+              {answer}
+            </Text>
             {selectedAnswer && answer === selectedAnswer && (
               <Ionicons
                 name={
@@ -451,16 +612,16 @@ const styles = StyleSheet.create({
     backgroundColor: "#f5f5f5",
   },
   fabBackButton: {
-    position: 'absolute',
+    position: "absolute",
     left: 16,
     zIndex: 50,
-    backgroundColor: '#ffffffee',
+    backgroundColor: "#ffffffee",
     width: 44,
     height: 44,
     borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
     shadowOpacity: 0.15,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
@@ -519,29 +680,29 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   progressRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: 8,
     gap: 12,
   },
   quizTitle: {
     flex: 1,
     fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: "600",
+    color: "#333",
   },
   inlineCounts: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
   },
   correctCount: {
-    color: '#2e7d32',
-    fontWeight: '600',
+    color: "#2e7d32",
+    fontWeight: "600",
   },
   wrongCount: {
-    color: '#c62828',
-    fontWeight: '600',
+    color: "#c62828",
+    fontWeight: "600",
   },
   progressBar: {
     height: 8,
@@ -604,7 +765,7 @@ const styles = StyleSheet.create({
     paddingTop: 4,
   },
   inlineResultCounts: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 16,
     marginTop: 12,
   },
@@ -709,7 +870,6 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   statItem: {
-    backgroundColor: "#fff",
     padding: 20,
     borderRadius: 12,
     alignItems: "center",
