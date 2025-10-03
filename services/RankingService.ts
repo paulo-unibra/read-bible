@@ -15,7 +15,7 @@ class RankingService {
     const full: RankingEntry = {
       id: `rk_${Date.now()}_${Math.random().toString(36).slice(2,6)}`,
       createdAt: new Date().toISOString(),
-      username: user.username,
+      username: (user as any).email || 'anon',
       ...entry,
     };
     this.store.entries.push(full);

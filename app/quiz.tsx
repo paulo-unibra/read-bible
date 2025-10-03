@@ -231,7 +231,7 @@ export default function QuizScreen() {
         try {
           const score = QuizService.calculateScore(session);
           RankingService.addEntry({
-            userId: user.id,
+            userId: (user as any).uid || 'no-id',
             bookId: bookId,
             chapter: chapterNumber,
             quizName: session.quiz.name,

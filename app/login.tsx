@@ -5,7 +5,7 @@ import AuthService from '../services/AuthService';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [loading, setLoading] = useState(false);
@@ -14,9 +14,9 @@ export default function LoginScreen() {
     try {
       setLoading(true);
       if (mode === 'login') {
-        await AuthService.login(username, password);
+        await AuthService.login(email, password);
       } else {
-        await AuthService.register(username, password);
+        await AuthService.register(email, password);
       }
       router.replace('/');
     } catch (e: any) {
@@ -28,7 +28,7 @@ export default function LoginScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.card}>
         <Text style={styles.title}>{mode === 'login' ? 'Entrar' : 'Registrar'}</Text>
-        <TextInput style={styles.input} placeholder="Usuário" autoCapitalize='none' value={username} onChangeText={setUsername} />
+  <TextInput style={styles.input} placeholder="Email" autoCapitalize='none' keyboardType='email-address' value={email} onChangeText={setEmail} />
         <TextInput style={styles.input} placeholder="Senha" secureTextEntry value={password} onChangeText={setPassword} />
         <TouchableOpacity style={[styles.button, loading && { opacity: 0.6 }]} disabled={loading} onPress={submit}>
           <Text style={styles.buttonText}>{mode === 'login' ? 'Login' : 'Cadastrar'}</Text>
