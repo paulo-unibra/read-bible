@@ -102,3 +102,28 @@ export interface DriveFile {
   size?: string;
   modifiedTime?: string;
 }
+
+// Autenticação básica
+export interface User {
+  id: string;          // UUID gerado local
+  username: string;    // nome de login único
+  passwordHash: string;// hash (sha256) da senha
+  createdAt: string;   // ISO date
+  lastLogin?: string;  // ISO date
+}
+
+// Ranking de quizzes
+export interface RankingEntry {
+  id: string;             // unique id (quizId + timestamp)
+  userId: string;         // referência ao usuário
+  username: string;       // denormalizado para exibição rápida
+  bookId: number;
+  chapter: number;
+  quizName: string;
+  correct: number;
+  total: number;
+  percentage: number;     // 0-100
+  totalTimeMs: number;    // tempo total em ms
+  averageTimeMs: number;  // media em ms
+  createdAt: string;      // ISO date
+}

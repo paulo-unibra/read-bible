@@ -30,6 +30,8 @@ export default function RootLayout() {
         <Stack.Screen name="reading-plans" options={{ headerShown: false }} />
         <Stack.Screen name="settings" options={{ headerShown: false }} />
         <Stack.Screen name="quiz" options={{ headerShown: false }} />
+  <Stack.Screen name="login" options={{ headerShown: false }} />
+  <Stack.Screen name="ranking" options={{ headerShown: false }} />
         <Stack.Screen
           name="modal"
           options={{ presentation: "modal", headerShown: false }}

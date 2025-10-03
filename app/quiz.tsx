@@ -17,11 +17,13 @@ import {
     useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import { Colors } from "../constants/theme";
+import AuthService from "../services/AuthService";
 import QuizService, {
     Quiz,
     QuizResult,
     QuizSession,
 } from "../services/QuizService";
+import RankingService from "../services/RankingService";
 
 export default function QuizScreen() {
   const router = useRouter();
@@ -42,6 +44,7 @@ export default function QuizScreen() {
   const [showResult, setShowResult] = useState(false);
   const [questionStartTime, setQuestionStartTime] = useState(Date.now());
   const timerRef = React.useRef<number | null>(null);
+  const [rankingRegistered, setRankingRegistered] = useState(false);
 
   // Animações
   const [timerAnimation] = useState(new Animated.Value(1));
@@ -79,7 +82,7 @@ export default function QuizScreen() {
         questions: quizData.questions.map((q) => ({
           ...q,
           // clona antes de embaralhar para não mutar original
-          alternativas: [...q.alternativas].sort(() => Math.random() - 0.5),
+          alternativas: [...q.alternativas].sort(() => Math.random() - 0.9),
         })),
       };
 
@@ -219,6 +222,32 @@ export default function QuizScreen() {
       setShowResult(true);
     }
   }, [session?.isCompleted, showResult]);
+
+  // Registrar entrada de ranking quando resultados mostrados
+  useEffect(() => {
+    if (showResult && session && !rankingRegistered) {
+      const user = AuthService.getCurrentUser();
+      if (user) {
+        try {
+          const score = QuizService.calculateScore(session);
+          RankingService.addEntry({
+            userId: user.id,
+            bookId: bookId,
+            chapter: chapterNumber,
+            quizName: session.quiz.name,
+            correct: score.correct,
+            total: score.total,
+            percentage: score.percentage,
+            totalTimeMs: score.totalTime,
+            averageTimeMs: score.averageTime,
+          });
+        } catch (e) {
+          console.warn("Falha ao registrar ranking", e);
+        }
+      }
+      setRankingRegistered(true);
+    }
+  }, [showResult, session, rankingRegistered, bookId, chapterNumber]);
 
   const handleAnswerSelect = (answer: string) => {
     if (selectedAnswer || !session) return;
@@ -440,6 +469,15 @@ export default function QuizScreen() {
             >
               <Ionicons name="checkmark" size={20} color="#fff" />
               <Text style={styles.finishButtonText}>Concluir</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={{ marginTop: 16 }}>
+            <TouchableOpacity
+              style={[styles.finishButton, { backgroundColor: "#2196F3" }]}
+              onPress={() => router.push("/ranking")}
+            >
+              <Ionicons name="trophy" size={20} color="#fff" />
+              <Text style={styles.finishButtonText}>Ranking</Text>
             </TouchableOpacity>
           </View>
         </View>

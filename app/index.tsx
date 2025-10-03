@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Logo } from '../components/logo';
+import AuthService from '../services/AuthService';
 import DatabaseService from '../services/DatabaseService';
 import notificationService from '../services/NotificationService';
 import readingPlanService from '../services/ReadingPlanService';
@@ -15,6 +16,7 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [fontSizePref, setFontSizePref] = useState<'small' | 'medium' | 'large'>('medium');
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [userLogged, setUserLogged] = useState(false);
 
   useEffect(() => { initializeApp(); }, []);
 
@@ -27,6 +29,7 @@ export default function HomeScreen() {
         if (mounted) {
           if (userFont) setFontSizePref(userFont);
           if (userTheme) setTheme(userTheme);
+          setUserLogged(!!AuthService.getCurrentUser());
         }
       } catch {}
     })();
@@ -41,8 +44,9 @@ export default function HomeScreen() {
       // Carregamento de planos desativado (em desenvolvimento)
       const userFont = (await DatabaseService.getSetting('fontSize')) as 'small' | 'medium' | 'large' | null;
       const userTheme = (await DatabaseService.getSetting('theme')) as 'light' | 'dark' | null;
-      if (userFont) setFontSizePref(userFont);
-      if (userTheme) setTheme(userTheme);
+  if (userFont) setFontSizePref(userFont);
+  if (userTheme) setTheme(userTheme);
+  setUserLogged(!!AuthService.getCurrentUser());
     } catch (e) {
       console.error(e);
       Alert.alert('Erro', 'Falha ao inicializar o aplicativo');
@@ -159,6 +163,26 @@ export default function HomeScreen() {
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.iconForward} />
           </TouchableOpacity>
+
+          <TouchableOpacity style={[styles.actionCard,{ backgroundColor: colors.card, shadowOpacity: isDark ? 0.25 : 0.1 }]} onPress={() => router.push('/ranking')}>
+            <View style={[styles.actionIcon,{ backgroundColor: colors.surfaceAlt }]}><Ionicons name="trophy-outline" size={32} color={isDark ? '#ffd54f' : '#FFC107'} /></View>
+            <View style={styles.actionContent}>
+              <Text style={[styles.actionTitle,{ color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Ranking</Text>
+              <Text style={[styles.actionDescription,{ color: colors.textSecondary, fontSize: applyFontScale(14) }]}>Melhores desempenhos em quizzes</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.iconForward} />
+          </TouchableOpacity>
+
+          {!userLogged && (
+            <TouchableOpacity style={[styles.actionCard,{ backgroundColor: colors.card, shadowOpacity: isDark ? 0.25 : 0.1 }]} onPress={() => router.push('/login')}>
+              <View style={[styles.actionIcon,{ backgroundColor: colors.surfaceAlt }]}><Ionicons name="log-in-outline" size={32} color={isDark ? '#64b5f6' : '#1976D2'} /></View>
+              <View style={styles.actionContent}>
+                <Text style={[styles.actionTitle,{ color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Login</Text>
+                <Text style={[styles.actionDescription,{ color: colors.textSecondary, fontSize: applyFontScale(14) }]}>Entre para salvar seu ranking</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.iconForward} />
+            </TouchableOpacity>
+          )}
         </View>
 
         <View style={styles.actionsSection}>
