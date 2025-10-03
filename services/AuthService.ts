@@ -48,6 +48,22 @@ class FirebaseAuthService {
     return cred.user as FbUser;
   }
 
+  async registerWithName(email: string, password: string, displayName: string) {
+    const user = await this.register(email, password);
+    try { await (user as any).updateProfile?.({ displayName }); } catch {}
+    return user;
+  }
+
+  async emailExists(email: string): Promise<boolean> {
+    this.init();
+    try {
+      const methods = await firebase.auth().fetchSignInMethodsForEmail(email.trim());
+      return methods && methods.length > 0;
+    } catch (e) {
+      return false; // Em caso de erro (ex: formato inválido) tratamos depois na validação de formato
+    }
+  }
+
   async login(email: string, password: string) {
     this.init();
     const cred = await firebase.auth().signInWithEmailAndPassword(email.trim(), password);
