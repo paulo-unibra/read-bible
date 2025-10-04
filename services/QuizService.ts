@@ -29,7 +29,7 @@ interface QuizSession {
 }
 
 class QuizService {
-  private DRIVE_FOLDER_ID = "12CZeaVlNKMfO3gT5PpOFdVgvY7fEQ0Yq";
+  private DRIVE_FOLDER_ID = process.env.EXPO_PUBLIC_QUIZ_DRIVE_FOLDER_ID || process.env.EXPO_PUBLIC_DRIVE_FOLDER_ID; // fallback para pasta geral se não houver específica
   private API_KEY = process.env.EXPO_PUBLIC_GOOGLE_API_KEY;
 
   // Mapeamento de nomes de livros bíblicos para o padrão dos arquivos JSON

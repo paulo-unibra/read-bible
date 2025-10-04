@@ -25,6 +25,33 @@ In the output, you'll find options to open the app in a
 
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
+## Environment Variables (.env)
+
+Configure as chaves em um arquivo `.env` (não é commitado). Use o `.env.example` como base.
+
+Variáveis usadas:
+
+| Variável | Descrição |
+|----------|-----------|
+| EXPO_PUBLIC_GOOGLE_API_KEY | API key do Google usada para acesso ao Drive (quizzes, áudios, bíblias) |
+| EXPO_PUBLIC_DRIVE_FOLDER_ID | Pasta principal no Google Drive com os recursos (DBs / mídia) |
+| EXPO_PUBLIC_QUIZ_DRIVE_FOLDER_ID | (Opcional) Pasta específica para JSON de quizzes (fallback para principal) |
+| EXPO_PUBLIC_FIREBASE_API_KEY | Firebase apiKey |
+| EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN | Firebase authDomain |
+| EXPO_PUBLIC_FIREBASE_PROJECT_ID | Firebase projectId |
+| EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET | Firebase storageBucket |
+| EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID | Firebase messagingSenderId |
+| EXPO_PUBLIC_FIREBASE_APP_ID | Firebase appId |
+| EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID | Firebase measurementId |
+
+Após criar ou alterar o `.env`, reinicie o bundler:
+
+```bash
+npx expo start -c
+```
+
+> Nota: Variáveis com prefixo `EXPO_PUBLIC_` ficam embutidas no bundle e são acessíveis em tempo de execução no cliente. Não coloque segredos reais sensíveis aqui.
+
 ## Get a fresh project
 
 When you're ready, run:
