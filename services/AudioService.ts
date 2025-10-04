@@ -1,5 +1,7 @@
 import { Audio, AVPlaybackStatus } from 'expo-av';
 import { Sound } from 'expo-av/build/Audio';
+import * as FileSystem from 'expo-file-system/legacy';
+import PlaybackNotificationService from './PlaybackNotificationService';
 
 interface AudioState {
   isPlaying: boolean;
@@ -9,6 +11,7 @@ interface AudioState {
   sound: Sound | null;
   currentBookId: number | null;
   currentChapter: number | null;
+  currentBookName?: string | null;
 }
 
 class AudioService {
@@ -20,11 +23,15 @@ class AudioService {
     sound: null,
     currentBookId: null,
     currentChapter: null,
+    currentBookName: null,
   };
 
   private listeners: Set<(state: AudioState) => void> = new Set();
-  private DRIVE_FOLDER_ID = "1oqKoOzUu1Ae6sFYlb6QI-wMN4aHjKYjw";
+  private endListeners: Set<() => void> = new Set();
+  // Permite sobrepor pasta específica de áudios, depois usa pasta geral e por fim fallback hardcoded
+  private DRIVE_FOLDER_ID = process.env.EXPO_PUBLIC_AUDIO_DRIVE_FOLDER_ID || process.env.EXPO_PUBLIC_DRIVE_FOLDER_ID || "1oqKoOzUu1Ae6sFYlb6QI-wMN4aHjKYjw";
   private API_KEY = process.env.EXPO_PUBLIC_GOOGLE_API_KEY;
+  private AUDIO_DIR = `${FileSystem.documentDirectory}audio/`;
 
   // Mapeamento de nomes de livros bíblicos para o padrão dos arquivos de áudio
   // Baseado no exemplo fornecido: "apocalipse-7.mp3"
@@ -101,6 +108,26 @@ class AudioService {
 
   constructor() {
     this.initializeAudio();
+    // Registrar handler de ações de notificação (play/pause/stop)
+    PlaybackNotificationService.setActionHandler(async (action) => {
+      try {
+        switch (action) {
+          case 'PAUSE_ACTION':
+            await this.pause();
+            break;
+          case 'PLAY_ACTION':
+            await this.play();
+            break;
+          case 'STOP_ACTION':
+            await this.stop();
+            break;
+          default:
+            break;
+        }
+      } catch (e) {
+        console.warn('Falha ao executar ação da notificação', action, e);
+      }
+    });
   }
 
   private async initializeAudio() {
@@ -122,6 +149,11 @@ class AudioService {
     return () => this.listeners.delete(callback);
   }
 
+  onEnded(cb: () => void) {
+    this.endListeners.add(cb);
+    return () => this.endListeners.delete(cb);
+  }
+
   private notifyListeners() {
     this.listeners.forEach(callback => callback(this.state));
   }
@@ -134,36 +166,40 @@ class AudioService {
     return `${bookName}-${chapter}.mp3`;
   }
 
-  private async getAudioUrl(fileName: string): Promise<string> {
-    try {
-      // Primeiro, listar os arquivos na pasta para encontrar o arquivo específico
-      const listUrl = `https://www.googleapis.com/drive/v3/files?q='${this.DRIVE_FOLDER_ID}'+in+parents+and+name='${fileName}'&key=${this.API_KEY}&fields=files(id,name,webContentLink)`;
-      
-      const response = await fetch(listUrl);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      if (!data.files || data.files.length === 0) {
-        throw new Error(`Audio file not found: ${fileName}`);
-      }
-      
-      const file = data.files[0];
-      if (!file.id) {
-        throw new Error('File ID not found');
-      }
-      
-      // Retornar URL direta do Google Drive para streaming
-      return `https://drive.google.com/uc?export=download&id=${file.id}`;
-    } catch (error) {
-      console.error('Error getting audio URL:', error);
-      throw error;
+  private async ensureAudioDir() {
+    const info = await FileSystem.getInfoAsync(this.AUDIO_DIR);
+    if (!info.exists) {
+      await FileSystem.makeDirectoryAsync(this.AUDIO_DIR, { intermediates: true });
     }
   }
 
-  async loadAndPlay(bookId: number, chapter: number): Promise<void> {
+  private async resolveDriveFileId(fileName: string): Promise<string> {
+    const listUrl = `https://www.googleapis.com/drive/v3/files?q='${this.DRIVE_FOLDER_ID}'+in+parents+and+name='${fileName}'&key=${this.API_KEY}&fields=files(id,name)`;
+    const response = await fetch(listUrl);
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    const data = await response.json();
+    if (!data.files || data.files.length === 0) throw new Error(`Audio file not found: ${fileName}`);
+    const file = data.files[0];
+    if (!file.id) throw new Error('File ID not found');
+    return file.id;
+  }
+
+  private async getOrDownloadAudioLocalPath(fileName: string): Promise<string> {
+    await this.ensureAudioDir();
+    const localPath = `${this.AUDIO_DIR}${fileName}`;
+    const info = await FileSystem.getInfoAsync(localPath);
+    if (info.exists && info.size && info.size > 1024) {
+      return localPath; // Já baixado
+    }
+    // Baixar
+    const fileId = await this.resolveDriveFileId(fileName);
+    const downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+    const result = await FileSystem.downloadAsync(downloadUrl, localPath);
+    if (result.status !== 200) throw new Error(`Falha ao baixar áudio (status ${result.status})`);
+    return localPath;
+  }
+
+  async loadAndPlay(bookId: number, chapter: number, opts?: { bookName?: string }): Promise<void> {
     try {
       // Se já está tocando o mesmo capítulo, apenas pausar/reproduzir
       if (this.state.currentBookId === bookId && this.state.currentChapter === chapter && this.state.sound) {
@@ -180,23 +216,37 @@ class AudioService {
 
       this.state.isLoading = true;
       this.state.currentBookId = bookId;
-      this.state.currentChapter = chapter;
+  this.state.currentChapter = chapter;
+  this.state.currentBookName = opts?.bookName || undefined;
       this.notifyListeners();
 
-      const fileName = this.getAudioFileName(bookId, chapter);
-      const audioUrl = await this.getAudioUrl(fileName);
+      const fileName = this.getAudioFileName(bookId, chapter);      
+      const localPath = await this.getOrDownloadAudioLocalPath(fileName);
 
       const { sound } = await Audio.Sound.createAsync(
-        { uri: audioUrl },
+        { uri: localPath },
         { shouldPlay: true },
         (status) => this.onPlaybackStatusUpdate(status)
       );
 
-      this.state.sound = sound;
+  this.state.sound = sound;
       this.state.isLoading = false;
       this.state.isPlaying = true;
       
-      // Force um status update inicial
+      // Notificação inicial
+      PlaybackNotificationService.showOrUpdate({
+        bookName: this.state.currentBookName || this.bookNameMapping[bookId],
+        chapter,
+        currentTime: 0,
+        duration: 0,
+        isPlaying: true,
+        loading: false,
+      }).catch(()=>{});
+
+      // Inicia prefetch do próximo capítulo (best effort)
+  this.prefetch(bookId, chapter + 1).catch(() => {});
+
+  // Force um status update inicial
       const initialStatus = await sound.getStatusAsync();
       this.onPlaybackStatusUpdate(initialStatus);
       
@@ -209,10 +259,22 @@ class AudioService {
       this.notifyListeners();
       
       // Re-throw com mensagem mais amigável
-      if (error instanceof Error && error.message.includes('not found')) {
+      if (error instanceof Error && /not found/i.test(error.message)) {
         throw new Error(`Áudio não disponível para este capítulo`);
       }
       throw new Error('Erro ao carregar áudio');
+    }
+  }
+
+  // Permite pré-baixar um capítulo sem tocar imediatamente
+  async prefetch(bookId: number, chapter: number): Promise<boolean> {
+    try {
+      const fileName = this.getAudioFileName(bookId, chapter);
+      await this.getOrDownloadAudioLocalPath(fileName);
+      return true;
+    } catch (e) {
+      console.warn('Prefetch falhou', e);
+      return false;
     }
   }
 
@@ -222,6 +284,13 @@ class AudioService {
         await this.state.sound.playAsync();
         this.state.isPlaying = true;
         this.notifyListeners();
+        PlaybackNotificationService.showOrUpdate({
+          bookName: this.state.currentBookName || (this.state.currentBookId ? this.bookNameMapping[this.state.currentBookId] : ''),
+          chapter: this.state.currentChapter || undefined,
+          currentTime: this.state.currentTime,
+          duration: this.state.duration,
+          isPlaying: true,
+        }).catch(()=>{});
       } catch (error) {
         console.error('Error playing audio:', error);
       }
@@ -234,6 +303,13 @@ class AudioService {
         await this.state.sound.pauseAsync();
         this.state.isPlaying = false;
         this.notifyListeners();
+        PlaybackNotificationService.showOrUpdate({
+          bookName: this.state.currentBookName || (this.state.currentBookId ? this.bookNameMapping[this.state.currentBookId] : ''),
+          chapter: this.state.currentChapter || undefined,
+          currentTime: this.state.currentTime,
+          duration: this.state.duration,
+          isPlaying: false,
+        }).catch(()=>{});
       } catch (error) {
         console.error('Error pausing audio:', error);
       }
@@ -255,9 +331,8 @@ class AudioService {
     this.state.isPlaying = false;
     this.state.currentTime = 0;
     this.state.duration = 0;
-    this.state.currentBookId = null;
-    this.state.currentChapter = null;
     this.notifyListeners();
+    PlaybackNotificationService.dismiss().catch(()=>{});
   }
 
   async seekTo(positionMillis: number): Promise<void> {
@@ -287,6 +362,15 @@ class AudioService {
       if (status.didJustFinish) {
         this.state.isPlaying = false;
         this.state.currentTime = 0;
+        // Notificar listeners de fim
+        this.endListeners.forEach(l => { try { l(); } catch(e) { console.warn('onEnded listener error', e); } });
+        PlaybackNotificationService.showOrUpdate({
+          bookName: this.state.currentBookName || (this.state.currentBookId ? this.bookNameMapping[this.state.currentBookId] : ''),
+          chapter: this.state.currentChapter || undefined,
+          currentTime: this.state.currentTime,
+          duration: this.state.duration,
+          isPlaying: false,
+        }).catch(()=>{});
       }
       
       this.notifyListeners();

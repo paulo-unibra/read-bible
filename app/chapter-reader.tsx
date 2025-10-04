@@ -1158,6 +1158,15 @@ export default function ChapterReaderScreen() {
                   chapterNumber={currentChapter}
                   bookName={book.name}
                   isDark={isDark}
+                  onRequestNext={async () => {
+                    if (navigating || loading) return;
+                    const prevChapter = currentChapter;
+                    await navigateChapter('next');
+                    const targetChapter = prevChapter + 1;
+                    setTimeout(() => {
+                      AudioService.loadAndPlay(currentBookId, targetChapter).catch(()=>{});
+                    }, 500);
+                  }}
                 />
               </>
             )}

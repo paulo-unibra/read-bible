@@ -1,22 +1,23 @@
-import { Ionicons } from '@expo/vector-icons';
-import Slider from '@react-native-community/slider';
-import React, { useEffect, useState } from 'react';
+import { Ionicons } from "@expo/vector-icons";
+import Slider from "@react-native-community/slider";
+import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Modal,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-} from 'react-native';
-import AudioService from '../services/AudioService';
+  ActivityIndicator,
+  Alert,
+  Modal,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import AudioService from "../services/AudioService";
 
 interface AudioPlayerProps {
   bookId: number;
   chapterNumber: number;
   bookName: string;
   isDark?: boolean;
+  onRequestNext?: () => void;
 }
 
 interface AudioPlayerModalProps {
@@ -35,9 +36,14 @@ const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
   isDark = false,
 }) => {
   const [audioState, setAudioState] = useState(AudioService.getState());
+  const [, setCurrentTime] = useState(audioState.currentTime);
 
   useEffect(() => {
-    const unsubscribe = AudioService.addListener(setAudioState);
+    const updateState = (newState: any) => {
+      setAudioState(newState);
+      setCurrentTime(newState.currentTime);
+    };
+    const unsubscribe = AudioService.addListener(updateState);
     return () => {
       unsubscribe();
     };
@@ -48,11 +54,14 @@ const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
     AudioService.seekTo(positionMillis);
   };
 
-  const progress = audioState.duration > 0 ? (audioState.currentTime / audioState.duration) * 100 : 0;
+  const progress =
+    audioState.duration > 0
+      ? (audioState.currentTime / audioState.duration) * 100
+      : 0;
 
-  const modalBg = isDark ? '#1e1e1e' : '#fff';
-  const textColor = isDark ? '#e0e0e0' : '#333';
-  const iconColor = isDark ? '#90caf9' : '#2196F3';
+  const modalBg = isDark ? "#1e1e1e" : "#fff";
+  const textColor = isDark ? "#e0e0e0" : "#333";
+  const iconColor = isDark ? "#90caf9" : "#2196F3";
 
   return (
     <Modal
@@ -88,7 +97,7 @@ const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
                 value={progress}
                 onSlidingComplete={handleSeek}
                 minimumTrackTintColor={iconColor}
-                maximumTrackTintColor={isDark ? '#555' : '#ddd'}
+                maximumTrackTintColor={isDark ? "#555" : "#ddd"}
                 thumbTintColor={iconColor}
               />
               <View style={styles.timeContainer}>
@@ -105,7 +114,11 @@ const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
             <View style={styles.controlsContainer}>
               <TouchableOpacity
                 style={[styles.controlButton, { borderColor: iconColor }]}
-                onPress={() => AudioService.seekTo(Math.max(0, audioState.currentTime - 10000))}
+                onPress={() =>
+                  AudioService.seekTo(
+                    Math.max(0, audioState.currentTime - 10000)
+                  )
+                }
                 disabled={audioState.isLoading}
               >
                 <Ionicons name="play-back" size={24} color={iconColor} />
@@ -113,23 +126,45 @@ const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
 
               <TouchableOpacity
                 style={[styles.playButton, { backgroundColor: iconColor }]}
-                onPress={audioState.isPlaying ? AudioService.pause : AudioService.play}
+                onPress={() => {
+                  if (
+                    audioState.currentTime === 0 &&
+                    audioState.currentBookId !== null &&
+                    audioState.currentChapter !== null
+                  ) {
+                    AudioService.loadAndPlay(
+                      audioState.currentBookId,
+                      audioState.currentChapter
+                    );
+                  } else {
+                    audioState.isPlaying
+                      ? AudioService.pause()
+                      : AudioService.play();
+                  }
+                }}
                 disabled={audioState.isLoading}
               >
                 {audioState.isLoading ? (
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
-                  <Ionicons 
-                    name={audioState.isPlaying ? "pause" : "play"} 
-                    size={32} 
-                    color="#fff" 
+                  <Ionicons
+                    name={audioState.isPlaying ? "pause" : "play"}
+                    size={32}
+                    color="#fff"
                   />
                 )}
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={[styles.controlButton, { borderColor: iconColor }]}
-                onPress={() => AudioService.seekTo(Math.min(audioState.duration, audioState.currentTime + 10000))}
+                onPress={() =>
+                  AudioService.seekTo(
+                    Math.min(
+                      audioState.duration,
+                      audioState.currentTime + 10000
+                    )
+                  )
+                }
                 disabled={audioState.isLoading}
               >
                 <Ionicons name="play-forward" size={24} color={iconColor} />
@@ -137,11 +172,23 @@ const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
             </View>
 
             <TouchableOpacity
-              style={[styles.stopButton, { borderColor: isDark ? '#666' : '#ccc' }]}
+              style={[
+                styles.stopButton,
+                { borderColor: isDark ? "#666" : "#ccc" },
+              ]}
               onPress={() => AudioService.stop()}
             >
-              <Ionicons name="stop" size={20} color={isDark ? '#ccc' : '#666'} />
-              <Text style={[styles.stopButtonText, { color: isDark ? '#ccc' : '#666' }]}>
+              <Ionicons
+                name="stop"
+                size={20}
+                color={isDark ? "#ccc" : "#666"}
+              />
+              <Text
+                style={[
+                  styles.stopButtonText,
+                  { color: isDark ? "#ccc" : "#666" },
+                ]}
+              >
                 Parar
               </Text>
             </TouchableOpacity>
@@ -152,21 +199,29 @@ const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
   );
 };
 
-const AudioPlayer: React.FC<AudioPlayerProps> = ({ 
-  bookId, 
-  chapterNumber, 
+const AudioPlayer: React.FC<AudioPlayerProps> = ({
+  bookId,
+  chapterNumber,
   bookName,
-  isDark = false 
+  isDark = false,
+  onRequestNext,
 }) => {
   const [audioState, setAudioState] = useState(AudioService.getState());
   const [modalVisible, setModalVisible] = useState(false);
 
   useEffect(() => {
     const unsubscribe = AudioService.addListener(setAudioState);
+
+    const unEnd = AudioService.onEnded(() => {
+      if (AudioService.isCurrentChapter(bookId, chapterNumber)) {
+        onRequestNext?.();
+      }
+    });
     return () => {
       unsubscribe();
+      unEnd();
     };
-  }, []);
+  }, [bookId, chapterNumber, onRequestNext]);
 
   const handleAudioPress = async () => {
     try {
@@ -175,27 +230,33 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
         setModalVisible(true);
       } else {
         // Se é um capítulo diferente, carregar e reproduzir
-        await AudioService.loadAndPlay(bookId, chapterNumber);
+        await AudioService.loadAndPlay(bookId, chapterNumber, { bookName });
         setModalVisible(true);
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido ao reproduzir áudio';
-      
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Erro desconhecido ao reproduzir áudio";
+
       // Se o erro for de arquivo não encontrado, mostrar mensagem mais amigável
-      if (errorMessage.includes('not found') || errorMessage.includes('não disponível')) {
+      if (
+        errorMessage.includes("not found") ||
+        errorMessage.includes("não disponível")
+      ) {
         Alert.alert(
-          'Áudio Indisponível',
+          "Áudio Indisponível",
           `O áudio para ${bookName} ${chapterNumber} não está disponível.`
         );
       } else {
-        Alert.alert('Erro no Áudio', errorMessage);
+        Alert.alert("Erro no Áudio", errorMessage);
       }
     }
   };
 
   const isCurrentChapter = AudioService.isCurrentChapter(bookId, chapterNumber);
-  const iconColor = isDark ? '#90caf9' : '#2196F3';
-  const iconBg = isDark ? '#2a2a2a' : '#f8f9fa';
+  const iconColor = isDark ? "#90caf9" : "#2196F3";
+  const iconBg = isDark ? "#2a2a2a" : "#f8f9fa";
 
   return (
     <>
@@ -203,7 +264,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
         style={[
           styles.audioButton,
           { backgroundColor: iconBg, borderColor: iconColor },
-          isCurrentChapter && audioState.isPlaying && styles.audioButtonPlaying
+          isCurrentChapter && audioState.isPlaying && styles.audioButtonPlaying,
         ]}
         onPress={handleAudioPress}
         disabled={audioState.isLoading && !isCurrentChapter}
@@ -211,14 +272,14 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
         {audioState.isLoading && isCurrentChapter ? (
           <ActivityIndicator size="small" color={iconColor} />
         ) : (
-          <Ionicons 
+          <Ionicons
             name={
-              isCurrentChapter && audioState.isPlaying 
-                ? "volume-high" 
+              isCurrentChapter && audioState.isPlaying
+                ? "volume-high"
                 : "headset"
-            } 
-            size={20} 
-            color={iconColor} 
+            }
+            size={20}
+            color={iconColor}
           />
         )}
       </TouchableOpacity>
@@ -239,83 +300,83 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     borderWidth: 1,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
   },
   audioButtonPlaying: {
-    shadowColor: '#2196F3',
+    shadowColor: "#2196F3",
     shadowOpacity: 0.3,
     elevation: 4,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   audioModal: {
-    width: '90%',
+    width: "90%",
     maxWidth: 400,
     borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#000',
+    overflow: "hidden",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
   },
   modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: "#e0e0e0",
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   audioContent: {
     padding: 24,
-    alignItems: 'center',
+    alignItems: "center",
   },
   chapterInfo: {
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 32,
   },
   chapterName: {
     fontSize: 20,
-    fontWeight: 'bold',
-    textAlign: 'center',
+    fontWeight: "bold",
+    textAlign: "center",
   },
   progressContainer: {
-    width: '100%',
+    width: "100%",
     marginBottom: 32,
   },
   slider: {
     height: 40,
-    width: '100%',
+    width: "100%",
   },
   timeContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginTop: 8,
   },
   timeText: {
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   controlsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 20,
     marginBottom: 24,
   },
@@ -324,25 +385,25 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: 25,
     borderWidth: 2,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'transparent',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "transparent",
   },
   playButton: {
     width: 70,
     height: 70,
     borderRadius: 35,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 4,
   },
   stopButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
@@ -351,7 +412,7 @@ const styles = StyleSheet.create({
   },
   stopButtonText: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: "500",
   },
 });
 
