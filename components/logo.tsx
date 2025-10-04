@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 interface LogoProps {
   size?: number;
@@ -23,15 +23,15 @@ export function Logo({ size = 48, color = '#2196F3', showText = true }: LogoProp
           color="white" 
         />
       </View>
-      {showText && (
+      {/* {showText && (
         <Text style={[styles.text, { 
           fontSize: size * 0.35,
           marginLeft: size * 0.2,
           color: color 
         }]}>
-          ReadBible
+          Palavra em Jogo
         </Text>
-      )}
+      )} */}
     </View>
   );
 }

@@ -318,7 +318,7 @@ export default function SettingsScreen() {
         <View style={[styles.section, { backgroundColor: colors.sectionBg }]}>
           <Text style={[styles.sectionTitle, { color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Sobre o App</Text>
           <View style={styles.infoContainer}>
-            <Text style={[styles.infoText, { color: colors.textSecondary }]}>{`ReadBible v1.0.0`}</Text>
+            <Text style={[styles.infoText, { color: colors.textSecondary }]}>{`Palavra em Jogo v1.0.0`}</Text>
             <Text style={[styles.infoText, { color: colors.textSecondary }]}>Aplicativo para estudo da Bíblia</Text>
             <Text style={[styles.infoText, { color: colors.textSecondary }]}>com planos de leitura organizados</Text>
           </View>

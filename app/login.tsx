@@ -61,7 +61,7 @@ export default function LoginScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.card}>
-        <Text style={styles.brand}>📖 ReadBible</Text>
+        <Text style={styles.brand}>📖 Palavra em Jogo</Text>
         <Text style={styles.title}>{mode === 'login' ? 'Bem-vindo de volta' : 'Crie sua conta'}</Text>
         <Text style={styles.subtitle}>{mode === 'login' ? 'Entre para continuar seus estudos e ranking.' : 'Cadastre-se para salvar progresso e ranking.'}</Text>
         <View style={styles.formGroup}>

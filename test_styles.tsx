@@ -861,7 +861,7 @@ import { Bible, Book, SearchResult, Verse } from "../types";
 
   ${book?.name} ${verseRange}
 
-  Aplicativo ReadBible
+  Aplicativo Palavra em Jogo
   Link do app: https://readbible.app`;
 
       const shareTitle =
