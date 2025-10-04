@@ -22,6 +22,16 @@ export function Logo({ size = 48, color = '#2196F3', showText = true }: LogoProp
           size={size * 0.6} 
           color="white" 
         />
+        {/* <Image 
+          source={require('../assets/images/logo.png')} 
+          style={{
+            position: 'absolute',
+            width: size * 0.8,
+            height: size * 0.8,
+            resizeMode: 'contain',
+            tintColor: 'white',
+          }}
+        /> */}
       </View>
       {/* {showText && (
         <Text style={[styles.text, { 

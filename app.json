@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Palavra em Jogo",
-    "slug": "palavra-em-jogo",
+    "slug": "ReadBible",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -51,6 +51,7 @@
       "eas": {
         "projectId": "96cae4dd-d05b-4021-b8ca-b80d0ab20403"
       }
-    }
+    },
+    "owner": "paulo_nlw"
   }
 }
