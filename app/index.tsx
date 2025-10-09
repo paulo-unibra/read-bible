@@ -163,15 +163,7 @@ export default function HomeScreen() {
             <Ionicons name="chevron-forward" size={20} color={colors.iconForward} />
           </TouchableOpacity>
 
-          {/* <TouchableOpacity style={[styles.actionCard,{ backgroundColor: colors.card, shadowOpacity: isDark ? 0.25 : 0.1 }]} onPress={() => router.push('/ranking')}>
-            <View style={[styles.actionIcon,{ backgroundColor: colors.surfaceAlt }]}><Ionicons name="trophy-outline" size={32} color={isDark ? '#ffd54f' : '#FFC107'} /></View>
-            <View style={styles.actionContent}>
-              <Text style={[styles.actionTitle,{ color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Ranking</Text>
-              <Text style={[styles.actionDescription,{ color: colors.textSecondary, fontSize: applyFontScale(14) }]}>Melhores desempenhos em quizzes</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.iconForward} />
-          </TouchableOpacity> */}
-
+-
           {/* {!userLogged && (
             <TouchableOpacity style={[styles.actionCard,{ backgroundColor: colors.card, shadowOpacity: isDark ? 0.25 : 0.1 }]} onPress={() => router.push('/login')}>
               <View style={[styles.actionIcon,{ backgroundColor: colors.surfaceAlt }]}><Ionicons name="log-in-outline" size={32} color={isDark ? '#64b5f6' : '#1976D2'} /></View>
