@@ -56,6 +56,7 @@ export default function ChapterReaderScreen() {
   const [isFirstOfBible, setIsFirstOfBible] = useState(false);
   const [isLastOfBible, setIsLastOfBible] = useState(false);
   const [loadingChapters, setLoadingChapters] = useState(false);
+  const [audioAvailable, setAudioAvailable] = useState(false);
 
   const [searchModalVisible, setSearchModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -231,6 +232,17 @@ export default function ChapterReaderScreen() {
     }
   }, [bibleId, currentBookId, currentChapter]);
 
+  const checkAudioAvailability = React.useCallback(async () => {
+    if (!currentBookId || !currentChapter) return;
+    try {
+      const available = await AudioService.isAudioAvailable(currentBookId, currentChapter);
+      setAudioAvailable(available);
+    } catch (error) {
+      console.log("Error checking audio availability:", error);
+      setAudioAvailable(false);
+    }
+  }, [currentBookId, currentChapter]);
+
   const updateNavigationState = React.useCallback(
     async (newChapter?: number) => {
       try {
@@ -281,6 +293,8 @@ export default function ChapterReaderScreen() {
 
       // Os versículos serão carregados pelo useEffect do currentChapter
       await updateNavigationState();
+      // Verifica disponibilidade do áudio para o capítulo atual
+      await checkAudioAvailability();
 
       try {
         if (bibleId && currentBookId && currentChapter) {
@@ -315,6 +329,7 @@ export default function ChapterReaderScreen() {
     currentChapter,
     router,
     updateNavigationState,
+    checkAudioAvailability,
   ]);
 
   useEffect(() => {
@@ -327,8 +342,9 @@ export default function ChapterReaderScreen() {
   useEffect(() => {
     if (bibleId && currentBookId && currentChapter && !loading) {
       loadChapterVerses();
+      checkAudioAvailability();
     }
-  }, [currentChapter, loadChapterVerses, bibleId, currentBookId, loading]);
+  }, [currentChapter, loadChapterVerses, checkAudioAvailability, bibleId, currentBookId, loading]);
 
   useEffect(() => {
     return () => {
@@ -1210,24 +1226,26 @@ export default function ChapterReaderScreen() {
                   bibleVersion={bibleAbbrev}
                   isDark={isDark}
                 />
-                <AudioPlayer
-                  bookId={currentBookId}
-                  chapterNumber={currentChapter}
-                  bookName={book.name}
-                  isDark={isDark}
-                  onRequestNext={async () => {
-                    if (navigating || loading) return;
-                    const prevChapter = currentChapter;
-                    await navigateChapter("next");
-                    const targetChapter = prevChapter + 1;
-                    setTimeout(() => {
-                      AudioService.loadAndPlay(
-                        currentBookId,
-                        targetChapter
-                      ).catch(() => {});
-                    }, 500);
-                  }}
-                />
+                {audioAvailable && (
+                  <AudioPlayer
+                    bookId={currentBookId}
+                    chapterNumber={currentChapter}
+                    bookName={book.name}
+                    isDark={isDark}
+                    onRequestNext={async () => {
+                      if (navigating || loading) return;
+                      const prevChapter = currentChapter;
+                      await navigateChapter("next");
+                      const targetChapter = prevChapter + 1;
+                      setTimeout(() => {
+                        AudioService.loadAndPlay(
+                          currentBookId,
+                          targetChapter
+                        ).catch(() => {});
+                      }, 500);
+                    }}
+                  />
+                )}
               </>
             )}
             <TouchableOpacity
