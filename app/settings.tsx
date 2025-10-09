@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DatabaseService from '../services/DatabaseService';
+import googleDriveService from '../services/GoogleDriveService';
 import notificationService from '../services/NotificationService';
 import { Bible } from '../types';
 
@@ -130,19 +131,50 @@ export default function SettingsScreen() {
   const clearAllData = () => {
     Alert.alert(
       'Limpar Todos os Dados',
-      'Esta ação irá remover todos os dados do aplicativo, incluindo Bíblias baixadas e planos de leitura. Deseja continuar?',
+      'Esta ação irá remover todos os dados do aplicativo, incluindo:\n\n• Todas as Bíblias baixadas\n• Configurações personalizadas\n• Favoritos e marcadores\n• Planos de leitura\n• Histórico de leitura\n• Notificações programadas\n\nEsta ação não pode ser desfeita. Deseja continuar?',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
-          text: 'Limpar',
+          text: 'Limpar Tudo',
           style: 'destructive',
           onPress: async () => {
             try {
-              // This would require additional implementation to clear all data
-              Alert.alert('Info', 'Funcionalidade em desenvolvimento');
+              // Show loading alert
+              Alert.alert('Limpando dados...', 'Por favor aguarde...');
+              
+              // Clear database data
+              await DatabaseService.clearAllData();
+              
+              // Clear Bible files
+              await googleDriveService.clearAllBibleFiles();
+              
+              // Cancel all notifications
+              await notificationService.cancelAllNotifications();
+              
+              // Reset local state
+              setBibles([]);
+              setSelectedBibleId('');
+              setFontSize('medium');
+              setTheme('light');
+              setNotificationsEnabled(false);
+              setNotificationTime('08:00');
+              
+              Alert.alert(
+                'Dados Limpos',
+                'Todos os dados foram removidos com sucesso. O aplicativo será reiniciado.',
+                [
+                  {
+                    text: 'OK',
+                    onPress: () => {
+                      // Navigate back to home and reload
+                      router.replace('/');
+                    },
+                  },
+                ]
+              );
             } catch (error) {
               console.error('Clear data error:', error);
-              Alert.alert('Erro', 'Falha ao limpar dados');
+              Alert.alert('Erro', 'Falha ao limpar alguns dados. Tente novamente.');
             }
           },
         },
@@ -200,7 +232,7 @@ export default function SettingsScreen() {
                       { color: colors.textSecondary, fontSize: applyFontScale(14) },
                       selectedBibleId === bible.id && { color: '#fff' }
                     ]}>
-                      {bible.language} • {bible.abbreviation}
+                     {bible.abbreviation}
                     </Text>
                   </View>
                   {selectedBibleId === bible.id && (

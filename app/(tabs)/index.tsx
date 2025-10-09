@@ -43,7 +43,6 @@ export default function HomeScreen() {
   const initializeApp = async () => {
     try {
       await DatabaseService.init();
-      await DatabaseService.ensureSampleBible();
       await notificationService.requestPermissions();
       
       const plans = await readingPlanService.getActivePlans();

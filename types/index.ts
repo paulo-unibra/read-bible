@@ -2,7 +2,6 @@ export interface Bible {
   id: string;
   name: string;
   abbreviation: string;
-  language: string;
   fileName: string;
   downloadUrl?: string;
   isDownloaded: boolean;

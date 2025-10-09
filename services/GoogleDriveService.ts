@@ -81,27 +81,22 @@ export class GoogleDriveService {
   }
 
   parseBibleInfo(fileName: string): Partial<Bible> {
-    // Parse bible info from filename
-    // Expected format: [Language]_[Name]_[Abbreviation].db
     const nameWithoutExt = fileName.replace('.db', '');
     const parts = nameWithoutExt.split('_');
     
     if (parts.length >= 3) {
       return {
         id: nameWithoutExt,
-        language: parts[0],
         name: parts.slice(1, -1).join(' '),
         abbreviation: parts[parts.length - 1],
         fileName: fileName,
       };
     }
-    
-    // Fallback for files that don't follow the naming convention
+
     return {
       id: nameWithoutExt,
       name: nameWithoutExt,
       abbreviation: nameWithoutExt.substring(0, 3).toUpperCase(),
-      language: 'Unknown',
       fileName: fileName,
     };
   }
@@ -115,6 +110,21 @@ export class GoogleDriveService {
     } catch (error) {
       console.error('Error checking local Bible file:', error);
       return null;
+    }
+  }
+
+  async clearAllBibleFiles(): Promise<void> {
+    try {
+      const biblesDir = `${FileSystem.documentDirectory!}bibles/`;
+      const dirInfo = await FileSystem.getInfoAsync(biblesDir);
+      
+      if (dirInfo.exists) {
+        await FileSystem.deleteAsync(biblesDir, { idempotent: true });
+        console.log('All Bible files cleared successfully');
+      }
+    } catch (error) {
+      console.error('Error clearing Bible files:', error);
+      throw error;
     }
   }
 }

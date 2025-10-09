@@ -144,7 +144,6 @@ class DatabaseService {
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         abbreviation TEXT NOT NULL,
-        language TEXT NOT NULL,
         fileName TEXT NOT NULL,
         isDownloaded INTEGER DEFAULT 0,
         downloadDate TEXT,
@@ -206,12 +205,11 @@ class DatabaseService {
     if (!this.db) throw new Error("Database not initialized");
     await this.withLock(async () => {
       await this.db!.runAsync(
-        "INSERT OR REPLACE INTO bibles (id, name, abbreviation, language, fileName, isDownloaded, downloadDate, size) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT OR REPLACE INTO bibles (id, name, abbreviation, fileName, isDownloaded, downloadDate, size) VALUES (?, ?, ?, ?, ?, ?, ?)",
         [
           bible.id,
           bible.name,
           bible.abbreviation,
-          bible.language,
           bible.fileName,
           bible.isDownloaded ? 1 : 0,
           bible.downloadDate || null,
@@ -247,7 +245,6 @@ class DatabaseService {
               id: row.id as string,
               name: displayName,
               abbreviation: row.abbreviation as string,
-              language: row.language as string,
               fileName: row.fileName as string,
               isDownloaded: Boolean(row.isDownloaded),
               downloadDate: row.downloadDate as string | undefined,
@@ -451,26 +448,29 @@ class DatabaseService {
     };
   }
 
-  async ensureSampleBible(): Promise<void> {
-    await this.ensureInitialized();
-    const bibles = await this.getBibles();
-
-    if (bibles.length === 0) {
-      // Add a sample Bible entry for testing
-      const sampleBible: Bible = {
-        id: "sample-bible",
-        name: "Bíblia de Exemplo",
-        abbreviation: "EXEMPLO",
-        language: "pt",
-        fileName: "sample.bbl.db",
-        isDownloaded: false,
-        downloadDate: undefined,
-        size: 0,
-      };
-
-      await this.saveBible(sampleBible);
-      console.log("Sample Bible added for testing purposes");
-    }
+  async clearAllData(): Promise<void> {
+    return this.withLock(async () => {
+      await this.ensureHealthy();
+      if (!this.db) throw new Error("Database not initialized");
+      
+      try {
+        // Clear all tables
+        await this.db.runAsync("DELETE FROM bibles");
+        await this.db.runAsync("DELETE FROM user_settings");
+        await this.db.runAsync("DELETE FROM favorites");
+        await this.db.runAsync("DELETE FROM reading_plans");
+        await this.db.runAsync("DELETE FROM reading_plan_days");
+        await this.db.runAsync("DELETE FROM reading_history");
+        
+        // Clear cache
+        this.biblesCache = null;
+        
+        console.log("All data cleared successfully");
+      } catch (error) {
+        console.error("Error clearing all data:", error);
+        throw error;
+      }
+    });
   }
 }
 

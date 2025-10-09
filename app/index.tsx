@@ -1,5 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
-import { router, useFocusEffect } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,7 +14,7 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [fontSizePref, setFontSizePref] = useState<'small' | 'medium' | 'large'>('medium');
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
-  const [userLogged, setUserLogged] = useState(false);
+
 
   useEffect(() => { initializeApp(); }, []);
 
@@ -28,7 +27,7 @@ export default function HomeScreen() {
         if (mounted) {
           if (userFont) setFontSizePref(userFont);
           if (userTheme) setTheme(userTheme);
-          setUserLogged(false); // Sem autenticação
+
         }
       } catch {}
     })();
@@ -38,14 +37,13 @@ export default function HomeScreen() {
   const initializeApp = async () => {
     try {
       await DatabaseService.init();
-      await DatabaseService.ensureSampleBible();
       await notificationService.requestPermissions();
       // Carregamento de planos desativado (em desenvolvimento)
       const userFont = (await DatabaseService.getSetting('fontSize')) as 'small' | 'medium' | 'large' | null;
       const userTheme = (await DatabaseService.getSetting('theme')) as 'light' | 'dark' | null;
   if (userFont) setFontSizePref(userFont);
   if (userTheme) setTheme(userTheme);
-  setUserLogged(false); // Sem autenticação
+
     } catch (e) {
       console.error(e);
       Alert.alert('Erro', 'Falha ao inicializar o aplicativo');

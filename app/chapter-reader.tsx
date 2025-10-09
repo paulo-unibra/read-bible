@@ -40,12 +40,10 @@ export default function ChapterReaderScreen() {
     null
   );
 
-  // URL params: bibleId, bookId, chapterNumber
   const bibleId = params.bibleId as string;
   const initialBookId = parseInt(params.bookId as string);
   const initialChapter = parseInt(params.chapterNumber as string);
 
-  // Abreviação da Bíblia atual para exibir no header
   const [bibleAbbrev, setBibleAbbrev] = useState<string>("");
   const [book, setBook] = useState<Book | null>(null);
   const [currentBookId, setCurrentBookId] = useState(initialBookId);
@@ -53,13 +51,12 @@ export default function ChapterReaderScreen() {
   const [verses, setVerses] = useState<Verse[]>([]);
   const [totalChapters, setTotalChapters] = useState(0);
   const [loading, setLoading] = useState(true);
-  // Favoritos desativados temporariamente (estado removido)
+
   const [navigating, setNavigating] = useState(false); // Prevent rapid navigation
   const [isFirstOfBible, setIsFirstOfBible] = useState(false);
   const [isLastOfBible, setIsLastOfBible] = useState(false);
   const [loadingChapters, setLoadingChapters] = useState(false);
 
-  // Search modal state
   const [searchModalVisible, setSearchModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -105,7 +102,9 @@ export default function ChapterReaderScreen() {
   // Bible selector modal state
   const [bibleSelectorVisible, setBibleSelectorVisible] = useState(false);
   const [availableBibles, setAvailableBibles] = useState<Bible[]>([]);
-  const [availableDriveBibles, setAvailableDriveBibles] = useState<DriveFile[]>([]);
+  const [availableDriveBibles, setAvailableDriveBibles] = useState<DriveFile[]>(
+    []
+  );
   const [downloading, setDownloading] = useState<string | null>(null);
 
   // Book selector modal state
@@ -232,11 +231,6 @@ export default function ChapterReaderScreen() {
     }
   }, [bibleId, currentBookId, currentChapter]);
 
-  const loadFavorites = React.useCallback(async () => {
-    if (!bibleId) return;
-    // favoritos desativados
-  }, [bibleId]);
-
   const updateNavigationState = React.useCallback(
     async (newChapter?: number) => {
       try {
@@ -283,10 +277,10 @@ export default function ChapterReaderScreen() {
         bibleId,
         currentBookId
       );
-      setTotalChapters(chapters.length);
+      setTotalChapters(chapters.length)
+      
 
       await loadChapterVerses();
-      await loadFavorites();
       await updateNavigationState();
 
       try {
@@ -316,7 +310,14 @@ export default function ChapterReaderScreen() {
     } finally {
       setLoading(false);
     }
-  }, [bibleId, currentBookId, currentChapter, router, loadChapterVerses, loadFavorites, updateNavigationState]);
+  }, [
+    bibleId,
+    currentBookId,
+    currentChapter,
+    router,
+    loadChapterVerses,
+    updateNavigationState,
+  ]);
 
   useEffect(() => {
     if (bibleId && currentBookId) {
@@ -329,7 +330,6 @@ export default function ChapterReaderScreen() {
       AudioService.cleanup();
     };
   }, []);
-
 
   const navigateChapter = async (direction: "prev" | "next") => {
     if (navigating || loading) return;
@@ -390,13 +390,12 @@ export default function ChapterReaderScreen() {
     }
   };
 
-
   const openBibleSelector = async () => {
     try {
       const bibles = await DatabaseService.getBibles();
       console.log("PASSOU openBibleSelector");
       setAvailableBibles(bibles);
-      
+
       // Carregar também as Bíblias disponíveis no Drive
       try {
         const driveFiles = await googleDriveService.listBibleFiles();
@@ -405,7 +404,7 @@ export default function ChapterReaderScreen() {
         console.warn("Error loading Drive bibles:", driveError);
         // Não impede a abertura do modal se falhar
       }
-      
+
       setBibleSelectorVisible(true);
     } catch (error) {
       console.error("Error loading bibles 1:", error);
@@ -416,36 +415,30 @@ export default function ChapterReaderScreen() {
   const handleDownloadBible = async (driveFile: DriveFile) => {
     try {
       setDownloading(driveFile.id);
-      
-      // Download the bible file
+
       await googleDriveService.downloadBible(driveFile);
-      
-      // Parse bible info from filename
+
       const bibleInfo = googleDriveService.parseBibleInfo(driveFile.name);
-      
-      // Create bible record
+
       const bible: Bible = {
         id: bibleInfo.id || driveFile.id,
         name: bibleInfo.name || driveFile.name,
-        abbreviation: bibleInfo.abbreviation || 'UNK',
-        language: bibleInfo.language || 'Unknown',
+        abbreviation: bibleInfo.abbreviation || "UNK",
         fileName: bibleInfo.fileName || driveFile.name,
         isDownloaded: true,
         downloadDate: new Date().toISOString(),
         size: driveFile.size ? parseInt(driveFile.size) : undefined,
       };
 
-      // Save to database
       await DatabaseService.saveBible(bible);
-      
-      // Refresh local bibles list
+
       const updatedLocalBibles = await DatabaseService.getBibles();
       setAvailableBibles(updatedLocalBibles);
-      
-      Alert.alert('Sucesso', `Bíblia "${bible.name}" baixada com sucesso!`);
+
+      Alert.alert("Sucesso", `Bíblia "${bible.name}" baixada com sucesso!`);
     } catch (error) {
-      console.error('Error downloading bible:', error);
-      Alert.alert('Erro', 'Falha ao baixar a Bíblia');
+      console.error("Error downloading bible:", error);
+      Alert.alert("Erro", "Falha ao baixar a Bíblia");
     } finally {
       setDownloading(null);
     }
@@ -453,29 +446,28 @@ export default function ChapterReaderScreen() {
 
   const handleDeleteBible = async (bible: Bible) => {
     Alert.alert(
-      'Confirmar Exclusão',
+      "Confirmar Exclusão",
       `Deseja excluir a Bíblia "${bible.name}"?`,
       [
         {
-          text: 'Cancelar',
-          style: 'cancel',
+          text: "Cancelar",
+          style: "cancel",
         },
         {
-          text: 'Excluir',
-          style: 'destructive',
+          text: "Excluir",
+          style: "destructive",
           onPress: async () => {
             try {
               await DatabaseService.deleteBible(bible.id);
               await googleDriveService.deleteBibleFile(bible.fileName);
-              
-              // Refresh local bibles list
+
               const updatedLocalBibles = await DatabaseService.getBibles();
               setAvailableBibles(updatedLocalBibles);
-              
-              Alert.alert('Sucesso', 'Bíblia excluída com sucesso!');
+
+              Alert.alert("Sucesso", "Bíblia excluída com sucesso!");
             } catch (error) {
-              console.error('Error deleting bible:', error);
-              Alert.alert('Erro', 'Falha ao excluir a Bíblia');
+              console.error("Error deleting bible:", error);
+              Alert.alert("Erro", "Falha ao excluir a Bíblia");
             }
           },
         },
@@ -484,7 +476,7 @@ export default function ChapterReaderScreen() {
   };
 
   const isDownloaded = (driveFile: DriveFile) => {
-    return availableBibles.some(bible => bible.fileName === driveFile.name);
+    return availableBibles.some((bible) => bible.fileName === driveFile.name);
   };
 
   const selectBible = async (selectedBible: Bible) => {
@@ -522,13 +514,12 @@ export default function ChapterReaderScreen() {
 
   const selectBook = async (selectedBook: Book) => {
     if (selectedBook.id === currentBookId) {
-      return; // Não fecha o modal, apenas mantém o estado
+      return; 
     }
 
     try {
       setLoading(true);
 
-      // Atualiza o livro atual e carrega os capítulos
       setBook(selectedBook);
       setCurrentBookId(selectedBook.id);
 
@@ -612,7 +603,7 @@ export default function ChapterReaderScreen() {
     [bookTestamentMap]
   );
 
-  const SEARCH_RESULTS_LIMIT = 1000; 
+  const SEARCH_RESULTS_LIMIT = 1000;
 
   const handleSearch = async () => {
     if (!searchQuery.trim() || !bibleId) return;
@@ -661,7 +652,6 @@ export default function ChapterReaderScreen() {
     }
   };
 
-  // Reaplicar filtro quando usuário troca (sem refazer query)
   useEffect(() => {
     if (rawSearchResults) {
       setSearchResults(
@@ -693,10 +683,8 @@ export default function ChapterReaderScreen() {
         }
       }
 
-      // Update current chapter
       setCurrentChapter(result.chapterNumber);
 
-      // Load verses for the search result chapter
       const versesData = await bibleReaderService.getVerses(
         bibleId,
         result.bookId,
@@ -717,7 +705,6 @@ export default function ChapterReaderScreen() {
     try {
       setLoading(true);
 
-      // Se um livro diferente foi especificado, atualize o livro primeiro
       if (book && book.id !== currentBookId) {
         setBook(book);
         setCurrentBookId(book.id);
@@ -726,10 +713,8 @@ export default function ChapterReaderScreen() {
         setTotalChapters(chapters.length);
       }
 
-      // Update current chapter state
       setCurrentChapter(chapterNumber);
 
-      // Load verses for the new chapter
       const versesData = await bibleReaderService.getVerses(
         bibleId,
         book ? book.id : currentBookId,
@@ -822,13 +807,13 @@ export default function ChapterReaderScreen() {
     }
   };
 
-  // toggleFavorite removido (favoritos desativados por enquanto)
+
 
   // Handle long press on verse
   const handleVerseLongPress = (verse: Verse) => {
     const verseKey = `${verse.bookId}-${verse.chapterNumber}-${verse.verseNumber}`;
     setSelectionMode(true);
-    // setShowFavoriteButtons(true); // desativado
+
 
     // Add the long-pressed verse to selection
     const newSelected = new Set(selectedVerses);
@@ -854,7 +839,7 @@ export default function ChapterReaderScreen() {
     // Exit selection mode if no verses selected
     if (newSelected.size === 0) {
       setSelectionMode(false);
-      // setShowFavoriteButtons(false); // desativado
+
     }
   };
 
@@ -862,7 +847,7 @@ export default function ChapterReaderScreen() {
   const clearSelection = () => {
     setSelectionMode(false);
     setSelectedVerses(new Set());
-    // setShowFavoriteButtons(false); // desativado
+
   };
 
   // Share selected verses
@@ -1235,10 +1220,13 @@ export default function ChapterReaderScreen() {
                   onRequestNext={async () => {
                     if (navigating || loading) return;
                     const prevChapter = currentChapter;
-                    await navigateChapter('next');
+                    await navigateChapter("next");
                     const targetChapter = prevChapter + 1;
                     setTimeout(() => {
-                      AudioService.loadAndPlay(currentBookId, targetChapter).catch(()=>{});
+                      AudioService.loadAndPlay(
+                        currentBookId,
+                        targetChapter
+                      ).catch(() => {});
                     }, 500);
                   }}
                 />
@@ -1859,13 +1847,24 @@ export default function ChapterReaderScreen() {
               {/* Bíblias Baixadas */}
               {availableBibles.length > 0 && (
                 <>
-                  <Text style={[styles.sectionTitle, isDark && { color: "#e0e0e0" }]}>
+                  <Text
+                    style={[
+                      styles.sectionTitle,
+                      isDark && { color: "#e0e0e0" },
+                    ]}
+                  >
                     Bíblias Baixadas ({availableBibles.length})
                   </Text>
                   {availableBibles.map((item) => {
                     const selected = item.id === bibleId;
                     return (
-                      <View key={item.id} style={[styles.selectorItem, isDark && { borderBottomColor: "#2a2a2a" }]}>
+                      <View
+                        key={item.id}
+                        style={[
+                          styles.selectorItem,
+                          isDark && { borderBottomColor: "#2a2a2a" },
+                        ]}
+                      >
                         <TouchableOpacity
                           style={[
                             styles.selectorItemContent,
@@ -1895,7 +1894,7 @@ export default function ChapterReaderScreen() {
                                 isDark && { color: "#b0b0b0" },
                               ]}
                             >
-                              {item.abbreviation} • {item.language.toUpperCase()}
+                              {item.abbreviation}
                             </Text>
                           </View>
                           {selected && (
@@ -1906,12 +1905,18 @@ export default function ChapterReaderScreen() {
                             />
                           )}
                         </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.deleteButton, isDark && { backgroundColor: "#d32f2f" }]}
-                          onPress={() => handleDeleteBible(item)}
-                        >
-                          <Ionicons name="trash" size={20} color="#fff" />
-                        </TouchableOpacity>
+
+                        {availableBibles.length > 1 && (
+                          <TouchableOpacity
+                            style={[
+                              styles.deleteButton,
+                              isDark && { backgroundColor: "#d32f2f" },
+                            ]}
+                            onPress={() => handleDeleteBible(item)}
+                          >
+                            <Ionicons name="trash" size={20} color="#fff" />
+                          </TouchableOpacity>
+                        )}
                       </View>
                     );
                   })}
@@ -1921,17 +1926,37 @@ export default function ChapterReaderScreen() {
               {/* Bíblias Disponíveis para Download */}
               {availableDriveBibles.length > 0 && (
                 <>
-                  <Text style={[styles.sectionTitle, isDark && { color: "#e0e0e0" }, { marginTop: 20 }]}>
-                    Disponíveis para Download ({availableDriveBibles.filter(driveFile => !isDownloaded(driveFile)).length})
+                  <Text
+                    style={[
+                      styles.sectionTitle,
+                      isDark && { color: "#e0e0e0" },
+                      { marginTop: 20 },
+                    ]}
+                  >
+                    Disponíveis para Download (
+                    {
+                      availableDriveBibles.filter(
+                        (driveFile) => !isDownloaded(driveFile)
+                      ).length
+                    }
+                    )
                   </Text>
                   {availableDriveBibles
-                    .filter(driveFile => !isDownloaded(driveFile))
+                    .filter((driveFile) => !isDownloaded(driveFile))
                     .map((driveFile) => {
-                      const bibleInfo = googleDriveService.parseBibleInfo(driveFile.name);
+                      const bibleInfo = googleDriveService.parseBibleInfo(
+                        driveFile.name
+                      );
                       const isDownloadingThis = downloading === driveFile.id;
 
                       return (
-                        <View key={driveFile.id} style={[styles.selectorItem, isDark && { borderBottomColor: "#2a2a2a" }]}>
+                        <View
+                          key={driveFile.id}
+                          style={[
+                            styles.selectorItem,
+                            isDark && { borderBottomColor: "#2a2a2a" },
+                          ]}
+                        >
                           <View style={styles.selectorItemContent}>
                             <Text
                               style={[
@@ -1947,15 +1972,24 @@ export default function ChapterReaderScreen() {
                                 isDark && { color: "#b0b0b0" },
                               ]}
                             >
-                              {bibleInfo.abbreviation} • {bibleInfo.language?.toUpperCase()}
-                              {driveFile.size && ` • ${(parseInt(driveFile.size) / 1024 / 1024).toFixed(1)} MB`}
+                              {bibleInfo.abbreviation} •{" "}
+                              {driveFile.size &&
+                                ` • ${(
+                                  parseInt(driveFile.size) /
+                                  1024 /
+                                  1024
+                                ).toFixed(1)} MB`}
                             </Text>
                           </View>
                           <TouchableOpacity
                             style={[
                               styles.downloadButton,
                               isDownloadingThis && styles.downloadingButton,
-                              isDark && { backgroundColor: isDownloadingThis ? "#666" : "#2196F3" }
+                              isDark && {
+                                backgroundColor: isDownloadingThis
+                                  ? "#666"
+                                  : "#2196F3",
+                              },
                             ]}
                             onPress={() => handleDownloadBible(driveFile)}
                             disabled={isDownloadingThis}
@@ -1963,7 +1997,11 @@ export default function ChapterReaderScreen() {
                             {isDownloadingThis ? (
                               <ActivityIndicator color="#fff" size="small" />
                             ) : (
-                              <Ionicons name="download" size={20} color="#fff" />
+                              <Ionicons
+                                name="download"
+                                size={20}
+                                color="#fff"
+                              />
                             )}
                           </TouchableOpacity>
                         </View>
@@ -1972,14 +2010,21 @@ export default function ChapterReaderScreen() {
                 </>
               )}
 
-              {availableBibles.length === 0 && availableDriveBibles.length === 0 && (
-                <View style={styles.bibleEmptyState}>
-                  <Ionicons name="book-outline" size={48} color={isDark ? "#555" : "#ccc"} />
-                  <Text style={[styles.emptyText, isDark && { color: "#999" }]}>
-                    Nenhuma Bíblia encontrada
-                  </Text>
-                </View>
-              )}
+              {availableBibles.length === 0 &&
+                availableDriveBibles.length === 0 && (
+                  <View style={styles.bibleEmptyState}>
+                    <Ionicons
+                      name="book-outline"
+                      size={48}
+                      color={isDark ? "#555" : "#ccc"}
+                    />
+                    <Text
+                      style={[styles.emptyText, isDark && { color: "#999" }]}
+                    >
+                      Nenhuma Bíblia encontrada
+                    </Text>
+                  </View>
+                )}
             </ScrollView>
           </View>
         </View>
@@ -2338,40 +2383,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#2196F3",
   },
-  favoriteButton: {
-    borderColor: "#ffebee",
-    backgroundColor: "#fff5f5",
-  },
-  favoriteBelowButton: {
-    marginTop: 6,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: "#f8f9fa",
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 1.5,
-    elevation: 2,
-  },
-  favoriteBelowButtonActive: {
-    backgroundColor: "#ffe5e5",
-    borderColor: "#ffcdd2",
-  },
-  favoriteButtonText: {
-    fontSize: 12,
-    fontWeight: "bold",
-    color: "#f44336",
-  },
-  unfavoriteButtonText: {
-    fontSize: 12,
-    fontWeight: "bold",
-    color: "#ccc",
-  },
+
   modalContainer: {
     flex: 1,
     backgroundColor: "#f5f5f5",
