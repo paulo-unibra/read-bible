@@ -24,7 +24,8 @@ import QuizButton from "../components/QuizButton";
 import AudioService from "../services/AudioService";
 import bibleReaderService from "../services/BibleReaderService";
 import DatabaseService from "../services/DatabaseService";
-import { Bible, Book, SearchResult, Verse } from "../types";
+import googleDriveService from "../services/GoogleDriveService";
+import { Bible, Book, DriveFile, SearchResult, Verse } from "../types";
 
 export default function ChapterReaderScreen() {
   const router = useRouter();
@@ -104,6 +105,8 @@ export default function ChapterReaderScreen() {
   // Bible selector modal state
   const [bibleSelectorVisible, setBibleSelectorVisible] = useState(false);
   const [availableBibles, setAvailableBibles] = useState<Bible[]>([]);
+  const [availableDriveBibles, setAvailableDriveBibles] = useState<DriveFile[]>([]);
+  const [downloading, setDownloading] = useState<string | null>(null);
 
   // Book selector modal state
   const [bookSelectorVisible, setBookSelectorVisible] = useState(false);
@@ -393,11 +396,95 @@ export default function ChapterReaderScreen() {
       const bibles = await DatabaseService.getBibles();
       console.log("PASSOU openBibleSelector");
       setAvailableBibles(bibles);
+      
+      // Carregar também as Bíblias disponíveis no Drive
+      try {
+        const driveFiles = await googleDriveService.listBibleFiles();
+        setAvailableDriveBibles(driveFiles);
+      } catch (driveError) {
+        console.warn("Error loading Drive bibles:", driveError);
+        // Não impede a abertura do modal se falhar
+      }
+      
       setBibleSelectorVisible(true);
     } catch (error) {
       console.error("Error loading bibles 1:", error);
       Alert.alert("Erro", "Falha ao carregar versões da Bíblia");
     }
+  };
+
+  const handleDownloadBible = async (driveFile: DriveFile) => {
+    try {
+      setDownloading(driveFile.id);
+      
+      // Download the bible file
+      await googleDriveService.downloadBible(driveFile);
+      
+      // Parse bible info from filename
+      const bibleInfo = googleDriveService.parseBibleInfo(driveFile.name);
+      
+      // Create bible record
+      const bible: Bible = {
+        id: bibleInfo.id || driveFile.id,
+        name: bibleInfo.name || driveFile.name,
+        abbreviation: bibleInfo.abbreviation || 'UNK',
+        language: bibleInfo.language || 'Unknown',
+        fileName: bibleInfo.fileName || driveFile.name,
+        isDownloaded: true,
+        downloadDate: new Date().toISOString(),
+        size: driveFile.size ? parseInt(driveFile.size) : undefined,
+      };
+
+      // Save to database
+      await DatabaseService.saveBible(bible);
+      
+      // Refresh local bibles list
+      const updatedLocalBibles = await DatabaseService.getBibles();
+      setAvailableBibles(updatedLocalBibles);
+      
+      Alert.alert('Sucesso', `Bíblia "${bible.name}" baixada com sucesso!`);
+    } catch (error) {
+      console.error('Error downloading bible:', error);
+      Alert.alert('Erro', 'Falha ao baixar a Bíblia');
+    } finally {
+      setDownloading(null);
+    }
+  };
+
+  const handleDeleteBible = async (bible: Bible) => {
+    Alert.alert(
+      'Confirmar Exclusão',
+      `Deseja excluir a Bíblia "${bible.name}"?`,
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+        },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await DatabaseService.deleteBible(bible.id);
+              await googleDriveService.deleteBibleFile(bible.fileName);
+              
+              // Refresh local bibles list
+              const updatedLocalBibles = await DatabaseService.getBibles();
+              setAvailableBibles(updatedLocalBibles);
+              
+              Alert.alert('Sucesso', 'Bíblia excluída com sucesso!');
+            } catch (error) {
+              console.error('Error deleting bible:', error);
+              Alert.alert('Erro', 'Falha ao excluir a Bíblia');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const isDownloaded = (driveFile: DriveFile) => {
+    return availableBibles.some(bible => bible.fileName === driveFile.name);
   };
 
   const selectBible = async (selectedBible: Bible) => {
@@ -1768,57 +1855,132 @@ export default function ChapterReaderScreen() {
               </TouchableOpacity>
             </View>
 
-            <FlatList
-              data={availableBibles}
-              keyExtractor={(item) => item.id}
-              showsVerticalScrollIndicator={false}
-              renderItem={({ item }) => {
-                const selected = item.id === bibleId;
-                return (
-                  <TouchableOpacity
-                    style={[
-                      styles.selectorItem,
-                      isDark && { borderBottomColor: "#2a2a2a" },
-                      selected &&
-                        (isDark
-                          ? { backgroundColor: "#263850" }
-                          : styles.selectedSelectorItem),
-                    ]}
-                    onPress={() => selectBible(item)}
-                  >
-                    <View style={styles.selectorItemContent}>
-                      <Text
-                        style={[
-                          styles.selectorItemTitle,
-                          isDark && { color: "#e0e0e0" },
-                          selected &&
-                            (isDark
-                              ? { color: "#90caf9", fontWeight: "600" }
-                              : styles.selectedSelectorItemTitle),
-                        ]}
-                      >
-                        {item.name}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.selectorItemSubtitle,
-                          isDark && { color: "#b0b0b0" },
-                        ]}
-                      >
-                        {item.abbreviation} • {item.language.toUpperCase()}
-                      </Text>
-                    </View>
-                    {selected && (
-                      <Ionicons
-                        name="checkmark"
-                        size={24}
-                        color={isDark ? "#90caf9" : "#2196F3"}
-                      />
-                    )}
-                  </TouchableOpacity>
-                );
-              }}
-            />
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Bíblias Baixadas */}
+              {availableBibles.length > 0 && (
+                <>
+                  <Text style={[styles.sectionTitle, isDark && { color: "#e0e0e0" }]}>
+                    Bíblias Baixadas ({availableBibles.length})
+                  </Text>
+                  {availableBibles.map((item) => {
+                    const selected = item.id === bibleId;
+                    return (
+                      <View key={item.id} style={[styles.selectorItem, isDark && { borderBottomColor: "#2a2a2a" }]}>
+                        <TouchableOpacity
+                          style={[
+                            styles.selectorItemContent,
+                            selected &&
+                              (isDark
+                                ? { backgroundColor: "#263850" }
+                                : styles.selectedSelectorItem),
+                          ]}
+                          onPress={() => selectBible(item)}
+                        >
+                          <View style={{ flex: 1 }}>
+                            <Text
+                              style={[
+                                styles.selectorItemTitle,
+                                isDark && { color: "#e0e0e0" },
+                                selected &&
+                                  (isDark
+                                    ? { color: "#90caf9", fontWeight: "600" }
+                                    : styles.selectedSelectorItemTitle),
+                              ]}
+                            >
+                              {item.name}
+                            </Text>
+                            <Text
+                              style={[
+                                styles.selectorItemSubtitle,
+                                isDark && { color: "#b0b0b0" },
+                              ]}
+                            >
+                              {item.abbreviation} • {item.language.toUpperCase()}
+                            </Text>
+                          </View>
+                          {selected && (
+                            <Ionicons
+                              name="checkmark"
+                              size={24}
+                              color={isDark ? "#90caf9" : "#2196F3"}
+                            />
+                          )}
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.deleteButton, isDark && { backgroundColor: "#d32f2f" }]}
+                          onPress={() => handleDeleteBible(item)}
+                        >
+                          <Ionicons name="trash" size={20} color="#fff" />
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  })}
+                </>
+              )}
+
+              {/* Bíblias Disponíveis para Download */}
+              {availableDriveBibles.length > 0 && (
+                <>
+                  <Text style={[styles.sectionTitle, isDark && { color: "#e0e0e0" }, { marginTop: 20 }]}>
+                    Disponíveis para Download ({availableDriveBibles.filter(driveFile => !isDownloaded(driveFile)).length})
+                  </Text>
+                  {availableDriveBibles
+                    .filter(driveFile => !isDownloaded(driveFile))
+                    .map((driveFile) => {
+                      const bibleInfo = googleDriveService.parseBibleInfo(driveFile.name);
+                      const isDownloadingThis = downloading === driveFile.id;
+
+                      return (
+                        <View key={driveFile.id} style={[styles.selectorItem, isDark && { borderBottomColor: "#2a2a2a" }]}>
+                          <View style={styles.selectorItemContent}>
+                            <Text
+                              style={[
+                                styles.selectorItemTitle,
+                                isDark && { color: "#e0e0e0" },
+                              ]}
+                            >
+                              {bibleInfo.name}
+                            </Text>
+                            <Text
+                              style={[
+                                styles.selectorItemSubtitle,
+                                isDark && { color: "#b0b0b0" },
+                              ]}
+                            >
+                              {bibleInfo.abbreviation} • {bibleInfo.language?.toUpperCase()}
+                              {driveFile.size && ` • ${(parseInt(driveFile.size) / 1024 / 1024).toFixed(1)} MB`}
+                            </Text>
+                          </View>
+                          <TouchableOpacity
+                            style={[
+                              styles.downloadButton,
+                              isDownloadingThis && styles.downloadingButton,
+                              isDark && { backgroundColor: isDownloadingThis ? "#666" : "#2196F3" }
+                            ]}
+                            onPress={() => handleDownloadBible(driveFile)}
+                            disabled={isDownloadingThis}
+                          >
+                            {isDownloadingThis ? (
+                              <ActivityIndicator color="#fff" size="small" />
+                            ) : (
+                              <Ionicons name="download" size={20} color="#fff" />
+                            )}
+                          </TouchableOpacity>
+                        </View>
+                      );
+                    })}
+                </>
+              )}
+
+              {availableBibles.length === 0 && availableDriveBibles.length === 0 && (
+                <View style={styles.bibleEmptyState}>
+                  <Ionicons name="book-outline" size={48} color={isDark ? "#555" : "#ccc"} />
+                  <Text style={[styles.emptyText, isDark && { color: "#999" }]}>
+                    Nenhuma Bíblia encontrada
+                  </Text>
+                </View>
+              )}
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -2842,5 +3004,38 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#999",
     textAlign: "center",
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 12,
+    paddingHorizontal: 16,
+  },
+  downloadButton: {
+    backgroundColor: "#2196F3",
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 12,
+  },
+  downloadingButton: {
+    backgroundColor: "#999",
+  },
+  deleteButton: {
+    backgroundColor: "#f44336",
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 12,
+  },
+  bibleEmptyState: {
+    alignItems: "center",
+    paddingVertical: 40,
+    paddingHorizontal: 20,
   },
 });
