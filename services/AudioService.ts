@@ -190,25 +190,22 @@ class AudioService {
     return file.id;
   }
 
-  // Método público para verificar se o áudio está disponível
   async isAudioAvailable(bookId: number, chapter: number): Promise<boolean> {
     try {
       const fileName = this.getAudioFileName(bookId, chapter);
       
-      // Primeiro verifica se já está baixado localmente
       await this.ensureAudioDir();
       const localPath = `${this.AUDIO_DIR}${fileName}`;
       const info = await FileSystem.getInfoAsync(localPath);
       if (info.exists && info.size && info.size > 1024) {
-        return true; // Já baixado e válido
+        return true; 
       }
       
-      // Se não está baixado, verifica se existe no Google Drive
       await this.resolveDriveFileId(fileName);
-      return true; // Existe no Drive
+      return true; 
     } catch (error) {
       console.log(`Audio not available for book ${bookId}, chapter ${chapter}:`, error);
-      return false; // Não existe nem local nem no Drive
+      return false; 
     }
   }
 
@@ -219,7 +216,10 @@ class AudioService {
     if (info.exists && info.size && info.size > 1024) {
       return localPath; // Já baixado
     }
-    // Baixar
+    // Baixar - notifica que está baixando
+    this.state.isLoading = true;
+    this.notifyListeners();
+    
     const fileId = await this.resolveDriveFileId(fileName);
     const downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
     const result = await FileSystem.downloadAsync(downloadUrl, localPath);
