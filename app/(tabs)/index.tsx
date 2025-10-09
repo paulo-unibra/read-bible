@@ -4,10 +4,11 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Logo } from '../../components/logo';
+import bibleReaderService from '../../services/BibleReaderService';
 import DatabaseService from '../../services/DatabaseService';
 import notificationService from '../../services/NotificationService';
 import readingPlanService from '../../services/ReadingPlanService';
-import { ReadingPlan, ReadingPlanDay } from '../../types';
+import { Book, ReadingPlan, ReadingPlanDay } from '../../types';
 
 export default function HomeScreen() {
   const [activePlans, setActivePlans] = useState<ReadingPlan[]>([]);
@@ -130,9 +131,30 @@ export default function HomeScreen() {
       
       // If no last reading, use first available Bible with book 1, chapter 1
       if (!lastReading) {
+        const firstBible = downloadedBibles[0];
+        let startBookId = 1;
+        
+        // Verificar se a Bíblia tem apenas NT (começar em Mateus)
+        try {
+          const books = await bibleReaderService.getBooks(firstBible.id);
+          await bibleReaderService.openBible(firstBible.id, firstBible.fileName);
+          
+          // Se não tem livros do AT, começar em Mateus
+          const hasOldTestament = books.some((book: Book) => book.testament === 'old');
+          if (!hasOldTestament) {
+            // Procurar por Mateus
+            const matthew = books.find((book: Book) => /Mateus|Matthew/i.test(book.name));
+            if (matthew) {
+              startBookId = matthew.id;
+            }
+          }
+        } catch (error) {
+          console.warn('Erro ao verificar livros da Bíblia:', error);
+        }
+        
         lastReading = {
-          bibleId: downloadedBibles[0].id,
-          bookId: 1,
+          bibleId: firstBible.id,
+          bookId: startBookId,
           chapterNumber: 1
         };
       }
