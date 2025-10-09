@@ -277,10 +277,9 @@ export default function ChapterReaderScreen() {
         bibleId,
         currentBookId
       );
-      setTotalChapters(chapters.length)
-      
+      setTotalChapters(chapters.length);
 
-      await loadChapterVerses();
+      // Os versículos serão carregados pelo useEffect do currentChapter
       await updateNavigationState();
 
       try {
@@ -315,7 +314,6 @@ export default function ChapterReaderScreen() {
     currentBookId,
     currentChapter,
     router,
-    loadChapterVerses,
     updateNavigationState,
   ]);
 
@@ -324,6 +322,13 @@ export default function ChapterReaderScreen() {
       initializeReader();
     }
   }, [bibleId, currentBookId, initializeReader]);
+
+  // Efeito separado para carregar apenas versículos quando o capítulo muda
+  useEffect(() => {
+    if (bibleId && currentBookId && currentChapter && !loading) {
+      loadChapterVerses();
+    }
+  }, [currentChapter, loadChapterVerses, bibleId, currentBookId, loading]);
 
   useEffect(() => {
     return () => {
@@ -365,14 +370,7 @@ export default function ChapterReaderScreen() {
 
       if (newChapter > 0 && newChapter <= totalChapters) {
         setCurrentChapter(newChapter);
-
-        const versesData = await bibleReaderService.getVerses(
-          bibleId,
-          currentBookId,
-          newChapter
-        );
-        setVerses(versesData);
-
+        // Os versículos serão carregados automaticamente pelo useEffect do currentChapter
         await updateNavigationState(newChapter);
       }
     } catch (error) {
@@ -1972,7 +1970,7 @@ export default function ChapterReaderScreen() {
                                 isDark && { color: "#b0b0b0" },
                               ]}
                             >
-                              {bibleInfo.abbreviation} •{" "}
+                              {bibleInfo.abbreviation}{" "}
                               {driveFile.size &&
                                 ` • ${(
                                   parseInt(driveFile.size) /
