@@ -203,8 +203,7 @@ class AudioService {
       
       await this.resolveDriveFileId(fileName);
       return true; 
-    } catch (error) {
-      console.log(`Audio not available for book ${bookId}, chapter ${chapter}:`, error);
+    } catch (_) {
       return false; 
     }
   }

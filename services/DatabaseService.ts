@@ -222,7 +222,6 @@ class DatabaseService {
 
   async getBibles(): Promise<Bible[]> {
     await this.ensureInitialized();
-    console.log("DB SERVICE - getBibles", this.db);
     if (!this.db) throw new Error("Database not initialized");
     // Cache: se já carregou e não houve mudança estrutural, reutiliza
     if (this.biblesCache) {

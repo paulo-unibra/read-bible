@@ -355,6 +355,7 @@ export default function ChapterReaderScreen() {
   const navigateChapter = async (direction: "prev" | "next") => {
     if (navigating || loading) return;
 
+    console.log("TESTE")
     setNavigating(true);
 
     try {
@@ -472,11 +473,45 @@ export default function ChapterReaderScreen() {
           style: "destructive",
           onPress: async () => {
             try {
+              const isCurrentBible = bible.id === bibleId;
+              
               await DatabaseService.deleteBible(bible.id);
               await googleDriveService.deleteBibleFile(bible.fileName);
 
               const updatedLocalBibles = await DatabaseService.getBibles();
+              const downloadedBibles = updatedLocalBibles.filter(b => b.isDownloaded);
               setAvailableBibles(updatedLocalBibles);
+
+              // Se removeu a Bíblia atual e ainda há outras disponíveis
+              if (isCurrentBible && downloadedBibles.length > 0) {
+                const firstAvailableBible = downloadedBibles[0];
+                
+                // Atualizar a configuração preferredBibleId
+                await DatabaseService.saveSetting('preferredBibleId', firstAvailableBible.id);
+                
+                // Redirecionar para a primeira Bíblia disponível
+                router.replace(`/chapter-reader?bibleId=${firstAvailableBible.id}&bookId=1&chapterNumber=1`);
+                setBibleSelectorVisible(false);
+                return; // Sair da função para evitar mostrar alert
+              }
+              
+              // Se não há mais Bíblias disponíveis
+              if (downloadedBibles.length === 0) {
+                Alert.alert(
+                  "Nenhuma Bíblia Disponível", 
+                  "Você precisa baixar pelo menos uma Bíblia para continuar.",
+                  [
+                    { 
+                      text: "OK", 
+                      onPress: () => {
+                        setBibleSelectorVisible(false);
+                        router.back(); // Voltar para tela anterior
+                      }
+                    }
+                  ]
+                );
+                return;
+              }
 
               Alert.alert("Sucesso", "Bíblia excluída com sucesso!");
             } catch (error) {
@@ -550,9 +585,10 @@ export default function ChapterReaderScreen() {
     }
   };
 
+
   const navigateToAdjacentBook = async (direction: "prev" | "next") => {
     try {
-      setLoading(true);
+      // setLoading(true);
 
       const books = await bibleReaderService.getBooks(bibleId);
       const currentBookIndex = books.findIndex((b) => b.id === currentBookId);
@@ -715,6 +751,12 @@ export default function ChapterReaderScreen() {
 
   const navigateToChapter = async (chapterNumber: number, book?: Book) => {
     if (!bibleId || !currentBookId || chapterNumber < 1) return;
+
+    console.log("TESTE DE TESTE", {
+      chapterNumber,
+      book,
+      currentBookId,
+    });
 
     try {
       setLoading(true);
