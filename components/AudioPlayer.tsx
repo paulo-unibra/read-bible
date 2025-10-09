@@ -226,11 +226,29 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
   const handleAudioPress = async () => {
     try {
       if (AudioService.isCurrentChapter(bookId, chapterNumber)) {
-        // Se é o capítulo atual, abrir o modal
+        // Se é o capítulo atual, abrir o modal diretamente
         setModalVisible(true);
       } else {
         // Se é um capítulo diferente, carregar e reproduzir
+        // O modal só abrirá quando o loading terminar
         await AudioService.loadAndPlay(bookId, chapterNumber, { bookName });
+        
+        // Aguardar até que não esteja mais carregando para abrir o modal
+        const waitForLoadingComplete = () => {
+          return new Promise<void>((resolve) => {
+            const checkLoading = () => {
+              const currentState = AudioService.getState();
+              if (!currentState.isLoading) {
+                resolve();
+              } else {
+                setTimeout(checkLoading, 100); // Verificar a cada 100ms
+              }
+            };
+            checkLoading();
+          });
+        };
+        
+        await waitForLoadingComplete();
         setModalVisible(true);
       }
     } catch (error) {
@@ -267,7 +285,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
           isCurrentChapter && audioState.isPlaying && styles.audioButtonPlaying,
         ]}
         onPress={handleAudioPress}
-        disabled={audioState.isLoading && !isCurrentChapter}
+        disabled={audioState.isLoading}
       >
         {audioState.isLoading && isCurrentChapter ? (
           <ActivityIndicator size="small" color={iconColor} />
