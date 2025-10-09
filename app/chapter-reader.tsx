@@ -214,19 +214,53 @@ export default function ChapterReaderScreen() {
 
   const HEADER_HEIGHT = 38;
 
-  useEffect(() => {
-    if (bibleId && currentBookId) {
-      initializeReader();
+  const loadChapterVerses = React.useCallback(async () => {
+    if (!bibleId || !currentBookId || !currentChapter) return;
+    try {
+      const versesData = await bibleReaderService.getVerses(
+        bibleId,
+        currentBookId,
+        currentChapter
+      );
+      setVerses(versesData);
+    } catch (error) {
+      console.error("Error loading verses:", error);
+      Alert.alert("Erro", "Falha ao carregar versículos");
     }
-  }, [bibleId, currentBookId]);
+  }, [bibleId, currentBookId, currentChapter]);
 
-  useEffect(() => {
-    return () => {
-      AudioService.cleanup();
-    };
-  }, []);
+  const loadFavorites = React.useCallback(async () => {
+    if (!bibleId) return;
+    // favoritos desativados
+  }, [bibleId]);
 
-  const initializeReader = async () => {
+  const updateNavigationState = React.useCallback(
+    async (newChapter?: number) => {
+      try {
+        const books = await bibleReaderService.getBooks(bibleId);
+        const firstBook = books[0];
+        const lastBook = books[books.length - 1];
+        const chapter = newChapter || currentChapter;
+        const atFirstOfBible = currentBookId === firstBook?.id && chapter === 1;
+        setIsFirstOfBible(atFirstOfBible);
+        if (currentBookId === lastBook?.id) {
+          const chapters = await bibleReaderService.getChapters(
+            bibleId,
+            lastBook.id
+          );
+          const atLastOfBible = chapter === chapters.length;
+          setIsLastOfBible(atLastOfBible);
+        } else {
+          setIsLastOfBible(false);
+        }
+      } catch (error) {
+        console.error("Error updating navigation state:", error);
+      }
+    },
+    [bibleId, currentBookId, currentChapter]
+  );
+
+  const initializeReader = React.useCallback(async () => {
     try {
       setLoading(true);
 
@@ -237,7 +271,6 @@ export default function ChapterReaderScreen() {
 
       await bibleReaderService.openBible(bibleId, currentBible.fileName);
 
-      // Get book info and total chapters
       const books = await bibleReaderService.getBooks(bibleId);
       const currentBook = books.find((b) => b.id === currentBookId);
       if (!currentBook) throw new Error("Book not found");
@@ -250,10 +283,7 @@ export default function ChapterReaderScreen() {
       setTotalChapters(chapters.length);
 
       await loadChapterVerses();
-
-      // Load favorites
       await loadFavorites();
-
       await updateNavigationState();
 
       try {
@@ -283,39 +313,20 @@ export default function ChapterReaderScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [bibleId, currentBookId, currentChapter, router, loadChapterVerses, loadFavorites, updateNavigationState]);
 
-  const loadChapterVerses = async () => {
-    if (!bibleId || !currentBookId || !currentChapter) return;
-
-    try {
-      const versesData = await bibleReaderService.getVerses(
-        bibleId,
-        currentBookId,
-        currentChapter
-      );
-      setVerses(versesData);
-    } catch (error) {
-      console.error("Error loading verses:", error);
-      Alert.alert("Erro", "Falha ao carregar versículos");
+  useEffect(() => {
+    if (bibleId && currentBookId) {
+      initializeReader();
     }
-  };
+  }, [bibleId, currentBookId, initializeReader]);
 
-  const loadFavorites = async () => {
-    if (!bibleId) return;
+  useEffect(() => {
+    return () => {
+      AudioService.cleanup();
+    };
+  }, []);
 
-    // try {
-    //   const favoritesData = await DatabaseService.getFavorites(bibleId);
-    //   const favoritesSet = new Set(
-    //     favoritesData.map(
-    //       (fav) => `${fav.bookId}-${fav.chapterNumber}-${fav.verseNumber}`
-    //     )
-    //   );
-    //   setFavorites(favoritesSet);
-    // } catch (error) {
-    //   console.error("Error loading favorites:", error);
-    // }
-  };
 
   const navigateChapter = async (direction: "prev" | "next") => {
     if (navigating || loading) return;
@@ -376,33 +387,6 @@ export default function ChapterReaderScreen() {
     }
   };
 
-  const updateNavigationState = async (newChapter?: number) => {
-    try {
-      const books = await bibleReaderService.getBooks(bibleId);
-      const firstBook = books[0];
-      const lastBook = books[books.length - 1];
-
-      const chapter = newChapter || currentChapter;
-
-      const atFirstOfBible = currentBookId === firstBook?.id && chapter === 1;
-      setIsFirstOfBible(atFirstOfBible);
-
-      if (currentBookId === lastBook?.id) {
-        const chapters = await bibleReaderService.getChapters(
-          bibleId,
-          lastBook.id
-        );
-
-        console.log("Last book chapters:", chapter);
-        const atLastOfBible = chapter === chapters.length;
-        setIsLastOfBible(atLastOfBible);
-      } else {
-        setIsLastOfBible(false);
-      }
-    } catch (error) {
-      console.error("Error updating navigation state:", error);
-    }
-  };
 
   const openBibleSelector = async () => {
     try {
@@ -1050,12 +1034,12 @@ export default function ChapterReaderScreen() {
 
   const selectBookInModal = async (selectedBook: Book) => {
     setSelectedBookInModal(selectedBook);
+    setLoadingChapters(true);
     try {
       const chapters = await bibleReaderService.getChapters(
         bibleId,
         selectedBook.id
       );
-      // Criar array com números dos capítulos (1, 2, 3, ..., n)
       const chapterNumbers = Array.from(
         { length: chapters.length },
         (_, i) => i + 1
@@ -1064,6 +1048,8 @@ export default function ChapterReaderScreen() {
     } catch (error) {
       console.error("Error loading chapters for selected book:", error);
       Alert.alert("Erro", "Falha ao carregar capítulos do livro selecionado");
+    } finally {
+      setLoadingChapters(false);
     }
   };
 
@@ -1151,6 +1137,7 @@ export default function ChapterReaderScreen() {
                   bookId={currentBookId}
                   chapterNumber={currentChapter}
                   bookName={book.name}
+                  bibleVersion={bibleAbbrev}
                   isDark={isDark}
                 />
                 <AudioPlayer

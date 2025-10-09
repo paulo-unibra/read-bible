@@ -1,5 +1,4 @@
 import { RankingEntry } from '../types';
-import AuthService from './AuthService';
 
 interface RankingStore {
   entries: RankingEntry[];
@@ -10,13 +9,11 @@ class RankingService {
   private store: RankingStore = { entries: [], updatedAt: new Date().toISOString() };
 
   addEntry(entry: Omit<RankingEntry, 'id' | 'createdAt' | 'username'>) {
-    const user = AuthService.getCurrentUser();
-    if (!user) throw new Error('Usuário não autenticado');
-    const displayName = (user as any).displayName;
+    // Sem autenticação, usar nome padrão
     const full: RankingEntry = {
       id: `rk_${Date.now()}_${Math.random().toString(36).slice(2,6)}`,
       createdAt: new Date().toISOString(),
-      username: displayName || (user as any).email || 'anon',
+      username: 'Usuário Anônimo',
       ...entry,
     };
     this.store.entries.push(full);

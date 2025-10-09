@@ -31,6 +31,34 @@ interface QuizSession {
 class QuizService {
   private DRIVE_FOLDER_ID = process.env.EXPO_PUBLIC_QUIZ_DRIVE_FOLDER_ID || process.env.EXPO_PUBLIC_DRIVE_FOLDER_ID; // fallback para pasta geral se não houver específica
   private API_KEY = process.env.EXPO_PUBLIC_GOOGLE_API_KEY;
+  private availabilityCache = new Map<string, boolean>();
+
+  constructor() {
+    // Validação inicial (não quebrar a aplicação, mas avisar)
+    if (!this.DRIVE_FOLDER_ID) {
+      console.warn(
+        '[QuizService] EXPO_PUBLIC_QUIZ_DRIVE_FOLDER_ID não definida. Usando EXPO_PUBLIC_DRIVE_FOLDER_ID como fallback. Caso queira separar a pasta dos quizzes, defina a variável específica.'
+      );
+    }
+    if (!this.API_KEY) {
+      console.warn(
+        '[QuizService] EXPO_PUBLIC_GOOGLE_API_KEY ausente. As requisições ao Google Drive irão falhar até que seja configurada.'
+      );
+    }
+  }
+
+  private ensureConfigured() {
+    if (!this.DRIVE_FOLDER_ID) {
+      throw new Error(
+        'Pasta de quizzes não configurada. Defina EXPO_PUBLIC_QUIZ_DRIVE_FOLDER_ID ou EXPO_PUBLIC_DRIVE_FOLDER_ID.'
+      );
+    }
+    if (!this.API_KEY) {
+      throw new Error(
+        'EXPO_PUBLIC_GOOGLE_API_KEY não configurada. Configure para acessar os quizzes do Google Drive.'
+      );
+    }
+  }
 
   // Mapeamento de nomes de livros bíblicos para o padrão dos arquivos JSON
   private bookNameMapping: { [key: number]: string } = {
@@ -114,24 +142,42 @@ class QuizService {
 
   async checkQuizAvailable(bookId: number, chapter: number): Promise<boolean> {
     try {
+      this.ensureConfigured();
       const fileName = this.getQuizFileName(bookId, chapter);
+      const cacheKey = `${fileName}`;
+      if (this.availabilityCache.has(cacheKey)) {
+        return this.availabilityCache.get(cacheKey)!;
+      }
       const listUrl = `https://www.googleapis.com/drive/v3/files?q='${this.DRIVE_FOLDER_ID}'+in+parents+and+name='${fileName}'&key=${this.API_KEY}&fields=files(id,name)`;
       
       const response = await fetch(listUrl);
       if (!response.ok) {
+        this.availabilityCache.set(cacheKey, false);
         return false;
       }
       
       const data = await response.json();
-      return data.files && data.files.length > 0;
+      const exists = data.files && data.files.length > 0;
+      this.availabilityCache.set(cacheKey, exists);
+      return exists;
     } catch (error) {
       console.error('Error checking quiz availability:', error);
       return false;
     }
   }
 
+  async ensureQuiz(bookId: number, chapter: number): Promise<Quiz> {
+    // Apenas carrega quizzes existentes do Drive
+    const exists = await this.checkQuizAvailable(bookId, chapter);
+    if (exists) {
+      return await this.loadQuiz(bookId, chapter);
+    }
+    throw new Error(`Quiz não encontrado para ${this.bookNameMapping[bookId]} capítulo ${chapter}`);
+  }
+
   async loadQuiz(bookId: number, chapter: number): Promise<Quiz> {
     try {
+      this.ensureConfigured();
       const fileName = this.getQuizFileName(bookId, chapter);
       const listUrl = `https://www.googleapis.com/drive/v3/files?q='${this.DRIVE_FOLDER_ID}'+in+parents+and+name='${fileName}'&key=${this.API_KEY}&fields=files(id,name)`;
       

@@ -37,13 +37,6 @@ Variáveis usadas:
 | EXPO_PUBLIC_DRIVE_FOLDER_ID | Pasta principal no Google Drive com os recursos (DBs / mídia) |
 | EXPO_PUBLIC_QUIZ_DRIVE_FOLDER_ID | (Opcional) Pasta específica para JSON de quizzes (fallback para principal) |
 | EXPO_PUBLIC_AUDIO_DRIVE_FOLDER_ID | (Opcional) Pasta específica para arquivos de áudio (fallback para principal) |
-| EXPO_PUBLIC_FIREBASE_API_KEY | Firebase apiKey |
-| EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN | Firebase authDomain |
-| EXPO_PUBLIC_FIREBASE_PROJECT_ID | Firebase projectId |
-| EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET | Firebase storageBucket |
-| EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID | Firebase messagingSenderId |
-| EXPO_PUBLIC_FIREBASE_APP_ID | Firebase appId |
-| EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID | Firebase measurementId |
 
 Após criar ou alterar o `.env`, reinicie o bundler:
 

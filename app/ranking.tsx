@@ -1,12 +1,11 @@
 import { useRouter } from 'expo-router';
 import React from 'react';
 import { FlatList, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import AuthService from '../services/AuthService';
 import RankingService from '../services/RankingService';
 
 export default function RankingScreen() {
   const router = useRouter();
-  const user = AuthService.getCurrentUser();
+  const user = null; // Sem autenticação
   const data = RankingService.list();
 
   return (

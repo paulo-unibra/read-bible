@@ -3,25 +3,24 @@ import { useTheme } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Animated,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Animated,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import {
-    SafeAreaView,
-    useSafeAreaInsets,
+  SafeAreaView,
+  useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import { Colors } from "../constants/theme";
-import AuthService from "../services/AuthService";
 import QuizService, {
-    Quiz,
-    QuizResult,
-    QuizSession,
+  Quiz,
+  QuizResult,
+  QuizSession,
 } from "../services/QuizService";
 import RankingService from "../services/RankingService";
 
@@ -35,6 +34,7 @@ export default function QuizScreen() {
 
   const bookId = parseInt(params.bookId as string);
   const chapterNumber = parseInt(params.chapterNumber as string);
+  const bibleVersion = (params.bibleVersion as string) || '';
 
   const [loading, setLoading] = useState(true);
   const [quiz, setQuiz] = useState<Quiz | null>(null);
@@ -226,24 +226,22 @@ export default function QuizScreen() {
   // Registrar entrada de ranking quando resultados mostrados
   useEffect(() => {
     if (showResult && session && !rankingRegistered) {
-      const user = AuthService.getCurrentUser();
-      if (user) {
-        try {
-          const score = QuizService.calculateScore(session);
-          RankingService.addEntry({
-            userId: (user as any).uid || 'no-id',
-            bookId: bookId,
-            chapter: chapterNumber,
-            quizName: session.quiz.name,
-            correct: score.correct,
-            total: score.total,
-            percentage: score.percentage,
-            totalTimeMs: score.totalTime,
-            averageTimeMs: score.averageTime,
-          });
-        } catch (e) {
-          console.warn("Falha ao registrar ranking", e);
-        }
+      // Sem autenticação, usar ID anônimo
+      try {
+        const score = QuizService.calculateScore(session);
+        RankingService.addEntry({
+          userId: 'anonymous-user',
+          bookId: bookId,
+          chapter: chapterNumber,
+          quizName: session.quiz.name,
+          correct: score.correct,
+          total: score.total,
+          percentage: score.percentage,
+          totalTimeMs: score.totalTime,
+          averageTimeMs: score.averageTime,
+        });
+      } catch (e) {
+        console.warn("Falha ao registrar ranking", e);
       }
       setRankingRegistered(true);
     }
@@ -400,7 +398,7 @@ export default function QuizScreen() {
 
         <View style={styles.resultContainer}>
           <Text style={[styles.resultTitle, { color: theme.text }]}>
-            {quiz.name}
+            {quiz.name} {bibleVersion ? `(${bibleVersion})` : ''}
           </Text>
 
           <View

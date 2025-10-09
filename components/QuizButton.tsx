@@ -13,6 +13,7 @@ interface QuizButtonProps {
   bookId: number;
   chapterNumber: number;
   bookName: string;
+  bibleVersion?: string;
   isDark?: boolean;
 }
 
@@ -20,6 +21,7 @@ const QuizButton: React.FC<QuizButtonProps> = ({
   bookId,
   chapterNumber,
   bookName,
+  bibleVersion,
   isDark = false,
 }) => {
   const router = useRouter();
@@ -43,45 +45,37 @@ const QuizButton: React.FC<QuizButtonProps> = ({
     checkQuizAvailability();
   }, [checkQuizAvailability]);
 
-  const handleQuizPress = () => {
-    if (!isAvailable) return;
-
-    Alert.alert(
-      'Questionário Disponível',
-      `Deseja iniciar o questionário sobre ${bookName} ${chapterNumber}?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Iniciar',
-          onPress: () => {
-            router.push({
-              pathname: '/quiz',
-              params: {
-                bookId: bookId.toString(),
-                chapterNumber: chapterNumber.toString(),
-                bookName,
-              },
-            });
-          },
+  const handleQuizPress = async () => {
+    try {
+      if (checking) return;
+      if (!isAvailable) {
+        Alert.alert('Quiz Indisponível', 'Não há questionário disponível para este capítulo.');
+        return;
+      }
+      // iniciar quiz
+      router.push({
+        pathname: '/quiz',
+        params: {
+          bookId: bookId.toString(),
+          chapterNumber: chapterNumber.toString(),
+          bookName,
+          bibleVersion: bibleVersion || '',
         },
-      ]
-    );
+      });
+    } catch (e) {
+      console.error('Erro no botão de quiz', e);
+    }
   };
 
-  if (checking) {
-    return (
-      <TouchableOpacity style={[styles.quizButton, styles.quizButtonLoading]} disabled>
-        <ActivityIndicator size="small" color={isDark ? '#90caf9' : '#2196F3'} />
-      </TouchableOpacity>
-    );
-  }
-
-  if (!isAvailable) {
-    return null;
-  }
+  const showSpinner = checking;
 
   const iconColor = isDark ? '#90caf9' : '#2196F3';
   const iconBg = isDark ? '#2a2a2a' : '#f8f9fa';
+
+  // Só mostra o botão se o quiz estiver disponível ou ainda estiver verificando
+  if (!checking && !isAvailable) {
+    return null;
+  }
 
   return (
     <TouchableOpacity
@@ -90,8 +84,13 @@ const QuizButton: React.FC<QuizButtonProps> = ({
         { backgroundColor: iconBg, borderColor: iconColor },
       ]}
       onPress={handleQuizPress}
+      disabled={showSpinner}
     >
-      <Ionicons name="game-controller" size={20} color={iconColor} />
+      {showSpinner ? (
+        <ActivityIndicator size="small" color={iconColor} />
+      ) : (
+        <Ionicons name="game-controller" size={20} color={iconColor} />
+      )}
     </TouchableOpacity>
   );
 };
