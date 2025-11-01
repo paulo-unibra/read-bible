@@ -151,9 +151,9 @@ export default function HomeScreen() {
             <Ionicons name="calendar-outline" size={48} color={colors.emptyIcon} />
             <Text style={[styles.noReadingTitle,{ color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Nenhuma leitura programada</Text>
             <Text style={[styles.noReadingText,{ color: colors.textSecondary, fontSize: applyFontScale(14), lineHeight: applyFontScale(20) }]}>Crie um plano de leitura para começar sua jornada bíblica</Text>
-              <TouchableOpacity style={[styles.createPlanButton, styles.disabledButton]} onPress={showPlansDevAlert}>
-                <Text style={[styles.createPlanButtonText, styles.disabledButtonText,{ fontSize: applyFontScale(16) }]}>Criar Plano</Text>
-              </TouchableOpacity>
+            <TouchableOpacity style={[styles.createPlanButton, styles.disabledButton]} onPress={showPlansDevAlert}>
+              <Text style={[styles.createPlanButtonText, styles.disabledButtonText,{ fontSize: applyFontScale(16) }]}>Criar Plano</Text>
+            </TouchableOpacity>
           </View>
         )}
 

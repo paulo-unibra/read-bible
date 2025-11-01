@@ -33,6 +33,31 @@ class DatabaseService {
     }
   }
 
+  private async safeDbOperation<T>(
+    operation: () => Promise<T>,
+    operationName: string,
+    maxRetries: number = 2
+  ): Promise<T> {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        console.error(`Erro em ${operationName} (tentativa ${attempt + 1}):`, error);
+        
+        if (this.isNativePrepareNPE(error)) {
+          if (attempt < maxRetries - 1) {
+            console.log(`Reinicializando banco para ${operationName}...`);
+            await this.reinitializeDatabase(`${operationName} retry ${attempt + 1}`);
+            continue;
+          }
+        }
+        
+        throw error;
+      }
+    }
+    throw new Error(`Operação ${operationName} falhou após ${maxRetries} tentativas`);
+  }
+
   private async ensureHealthy() {
     if (!this.db) return;
     const now = Date.now();
@@ -80,43 +105,79 @@ class DatabaseService {
   private isNativePrepareNPE(err: any): boolean {
     if (!err) return false;
     const msg = String(err.message || err);
-    return msg.includes("prepareAsync") || msg.includes("NullPointerException");
+    return (
+      msg.includes("prepareAsync") || 
+      msg.includes("NullPointerException") ||
+      msg.includes("NativeDatabase.prepareAsync") ||
+      msg.includes("database is locked") ||
+      msg.includes("Call to function 'NativeDatabase")
+    );
   }
 
   /**
    * Garantir inicialização única e reutilizável.
    */
   private async ensureInitialized() {
-    if (this.db) {
-      await this.ensureHealthy();
-      return;
-    }
-    if (global.__READBIBLE_DB_HANDLE) {
-      this.db = global.__READBIBLE_DB_HANDLE;
-      await this.ensureHealthy();
-      return;
-    }
-    if (this.initPromise) {
-      return this.initPromise;
-    }
-    this.initPromise = this.init();
-    try {
-      await this.initPromise;
-    } finally {
-      if (!this.db) this.initPromise = null;
-    }
+    // Use withLock to prevent concurrent initialization
+    return this.withLock(async () => {
+      if (this.db) {
+        await this.ensureHealthy();
+        return;
+      }
+      if (global.__READBIBLE_DB_HANDLE) {
+        this.db = global.__READBIBLE_DB_HANDLE;
+        await this.ensureHealthy();
+        return;
+      }
+      if (this.initPromise) {
+        return this.initPromise;
+      }
+      this.initPromise = this.init();
+      try {
+        await this.initPromise;
+      } catch (error) {
+        console.error("Erro na inicialização do banco:", error);
+        this.initPromise = null;
+        throw error;
+      } finally {
+        if (!this.db) this.initPromise = null;
+      }
+    });
   }
 
   async init() {
     try {
       console.log("INICIANDO BANCO DE DADOS");
+      
+      // Check if database is already open
+      if (global.__READBIBLE_DB_HANDLE) {
+        try {
+          // Test if the existing connection is still valid
+          await global.__READBIBLE_DB_HANDLE.getFirstAsync("SELECT 1");
+          this.db = global.__READBIBLE_DB_HANDLE;
+          console.log("Reutilizando conexão existente do banco de dados");
+          return;
+        } catch (error) {
+          // Connection is dead, close it and create new one
+          console.warn("Conexão existente inválida, criando nova conexão:", error);
+          try {
+            await global.__READBIBLE_DB_HANDLE.closeAsync?.();
+          } catch {}
+          global.__READBIBLE_DB_HANDLE = undefined;
+        }
+      }
+
       this.db = await SQLite.openDatabaseAsync(DB_NAME, {
-        useNewConnection: true,
+        useNewConnection: false, // Reuse connections to prevent locks
       });
       global.__READBIBLE_DB_HANDLE = this.db;
       await this.createTables();
     } catch (error) {
       console.error("Database initialization error:", error);
+      // Reset state on error
+      this.db = null;
+      global.__READBIBLE_DB_HANDLE = undefined;
+      this.initPromise = null;
       throw error;
     }
   }
@@ -298,13 +359,16 @@ class DatabaseService {
 
   // Settings management
   async saveSetting(key: string, value: string): Promise<void> {
-    await this.ensureInitialized();
-    if (!this.db) throw new Error("Database not initialized");
-    await this.withLock(async () => {
-      await this.db!.runAsync(
-        "INSERT OR REPLACE INTO user_settings (key, value) VALUES (?, ?)",
-        [key, value]
-      );
+    return this.withLock(async () => {
+      return this.safeDbOperation(async () => {
+        await this.ensureInitialized();
+        if (!this.db) throw new Error("Database not initialized");
+        
+        await this.db.runAsync(
+          "INSERT OR REPLACE INTO user_settings (key, value) VALUES (?, ?)",
+          [key, value]
+        );
+      }, `saveSetting(${key})`);
     });
   }
 
@@ -393,18 +457,27 @@ class DatabaseService {
     bookId: number,
     chapterNumber: number
   ): Promise<void> {
-    await this.ensureInitialized();
-    if (!this.db) throw new Error("Database not initialized");
+    return this.withLock(async () => {
+      return this.safeDbOperation(async () => {
+        await this.ensureInitialized();
+        if (!this.db) throw new Error("Database not initialized");
 
-    await this.db.runAsync(
-      "INSERT OR REPLACE INTO reading_history (bibleId, bookId, chapterNumber, lastReadDate) VALUES (?, ?, ?, ?)",
-      [bibleId, bookId, chapterNumber, new Date().toISOString()]
-    );
+        await this.db.runAsync(
+          "INSERT OR REPLACE INTO reading_history (bibleId, bookId, chapterNumber, lastReadDate) VALUES (?, ?, ?, ?)",
+          [bibleId, bookId, chapterNumber, new Date().toISOString()]
+        );
 
-    // Also save as preferred settings
-    await this.saveSetting("lastReadBibleId", bibleId);
-    await this.saveSetting("lastReadBookId", bookId.toString());
-    await this.saveSetting("lastReadChapter", chapterNumber.toString());
+        // Also save as preferred settings (non-critical, continue even if these fail)
+        try {
+          await this.saveSetting("lastReadBibleId", bibleId);
+          await this.saveSetting("lastReadBookId", bookId.toString());
+          await this.saveSetting("lastReadChapter", chapterNumber.toString());
+        } catch (settingsError) {
+          console.warn("Erro ao salvar configurações de leitura:", settingsError);
+          // Don't throw, these are non-critical
+        }
+      }, "saveLastReading");
+    });
   }
 
   async getLastReading(): Promise<{

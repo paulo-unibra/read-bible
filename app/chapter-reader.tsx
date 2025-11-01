@@ -50,7 +50,10 @@ export default function ChapterReaderScreen() {
   const [currentChapter, setCurrentChapter] = useState(initialChapter);
   const [verses, setVerses] = useState<Verse[]>([]);
   const [totalChapters, setTotalChapters] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // Loading inicial completo
+  const [initializing, setInitializing] = useState(true);
+  const [lastLoadedChapter, setLastLoadedChapter] = useState<number | null>(null);
+  const [chapterLoading, setChapterLoading] = useState(false); // Loading apenas para troca de capítulo
 
   const [navigating, setNavigating] = useState(false); // Prevent rapid navigation
   const [isFirstOfBible, setIsFirstOfBible] = useState(false);
@@ -219,6 +222,7 @@ export default function ChapterReaderScreen() {
 
   const loadChapterVerses = React.useCallback(async () => {
     if (!bibleId || !currentBookId || !currentChapter) return;
+    console.log("CARREGOU O BANCO - loadChapterVerses called");
     try {
       const versesData = await bibleReaderService.getVerses(
         bibleId,
@@ -291,31 +295,28 @@ export default function ChapterReaderScreen() {
       );
       setTotalChapters(chapters.length);
 
-      // Os versículos serão carregados pelo useEffect do currentChapter
+      // Load initial verses - use the initial chapter from params
+      const chapterToLoad = initialChapter || 1;
+      const versesData = await bibleReaderService.getVerses(
+        bibleId,
+        currentBookId,
+        chapterToLoad
+      );
+      setVerses(versesData);
+
+      // Update navigation state and check audio availability
       await updateNavigationState();
-      // Verifica disponibilidade do áudio para o capítulo atual
       await checkAudioAvailability();
 
-      try {
-        if (bibleId && currentBookId && currentChapter) {
-          await DatabaseService.saveLastReading(
-            bibleId,
-            currentBookId,
-            currentChapter
-          );
-        } else {
-          console.warn(
-            "[DEBUG] Valores inválidos detectados ao salvar posição de leitura:",
-            {
-              bibleId,
-              currentBookId,
-              currentChapter,
-            }
-          );
-        }
-      } catch (error) {
-        console.error("[DEBUG] Erro ao salvar posição de leitura:", error);
-      }
+      // Save reading position (non-blocking)
+      DatabaseService.saveLastReading(
+        bibleId,
+        currentBookId,
+        chapterToLoad
+      ).catch((error) => {
+        console.warn("[DEBUG] Erro ao salvar posição de leitura (não crítico):", error);
+        // Don't show alert for this non-critical operation
+      });
     } catch (error) {
       console.error("Error initializing reader:", error);
       Alert.alert("Erro", "Falha ao carregar capítulo");
@@ -326,25 +327,73 @@ export default function ChapterReaderScreen() {
   }, [
     bibleId,
     currentBookId,
-    currentChapter,
+    initialChapter,
     router,
     updateNavigationState,
     checkAudioAvailability,
   ]);
 
   useEffect(() => {
+    // Só inicializar completamente quando mudar a Bíblia ou o livro, não o capítulo
     if (bibleId && currentBookId) {
       initializeReader();
     }
   }, [bibleId, currentBookId, initializeReader]);
 
-  // Efeito separado para carregar apenas versículos quando o capítulo muda
-  useEffect(() => {
-    if (bibleId && currentBookId && currentChapter && !loading) {
-      loadChapterVerses();
-      checkAudioAvailability();
+  // Função para carregar dados do capítulo
+  const loadChapterData = useCallback(async (isInitialLoad: boolean = false) => {
+    console.log("[DEBUG] loadChapterData called - Chapter:", currentChapter, "IsInitial:", isInitialLoad);
+    
+    // Validar se temos todos os dados necessários
+    if (!bibleId || !currentBookId || !currentChapter || !book) {
+      console.log("[DEBUG] Dados incompletos para carregar capítulo");
+      return;
     }
-  }, [currentChapter, loadChapterVerses, checkAudioAvailability, bibleId, currentBookId, loading]);
+
+    // Verificar se já carregamos este capítulo (exceto na inicialização)
+    if (!isInitialLoad && lastLoadedChapter === currentChapter) {
+      console.log("[DEBUG] Capítulo já carregado, ignorando:", currentChapter);
+      return;
+    }
+
+    // Se for carregamento inicial, usa loading completo; se for navegação, usa chapterLoading
+    if (isInitialLoad) {
+      setLoading(true);
+    } else {
+      setChapterLoading(true);
+    }
+
+    try {
+      await loadChapterVerses();
+      await checkAudioAvailability();
+      setLastLoadedChapter(currentChapter);
+    } catch (error) {
+      console.error("Error loading chapter data:", error);
+    } finally {
+      if (isInitialLoad) {
+        setLoading(false);
+        setInitializing(false);
+      } else {
+        setChapterLoading(false);
+      }
+    }
+  }, [bibleId, currentBookId, currentChapter, book, lastLoadedChapter, loadChapterVerses, checkAudioAvailability]);
+
+  // Efeito para inicialização
+  useEffect(() => {
+    if (initializing && currentChapter) {
+      console.log("[DEBUG] Inicializando leitor de capítulo");
+      loadChapterData(true);
+    }
+  }, [initializing, currentChapter, loadChapterData]);
+
+  // Efeito para navegação entre capítulos
+  useEffect(() => {
+    if (!initializing && currentChapter && currentChapter !== lastLoadedChapter) {
+      console.log("[DEBUG] Navegação detectada para capítulo:", currentChapter);
+      loadChapterData(false);
+    }
+  }, [currentChapter, initializing, lastLoadedChapter, loadChapterData]);
 
   useEffect(() => {
     return () => {
@@ -353,9 +402,12 @@ export default function ChapterReaderScreen() {
   }, []);
 
   const navigateChapter = async (direction: "prev" | "next") => {
-    if (navigating || loading) return;
+    if (navigating || loading) {
+      console.log("Navigation blocked - already navigating or loading");
+      return;
+    }
 
-    console.log("TESTE")
+    console.log("Starting navigation:", direction);
     setNavigating(true);
 
     try {
@@ -387,8 +439,10 @@ export default function ChapterReaderScreen() {
 
       if (newChapter > 0 && newChapter <= totalChapters) {
         setCurrentChapter(newChapter);
-        // Os versículos serão carregados automaticamente pelo useEffect do currentChapter
-        await updateNavigationState(newChapter);
+        // Atualizar estado de navegação depois de mudar o capítulo
+        setTimeout(async () => {
+          await updateNavigationState(newChapter);
+        }, 100);
       }
     } catch (error) {
       const errorMessage =
@@ -716,9 +770,9 @@ export default function ChapterReaderScreen() {
     setSearchResults([]);
 
     try {
-      setLoading(true);
-
+      // Se mudou o livro, precisamos recarregar tudo
       if (result.bookId !== currentBookId) {
+        setLoading(true);
         const books = await bibleReaderService.getBooks(bibleId);
         const newBook = books.find((b) => b.id === result.bookId);
         if (newBook) {
@@ -731,57 +785,42 @@ export default function ChapterReaderScreen() {
           );
           setTotalChapters(chapters.length);
         }
+        
+        // Quando mudamos o livro E capítulo, setamos ambos e o useEffect irá carregar
+        setCurrentChapter(result.chapterNumber);
+      } else {
+        // Só mudou o capítulo, o useEffect irá carregar automaticamente
+        setCurrentChapter(result.chapterNumber);
       }
-
-      setCurrentChapter(result.chapterNumber);
-
-      const versesData = await bibleReaderService.getVerses(
-        bibleId,
-        result.bookId,
-        result.chapterNumber
-      );
-      setVerses(versesData);
     } catch (error) {
       console.error("Error navigating to search result:", error);
       Alert.alert("Erro", "Falha ao navegar para o resultado da busca");
-    } finally {
       setLoading(false);
     }
   };
 
   const navigateToChapter = async (chapterNumber: number, book?: Book) => {
-    if (!bibleId || !currentBookId || chapterNumber < 1) return;
-
-    console.log("TESTE DE TESTE", {
-      chapterNumber,
-      book,
-      currentBookId,
-    });
+    if (!bibleId || chapterNumber < 1) return;
 
     try {
-      setLoading(true);
-
+      // Se mudou o livro, precisamos recarregar tudo
       if (book && book.id !== currentBookId) {
+        setLoading(true);
         setBook(book);
         setCurrentBookId(book.id);
 
         const chapters = await bibleReaderService.getChapters(bibleId, book.id);
         setTotalChapters(chapters.length);
+        
+        // Quando mudamos o livro E capítulo, setamos ambos e o useEffect irá carregar
+        setCurrentChapter(chapterNumber);
+      } else {
+        // Só mudou o capítulo, o useEffect irá carregar automaticamente
+        setCurrentChapter(chapterNumber);
       }
-
-      setCurrentChapter(chapterNumber);
-
-      const versesData = await bibleReaderService.getVerses(
-        bibleId,
-        book ? book.id : currentBookId,
-        chapterNumber
-      );
-
-      setVerses(versesData);
     } catch (error) {
       console.error("Error navigating to chapter:", error);
       Alert.alert("Erro", "Falha ao carregar o capítulo");
-    } finally {
       setLoading(false);
     }
   };
@@ -1149,7 +1188,8 @@ export default function ChapterReaderScreen() {
     </TouchableOpacity>
   );
 
-  if (loading) {
+  // Só mostra tela de loading completa durante a inicialização inicial
+  if (loading && initializing) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.centerContent}>
@@ -1306,14 +1346,25 @@ export default function ChapterReaderScreen() {
       </View>
 
       {/* Verses List */}
-      <FlatList
-        data={verses}
-        renderItem={renderVerse}
-        keyExtractor={(item) => item.id.toString()}
-        showsVerticalScrollIndicator={false}
-        style={[styles.versesList, versesListBg]}
-        contentContainerStyle={[styles.versesListContent, { paddingTop: 8 }]}
-      />
+      <View style={styles.versesContainer}>
+        <FlatList
+          data={verses}
+          renderItem={renderVerse}
+          keyExtractor={(item) => item.id.toString()}
+          showsVerticalScrollIndicator={false}
+          style={[styles.versesList, versesListBg]}
+          contentContainerStyle={[styles.versesListContent, { paddingTop: 8 }]}
+        />
+        
+        {/* Indicador discreto de carregamento de capítulo */}
+        {chapterLoading && (
+          <View style={styles.chapterLoadingOverlay}>
+            <View style={styles.chapterLoadingIndicator}>
+              <ActivityIndicator size="small" color="#2196F3" />
+            </View>
+          </View>
+        )}
+      </View>
 
       {/* Floating Navigation Buttons */}
       <View
@@ -2365,6 +2416,26 @@ const styles = StyleSheet.create({
   versesList: {
     flex: 1,
     backgroundColor: "#fff",
+  },
+  versesContainer: {
+    flex: 1,
+    position: 'relative',
+  },
+  chapterLoadingOverlay: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    zIndex: 999,
+  },
+  chapterLoadingIndicator: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 20,
+    padding: 8,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   verseContainer: {
     paddingHorizontal: 8,
