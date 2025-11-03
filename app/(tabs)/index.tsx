@@ -27,8 +27,9 @@ export default function HomeScreen() {
       let mounted = true;
       (async () => {
         try {
-          const userFont = (await DatabaseService.getSetting('fontSize')) as 'small' | 'medium' | 'large' | null;
-            const userTheme = (await DatabaseService.getSetting('theme')) as 'light' | 'dark' | null;
+          const settings = await DatabaseService.getMultipleSettings(['fontSize', 'theme']);
+          const userFont = settings.fontSize as 'small' | 'medium' | 'large' | null;
+          const userTheme = settings.theme as 'light' | 'dark' | null;
             if (mounted) {
               if (userFont) setFontSizePref(userFont);
               if (userTheme) setTheme(userTheme);
@@ -54,8 +55,9 @@ export default function HomeScreen() {
         setTodayReading(reading);
       }
       // carregar preferências de aparência
-      const userFont = (await DatabaseService.getSetting('fontSize')) as 'small' | 'medium' | 'large' | null;
-      const userTheme = (await DatabaseService.getSetting('theme')) as 'light' | 'dark' | null;
+      const settings = await DatabaseService.getMultipleSettings(['fontSize', 'theme']);
+      const userFont = settings.fontSize as 'small' | 'medium' | 'large' | null;
+      const userTheme = settings.theme as 'light' | 'dark' | null;
       if (userFont) setFontSizePref(userFont);
       if (userTheme) setTheme(userTheme);
     } catch (error) {

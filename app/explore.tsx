@@ -9,8 +9,9 @@ export default function ExploreScreen() {
   const [fontSizePref, setFontSizePref] = useState<'small' | 'medium' | 'large'>('medium');
 
   useEffect(() => { (async () => {
-    const t = await DatabaseService.getSetting('theme'); if (t === 'dark' || t === 'light') setTheme(t);
-    const f = await DatabaseService.getSetting('fontSize'); if (f === 'small' || f === 'medium' || f === 'large') setFontSizePref(f);
+    const settings = await DatabaseService.getMultipleSettings(['theme', 'fontSize']);
+    const t = settings.theme; if (t === 'dark' || t === 'light') setTheme(t);
+    const f = settings.fontSize; if (f === 'small' || f === 'medium' || f === 'large') setFontSizePref(f);
   })(); }, []);
 
   const applyFontScale = useCallback((b: number) => fontSizePref==='small'? b*0.9 : fontSizePref==='large'? b*1.2 : b, [fontSizePref]);

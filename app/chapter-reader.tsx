@@ -2,22 +2,22 @@ import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Modal,
-    Pressable,
-    ScrollView,
-    Share,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Modal,
+  Pressable,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import {
-    SafeAreaView,
-    useSafeAreaInsets,
+  SafeAreaView,
+  useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import AudioPlayer from "../components/AudioPlayer";
 import QuizButton from "../components/QuizButton";
@@ -146,12 +146,13 @@ export default function ChapterReaderScreen() {
   useEffect(() => {
     (async () => {
       try {
-        const fs = (await DatabaseService.getSetting("fontSize")) as
+        const settings = await DatabaseService.getMultipleSettings(['fontSize', 'theme']);
+        const fs = settings.fontSize as
           | "small"
           | "medium"
           | "large"
           | null;
-        const th = (await DatabaseService.getSetting("theme")) as
+        const th = settings.theme as
           | "light"
           | "dark"
           | null;

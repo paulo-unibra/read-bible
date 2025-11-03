@@ -31,11 +31,18 @@ export default function SettingsScreen() {
       setBibles(downloadedBibles);
       
       // Load user settings
-      const preferredBibleId = await DatabaseService.getSetting('preferredBibleId') || downloadedBibles[0]?.id || '';
-      const userFontSize = await DatabaseService.getSetting('fontSize') as 'small' | 'medium' | 'large' || 'medium';
-      const userTheme = await DatabaseService.getSetting('theme') as 'light' | 'dark' || 'light';
-      const notifEnabled = (await DatabaseService.getSetting('dailyNotificationEnabled')) === 'true';
-      const notifTime = await DatabaseService.getSetting('notificationTime') || '08:00';
+      const settings = await DatabaseService.getMultipleSettings([
+        'preferredBibleId',
+        'fontSize',
+        'theme',
+        'dailyNotificationEnabled',
+        'notificationTime'
+      ]);
+      const preferredBibleId = settings.preferredBibleId || downloadedBibles[0]?.id || '';
+      const userFontSize = settings.fontSize as 'small' | 'medium' | 'large' || 'medium';
+      const userTheme = settings.theme as 'light' | 'dark' || 'light';
+      const notifEnabled = settings.dailyNotificationEnabled === 'true';
+      const notifTime = settings.notificationTime || '08:00';
       
       setSelectedBibleId(preferredBibleId);
       setFontSize(userFontSize);

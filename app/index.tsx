@@ -24,8 +24,9 @@ export default function HomeScreen() {
     let mounted = true;
     (async () => {
       try {
-        const userFont = (await DatabaseService.getSetting('fontSize')) as 'small' | 'medium' | 'large' | null;
-        const userTheme = (await DatabaseService.getSetting('theme')) as 'light' | 'dark' | null;
+        const settings = await DatabaseService.getMultipleSettings(['fontSize', 'theme']);
+        const userFont = settings.fontSize as 'small' | 'medium' | 'large' | null;
+        const userTheme = settings.theme as 'light' | 'dark' | null;
         if (mounted) {
           if (userFont) setFontSizePref(userFont);
           if (userTheme) setTheme(userTheme);
@@ -41,8 +42,9 @@ export default function HomeScreen() {
       await DatabaseService.init();
       await notificationService.requestPermissions();
       // Carregamento de planos desativado (em desenvolvimento)
-      const userFont = (await DatabaseService.getSetting('fontSize')) as 'small' | 'medium' | 'large' | null;
-      const userTheme = (await DatabaseService.getSetting('theme')) as 'light' | 'dark' | null;
+      const settings = await DatabaseService.getMultipleSettings(['fontSize', 'theme']);
+      const userFont = settings.fontSize as 'small' | 'medium' | 'large' | null;
+      const userTheme = settings.theme as 'light' | 'dark' | null;
   if (userFont) setFontSizePref(userFont);
   if (userTheme) setTheme(userTheme);
 
@@ -186,7 +188,6 @@ export default function HomeScreen() {
             <Ionicons name="chevron-forward" size={20} color={colors.iconForward} />
           </TouchableOpacity>
 
--
           {/* {!userLogged && (
             <TouchableOpacity style={[styles.actionCard,{ backgroundColor: colors.card, shadowOpacity: isDark ? 0.25 : 0.1 }]} onPress={() => router.push('/login')}>
               <View style={[styles.actionIcon,{ backgroundColor: colors.surfaceAlt }]}><Ionicons name="log-in-outline" size={32} color={isDark ? '#64b5f6' : '#1976D2'} /></View>

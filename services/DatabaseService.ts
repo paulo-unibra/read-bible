@@ -11,7 +11,6 @@ declare global {
 class DatabaseService {
   private db: SQLite.SQLiteDatabase | null = null;
   private initPromise: Promise<void> | null = null;
-  private lock: Promise<void> = Promise.resolve();
   private biblesCache: { data: Bible[]; updatedAt: number } | null = null;
   // Saúde / circuito
   private lastHealthCheck = 0;
@@ -19,51 +18,145 @@ class DatabaseService {
   private healthFailures = 0;
   private reinitializing = false;
   private circuitOpenUntil = 0;
+  // Debounce para saveLastReading
+  private saveReadingDebounceTimer: any = null;
+  private pendingReadingSave: { bibleId: string; bookId: number; chapterNumber: number } | null = null;
 
-  // Método para resetar o lock em caso de problemas
-  private resetLock() {
-    console.log('🔄 Resetting database lock...');
-    this.lock = Promise.resolve();
-  }
-
-  private async withLock<T>(fn: () => Promise<T>): Promise<T> {
-    console.log('🔒 withLock: Requesting lock...');
-    // Cria um novo promise e encadeia no lock anterior para serializar
-    const start = this.lock;
-    let release: () => void = () => {};
-    this.lock = new Promise<void>((res) => (release = res));
-    
-    console.log('🔒 withLock: Waiting for previous operations...');
-    
-    // Timeout para evitar travamentos indefinidos no lock
-    const lockTimeout = new Promise<never>((_, reject) => {
-      setTimeout(() => {
-        console.error('🔒 LOCK TIMEOUT - Previous operation taking too long, forcing release');
-        reject(new Error('Database lock timeout - previous operation hanging'));
-      }, 10000); // 10 segundos timeout
-    });
-    
+  // Método para criar uma nova conexão independente para cada operação
+  private async createFreshConnection(): Promise<SQLite.SQLiteDatabase> {
     try {
-      // Race entre o lock anterior e o timeout
-      await Promise.race([start, lockTimeout]);
-      console.log('🔒 withLock: Lock acquired, executing function...');
+      const connection = await SQLite.openDatabaseAsync(DB_NAME, {
+        useNewConnection: true, // IMPORTANTE: Nova conexão a cada chamada
+      });
+      
+      // Verificar se as tabelas existem na nova conexão
+      const result = await connection.getFirstAsync("SELECT name FROM sqlite_master WHERE type='table' AND name='bibles'");
+      if (!result) {
+        // Se não existir, criar as tabelas necessárias
+        await this.createTablesOnConnection(connection);
+      }
+      
+      return connection;
     } catch (error) {
-      console.error('🔒 withLock: Lock acquisition failed:', error);
-      // Force reset do lock em caso de timeout
-      this.lock = Promise.resolve();
+      console.error("Erro ao criar nova conexão:", error);
       throw error;
     }
+  }
+
+  // Executar operação com conexão independente
+  private async withFreshConnection<T>(
+    operation: (db: SQLite.SQLiteDatabase) => Promise<T>,
+    operationName: string = 'unknown'
+  ): Promise<T> {
+    let connection: SQLite.SQLiteDatabase | null = null;
     
     try {
-      const result = await fn();
-      console.log('🔒 withLock: Function completed successfully');
+      console.log(`� Criando nova conexão para: ${operationName}`);
+      connection = await this.createFreshConnection();
+      
+      const result = await operation(connection);
+      
+      console.log(`✅ Operação ${operationName} concluída com sucesso`);
       return result;
+    } catch (error) {
+      console.error(`❌ Erro na operação ${operationName}:`, error);
+      throw error;
     } finally {
-      console.log('🔒 withLock: Releasing lock...');
-      release();
-      console.log('🔒 withLock: Lock released');
+      if (connection) {
+        try {
+          await connection.closeAsync();
+          console.log(`🔒 Conexão fechada para: ${operationName}`);
+        } catch (closeError) {
+          console.warn(`⚠️ Erro ao fechar conexão:`, closeError);
+        }
+      }
     }
   }
+
+  // Método público para forçar reset em casos extremos
+  public forceResetLock() {
+    console.warn('🚨 FORCE RESETTING DATABASE CONNECTIONS - Use with caution');
+    this.initPromise = null;
+    // Também reseta o cache para forçar re-inicialização se necessário
+    this.biblesCache = null;
+  }
+
+  // Auto-recovery: reset locks se muitos timeouts consecutivos
+  private consecutiveTimeouts = 0;
+  private autoRecoverLock() {
+    this.consecutiveTimeouts++;
+    console.warn(`🔄 Auto-recovery: ${this.consecutiveTimeouts} consecutive timeouts`);
+    
+    if (this.consecutiveTimeouts >= 3) {
+      console.warn('🚨 AUTO-RECOVERY: Too many consecutive timeouts, force resetting locks');
+      this.forceResetLock();
+      this.consecutiveTimeouts = 0;
+    }
+  }
+
+  // Criar tabelas em uma conexão específica
+  private async createTablesOnConnection(db: SQLite.SQLiteDatabase): Promise<void> {
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS bibles (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        abbreviation TEXT NOT NULL,
+        fileName TEXT NOT NULL,
+        isDownloaded INTEGER DEFAULT 0,
+        downloadDate TEXT,
+        size INTEGER
+      );
+
+      CREATE TABLE IF NOT EXISTS user_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS favorites (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        bibleId TEXT NOT NULL,
+        bookId INTEGER NOT NULL,
+        chapterNumber INTEGER NOT NULL,
+        verseNumber INTEGER NOT NULL,
+        createdDate TEXT DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(bibleId, bookId, chapterNumber, verseNumber)
+      );
+
+      CREATE TABLE IF NOT EXISTS reading_plans (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT,
+        totalDays INTEGER NOT NULL,
+        currentDay INTEGER DEFAULT 1,
+        isActive INTEGER DEFAULT 0,
+        createdDate TEXT DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS reading_plan_days (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        planId TEXT NOT NULL,
+        dayNumber INTEGER NOT NULL,
+        bibleId TEXT NOT NULL,
+        bookId INTEGER NOT NULL,
+        chapterNumber INTEGER NOT NULL,
+        isCompleted INTEGER DEFAULT 0,
+        completedDate TEXT,
+        FOREIGN KEY (planId) REFERENCES reading_plans (id) ON DELETE CASCADE,
+        UNIQUE(planId, dayNumber)
+      );
+
+      CREATE TABLE IF NOT EXISTS reading_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        bibleId TEXT NOT NULL,
+        bookId INTEGER NOT NULL,
+        chapterNumber INTEGER NOT NULL,
+        lastReadDate TEXT DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(bibleId, bookId, chapterNumber)
+      );
+    `);
+  }
+
+
 
   private async safeDbOperation<T>(
     operation: () => Promise<T>,
@@ -150,31 +243,29 @@ class DatabaseService {
    * Garantir inicialização única e reutilizável.
    */
   private async ensureInitialized() {
-    // Use withLock to prevent concurrent initialization
-    return this.withLock(async () => {
-      if (this.db) {
-        await this.ensureHealthy();
-        return;
-      }
-      if (global.__READBIBLE_DB_HANDLE) {
-        this.db = global.__READBIBLE_DB_HANDLE;
-        await this.ensureHealthy();
-        return;
-      }
-      if (this.initPromise) {
-        return this.initPromise;
-      }
-      this.initPromise = this.init();
-      try {
-        await this.initPromise;
-      } catch (error) {
-        console.error("Erro na inicialização do banco:", error);
-        this.initPromise = null;
-        throw error;
-      } finally {
-        if (!this.db) this.initPromise = null;
-      }
-    });
+    // Simplified initialization without locks for main connection
+    if (this.db) {
+      await this.ensureHealthy();
+      return;
+    }
+    if (global.__READBIBLE_DB_HANDLE) {
+      this.db = global.__READBIBLE_DB_HANDLE;
+      await this.ensureHealthy();
+      return;
+    }
+    if (this.initPromise) {
+      return this.initPromise;
+    }
+    this.initPromise = this.init();
+    try {
+      await this.initPromise;
+    } catch (error) {
+      console.error("Erro na inicialização do banco:", error);
+      this.initPromise = null;
+      throw error;
+    } finally {
+      if (!this.db) this.initPromise = null;
+    }
   }
 
   async init() {
@@ -226,7 +317,7 @@ class DatabaseService {
     this.db = null;
     this.initPromise = null;
     this.lastHealthCheck = 0;
-    this.resetLock(); // Reset do lock também
+    // No more locks to reset - using fresh connections per operation
     await this.ensureInitialized();
   }
 
@@ -332,15 +423,18 @@ class DatabaseService {
   }
 
   async getBibles(): Promise<Bible[]> {
-    await this.ensureInitialized();
-    if (!this.db) throw new Error("Database not initialized");
     // Cache: se já carregou e não houve mudança estrutural, reutiliza
     if (this.biblesCache) {
       return this.biblesCache.data;
     }
 
-    return this.safeDbOperation(async () => {
-      const rows = await this.db!.getAllAsync(
+    return this.withFreshConnection(async (db) => {
+      // Double-check cache
+      if (this.biblesCache) {
+        return this.biblesCache.data;
+      }
+
+      const rows = await db.getAllAsync(
         "SELECT * FROM bibles ORDER BY name"
       );
       const mapped = rows.map((row: any) => {
@@ -362,7 +456,7 @@ class DatabaseService {
       console.log("BÍBLIAS NO BANCO", mapped.length);
       console.log("----------------------");
       return mapped;
-    }, 'getBibles', 2);
+    });
   }
 
   async deleteBible(bibleId: string): Promise<void> {
@@ -393,28 +487,42 @@ class DatabaseService {
 
   // Settings management
   async saveSetting(key: string, value: string): Promise<void> {
-    return this.withLock(async () => {
-      return this.safeDbOperation(async () => {
-        await this.ensureInitialized();
-        if (!this.db) throw new Error("Database not initialized");
-        
-        await this.db.runAsync(
-          "INSERT OR REPLACE INTO user_settings (key, value) VALUES (?, ?)",
-          [key, value]
-        );
-      }, `saveSetting(${key})`);
+    return this.withFreshConnection(async (db) => {
+      await db.runAsync(
+        "INSERT OR REPLACE INTO user_settings (key, value) VALUES (?, ?)",
+        [key, value]
+      );
     });
   }
 
   async getSetting(key: string): Promise<string | null> {
-    await this.ensureInitialized();
-    if (!this.db) throw new Error("Database not initialized");
+    return this.withFreshConnection(async (db) => {
+      const result = (await db.getFirstAsync(
+        "SELECT value FROM user_settings WHERE key = ?",
+        [key]
+      )) as { value: string } | null;
+      return result ? result.value : null;
+    });
+  }
 
-    const result = (await this.db.getFirstAsync(
-      "SELECT value FROM user_settings WHERE key = ?",
-      [key]
-    )) as { value: string } | null;
-    return result ? result.value : null;
+  async getMultipleSettings(keys: string[]): Promise<Record<string, string | null>> {
+    return this.withFreshConnection(async (db) => {
+      const placeholders = keys.map(() => '?').join(',');
+      const results = (await db.getAllAsync(
+        `SELECT key, value FROM user_settings WHERE key IN (${placeholders})`,
+        keys
+      )) as { key: string; value: string }[];
+
+      const settingsMap: Record<string, string | null> = {};
+      keys.forEach(key => {
+        settingsMap[key] = null;
+      });
+      results.forEach(result => {
+        settingsMap[result.key] = result.value;
+      });
+
+      return settingsMap;
+    });
   }
 
   // Favorites management
@@ -493,27 +601,36 @@ class DatabaseService {
     bookId: number,
     chapterNumber: number
   ): Promise<void> {
-    return this.withLock(async () => {
-      return this.safeDbOperation(async () => {
-        await this.ensureInitialized();
-        if (!this.db) throw new Error("Database not initialized");
-
-        await this.db.runAsync(
-          "INSERT OR REPLACE INTO reading_history (bibleId, bookId, chapterNumber, lastReadDate) VALUES (?, ?, ?, ?)",
-          [bibleId, bookId, chapterNumber, new Date().toISOString()]
-        );
-
-        // Also save as preferred settings (non-critical, continue even if these fail)
-        try {
-          await this.saveSetting("lastReadBibleId", bibleId);
-          await this.saveSetting("lastReadBookId", bookId.toString());
-          await this.saveSetting("lastReadChapter", chapterNumber.toString());
-        } catch (settingsError) {
-          console.warn("Erro ao salvar configurações de leitura:", settingsError);
-          // Don't throw, these are non-critical
-        }
-      }, "saveLastReading");
-    });
+    // Sistema completamente não-bloqueante - retorna imediatamente
+    this.pendingReadingSave = { bibleId, bookId, chapterNumber };
+    
+    if (this.saveReadingDebounceTimer) {
+      clearTimeout(this.saveReadingDebounceTimer);
+    }
+    
+    // Salvar em background sem esperar nem bloquear
+    this.saveReadingDebounceTimer = setTimeout(async () => {
+      if (!this.pendingReadingSave) return;
+      
+      const { bibleId: finalBibleId, bookId: finalBookId, chapterNumber: finalChapter } = this.pendingReadingSave;
+      this.pendingReadingSave = null;
+      
+      // Tentar salvar usando conexão independente - se falhar, não é crítico
+      try {
+        await this.withFreshConnection(async (db) => {
+          await db.runAsync(
+            "INSERT OR REPLACE INTO reading_history (bibleId, bookId, chapterNumber, lastReadDate) VALUES (?, ?, ?, ?)",
+            [finalBibleId, finalBookId, finalChapter, new Date().toISOString()]
+          );
+        });
+      } catch (error) {
+        // Salvar leitura não é crítico - ignora erros
+        console.warn("[DEBUG] Erro ao salvar posição de leitura (ignorado):", error);
+      }
+    }, 2000); // 2 segundos de debounce
+    
+    // Retorna imediatamente - não bloqueia NADA
+    return Promise.resolve();
   }
 
   async getLastReading(): Promise<{
@@ -577,4 +694,18 @@ class DatabaseService {
   }
 }
 
-export default new DatabaseService();
+const databaseServiceInstance = new DatabaseService();
+
+// Expor função global para debug/emergência
+declare global {
+  var __FORCE_RESET_DB_LOCK: () => void;
+}
+
+if (__DEV__) {
+  global.__FORCE_RESET_DB_LOCK = () => {
+    console.warn('🚨 MANUAL EMERGENCY DATABASE LOCK RESET');
+    databaseServiceInstance.forceResetLock();
+  };
+}
+
+export default databaseServiceInstance;
