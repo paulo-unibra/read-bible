@@ -20,16 +20,48 @@ class DatabaseService {
   private reinitializing = false;
   private circuitOpenUntil = 0;
 
+  // Método para resetar o lock em caso de problemas
+  private resetLock() {
+    console.log('🔄 Resetting database lock...');
+    this.lock = Promise.resolve();
+  }
+
   private async withLock<T>(fn: () => Promise<T>): Promise<T> {
+    console.log('🔒 withLock: Requesting lock...');
     // Cria um novo promise e encadeia no lock anterior para serializar
     const start = this.lock;
     let release: () => void = () => {};
     this.lock = new Promise<void>((res) => (release = res));
-    await start; // espera operações anteriores
+    
+    console.log('🔒 withLock: Waiting for previous operations...');
+    
+    // Timeout para evitar travamentos indefinidos no lock
+    const lockTimeout = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        console.error('🔒 LOCK TIMEOUT - Previous operation taking too long, forcing release');
+        reject(new Error('Database lock timeout - previous operation hanging'));
+      }, 10000); // 10 segundos timeout
+    });
+    
     try {
-      return await fn();
+      // Race entre o lock anterior e o timeout
+      await Promise.race([start, lockTimeout]);
+      console.log('🔒 withLock: Lock acquired, executing function...');
+    } catch (error) {
+      console.error('🔒 withLock: Lock acquisition failed:', error);
+      // Force reset do lock em caso de timeout
+      this.lock = Promise.resolve();
+      throw error;
+    }
+    
+    try {
+      const result = await fn();
+      console.log('🔒 withLock: Function completed successfully');
+      return result;
     } finally {
+      console.log('🔒 withLock: Releasing lock...');
       release();
+      console.log('🔒 withLock: Lock released');
     }
   }
 
@@ -194,6 +226,7 @@ class DatabaseService {
     this.db = null;
     this.initPromise = null;
     this.lastHealthCheck = 0;
+    this.resetLock(); // Reset do lock também
     await this.ensureInitialized();
   }
 
@@ -262,10 +295,25 @@ class DatabaseService {
 
   // Bible management
   async saveBible(bible: Bible): Promise<void> {
-    await this.ensureInitialized();
-    if (!this.db) throw new Error("Database not initialized");
-    await this.withLock(async () => {
-      await this.db!.runAsync(
+    console.log('🔥 DatabaseService.saveBible CALLED with:', {
+      id: bible.id,
+      name: bible.name,
+      abbreviation: bible.abbreviation,
+      fileName: bible.fileName,
+      isDownloaded: bible.isDownloaded,
+      downloadDate: bible.downloadDate,
+      size: bible.size
+    });
+    
+    return this.safeDbOperation(async () => {
+      console.log('🔥 About to call ensureInitialized...');
+      await this.ensureInitialized();
+      console.log('🔥 ensureInitialized completed');
+      
+      if (!this.db) throw new Error("Database not initialized");
+      console.log('🔥 Database is initialized, running INSERT OR REPLACE directly...');
+      
+      await this.db.runAsync(
         "INSERT OR REPLACE INTO bibles (id, name, abbreviation, fileName, isDownloaded, downloadDate, size) VALUES (?, ?, ?, ?, ?, ?, ?)",
         [
           bible.id,
@@ -277,8 +325,10 @@ class DatabaseService {
           bible.size || null,
         ]
       );
+      console.log('🔥 INSERT OR REPLACE completed successfully');
       this.biblesCache = null; // invalidar cache
-    });
+      console.log('🔥 Cache invalidated, saveBible operation completed');
+    }, 'saveBible', 3); // 3 tentativas de retry
   }
 
   async getBibles(): Promise<Bible[]> {
@@ -289,72 +339,56 @@ class DatabaseService {
       return this.biblesCache.data;
     }
 
-    const execute = async () => {
-      let attempt = 0;
-      while (attempt < 2) {
-        try {
-          const rows = await this.db!.getAllAsync(
-            "SELECT * FROM bibles ORDER BY name"
-          );
-          const mapped = rows.map((row: any) => {
-            // Limpar extensões indesejadas no nome exibido (.bbl, .bbl.db, .db)
-            let displayName = String(row.name || "");
-            displayName = displayName.replace(/\.bbl(?:\.db)?$/i, "");
-            displayName = displayName.replace(/\.db$/i, "");
-            return {
-              id: row.id as string,
-              name: displayName,
-              abbreviation: row.abbreviation as string,
-              fileName: row.fileName as string,
-              isDownloaded: Boolean(row.isDownloaded),
-              downloadDate: row.downloadDate as string | undefined,
-              size: row.size as number | undefined,
-            };
-          });
-          this.biblesCache = { data: mapped, updatedAt: Date.now() };
-          console.log("BÍBLIAS NO BANCO", mapped.length);
-          console.log("----------------------");
-          return mapped;
-        } catch (err: any) {
-          const message = String(err?.message || err);
-          console.error("Erro getBibles tentativa", attempt + 1, message);
-          if (this.isNativePrepareNPE(err)) {
-            await this.reinitializeDatabase("prepareAsync NPE getBibles");
-            attempt++;
-            continue;
-          }
-          throw err;
-        }
-      }
-      throw new Error("Falha ao executar getBibles após retries");
-    };
-
-    // Serializa a execução para evitar corrida múltipla de reinitialize
-    return this.withLock(execute);
+    return this.safeDbOperation(async () => {
+      const rows = await this.db!.getAllAsync(
+        "SELECT * FROM bibles ORDER BY name"
+      );
+      const mapped = rows.map((row: any) => {
+        // Limpar extensões indesejadas no nome exibido (.bbl, .bbl.db, .db)
+        let displayName = String(row.name || "");
+        displayName = displayName.replace(/\.bbl(?:\.db)?$/i, "");
+        displayName = displayName.replace(/\.db$/i, "");
+        return {
+          id: row.id as string,
+          name: displayName,
+          abbreviation: row.abbreviation as string,
+          fileName: row.fileName as string,
+          isDownloaded: Boolean(row.isDownloaded),
+          downloadDate: row.downloadDate as string | undefined,
+          size: row.size as number | undefined,
+        };
+      });
+      this.biblesCache = { data: mapped, updatedAt: Date.now() };
+      console.log("BÍBLIAS NO BANCO", mapped.length);
+      console.log("----------------------");
+      return mapped;
+    }, 'getBibles', 2);
   }
 
   async deleteBible(bibleId: string): Promise<void> {
-    await this.ensureInitialized();
-    if (!this.db) throw new Error("Database not initialized");
-    await this.withLock(async () => {
-      await this.db!.runAsync("DELETE FROM bibles WHERE id = ?", [bibleId]);
-      await this.db!.runAsync("DELETE FROM favorites WHERE bibleId = ?", [
+    return this.safeDbOperation(async () => {
+      await this.ensureInitialized();
+      if (!this.db) throw new Error("Database not initialized");
+      
+      await this.db.runAsync("DELETE FROM bibles WHERE id = ?", [bibleId]);
+      await this.db.runAsync("DELETE FROM favorites WHERE bibleId = ?", [
         bibleId,
       ]);
       this.biblesCache = null;
-    });
+    }, 'deleteBible');
   }
 
   async markBibleAsDownloaded(bibleId: string, size?: number): Promise<void> {
-    await this.ensureInitialized();
-    if (!this.db) throw new Error("Database not initialized");
-    await this.withLock(async () => {
-      await this.db!.runAsync(
+    return this.safeDbOperation(async () => {
+      await this.ensureInitialized();
+      if (!this.db) throw new Error("Database not initialized");
+      
+      await this.db.runAsync(
         "UPDATE bibles SET isDownloaded = 1, downloadDate = ?, size = ? WHERE id = ?",
         [new Date().toISOString(), size || null, bibleId]
       );
       this.biblesCache = null;
-    });
+    }, 'markBibleAsDownloaded');
   }
 
   // Settings management
@@ -390,14 +424,15 @@ class DatabaseService {
     chapterNumber: number,
     verseNumber: number
   ): Promise<void> {
-    await this.ensureInitialized();
-    if (!this.db) throw new Error("Database not initialized");
-    await this.withLock(async () => {
-      await this.db!.runAsync(
+    return this.safeDbOperation(async () => {
+      await this.ensureInitialized();
+      if (!this.db) throw new Error("Database not initialized");
+      
+      await this.db.runAsync(
         "INSERT OR IGNORE INTO favorites (bibleId, bookId, chapterNumber, verseNumber) VALUES (?, ?, ?, ?)",
         [bibleId, bookId, chapterNumber, verseNumber]
       );
-    });
+    }, 'addToFavorites');
   }
 
   async removeFromFavorites(
@@ -406,14 +441,15 @@ class DatabaseService {
     chapterNumber: number,
     verseNumber: number
   ): Promise<void> {
-    await this.ensureInitialized();
-    if (!this.db) throw new Error("Database not initialized");
-    await this.withLock(async () => {
-      await this.db!.runAsync(
+    return this.safeDbOperation(async () => {
+      await this.ensureInitialized();
+      if (!this.db) throw new Error("Database not initialized");
+      
+      await this.db.runAsync(
         "DELETE FROM favorites WHERE bibleId = ? AND bookId = ? AND chapterNumber = ? AND verseNumber = ?",
         [bibleId, bookId, chapterNumber, verseNumber]
       );
-    });
+    }, 'removeFromFavorites');
   }
 
   async getFavorites(
@@ -521,28 +557,23 @@ class DatabaseService {
   }
 
   async clearAllData(): Promise<void> {
-    return this.withLock(async () => {
-      await this.ensureHealthy();
+    return this.safeDbOperation(async () => {
+      await this.ensureInitialized();
       if (!this.db) throw new Error("Database not initialized");
       
-      try {
-        // Clear all tables
-        await this.db.runAsync("DELETE FROM bibles");
-        await this.db.runAsync("DELETE FROM user_settings");
-        await this.db.runAsync("DELETE FROM favorites");
-        await this.db.runAsync("DELETE FROM reading_plans");
-        await this.db.runAsync("DELETE FROM reading_plan_days");
-        await this.db.runAsync("DELETE FROM reading_history");
-        
-        // Clear cache
-        this.biblesCache = null;
-        
-        console.log("All data cleared successfully");
-      } catch (error) {
-        console.error("Error clearing all data:", error);
-        throw error;
-      }
-    });
+      // Clear all tables
+      await this.db.runAsync("DELETE FROM bibles");
+      await this.db.runAsync("DELETE FROM user_settings");
+      await this.db.runAsync("DELETE FROM favorites");
+      await this.db.runAsync("DELETE FROM reading_plans");
+      await this.db.runAsync("DELETE FROM reading_plan_days");
+      await this.db.runAsync("DELETE FROM reading_history");
+      
+      // Clear cache
+      this.biblesCache = null;
+      
+      console.log("All data cleared successfully");
+    }, 'clearAllData');
   }
 }
 

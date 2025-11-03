@@ -1,15 +1,15 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Dimensions,
-  FlatList,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    Dimensions,
+    FlatList,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import DatabaseService from "../services/DatabaseService";
@@ -27,6 +27,13 @@ export default function BibleManagerScreen() {
     loadData();
   }, []);
 
+  // Recarregar dados sempre que a tela ganhar foco
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [])
+  );
+
   const loadData = async () => {
     try {
       setLoading(true);
@@ -38,6 +45,8 @@ export default function BibleManagerScreen() {
 
       // Load local bibles
       const localBiblesData = await DatabaseService.getBibles();
+      console.log("Bible-manager loaded bibles:", localBiblesData.length, "bibles found");
+      console.log("Bible-manager bibles list:", localBiblesData.map(b => ({ id: b.id, name: b.name, fileName: b.fileName })));
       setLocalBibles(localBiblesData);
     } catch (error) {
       console.error("Error loading bible data:", error);
