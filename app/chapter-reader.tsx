@@ -2117,18 +2117,25 @@ export default function ChapterReaderScreen() {
                 },
               ]}
             >
-              <Text style={[styles.modalTitle, isDark && { color: "#e0e0e0" }]}>
-                Escolher Versão da Bíblia
-              </Text>
-              <TouchableOpacity
-                style={styles.refreshButton}
-                onPress={forceOpenBibleSelector}
-              >
-                <Ionicons name="refresh" size={20} color={iconColor} />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => setBibleSelectorVisible(false)}>
-                <Ionicons name="close" size={24} color={iconColor} />
-              </TouchableOpacity>
+              <View style={styles.modalHeaderLeft}>
+                <Text style={[styles.modalTitle, isDark && { color: "#e0e0e0" }]}>
+                  Escolher Versão da Bíblia
+                </Text>
+              </View>
+              <View style={styles.modalHeaderActions}>
+                <TouchableOpacity
+                  style={styles.refreshButton}
+                  onPress={forceOpenBibleSelector}
+                >
+                  <Ionicons name="refresh" size={20} color={iconColor} />
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.closeButton}
+                  onPress={() => setBibleSelectorVisible(false)}
+                >
+                  <Ionicons name="close" size={24} color={iconColor} />
+                </TouchableOpacity>
+              </View>
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} style={styles.modalScrollContent}>
@@ -2627,11 +2634,15 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    paddingHorizontal: 30,
+    paddingVertical: 40,
   },
   loadingText: {
-    marginTop: 16,
+    marginTop: 20,
     fontSize: 16,
-    color: "#666",
+    color: "#7f8c8d",
+    textAlign: "center",
+    letterSpacing: 0.2,
   },
   versesList: {
     flex: 1,
@@ -2741,15 +2752,40 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 18,
     backgroundColor: "#fff",
     borderBottomWidth: 1,
     borderBottomColor: "#e0e0e0",
+    elevation: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  modalHeaderLeft: {
+    flex: 1,
+  },
+  modalHeaderActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  refreshButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: "rgba(33, 150, 243, 0.1)",
+  },
+  closeButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: "rgba(255, 0, 0, 0.1)",
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#333",
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#2c3e50",
+    letterSpacing: 0.3,
   },
   searchContainer: {
     flexDirection: "row",
@@ -2838,7 +2874,8 @@ const styles = StyleSheet.create({
   },
   emptyState: {
     alignItems: "center",
-    paddingVertical: 48,
+    paddingVertical: 60,
+    paddingHorizontal: 20,
   },
   modalOverlay: {
     flex: 1,
@@ -3116,10 +3153,15 @@ const styles = StyleSheet.create({
   // Bible/Book Selector Modal Styles
   selectorModal: {
     backgroundColor: "white",
-    borderRadius: 12,
-    height: "80%",
-    width: "85%",
+    borderRadius: 16,
+    height: "85%",
+    width: "90%",
     overflow: "hidden",
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
   },
 
   selectorItem: {
@@ -3361,10 +3403,12 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   emptyText: {
-    marginTop: 16,
-    fontSize: 14,
-    color: "#999",
+    marginTop: 20,
+    fontSize: 16,
+    color: "#95a5a6",
     textAlign: "center",
+    lineHeight: 22,
+    letterSpacing: 0.2,
   },
   sectionTitle: {
     fontSize: 16,
@@ -3375,12 +3419,17 @@ const styles = StyleSheet.create({
   },
   downloadButton: {
     backgroundColor: "#2196F3",
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: "center",
     alignItems: "center",
     marginLeft: 12,
+    elevation: 2,
+    shadowColor: "#2196F3",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
   downloadingButton: {
     backgroundColor: "#999",
@@ -3413,59 +3462,61 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
     paddingHorizontal: 20,
   },
-  // Novos estilos para o modal refatorado
-  refreshButton: {
-    padding: 8,
-    marginRight: 8,
-  },
+
   modalScrollContent: {
     flex: 1,
   },
   modalSection: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    marginBottom: 8,
   },
   modalSectionTitle: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 17,
+    fontWeight: "700",
     color: "#333",
-    marginBottom: 12,
-    marginTop: 8,
+    marginBottom: 16,
+    marginTop: 4,
+    letterSpacing: 0.3,
   },
   bibleCard: {
     backgroundColor: "#fff",
-    borderRadius: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
+    borderRadius: 14,
+    marginBottom: 12,
+    borderWidth: 1.5,
+    borderColor: "#e8e8e8",
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
-      height: 1,
+      height: 2,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 3,
   },
   bibleCardContent: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 16,
+    padding: 18,
     flex: 1,
+    minHeight: 70,
   },
   bibleInfo: {
     flex: 1,
   },
   bibleName: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: "600",
-    color: "#333",
-    marginBottom: 4,
+    color: "#2c3e50",
+    marginBottom: 6,
+    letterSpacing: 0.2,
+    lineHeight: 22,
   },
   bibleDetails: {
     fontSize: 14,
-    color: "#666",
-    lineHeight: 18,
+    color: "#7f8c8d",
+    lineHeight: 19,
+    letterSpacing: 0.1,
   },
   downloadDate: {
     fontSize: 12,
