@@ -404,6 +404,14 @@ export default function ChapterReaderScreen() {
   // Função para carregar dados do capítulo
   const loadChapterData = useCallback(
     async (isInitialLoad: boolean = false) => {
+      console.log("🔄 loadChapterData CHAMADA:");
+      console.log("  isInitialLoad:", isInitialLoad);
+      console.log("  bibleId:", bibleId);
+      console.log("  currentBookId:", currentBookId);
+      console.log("  currentChapter:", currentChapter);
+      console.log("  book:", book?.name);
+      console.log("  lastLoadedChapter:", lastLoadedChapter);
+      
       // Validar se temos todos os dados necessários
       if (
         !bibleId ||
@@ -412,14 +420,18 @@ export default function ChapterReaderScreen() {
         currentChapter === undefined ||
         !book
       ) {
+        console.log("❌ Retornando - dados incompletos");
         return;
       }
 
       // Verificar se já carregamos este capítulo (exceto na inicialização)
       if (!isInitialLoad && lastLoadedChapter === currentChapter) {
+        console.log("⏭️ Capítulo já carregado, pulando...");
         return;
       }
 
+      console.log("✅ Carregando capítulo", currentChapter, "do livro", book.name);
+      
       // Se for carregamento inicial, usa loading completo; se for navegação, usa chapterLoading
       if (isInitialLoad) {
         setLoading(true);
@@ -431,6 +443,15 @@ export default function ChapterReaderScreen() {
         await loadChapterVerses();
         await checkAudioAvailability();
         setLastLoadedChapter(currentChapter);
+        console.log("✅ Capítulo carregado com sucesso!");
+
+        
+        // Salvar a última posição de leitura
+        DatabaseService.saveLastReading(bibleId, currentBookId, currentChapter).catch(
+          (error) => {
+            console.warn("Failed to save last reading position:", error);
+          }
+        );
       } catch (error) {
         console.error("Error loading chapter data:", error);
       } finally {
@@ -455,20 +476,33 @@ export default function ChapterReaderScreen() {
 
   // Efeito para inicialização
   useEffect(() => {
+    console.log("🔵 useEffect INICIALIZAÇÃO:");
+    console.log("  initializing:", initializing);
+    console.log("  currentChapter:", currentChapter);
     if (initializing && (currentChapter || currentChapter === 0)) {
+      console.log("✅ Carregando dados iniciais...");
       loadChapterData(true);
     }
   }, [initializing, currentChapter, loadChapterData]);
 
   // Efeito para navegação entre capítulos
   useEffect(() => {
+    console.log("🟢 useEffect NAVEGAÇÃO:");
+    console.log("  initializing:", initializing);
+    console.log("  currentChapter:", currentChapter);
+    console.log("  lastLoadedChapter:", lastLoadedChapter);
+    console.log("  currentChapter !== lastLoadedChapter:", currentChapter !== lastLoadedChapter);
+    
     if (
       !initializing &&
       currentChapter !== null &&
       currentChapter !== undefined &&
       currentChapter !== lastLoadedChapter
     ) {
+      console.log("✅ Carregando novo capítulo...");
       loadChapterData(false);
+    } else {
+      console.log("⏭️ Pulando - condições não atendidas");
     }
   }, [currentChapter, initializing, lastLoadedChapter, loadChapterData]);
 
@@ -1102,14 +1136,32 @@ export default function ChapterReaderScreen() {
   };
 
   const navigateToChapter = async (chapterNumber: number, book?: Book) => {
-    if (!bibleId || chapterNumber < 0) return;
+    console.log("=== navigateToChapter CHAMADA ===");
+    console.log("Parâmetros recebidos:");
+    console.log("  chapterNumber:", chapterNumber);
+    console.log("  book:", book?.id, book?.name);
+    console.log("Estado atual:");
+    console.log("  currentBookId:", currentBookId);
+    console.log("  currentChapter:", currentChapter);
+    console.log("  bibleId:", bibleId);
+    
+    if (!bibleId || chapterNumber < 0) {
+      console.log("❌ Retornando: bibleId ou chapterNumber inválido");
+      return;
+    }
 
     try {
       // Se mudou o livro, precisamos recarregar tudo
       if (book && book.id !== currentBookId) {
+        console.log("📚 MUDOU DE LIVRO - Recarregando tudo...");
         setLoading(true);
         setBook(book);
         setCurrentBookId(book.id);
+        
+        // IMPORTANTE: Resetar lastLoadedChapter para forçar o recarregamento
+        // mesmo se o número do capítulo for o mesmo (ex: intro → intro)
+        console.log("🔄 Resetando lastLoadedChapter para forçar reload");
+        setLastLoadedChapter(null);
 
         const chapters = await bibleReaderService.getChapters(bibleId, book.id);
         // Calcular totalChapters corretamente: se tem introdução (capítulo 0), remove 1 do length
@@ -1120,13 +1172,16 @@ export default function ChapterReaderScreen() {
         setTotalChapters(actualTotalChapters);
 
         // Quando mudamos o livro E capítulo, setamos ambos e o useEffect irá carregar
+        console.log("✅ Setando capítulo:", chapterNumber);
         setCurrentChapter(chapterNumber);
       } else {
         // Só mudou o capítulo, o useEffect irá carregar automaticamente
+        console.log("📖 MESMO LIVRO - Só mudando capítulo");
+        console.log("  De:", currentChapter, "Para:", chapterNumber);
         setCurrentChapter(chapterNumber);
       }
     } catch (error) {
-      console.error("Error navigating to chapter:", error);
+      console.error("❌ Error navigating to chapter:", error);
       Alert.alert("Erro", "Falha ao carregar o capítulo");
       setLoading(false);
     }
@@ -2170,12 +2225,23 @@ export default function ChapterReaderScreen() {
                             isCurrentChapter && styles.currentChapterItem,
                           ]}
                           onPress={() => {
+                            console.log("=== MODAL CHAPTER CLICK ===");
+                            console.log("Capítulo clicado:", chapterNumber);
+                            console.log("Livro do modal:", selectedBookInModal.id, selectedBookInModal.name);
+                            console.log("Livro atual:", currentBookId);
+                            console.log("Capítulo atual:", currentChapter);
+                            console.log("É o mesmo livro?", selectedBookInModal.id === currentBookId);
+                            console.log("É o mesmo capítulo?", chapterNumber === currentChapter);
+                            
                             setBookSelectorVisible(false);
-                            navigateToChapter(chapterNumber);
-                            // Se o livro selecionado for diferente do atual, também mudamos o livro
+                            // Se o livro selecionado for diferente do atual, mudamos o livro ANTES de navegar
                             if (selectedBookInModal.id !== currentBookId) {
+                              console.log("🔄 Trocando livro ANTES...");
                               selectBook(selectedBookInModal);
                             }
+                            // Agora navegamos para o capítulo (já com o livro correto)
+                            console.log("📍 Navegando para capítulo:", chapterNumber);
+                            navigateToChapter(chapterNumber, selectedBookInModal);
                           }}
                         >
                           <Text
