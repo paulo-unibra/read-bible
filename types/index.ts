@@ -102,6 +102,12 @@ export interface DriveFile {
   modifiedTime?: string;
 }
 
+export interface BookIntroduction {
+  bookId: number;
+  word: string; // nome do livro (ex: GÊNESIS, ÊXODO)
+  data: string; // conteúdo HTML da introdução
+}
+
 // Autenticação básica
 export interface User {
   id: string;          // UUID gerado local

@@ -1,5 +1,5 @@
 import * as SQLite from 'expo-sqlite';
-import { Book, Chapter, SearchResult, Verse } from '../types';
+import { Book, BookIntroduction, Chapter, SearchResult, Verse } from '../types';
 import googleDriveService from './GoogleDriveService';
 
 export class BibleReaderService {
@@ -329,12 +329,26 @@ export class BibleReaderService {
         [bookId]
       );
       
-      return result.map((row: any, index: number) => ({
+      const chapters = result.map((row: any, index: number) => ({
         id: index + 1,
         bookId,
         chapterNumber: row.Chapter,
         versesCount: 0, // Will be calculated later if needed
       }));
+
+      // Verificar se existe introdução para este livro
+      const introduction = await this.getBookIntroduction(bibleId, bookId);
+      
+      if (introduction) {
+        chapters.unshift({
+          id: 0,
+          bookId,
+          chapterNumber: 0,
+          versesCount: 1, // A introdução conta como 1 "versículo"
+        });
+      }
+      
+      return chapters;
     } catch (error) {
       console.error('Error getting chapters:', error);
       throw error;
@@ -355,6 +369,31 @@ export class BibleReaderService {
     }
 
     try {
+      // Se o capítulo for 0, retornar a introdução
+      if (chapterNumber === 0) {
+        const introduction = await this.getBookIntroduction(bibleId, bookId);
+        if (introduction) {
+          // Para introdução, retornar o HTML original do campo 'data' sem limpeza
+          // O IntroductionRenderer irá processar o HTML adequadamente
+          
+          return [{
+            id: parseInt(`${bookId}000000`), // ID especial para introdução
+            bookId,
+            chapterNumber: 0,
+            verseNumber: 0,
+            text: introduction.data,
+            titles: [{ level: 1, text: 'Introdução' }],
+            notes: undefined,
+            verseReferences: undefined,
+            crossReferences: undefined,
+            strongNumbers: undefined,
+            interlinear: undefined,
+            formatting: undefined,
+          }];
+        }
+        return [];
+      }
+
       const result = await db.getAllAsync(
         'SELECT * FROM Bible WHERE Book = ? AND Chapter = ? ORDER BY Verse',
         [bookId, chapterNumber]
@@ -672,10 +711,169 @@ export class BibleReaderService {
     return bookId <= 39 ? 'old' : 'new';
   }
 
-  async closeAllConnections(): Promise<void> {
-    for (const [bibleId] of this.bibleConnections) {
-      await this.closeBible(bibleId);
+  async getBookIntroduction(bibleId: string, bookId: number): Promise<BookIntroduction | null> {
+    const db = this.getBibleConnection(bibleId);
+    
+    // Se for a bíblia de exemplo, não tem introdução
+    if (bibleId === 'sample-bible' || !db) {
+      return null;
     }
+
+    try {
+      // Primeiro verifica se a tabela 'dictionary' existe
+      const tableExists = await db.getFirstAsync(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='dictionary'"
+      );
+      
+      if (!tableExists) {
+        return null;
+      }
+
+      // Buscar o nome do livro pelo bookId
+      const bookName = this.getBookName(bookId);
+      
+      // Tentar várias variações do nome do livro para encontrar na tabela dictionary
+      const bookVariations = this.getBookVariations(bookName);
+      
+      for (const variation of bookVariations) {
+        const result = await db.getFirstAsync(
+          'SELECT word, data FROM dictionary WHERE UPPER(word) = UPPER(?)',
+          [variation]
+        );
+        
+        if (result) {
+          // Retornar HTML original sem limpeza para renderização pelo componente
+          return {
+            bookId,
+            word: (result as any).word,
+            data: (result as any).data
+          };
+        }
+      }
+      
+      // Se não encontrou com as variações exatas, tentar busca com LIKE
+      const likeResult = await db.getFirstAsync(
+        'SELECT word, data FROM dictionary WHERE UPPER(word) LIKE ?',
+        [`%${bookName.toUpperCase()}%`]
+      );
+      
+      if (likeResult) {
+        // Retornar HTML original sem limpeza para renderização pelo componente
+        return {
+          bookId,
+          word: (likeResult as any).word,
+          data: (likeResult as any).data
+        };
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error getting book introduction:', error);
+      return null;
+    }
+  }
+
+  private getBookVariations(bookName: string): string[] {
+    // Gerar várias variações do nome do livro para tentar encontrar na tabela dictionary
+    const variations = [bookName.toUpperCase()];
+    
+    // Remover números e espaços para livros como "1 Samuel" -> "SAMUEL"
+    const withoutNumbers = bookName.replace(/^\d+\s+/, '').toUpperCase();
+    if (withoutNumbers !== bookName.toUpperCase()) {
+      variations.push(withoutNumbers);
+    }
+    
+    // Versão sem acentos
+    const withoutAccents = bookName
+      .toUpperCase()
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '');
+    variations.push(withoutAccents);
+    
+    // Mapeamento específico para nomes comuns (incluindo variações)
+    const nameMap: {[key: string]: string[]} = {
+      'GÊNESIS': ['GENESIS', 'GN', 'GEN'],
+      'ÊXODO': ['EXODO', 'EX'],
+      'LEVÍTICO': ['LEVITICO', 'LV', 'LEV'],
+      'NÚMEROS': ['NUMEROS', 'NM', 'NUM'],
+      'DEUTERONÔMIO': ['DEUTERONOMIO', 'DT', 'DEU'],
+      'JOSUÉ': ['JOSUE', 'JS', 'JOS'],
+      'JUÍZES': ['JUIZES', 'JZ', 'JUZ'],
+      'RUTE': ['RT', 'RUT'],
+      '1 SAMUEL': ['SAMUEL', '1SAMUEL', '1SM', '1 SM', 'I SAMUEL'],
+      '2 SAMUEL': ['SAMUEL', '2SAMUEL', '2SM', '2 SM', 'II SAMUEL'],
+      '1 REIS': ['REIS', '1REIS', '1RS', '1 RS', 'I REIS'],
+      '2 REIS': ['REIS', '2REIS', '2RS', '2 RS', 'II REIS'],
+      '1 CRÔNICAS': ['CRONICAS', '1CRONICAS', '1CR', '1 CR', 'I CRONICAS'],
+      '2 CRÔNICAS': ['CRONICAS', '2CRONICAS', '2CR', '2 CR', 'II CRONICAS'],
+      'ESDRAS': ['ED', 'ESR'],
+      'NEEMIAS': ['NE', 'NEE'],
+      'ESTER': ['ET', 'EST'],
+      'JÓ': ['JO', 'JOB'],
+      'SALMOS': ['SALMO', 'SL', 'SAL', 'PS'],
+      'PROVÉRBIOS': ['PROVERBIOS', 'PV', 'PRO'],
+      'ECLESIASTES': ['ECLESIASTES', 'EC', 'ECL'],
+      'CANTARES': ['CANTICOS', 'CANTICO DOS CANTICOS', 'CT', 'CAN'],
+      'ISAÍAS': ['ISAIAS', 'IS', 'ISA'],
+      'JEREMIAS': ['JR', 'JER'],
+      'LAMENTAÇÕES': ['LAMENTACOES', 'LM', 'LAM'],
+      'EZEQUIEL': ['EZ', 'EZE'],
+      'DANIEL': ['DN', 'DAN'],
+      'OSÉIAS': ['OSEIAS', 'OS', 'OSE'],
+      'JOEL': ['JL', 'JOE'],
+      'AMÓS': ['AMOS', 'AM', 'AMO'],
+      'OBADIAS': ['OB', 'OBD'],
+      'JONAS': ['JN', 'JON'],
+      'MIQUÉIAS': ['MIQUEIAS', 'MQ', 'MIQ'],
+      'NAUM': ['NA', 'NAU'],
+      'HABACUQUE': ['HC', 'HAB'],
+      'SOFONIAS': ['SF', 'SOF'],
+      'AGEU': ['AG', 'AGE'],
+      'ZACARIAS': ['ZC', 'ZAC'],
+      'MALAQUIAS': ['ML', 'MAL'],
+      'MATEUS': ['MT', 'MAT'],
+      'MARCOS': ['MC', 'MAR'],
+      'LUCAS': ['LC', 'LUC'],
+      'JOÃO': ['JOAO', 'JO', 'JOA'],
+      'ATOS': ['AT', 'ACT'],
+      'ROMANOS': ['RM', 'ROM'],
+      '1 CORÍNTIOS': ['CORINTIOS', '1CORINTIOS', '1CO', '1 CO', 'I CORINTIOS'],
+      '2 CORÍNTIOS': ['CORINTIOS', '2CORINTIOS', '2CO', '2 CO', 'II CORINTIOS'],
+      'GÁLATAS': ['GALATAS', 'GL', 'GAL'],
+      'EFÉSIOS': ['EFESIOS', 'EF', 'EFE'],
+      'FILIPENSES': ['FL', 'FIL'],
+      'COLOSSENSES': ['CL', 'COL'],
+      '1 TESSALONICENSES': ['TESSALONICENSES', '1TESSALONICENSES', '1TS', '1 TS', 'I TESSALONICENSES'],
+      '2 TESSALONICENSES': ['TESSALONICENSES', '2TESSALONICENSES', '2TS', '2 TS', 'II TESSALONICENSES'],
+      '1 TIMÓTEO': ['TIMOTEO', '1TIMOTEO', '1TM', '1 TM', 'I TIMOTEO'],
+      '2 TIMÓTEO': ['TIMOTEO', '2TIMOTEO', '2TM', '2 TM', 'II TIMOTEO'],
+      'TITO': ['TT', 'TIT'],
+      'FILEMOM': ['FM', 'FIL'],
+      'HEBREUS': ['HB', 'HEB'],
+      'TIAGO': ['TG', 'TIA'],
+      '1 PEDRO': ['PEDRO', '1PEDRO', '1PE', '1 PE', 'I PEDRO'],
+      '2 PEDRO': ['PEDRO', '2PEDRO', '2PE', '2 PE', 'II PEDRO'],
+      '1 JOÃO': ['JOAO', '1JOAO', '1JO', '1 JO', 'I JOAO'],
+      '2 JOÃO': ['JOAO', '2JOAO', '2JO', '2 JO', 'II JOAO'], 
+      '3 JOÃO': ['JOAO', '3JOAO', '3JO', '3 JO', 'III JOAO'],
+      'JUDAS': ['JD', 'JUD'],
+      'APOCALIPSE': ['AP', 'APO', 'REV']
+    };
+    
+    const upperBookName = bookName.toUpperCase();
+    if (nameMap[upperBookName]) {
+      variations.push(...nameMap[upperBookName]);
+    }
+    
+    // Adicionar versões sem acentos das variações mapeadas
+    if (nameMap[upperBookName]) {
+      const accentFreeVariations = nameMap[upperBookName].map(v => 
+        v.normalize('NFD').replace(/\p{Diacritic}/gu, '')
+      );
+      variations.push(...accentFreeVariations);
+    }
+    
+    return [...new Set(variations)]; // Remove duplicatas
   }
 }
 

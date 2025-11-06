@@ -20,12 +20,20 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import AudioPlayer from "../components/AudioPlayer";
+import { IntroductionRenderer } from "../components/IntroductionRenderer";
 import QuizButton from "../components/QuizButton";
 import AudioService from "../services/AudioService";
 import bibleReaderService from "../services/BibleReaderService";
 import DatabaseService from "../services/DatabaseService";
 import googleDriveService from "../services/GoogleDriveService";
-import { Bible, Book, DriveFile, SearchResult, Verse } from "../types";
+import {
+  Bible,
+  Book,
+  BookIntroduction,
+  DriveFile,
+  SearchResult,
+  Verse,
+} from "../types";
 
 export default function ChapterReaderScreen() {
   const router = useRouter();
@@ -49,10 +57,14 @@ export default function ChapterReaderScreen() {
   const [currentBookId, setCurrentBookId] = useState(initialBookId);
   const [currentChapter, setCurrentChapter] = useState(initialChapter);
   const [verses, setVerses] = useState<Verse[]>([]);
+  const [bookIntroduction, setBookIntroduction] =
+    useState<BookIntroduction | null>(null);
   const [totalChapters, setTotalChapters] = useState(0);
   const [loading, setLoading] = useState(true); // Loading inicial completo
   const [initializing, setInitializing] = useState(true);
-  const [lastLoadedChapter, setLastLoadedChapter] = useState<number | null>(null);
+  const [lastLoadedChapter, setLastLoadedChapter] = useState<number | null>(
+    null
+  );
   const [chapterLoading, setChapterLoading] = useState(false); // Loading apenas para troca de capítulo
 
   const [navigating, setNavigating] = useState(false); // Prevent rapid navigation
@@ -123,6 +135,8 @@ export default function ChapterReaderScreen() {
   // Verse reference modal state (for single reference display)
   const [verseRefModalVisible, setVerseRefModalVisible] = useState(false);
   const [currentVerseRef, setCurrentVerseRef] = useState<Verse | null>(null);
+  const [currentVerseRefBookName, setCurrentVerseRefBookName] =
+    useState<string>("");
   const [verseRefLoading, setVerseRefLoading] = useState(false);
 
   // References modal state
@@ -146,16 +160,12 @@ export default function ChapterReaderScreen() {
   useEffect(() => {
     (async () => {
       try {
-        const settings = await DatabaseService.getMultipleSettings(['fontSize', 'theme']);
-        const fs = settings.fontSize as
-          | "small"
-          | "medium"
-          | "large"
-          | null;
-        const th = settings.theme as
-          | "light"
-          | "dark"
-          | null;
+        const settings = await DatabaseService.getMultipleSettings([
+          "fontSize",
+          "theme",
+        ]);
+        const fs = settings.fontSize as "small" | "medium" | "large" | null;
+        const th = settings.theme as "light" | "dark" | null;
         if (fs) setReaderFontSize(fs);
         if (th) setReaderTheme(th);
       } catch (e) {
@@ -223,25 +233,51 @@ export default function ChapterReaderScreen() {
   const HEADER_HEIGHT = 38;
 
   const loadChapterVerses = React.useCallback(async () => {
-    if (!bibleId || !currentBookId || !currentChapter) return;
-    console.log("CARREGOU O BANCO - loadChapterVerses called");
+    if (!bibleId || !currentBookId) return;
+
     try {
-      const versesData = await bibleReaderService.getVerses(
-        bibleId,
-        currentBookId,
-        currentChapter
-      );
-      setVerses(versesData);
+      // Se for capítulo 0, carregamos a introdução
+      if (currentChapter === 0) {
+        const introduction = await bibleReaderService.getBookIntroduction(
+          bibleId,
+          currentBookId
+        );
+        setBookIntroduction(introduction);
+        setVerses([]); // Limpa os versículos pois é introdução
+      } else {
+        // Capítulo normal - carrega versículos
+        setBookIntroduction(null); // Limpa introdução
+        const versesData = await bibleReaderService.getVerses(
+          bibleId,
+          currentBookId,
+          currentChapter
+        );
+        console.log(
+          "[getVerses] Retornou:",
+          versesData?.length || 0,
+          "versículos para capítulo",
+          currentChapter
+        );
+        setVerses(versesData);
+      }
     } catch (error) {
-      console.error("Error loading verses:", error);
-      Alert.alert("Erro", "Falha ao carregar versículos");
+      console.error("Error loading chapter content:", error);
+      Alert.alert("Erro", "Falha ao carregar conteúdo do capítulo");
     }
   }, [bibleId, currentBookId, currentChapter]);
 
   const checkAudioAvailability = React.useCallback(async () => {
-    if (!currentBookId || !currentChapter) return;
+    if (
+      !currentBookId ||
+      currentChapter === null ||
+      currentChapter === undefined
+    )
+      return;
     try {
-      const available = await AudioService.isAudioAvailable(currentBookId, currentChapter);
+      const available = await AudioService.isAudioAvailable(
+        currentBookId,
+        currentChapter
+      );
       setAudioAvailable(available);
     } catch (error) {
       console.log("Error checking audio availability:", error);
@@ -256,14 +292,27 @@ export default function ChapterReaderScreen() {
         const firstBook = books[0];
         const lastBook = books[books.length - 1];
         const chapter = newChapter || currentChapter;
-        const atFirstOfBible = currentBookId === firstBook?.id && chapter === 1;
-        setIsFirstOfBible(atFirstOfBible);
+
+        let isFirstOfBible = false;
+        if (currentBookId === firstBook?.id) {
+          const chapters = await bibleReaderService.getChapters(
+            bibleId,
+            firstBook.id
+          );
+          const hasIntroduction = chapters.some((ch) => ch.chapterNumber === 0);
+          const firstChapter = hasIntroduction ? 0 : 1;
+          isFirstOfBible = chapter === firstChapter;
+        }
+        setIsFirstOfBible(isFirstOfBible);
+
+        // Verificar se é o último da Bíblia
         if (currentBookId === lastBook?.id) {
           const chapters = await bibleReaderService.getChapters(
             bibleId,
             lastBook.id
           );
-          const atLastOfBible = chapter === chapters.length;
+          const atLastOfBible =
+            chapter === chapters[chapters.length - 1]?.chapterNumber;
           setIsLastOfBible(atLastOfBible);
         } else {
           setIsLastOfBible(false);
@@ -295,10 +344,16 @@ export default function ChapterReaderScreen() {
         bibleId,
         currentBookId
       );
-      setTotalChapters(chapters.length);
+      // Calcular totalChapters corretamente: se tem introdução (capítulo 0), remove 1 do length
+      const hasIntroduction = chapters.some((ch) => ch.chapterNumber === 0);
+      const actualTotalChapters = hasIntroduction
+        ? chapters.length - 1
+        : chapters.length;
+      setTotalChapters(actualTotalChapters);
 
       // Load initial verses - use the initial chapter from params
       const chapterToLoad = initialChapter || 1;
+
       const versesData = await bibleReaderService.getVerses(
         bibleId,
         currentBookId,
@@ -316,7 +371,10 @@ export default function ChapterReaderScreen() {
         currentBookId,
         chapterToLoad
       ).catch((error) => {
-        console.warn("[DEBUG] Erro ao salvar posição de leitura (não crítico):", error);
+        console.warn(
+          "[DEBUG] Erro ao salvar posição de leitura (não crítico):",
+          error
+        );
         // Don't show alert for this non-critical operation
       });
     } catch (error) {
@@ -343,56 +401,72 @@ export default function ChapterReaderScreen() {
   }, [bibleId, currentBookId, initializeReader]);
 
   // Função para carregar dados do capítulo
-  const loadChapterData = useCallback(async (isInitialLoad: boolean = false) => {
-    console.log("[DEBUG] loadChapterData called - Chapter:", currentChapter, "IsInitial:", isInitialLoad);
-    
-    // Validar se temos todos os dados necessários
-    if (!bibleId || !currentBookId || !currentChapter || !book) {
-      console.log("[DEBUG] Dados incompletos para carregar capítulo");
-      return;
-    }
-
-    // Verificar se já carregamos este capítulo (exceto na inicialização)
-    if (!isInitialLoad && lastLoadedChapter === currentChapter) {
-      console.log("[DEBUG] Capítulo já carregado, ignorando:", currentChapter);
-      return;
-    }
-
-    // Se for carregamento inicial, usa loading completo; se for navegação, usa chapterLoading
-    if (isInitialLoad) {
-      setLoading(true);
-    } else {
-      setChapterLoading(true);
-    }
-
-    try {
-      await loadChapterVerses();
-      await checkAudioAvailability();
-      setLastLoadedChapter(currentChapter);
-    } catch (error) {
-      console.error("Error loading chapter data:", error);
-    } finally {
-      if (isInitialLoad) {
-        setLoading(false);
-        setInitializing(false);
-      } else {
-        setChapterLoading(false);
+  const loadChapterData = useCallback(
+    async (isInitialLoad: boolean = false) => {
+      // Validar se temos todos os dados necessários
+      if (
+        !bibleId ||
+        !currentBookId ||
+        currentChapter === null ||
+        currentChapter === undefined ||
+        !book
+      ) {
+        return;
       }
-    }
-  }, [bibleId, currentBookId, currentChapter, book, lastLoadedChapter, loadChapterVerses, checkAudioAvailability]);
+
+      // Verificar se já carregamos este capítulo (exceto na inicialização)
+      if (!isInitialLoad && lastLoadedChapter === currentChapter) {
+        return;
+      }
+
+      // Se for carregamento inicial, usa loading completo; se for navegação, usa chapterLoading
+      if (isInitialLoad) {
+        setLoading(true);
+      } else {
+        setChapterLoading(true);
+      }
+
+      try {
+        await loadChapterVerses();
+        await checkAudioAvailability();
+        setLastLoadedChapter(currentChapter);
+      } catch (error) {
+        console.error("Error loading chapter data:", error);
+      } finally {
+        if (isInitialLoad) {
+          setLoading(false);
+          setInitializing(false);
+        } else {
+          setChapterLoading(false);
+        }
+      }
+    },
+    [
+      bibleId,
+      currentBookId,
+      currentChapter,
+      book,
+      lastLoadedChapter,
+      loadChapterVerses,
+      checkAudioAvailability,
+    ]
+  );
 
   // Efeito para inicialização
   useEffect(() => {
-    if (initializing && currentChapter) {
-      console.log("[DEBUG] Inicializando leitor de capítulo");
+    if (initializing && (currentChapter || currentChapter === 0)) {
       loadChapterData(true);
     }
   }, [initializing, currentChapter, loadChapterData]);
 
   // Efeito para navegação entre capítulos
   useEffect(() => {
-    if (!initializing && currentChapter && currentChapter !== lastLoadedChapter) {
-      console.log("[DEBUG] Navegação detectada para capítulo:", currentChapter);
+    if (
+      !initializing &&
+      currentChapter !== null &&
+      currentChapter !== undefined &&
+      currentChapter !== lastLoadedChapter
+    ) {
       loadChapterData(false);
     }
   }, [currentChapter, initializing, lastLoadedChapter, loadChapterData]);
@@ -433,7 +507,7 @@ export default function ChapterReaderScreen() {
   const diagnoseDatabaseIssue = async () => {
     try {
       console.log("=== DATABASE DIAGNOSIS START ===");
-      
+
       // Testar conexão básica
       console.log("Testing basic database connection...");
       const testStart = Date.now();
@@ -441,47 +515,54 @@ export default function ChapterReaderScreen() {
       const testEnd = Date.now();
       console.log(`Database query took: ${testEnd - testStart}ms`);
       console.log("Current bibles in database:", bibles.length);
-      
+
       // Testar operação de salvar simples
       console.log("Testing simple save operation...");
       const testBible = {
-        id: 'test-bible-' + Date.now(),
-        name: 'Test Bible',
-        abbreviation: 'TST',
-        fileName: 'test.db',
-        isDownloaded: true
+        id: "test-bible-" + Date.now(),
+        name: "Test Bible",
+        abbreviation: "TST",
+        fileName: "test.db",
+        isDownloaded: true,
       };
-      
+
       const saveStart = Date.now();
       await DatabaseService.saveBible(testBible);
       const saveEnd = Date.now();
       console.log(`Save operation took: ${saveEnd - saveStart}ms`);
-      
+
       console.log("=== DATABASE DIAGNOSIS END ===");
-      Alert.alert("Diagnóstico", "Check console for database diagnosis results");
+      Alert.alert(
+        "Diagnóstico",
+        "Check console for database diagnosis results"
+      );
     } catch (error) {
       console.error("Database diagnosis failed:", error);
-      Alert.alert("Erro", "Falha no diagnóstico do banco: " + (error instanceof Error ? error.message : String(error)));
+      Alert.alert(
+        "Erro",
+        "Falha no diagnóstico do banco: " +
+          (error instanceof Error ? error.message : String(error))
+      );
     }
   };
 
   // Função alternativa para forçar a abertura do modal
   const forceOpenBibleSelector = async () => {
     console.log("forceOpenBibleSelector called - forcing modal open");
-    
+
     // Criar uma bíblia básica se não houver dados
     const basicBible = {
-      id: bibleId || 'basic',
-      abbreviation: bibleAbbrev || 'BEP',
-      name: 'Bíblia Atual',
-      description: 'Versão atualmente em uso',
-      fileName: '',
-      isDownloaded: true
+      id: bibleId || "basic",
+      abbreviation: bibleAbbrev || "BEP",
+      name: "Bíblia Atual",
+      description: "Versão atualmente em uso",
+      fileName: "",
+      isDownloaded: true,
     };
-    
+
     setAvailableBibles([basicBible]);
     setBibleSelectorVisible(true);
-    
+
     // Tentar carregar bíblias do Drive em background
     try {
       console.log("Loading Drive bibles...");
@@ -516,13 +597,31 @@ export default function ChapterReaderScreen() {
       if (direction === "prev") {
         if (currentChapter > 1) {
           newChapter = currentChapter - 1;
-        } else {
+        } else if (currentChapter === 1) {
+          // Verificar se existe capítulo 0 (introdução)
+          const chapters = await bibleReaderService.getChapters(
+            bibleId,
+            currentBookId
+          );
+          const hasIntroduction = chapters.some((ch) => ch.chapterNumber === 0);
+          if (hasIntroduction) {
+            newChapter = 0;
+          } else {
+            setIsFirstOfBible(true);
+            await navigateToAdjacentBook("prev");
+            return;
+          }
+        } else if (currentChapter === 0) {
+          // Se estamos na introdução e tentamos ir para trás, vai para livro anterior
           setIsFirstOfBible(true);
           await navigateToAdjacentBook("prev");
           return;
         }
       } else {
-        if (currentChapter < totalChapters) {
+        if (currentChapter === 0) {
+          // Se estamos na introdução, próximo é sempre o capítulo 1
+          newChapter = 1;
+        } else if (currentChapter < totalChapters) {
           newChapter = currentChapter + 1;
         } else {
           await navigateToAdjacentBook("next");
@@ -530,7 +629,7 @@ export default function ChapterReaderScreen() {
         }
       }
 
-      if (newChapter > 0 && newChapter <= totalChapters) {
+      if (newChapter >= 0 && newChapter <= totalChapters) {
         setCurrentChapter(newChapter);
         // Atualizar estado de navegação depois de mudar o capítulo
         setTimeout(async () => {
@@ -556,18 +655,21 @@ export default function ChapterReaderScreen() {
     console.log("openBibleSelector called - starting...");
     try {
       console.log("About to call DatabaseService.getBibles()...");
-      
+
       // Criar uma promise com timeout para evitar travamento
       const getBiblesWithTimeout = () => {
         return Promise.race([
           DatabaseService.getBibles(),
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Timeout na consulta de bíblias')), 5000)
-          )
+          new Promise((_, reject) =>
+            setTimeout(
+              () => reject(new Error("Timeout na consulta de bíblias")),
+              5000
+            )
+          ),
         ]);
       };
 
-      const bibles = await getBiblesWithTimeout() as any[];
+      const bibles = (await getBiblesWithTimeout()) as any[];
       console.log("PASSOU openBibleSelector - got bibles:", bibles.length);
       setAvailableBibles(bibles);
 
@@ -584,9 +686,10 @@ export default function ChapterReaderScreen() {
       setBibleSelectorVisible(true);
     } catch (error) {
       console.error("Error in openBibleSelector:", error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       console.error("Error message:", errorMessage);
-      
+
       // Se falhar, ainda assim abrir o modal com uma lista vazia ou básica
       console.log("Opening modal with empty bible list due to error");
       setAvailableBibles([]);
@@ -599,7 +702,7 @@ export default function ChapterReaderScreen() {
   const handleDownloadBible = async (driveFile: DriveFile) => {
     console.log("🚀 handleDownloadBible FUNCTION CALLED with:", driveFile.name);
     console.log("🚀 DriveFile ID:", driveFile.id);
-    
+
     // Timeout de segurança para evitar travamentos
     const timeoutId = setTimeout(() => {
       console.error("DOWNLOAD TIMEOUT - Process taking too long");
@@ -610,7 +713,9 @@ export default function ChapterReaderScreen() {
     try {
       console.log("=== STARTING DOWNLOAD PROCESS ===");
       setDownloading(driveFile.id);
-      console.log("Download state set, starting googleDriveService.downloadBible...");
+      console.log(
+        "Download state set, starting googleDriveService.downloadBible..."
+      );
 
       await googleDriveService.downloadBible(driveFile);
       console.log("googleDriveService.downloadBible completed successfully");
@@ -639,16 +744,30 @@ export default function ChapterReaderScreen() {
         console.log("DatabaseService.saveBible completed successfully");
       } catch (saveError) {
         console.error("Error saving bible to database:", saveError);
-        console.error("Save error details:", JSON.stringify(saveError, null, 2));
+        console.error(
+          "Save error details:",
+          JSON.stringify(saveError, null, 2)
+        );
         throw saveError; // Re-throw para ser capturado pelo catch principal
       }
       console.log("Bible saved to database successfully");
 
       // Refresh local bibles list
       const updatedLocalBibles = await DatabaseService.getBibles();
-      console.log("Updated bibles from database:", updatedLocalBibles.length, "bibles found");
-      console.log("Updated bibles list:", updatedLocalBibles.map(b => ({ id: b.id, name: b.name, fileName: b.fileName })));
-      
+      console.log(
+        "Updated bibles from database:",
+        updatedLocalBibles.length,
+        "bibles found"
+      );
+      console.log(
+        "Updated bibles list:",
+        updatedLocalBibles.map((b) => ({
+          id: b.id,
+          name: b.name,
+          fileName: b.fileName,
+        }))
+      );
+
       setAvailableBibles(updatedLocalBibles);
       console.log("availableBibles state updated");
 
@@ -662,8 +781,6 @@ export default function ChapterReaderScreen() {
       console.log("=== DOWNLOAD PROCESS FINISHED ===");
     }
   };
-
-
 
   const handleDeleteBible = async (bible: Bible) => {
     Alert.alert(
@@ -680,40 +797,47 @@ export default function ChapterReaderScreen() {
           onPress: async () => {
             try {
               const isCurrentBible = bible.id === bibleId;
-              
+
               await DatabaseService.deleteBible(bible.id);
               await googleDriveService.deleteBibleFile(bible.fileName);
 
               const updatedLocalBibles = await DatabaseService.getBibles();
-              const downloadedBibles = updatedLocalBibles.filter(b => b.isDownloaded);
+              const downloadedBibles = updatedLocalBibles.filter(
+                (b) => b.isDownloaded
+              );
               setAvailableBibles(updatedLocalBibles);
 
               // Se removeu a Bíblia atual e ainda há outras disponíveis
               if (isCurrentBible && downloadedBibles.length > 0) {
                 const firstAvailableBible = downloadedBibles[0];
-                
+
                 // Atualizar a configuração preferredBibleId
-                await DatabaseService.saveSetting('preferredBibleId', firstAvailableBible.id);
-                
+                await DatabaseService.saveSetting(
+                  "preferredBibleId",
+                  firstAvailableBible.id
+                );
+
                 // Redirecionar para a primeira Bíblia disponível
-                router.replace(`/chapter-reader?bibleId=${firstAvailableBible.id}&bookId=1&chapterNumber=1`);
+                router.replace(
+                  `/chapter-reader?bibleId=${firstAvailableBible.id}&bookId=1&chapterNumber=1`
+                );
                 setBibleSelectorVisible(false);
                 return; // Sair da função para evitar mostrar alert
               }
-              
+
               // Se não há mais Bíblias disponíveis
               if (downloadedBibles.length === 0) {
                 Alert.alert(
-                  "Nenhuma Bíblia Disponível", 
+                  "Nenhuma Bíblia Disponível",
                   "Você precisa baixar pelo menos uma Bíblia para continuar.",
                   [
-                    { 
-                      text: "OK", 
+                    {
+                      text: "OK",
                       onPress: () => {
                         setBibleSelectorVisible(false);
                         router.back(); // Voltar para tela anterior
-                      }
-                    }
+                      },
+                    },
                   ]
                 );
                 return;
@@ -769,7 +893,7 @@ export default function ChapterReaderScreen() {
 
   const selectBook = async (selectedBook: Book) => {
     if (selectedBook.id === currentBookId) {
-      return; 
+      return;
     }
 
     try {
@@ -782,7 +906,12 @@ export default function ChapterReaderScreen() {
         bibleId,
         selectedBook.id
       );
-      setTotalChapters(chapters.length);
+      // Calcular totalChapters corretamente: se tem introdução (capítulo 0), remove 1 do length
+      const hasIntroduction = chapters.some((ch) => ch.chapterNumber === 0);
+      const actualTotalChapters = hasIntroduction
+        ? chapters.length - 1
+        : chapters.length;
+      setTotalChapters(actualTotalChapters);
     } catch (error) {
       console.error("Erro ao trocar livro:", error);
       Alert.alert("Erro", "Falha ao carregar capítulos do livro selecionado");
@@ -790,7 +919,6 @@ export default function ChapterReaderScreen() {
       setLoading(false);
     }
   };
-
 
   const navigateToAdjacentBook = async (direction: "prev" | "next") => {
     try {
@@ -817,12 +945,28 @@ export default function ChapterReaderScreen() {
         bibleId,
         newBook.id
       );
-      const newChapter = direction === "prev" ? newBookChapters.length : 1;
+
+      let newChapter: number;
+      if (direction === "prev") {
+        // Indo para o livro anterior: ir para o último capítulo
+        newChapter =
+          newBookChapters[newBookChapters.length - 1]?.chapterNumber || 1;
+      } else {
+        // Indo para o próximo livro: ir para o primeiro capítulo (pode ser 0 se tem introdução)
+        newChapter = newBookChapters[0]?.chapterNumber || 1;
+      }
 
       setBook(newBook);
       setCurrentBookId(newBook.id);
       setCurrentChapter(newChapter);
-      setTotalChapters(newBookChapters.length);
+      // Calcular totalChapters corretamente: se tem introdução (capítulo 0), remove 1 do length
+      const hasIntroduction = newBookChapters.some(
+        (ch) => ch.chapterNumber === 0
+      );
+      const actualTotalChapters = hasIntroduction
+        ? newBookChapters.length - 1
+        : newBookChapters.length;
+      setTotalChapters(actualTotalChapters);
 
       const versesData = await bibleReaderService.getVerses(
         bibleId,
@@ -935,9 +1079,14 @@ export default function ChapterReaderScreen() {
             bibleId,
             result.bookId
           );
-          setTotalChapters(chapters.length);
+          // Calcular totalChapters corretamente: se tem introdução (capítulo 0), remove 1 do length
+          const hasIntroduction = chapters.some((ch) => ch.chapterNumber === 0);
+          const actualTotalChapters = hasIntroduction
+            ? chapters.length - 1
+            : chapters.length;
+          setTotalChapters(actualTotalChapters);
         }
-        
+
         // Quando mudamos o livro E capítulo, setamos ambos e o useEffect irá carregar
         setCurrentChapter(result.chapterNumber);
       } else {
@@ -952,7 +1101,7 @@ export default function ChapterReaderScreen() {
   };
 
   const navigateToChapter = async (chapterNumber: number, book?: Book) => {
-    if (!bibleId || chapterNumber < 1) return;
+    if (!bibleId || chapterNumber < 0) return;
 
     try {
       // Se mudou o livro, precisamos recarregar tudo
@@ -962,8 +1111,13 @@ export default function ChapterReaderScreen() {
         setCurrentBookId(book.id);
 
         const chapters = await bibleReaderService.getChapters(bibleId, book.id);
-        setTotalChapters(chapters.length);
-        
+        // Calcular totalChapters corretamente: se tem introdução (capítulo 0), remove 1 do length
+        const hasIntroduction = chapters.some((ch) => ch.chapterNumber === 0);
+        const actualTotalChapters = hasIntroduction
+          ? chapters.length - 1
+          : chapters.length;
+        setTotalChapters(actualTotalChapters);
+
         // Quando mudamos o livro E capítulo, setamos ambos e o useEffect irá carregar
         setCurrentChapter(chapterNumber);
       } else {
@@ -1054,13 +1208,93 @@ export default function ChapterReaderScreen() {
     }
   };
 
+  // Get book name from bookId
+  const getBookNameById = async (bookId: number): Promise<string> => {
+    if (!bibleId) return `Livro ${bookId}`;
 
+    try {
+      let books = availableBooks;
+      if (!books || books.length === 0) {
+        books = await bibleReaderService.getBooks(bibleId);
+      }
+
+      const book = books.find((b: Book) => b.id === bookId);
+      return book ? book.abbreviation || book.name : `Livro ${bookId}`;
+    } catch (error) {
+      console.error("Error getting book name:", error);
+      return `Livro ${bookId}`;
+    }
+  };
+
+  // Handle reference press from introduction
+  const handleIntroductionReferencePress = async (
+    bookIdStr: string,
+    chapter: number,
+    verseStart?: number,
+    verseEnd?: number
+  ) => {
+    if (!bibleId) return;
+
+    try {
+      const bookId = parseInt(bookIdStr);
+
+      // Buscar os versículos do capítulo diretamente com o bookId
+      setVerseRefLoading(true);
+      const verses = await bibleReaderService.getVerses(
+        bibleId,
+        bookId,
+        chapter
+      );
+
+      if (!verses || verses.length === 0) {
+        Alert.alert("Erro", `Capítulo ${chapter} não encontrado`);
+        setVerseRefLoading(false);
+        return;
+      }
+
+      // Filtrar versículo(s) específico(s)
+      let selectedVerses: Verse[];
+      if (verseStart) {
+        if (verseEnd && verseEnd !== verseStart) {
+          // Range de versículos
+          selectedVerses = verses.filter(
+            (v) => v.verseNumber >= verseStart && v.verseNumber <= verseEnd
+          );
+        } else {
+          // Versículo único
+          selectedVerses = verses.filter((v) => v.verseNumber === verseStart);
+        }
+      } else {
+        // Capítulo inteiro
+        selectedVerses = verses;
+      }
+
+      if (selectedVerses.length === 0) {
+        Alert.alert("Erro", `Versículo não encontrado`);
+        setVerseRefLoading(false);
+        return;
+      }
+
+      // Usar o primeiro versículo para o modal (pode ser expandido no futuro para mostrar múltiplos)
+      setCurrentVerseRef(selectedVerses[0]);
+
+      // Buscar e armazenar o nome do livro
+      const bookName = await getBookNameById(bookId);
+      setCurrentVerseRefBookName(bookName);
+
+      setVerseRefModalVisible(true);
+    } catch (error) {
+      console.error("Error handling introduction reference:", error);
+      Alert.alert("Erro", "Falha ao abrir referência");
+    } finally {
+      setVerseRefLoading(false);
+    }
+  };
 
   // Handle long press on verse
   const handleVerseLongPress = (verse: Verse) => {
     const verseKey = `${verse.bookId}-${verse.chapterNumber}-${verse.verseNumber}`;
     setSelectionMode(true);
-
 
     // Add the long-pressed verse to selection
     const newSelected = new Set(selectedVerses);
@@ -1086,7 +1320,6 @@ export default function ChapterReaderScreen() {
     // Exit selection mode if no verses selected
     if (newSelected.size === 0) {
       setSelectionMode(false);
-
     }
   };
 
@@ -1094,7 +1327,6 @@ export default function ChapterReaderScreen() {
   const clearSelection = () => {
     setSelectionMode(false);
     setSelectedVerses(new Set());
-
   };
 
   // Share selected verses
@@ -1140,7 +1372,9 @@ export default function ChapterReaderScreen() {
     const shareTitle =
       selectedVerses.size === 1
         ? `Versículo ${book?.name} ${sortedVerses[0].chapterNumber}:${sortedVerses[0].verseNumber}`
-        : `${selectedVerses.size} versículos de ${book?.name} ${currentChapter}`;
+        : `${selectedVerses.size} versículos de ${book?.name} ${
+            currentChapter === 0 ? "Introdução" : currentChapter
+          }`;
 
     try {
       const result = await Share.share({
@@ -1159,15 +1393,20 @@ export default function ChapterReaderScreen() {
   };
 
   const renderVerseText = (text: string, verse: Verse) => {
+    // Limpar prefixo "Introdução|LIVRO | " que aparece no primeiro versículo
+    // Padrão: "Introdução|APOCALIPSE	|	Título e assunto do livro"
+    // Remove até o último "|" incluindo espaços/tabs
+    let cleanedText = text.replace(/^[^|]*\|[^|]*\|\s*/, '');
+    
     const parts: React.ReactNode[] = [];
     let cursor = 0;
     const symbolRegex = /([✚ℕ])/g;
     let match: RegExpExecArray | null;
-    while ((match = symbolRegex.exec(text)) !== null) {
+    while ((match = symbolRegex.exec(cleanedText)) !== null) {
       if (match.index > cursor) {
         parts.push(
           <Text key={`seg-${cursor}`}>
-            {text.substring(cursor, match.index)}
+            {cleanedText.substring(cursor, match.index)}
           </Text>
         );
       }
@@ -1212,14 +1451,20 @@ export default function ChapterReaderScreen() {
       }
       cursor = match.index + match[0].length;
     }
-    if (cursor < text.length) {
-      parts.push(<Text key={`tail-${cursor}`}>{text.substring(cursor)}</Text>);
+    if (cursor < cleanedText.length) {
+      parts.push(<Text key={`tail-${cursor}`}>{cleanedText.substring(cursor)}</Text>);
     }
     return <>{parts}</>;
   };
 
   // Renderização dos títulos já com estilo neutro
   const renderTitleText = (titleText: string, level: number = 1) => {
+    // Mostrar apenas o que vem depois do último "|"
+    // Padrão: "Introdução|APOCALIPSE | Título e assunto do livro" -> "Título e assunto do livro"
+    const cleanedTitle = titleText.includes('|') 
+      ? titleText.substring(titleText.lastIndexOf('|') + 1).trim()
+      : titleText;
+    
     const levelSizes: Record<number, number> = { 1: 16, 2: 15, 3: 14 };
     const lightColors: Record<number, string> = {
       1: "#444",
@@ -1240,7 +1485,7 @@ export default function ChapterReaderScreen() {
           color: palette[level] || (isDark ? "#d0d0d0" : "#555"),
         }}
       >
-        {titleText}
+        {cleanedTitle}
       </Text>
     );
   };
@@ -1305,18 +1550,23 @@ export default function ChapterReaderScreen() {
             ]}
           >
             <Text style={[styles.verseText, verseTextDynamic]}>
-              <Text
-                style={[
-                  styles.verseNumber,
-                  isDark && { color: colorScheme.verseNumber },
-                ]}
-              >
-                {item.verseNumber}
-              </Text>
-              <Text style={{ fontWeight: "bold", color: colorScheme.dash }}>
-                {" "}
-                -{" "}
-              </Text>
+              {/* Não mostrar número do versículo para introdução (capítulo 0) */}
+              {item.chapterNumber !== 0 && (
+                <>
+                  <Text
+                    style={[
+                      styles.verseNumber,
+                      isDark && { color: colorScheme.verseNumber },
+                    ]}
+                  >
+                    {item.verseNumber}
+                  </Text>
+                  <Text style={{ fontWeight: "bold", color: colorScheme.dash }}>
+                    {" "}
+                    -{" "}
+                  </Text>
+                </>
+              )}
               {renderVerseText(item.text, item)}
             </Text>
             <View style={styles.verseButtonsRow}>
@@ -1360,10 +1610,8 @@ export default function ChapterReaderScreen() {
         bibleId,
         selectedBook.id
       );
-      const chapterNumbers = Array.from(
-        { length: chapters.length },
-        (_, i) => i + 1
-      );
+      // Incluir todos os capítulos, incluindo o 0 se existir introdução
+      const chapterNumbers = chapters.map((ch) => ch.chapterNumber);
       setChaptersForSelectedBook(chapterNumbers);
     } catch (error) {
       console.error("Error loading chapters for selected book:", error);
@@ -1388,11 +1636,11 @@ export default function ChapterReaderScreen() {
             <TouchableOpacity
               onPress={async () => {
                 console.log("Bible badge clicked!", bibleAbbrev);
-                
+
                 try {
                   // Abrir modal e carregar dados
                   await forceOpenBibleSelector();
-                  
+
                   // Carregar bíblias locais em paralelo
                   setTimeout(async () => {
                     try {
@@ -1450,85 +1698,165 @@ export default function ChapterReaderScreen() {
               >
                 <Ionicons name="library" size={24} color={iconColor} />
               </TouchableOpacity>
+
+              {/* Botão para testar navegação para intro */}
+              <TouchableOpacity
+                onPress={() => {
+                  console.log("Navegando para capítulo 0 (introdução)...");
+                  navigateToChapter(0);
+                }}
+                style={[
+                  styles.headerButton,
+                  { backgroundColor: isDark ? "#444" : "#ccc" },
+                ]}
+              >
+                <Text style={{ color: isDark ? "#fff" : "#000", fontSize: 10 }}>
+                  CH0
+                </Text>
+              </TouchableOpacity>
             </>
           )}
         </View>
       </View>
 
-      {/* Chapter Header fixo */}
-      <View
-        style={[
-          styles.fixedChapterHeader,
-          chapterHeaderBg,
-          { minHeight: HEADER_HEIGHT },
-        ]}
-      >
-        <View style={styles.chapterHeaderContent}>
-          <Text
-            style={[styles.chapterTitle, { color: isDark ? "#ddd" : "#666" }]}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-          >
-            {book?.name} {currentChapter}
-          </Text>
-          <View style={styles.chapterHeaderActions}>
-            {book && (
-              <>
-                <QuizButton
-                  bookId={currentBookId}
-                  chapterNumber={currentChapter}
-                  bookName={book.name}
-                  bibleVersion={bibleAbbrev}
-                  isDark={isDark}
-                />
-                {audioAvailable && (
-                  <AudioPlayer
+      {/* Chapter Header fixo - Oculto na introdução */}
+      {currentChapter !== 0 && (
+        <View
+          style={[
+            styles.fixedChapterHeader,
+            chapterHeaderBg,
+            { minHeight: HEADER_HEIGHT },
+          ]}
+        >
+          <View style={styles.chapterHeaderContent}>
+            <View style={styles.chapterHeaderActions}>
+              {book && (
+                <>
+                  <QuizButton
                     bookId={currentBookId}
                     chapterNumber={currentChapter}
                     bookName={book.name}
+                    bibleVersion={bibleAbbrev}
                     isDark={isDark}
-                    onRequestNext={async () => {
-                      if (navigating || loading) return;
-                      const prevChapter = currentChapter;
-                      await navigateChapter("next");
-                      const targetChapter = prevChapter + 1;
-                      setTimeout(() => {
-                        AudioService.loadAndPlay(
-                          currentBookId,
-                          targetChapter
-                        ).catch(() => {});
-                      }, 500);
-                    }}
                   />
-                )}
-              </>
-            )}
-            <TouchableOpacity
-              onPress={openSettings}
-              style={styles.settingsButton}
-              accessibilityLabel="Abrir configurações de leitura"
-            >
-              <Ionicons
-                name="settings-outline"
-                size={22}
-                color={isDark ? "#ddd" : "#555"}
-              />
-            </TouchableOpacity>
+                  {audioAvailable && (
+                    <AudioPlayer
+                      bookId={currentBookId}
+                      chapterNumber={currentChapter}
+                      bookName={book.name}
+                      isDark={isDark}
+                      onRequestNext={async () => {
+                        if (navigating || loading) return;
+                        const prevChapter = currentChapter;
+                        await navigateChapter("next");
+                        const targetChapter = prevChapter + 1;
+                        setTimeout(() => {
+                          AudioService.loadAndPlay(
+                            currentBookId,
+                            targetChapter
+                          ).catch(() => {});
+                        }, 500);
+                      }}
+                    />
+                  )}
+                </>
+              )}
+              <TouchableOpacity
+                onPress={openSettings}
+                style={styles.settingsButton}
+                accessibilityLabel="Abrir configurações de leitura"
+              >
+                <Ionicons
+                  name="settings-outline"
+                  size={22}
+                  color={isDark ? "#ddd" : "#555"}
+                />
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
-      </View>
+      )}
 
-      {/* Verses List */}
+      {/* Content Area - Introduction or Verses */}
       <View style={styles.versesContainer}>
-        <FlatList
-          data={verses}
-          renderItem={renderVerse}
-          keyExtractor={(item) => item.id.toString()}
-          showsVerticalScrollIndicator={false}
-          style={[styles.versesList, versesListBg]}
-          contentContainerStyle={[styles.versesListContent, { paddingTop: 8 }]}
-        />
-        
+        {currentChapter === 0 ? (
+          /* Introduction View */
+          <ScrollView
+            style={[styles.versesList, versesListBg]}
+            contentContainerStyle={[
+              styles.introductionContent,
+              { paddingTop: 16, paddingHorizontal: 16, paddingBottom: 32 },
+            ]}
+            showsVerticalScrollIndicator={false}
+          >
+            {bookIntroduction ? (
+              <IntroductionRenderer
+                htmlContent={bookIntroduction.data}
+                isDark={isDark}
+                fontSize={applyFontScale(16)}
+                onReferencePress={handleIntroductionReferencePress}
+              />
+            ) : (
+              <View
+                style={[
+                  styles.introductionContainer,
+                  isDark && { backgroundColor: "#1a1a1a" },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.introductionTitle,
+                    isDark && { color: "#e0e0e0" },
+                  ]}
+                >
+                  Introdução
+                </Text>
+                <View
+                  style={[
+                    styles.introductionTextContainer,
+                    isDark && { backgroundColor: "#242424" },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.introductionText,
+                      verseTextDynamic,
+                      isDark && { color: "#888" },
+                    ]}
+                  >
+                    Não há introdução disponível para este livro.
+                  </Text>
+                </View>
+              </View>
+            )}
+          </ScrollView>
+        ) : (
+          /* Normal Verses List */
+          <FlatList
+            data={verses}
+            renderItem={renderVerse}
+            keyExtractor={(item) => item.id.toString()}
+            showsVerticalScrollIndicator={false}
+            style={[styles.versesList, versesListBg]}
+            contentContainerStyle={[
+              styles.versesListContent,
+              { paddingTop: 8 },
+            ]}
+            ListHeaderComponent={
+              <View style={styles.chapterTitleContainer}>
+                <Text
+                  style={[
+                    styles.chapterTitleH1,
+                    { color: isDark ? "#e8e8e8" : "#222" },
+                  ]}
+                >
+                  {book?.name} {currentChapter}
+                </Text>
+              </View>
+            }
+          />
+        )}
+
         {/* Indicador discreto de carregamento de capítulo */}
         {chapterLoading && (
           <View style={styles.chapterLoadingOverlay}>
@@ -1839,7 +2167,7 @@ export default function ChapterReaderScreen() {
                               isCurrentChapter && styles.currentChapterText,
                             ]}
                           >
-                            {chapterNumber}
+                            {chapterNumber === 0 ? "Intro" : chapterNumber}
                           </Text>
                         </TouchableOpacity>
                       );
@@ -2068,26 +2396,63 @@ export default function ChapterReaderScreen() {
         onRequestClose={() => setVerseRefModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.notesModal}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Referência Bíblica</Text>
+          <View
+            style={[
+              styles.notesModal,
+              isDark && { backgroundColor: "#1e1e1e" },
+            ]}
+          >
+            <View
+              style={[
+                styles.modalHeader,
+                isDark && {
+                  backgroundColor: "#1d1d1d",
+                  borderBottomColor: "#2b2b2b",
+                },
+              ]}
+            >
+              <Text style={[styles.modalTitle, isDark && { color: "#e0e0e0" }]}>
+                Referência Bíblica
+              </Text>
               <TouchableOpacity onPress={() => setVerseRefModalVisible(false)}>
-                <Ionicons name="close" size={24} color={iconColor} />
+                <Ionicons
+                  name="close"
+                  size={24}
+                  color={isDark ? "#e0e0e0" : iconColor}
+                />
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.notesContent}>
+            <ScrollView
+              style={[
+                styles.notesContent,
+                isDark && { backgroundColor: "#1e1e1e" },
+              ]}
+            >
               {verseRefLoading ? (
                 <ActivityIndicator size="large" color="#2196F3" />
               ) : currentVerseRef ? (
                 <View>
-                  <Text style={styles.referenceTitle}>
-                    {`${currentVerseRef.bookId} ${currentVerseRef.chapterNumber}:${currentVerseRef.verseNumber}`}
+                  <Text
+                    style={[
+                      styles.referenceTitle,
+                      isDark && { color: "#64B5F6" },
+                    ]}
+                  >
+                    {currentVerseRefBookName
+                      ? `${currentVerseRefBookName} ${currentVerseRef.chapterNumber}:${currentVerseRef.verseNumber}`
+                      : `${currentVerseRef.bookId} ${currentVerseRef.chapterNumber}:${currentVerseRef.verseNumber}`}
                   </Text>
-                  <Text style={styles.noteText}>{currentVerseRef.text}</Text>
+                  <Text
+                    style={[styles.noteText, isDark && { color: "#d0d0d0" }]}
+                  >
+                    {currentVerseRef.text}
+                  </Text>
                 </View>
               ) : (
-                <Text style={styles.noteText}>Versículo não encontrado.</Text>
+                <Text style={[styles.noteText, isDark && { color: "#d0d0d0" }]}>
+                  Versículo não encontrado.
+                </Text>
               )}
             </ScrollView>
           </View>
@@ -2118,7 +2483,9 @@ export default function ChapterReaderScreen() {
               ]}
             >
               <View style={styles.modalHeaderLeft}>
-                <Text style={[styles.modalTitle, isDark && { color: "#e0e0e0" }]}>
+                <Text
+                  style={[styles.modalTitle, isDark && { color: "#e0e0e0" }]}
+                >
                   Escolher Versão da Bíblia
                 </Text>
               </View>
@@ -2129,7 +2496,7 @@ export default function ChapterReaderScreen() {
                 >
                   <Ionicons name="refresh" size={20} color={iconColor} />
                 </TouchableOpacity>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.closeButton}
                   onPress={() => setBibleSelectorVisible(false)}
                 >
@@ -2138,16 +2505,22 @@ export default function ChapterReaderScreen() {
               </View>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} style={styles.modalScrollContent}>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              style={styles.modalScrollContent}
+            >
               {/* Indicador de carregamento */}
-              {availableBibles.length === 0 && availableDriveBibles.length === 0 && (
-                <View style={styles.centerContent}>
-                  <ActivityIndicator size="large" color="#2196F3" />
-                  <Text style={[styles.loadingText, isDark && { color: "#999" }]}>
-                    Carregando bíblias...
-                  </Text>
-                </View>
-              )}
+              {availableBibles.length === 0 &&
+                availableDriveBibles.length === 0 && (
+                  <View style={styles.centerContent}>
+                    <ActivityIndicator size="large" color="#2196F3" />
+                    <Text
+                      style={[styles.loadingText, isDark && { color: "#999" }]}
+                    >
+                      Carregando bíblias...
+                    </Text>
+                  </View>
+                )}
 
               {/* Bíblias Baixadas */}
               {availableBibles.length > 0 && (
@@ -2160,7 +2533,7 @@ export default function ChapterReaderScreen() {
                   >
                     Bíblias Baixadas ({availableBibles.length})
                   </Text>
-                  
+
                   {availableBibles.map((item) => {
                     const selected = item.id === bibleId;
                     return (
@@ -2168,14 +2541,14 @@ export default function ChapterReaderScreen() {
                         key={item.id}
                         style={[
                           styles.bibleCard,
-                          isDark && { 
+                          isDark && {
                             backgroundColor: "#2d2d2d",
-                            borderColor: "#404040" 
+                            borderColor: "#404040",
                           },
                           selected && {
                             borderColor: isDark ? "#90caf9" : "#2196F3",
-                            backgroundColor: isDark ? "#263850" : "#e3f2fd"
-                          }
+                            backgroundColor: isDark ? "#263850" : "#e3f2fd",
+                          },
                         ]}
                       >
                         <TouchableOpacity
@@ -2189,8 +2562,8 @@ export default function ChapterReaderScreen() {
                                 isDark && { color: "#e0e0e0" },
                                 selected && {
                                   color: isDark ? "#90caf9" : "#1976d2",
-                                  fontWeight: "600"
-                                }
+                                  fontWeight: "600",
+                                },
                               ]}
                             >
                               {item.name}
@@ -2204,7 +2577,10 @@ export default function ChapterReaderScreen() {
                               {item.abbreviation}
                               {item.downloadDate && (
                                 <Text style={styles.downloadDate}>
-                                  {" • Baixada em "}{new Date(item.downloadDate).toLocaleDateString('pt-BR')}
+                                  {" • Baixada em "}
+                                  {new Date(
+                                    item.downloadDate
+                                  ).toLocaleDateString("pt-BR")}
                                 </Text>
                               )}
                             </Text>
@@ -2246,13 +2622,19 @@ export default function ChapterReaderScreen() {
                     ]}
                   >
                     Disponíveis para Download (
-                    {availableDriveBibles.filter(df => !isDownloaded(df)).length})
+                    {
+                      availableDriveBibles.filter((df) => !isDownloaded(df))
+                        .length
+                    }
+                    )
                   </Text>
 
                   {availableDriveBibles
                     .filter((driveFile) => !isDownloaded(driveFile))
                     .map((driveFile) => {
-                      const bibleInfo = googleDriveService.parseBibleInfo(driveFile.name);
+                      const bibleInfo = googleDriveService.parseBibleInfo(
+                        driveFile.name
+                      );
                       const isDownloadingThis = downloading === driveFile.id;
 
                       return (
@@ -2260,10 +2642,10 @@ export default function ChapterReaderScreen() {
                           key={driveFile.id}
                           style={[
                             styles.bibleCard,
-                            isDark && { 
+                            isDark && {
                               backgroundColor: "#2d2d2d",
-                              borderColor: "#404040" 
-                            }
+                              borderColor: "#404040",
+                            },
                           ]}
                         >
                           <View style={styles.bibleCardContent}>
@@ -2282,13 +2664,15 @@ export default function ChapterReaderScreen() {
                                   isDark && { color: "#b0b0b0" },
                                 ]}
                               >
-                                `${bibleInfo.abbreviation}${
-                                    driveFile.size
-                                      ? ` • ${(
-                                          parseInt(driveFile.size) / 1024 / 1024
-                                        ).toFixed(1)} MB`
-                                      : ""
-                                  }`
+                                `${bibleInfo.abbreviation}$
+                                {driveFile.size
+                                  ? ` • ${(
+                                      parseInt(driveFile.size) /
+                                      1024 /
+                                      1024
+                                    ).toFixed(1)} MB`
+                                  : ""}
+                                `
                               </Text>
                             </View>
                           </View>
@@ -2296,7 +2680,10 @@ export default function ChapterReaderScreen() {
                           <View style={styles.bibleActions}>
                             {isDownloadingThis ? (
                               <View style={styles.downloadingContainer}>
-                                <ActivityIndicator color="#2196F3" size="small" />
+                                <ActivityIndicator
+                                  color="#2196F3"
+                                  size="small"
+                                />
                                 <TouchableOpacity
                                   style={[
                                     styles.cancelButton,
@@ -2307,7 +2694,11 @@ export default function ChapterReaderScreen() {
                                     Alert.alert("Info", "Download cancelado");
                                   }}
                                 >
-                                  <Ionicons name="close" size={14} color="#fff" />
+                                  <Ionicons
+                                    name="close"
+                                    size={14}
+                                    color="#fff"
+                                  />
                                 </TouchableOpacity>
                               </View>
                             ) : (
@@ -2317,12 +2708,23 @@ export default function ChapterReaderScreen() {
                                   isDark && { backgroundColor: "#2196F3" },
                                 ]}
                                 onPress={() => {
-                                  console.log('📱 DOWNLOAD BUTTON PRESSED for:', driveFile.id, driveFile.name);
-                                  console.log('🔍 handleDownloadBible function exists:', typeof handleDownloadBible);
+                                  console.log(
+                                    "📱 DOWNLOAD BUTTON PRESSED for:",
+                                    driveFile.id,
+                                    driveFile.name
+                                  );
+                                  console.log(
+                                    "🔍 handleDownloadBible function exists:",
+                                    typeof handleDownloadBible
+                                  );
                                   handleDownloadBible(driveFile);
                                 }}
                               >
-                                <Ionicons name="download" size={18} color="#fff" />
+                                <Ionicons
+                                  name="download"
+                                  size={18}
+                                  color="#fff"
+                                />
                               </TouchableOpacity>
                             )}
                           </View>
@@ -2331,7 +2733,8 @@ export default function ChapterReaderScreen() {
                     })}
 
                   {/* Mensagem quando não há bíblias para download */}
-                  {availableDriveBibles.filter(df => !isDownloaded(df)).length === 0 && (
+                  {availableDriveBibles.filter((df) => !isDownloaded(df))
+                    .length === 0 && (
                     <View style={styles.emptyState}>
                       <Ionicons
                         name="checkmark-circle"
@@ -2349,18 +2752,21 @@ export default function ChapterReaderScreen() {
               )}
 
               {/* Estado vazio quando não há bíblias */}
-              {availableBibles.length === 0 && availableDriveBibles.length === 0 && (
-                <View style={styles.emptyState}>
-                  <Ionicons
-                    name="book-outline"
-                    size={48}
-                    color={isDark ? "#555" : "#ccc"}
-                  />
-                  <Text style={[styles.emptyText, isDark && { color: "#999" }]}>
-                    Nenhuma Bíblia encontrada
-                  </Text>
-                </View>
-              )}
+              {availableBibles.length === 0 &&
+                availableDriveBibles.length === 0 && (
+                  <View style={styles.emptyState}>
+                    <Ionicons
+                      name="book-outline"
+                      size={48}
+                      color={isDark ? "#555" : "#ccc"}
+                    />
+                    <Text
+                      style={[styles.emptyText, isDark && { color: "#999" }]}
+                    >
+                      Nenhuma Bíblia encontrada
+                    </Text>
+                  </View>
+                )}
             </ScrollView>
           </View>
         </View>
@@ -2650,20 +3056,20 @@ const styles = StyleSheet.create({
   },
   versesContainer: {
     flex: 1,
-    position: 'relative',
+    position: "relative",
   },
   chapterLoadingOverlay: {
-    position: 'absolute',
+    position: "absolute",
     top: 10,
     right: 10,
     zIndex: 999,
   },
   chapterLoadingIndicator: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
     borderRadius: 20,
     padding: 8,
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
@@ -3206,7 +3612,7 @@ const styles = StyleSheet.create({
   chapterHeaderContent: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "flex-end",
     gap: 8,
   },
 
@@ -3525,5 +3931,64 @@ const styles = StyleSheet.create({
   },
   bibleActions: {
     marginLeft: 16,
+  },
+  // Estilos para a introdução
+  introductionContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 100, // espaço para os botões flutuantes
+  },
+  introductionContainer: {
+    backgroundColor: "#ffffff",
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  introductionTitle: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#2c3e50",
+    marginBottom: 8,
+    textAlign: "center",
+    letterSpacing: 0.5,
+  },
+  introductionSubtitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#34495e",
+    marginBottom: 20,
+    textAlign: "center",
+    letterSpacing: 0.3,
+  },
+  introductionTextContainer: {
+    backgroundColor: "#f8f9fa",
+    borderRadius: 8,
+    padding: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: "#3498db",
+  },
+  introductionText: {
+    fontSize: 16,
+    lineHeight: 26,
+    color: "#2c3e50",
+    textAlign: "justify",
+    letterSpacing: 0.2,
+  },
+  chapterTitleContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    paddingBottom: 16,
+  },
+  chapterTitleH1: {
+    fontSize: 28,
+    fontWeight: "700",
+    letterSpacing: 0.5,
   },
 });
