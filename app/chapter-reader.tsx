@@ -351,8 +351,8 @@ export default function ChapterReaderScreen() {
         : chapters.length;
       setTotalChapters(actualTotalChapters);
 
-      // Load initial verses - use the initial chapter from params
-      const chapterToLoad = initialChapter || 1;
+      // Load initial verses - use the current chapter state
+      const chapterToLoad = currentChapter ?? initialChapter ?? 1;
 
       const versesData = await bibleReaderService.getVerses(
         bibleId,
@@ -387,6 +387,7 @@ export default function ChapterReaderScreen() {
   }, [
     bibleId,
     currentBookId,
+    currentChapter,
     initialChapter,
     router,
     updateNavigationState,
