@@ -105,6 +105,7 @@ export const IntroductionRenderer: React.FC<IntroductionRendererProps> = ({
             color: textColor, 
             fontSize: fontSize,
             lineHeight: fontSize * 1.6,
+            textAlign: 'justify',
           }}
         >
           {cleanText(html)}
@@ -125,6 +126,7 @@ export const IntroductionRenderer: React.FC<IntroductionRendererProps> = ({
             color: textColor, 
             fontSize: fontSize,
             lineHeight: fontSize * 1.6,
+            textAlign: 'justify',
           }}
         >
           {parts[0].content}
@@ -133,7 +135,11 @@ export const IntroductionRenderer: React.FC<IntroductionRendererProps> = ({
     }
 
     return (
-      <Text style={{ fontSize: fontSize, lineHeight: fontSize * 1.6 }}>
+      <Text style={{ 
+        fontSize: fontSize, 
+        lineHeight: fontSize * 1.6,
+        textAlign: 'justify',
+      }}>
         {parts.map((part, index) => {
           if (part.type === 'link' && part.bookId !== undefined) {
             return (

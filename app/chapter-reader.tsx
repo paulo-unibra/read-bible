@@ -1396,8 +1396,8 @@ export default function ChapterReaderScreen() {
     // Limpar prefixo "Introdução|LIVRO | " que aparece no primeiro versículo
     // Padrão: "Introdução|APOCALIPSE	|	Título e assunto do livro"
     // Remove até o último "|" incluindo espaços/tabs
-    let cleanedText = text.replace(/^[^|]*\|[^|]*\|\s*/, '');
-    
+    let cleanedText = text.replace(/^[^|]*\|[^|]*\|\s*/, "");
+
     const parts: React.ReactNode[] = [];
     let cursor = 0;
     const symbolRegex = /([✚ℕ])/g;
@@ -1452,7 +1452,9 @@ export default function ChapterReaderScreen() {
       cursor = match.index + match[0].length;
     }
     if (cursor < cleanedText.length) {
-      parts.push(<Text key={`tail-${cursor}`}>{cleanedText.substring(cursor)}</Text>);
+      parts.push(
+        <Text key={`tail-${cursor}`}>{cleanedText.substring(cursor)}</Text>
+      );
     }
     return <>{parts}</>;
   };
@@ -1461,10 +1463,10 @@ export default function ChapterReaderScreen() {
   const renderTitleText = (titleText: string, level: number = 1) => {
     // Mostrar apenas o que vem depois do último "|"
     // Padrão: "Introdução|APOCALIPSE | Título e assunto do livro" -> "Título e assunto do livro"
-    const cleanedTitle = titleText.includes('|') 
-      ? titleText.substring(titleText.lastIndexOf('|') + 1).trim()
+    const cleanedTitle = titleText.includes("|")
+      ? titleText.substring(titleText.lastIndexOf("|") + 1).trim()
       : titleText;
-    
+
     const levelSizes: Record<number, number> = { 1: 16, 2: 15, 3: 14 };
     const lightColors: Record<number, string> = {
       1: "#444",
@@ -1698,40 +1700,51 @@ export default function ChapterReaderScreen() {
               >
                 <Ionicons name="library" size={24} color={iconColor} />
               </TouchableOpacity>
-
-              {/* Botão para testar navegação para intro */}
-              <TouchableOpacity
-                onPress={() => {
-                  console.log("Navegando para capítulo 0 (introdução)...");
-                  navigateToChapter(0);
-                }}
-                style={[
-                  styles.headerButton,
-                  { backgroundColor: isDark ? "#444" : "#ccc" },
-                ]}
-              >
-                <Text style={{ color: isDark ? "#fff" : "#000", fontSize: 10 }}>
-                  CH0
-                </Text>
-              </TouchableOpacity>
             </>
           )}
         </View>
       </View>
 
-      {/* Chapter Header fixo - Oculto na introdução */}
-      {currentChapter !== 0 && (
-        <View
-          style={[
-            styles.fixedChapterHeader,
-            chapterHeaderBg,
-            { minHeight: HEADER_HEIGHT },
-          ]}
-        >
-          <View style={styles.chapterHeaderContent}>
-            <View style={styles.chapterHeaderActions}>
-              {book && (
-                <>
+      {/* Chapter Header fixo */}
+      <View
+        style={[
+          styles.fixedChapterHeader,
+          chapterHeaderBg,
+          { minHeight: HEADER_HEIGHT },
+        ]}
+      >
+        <View style={styles.chapterHeaderContent}>
+          {/* Botão Introdução - só aparece quando não está na introdução */}
+
+          {currentChapter !== 0 ? (
+            <TouchableOpacity
+              onPress={() => {
+                console.log("Navegando para introdução...");
+                navigateToChapter(0);
+              }}
+              style={[
+                styles.introButton,
+                {
+                  backgroundColor: isDark ? "#2a2a2a" : "#e8e8e8",
+                  borderColor: isDark ? "#444" : "#ccc",
+                },
+              ]}
+              accessibilityLabel="Ver introdução do livro"
+            >
+              <Ionicons
+                name="book-outline"
+                size={18}
+                color={isDark ? "#64B5F6" : "#1976D2"}
+              />
+            </TouchableOpacity>
+          ) : (
+            <View></View>
+          )}
+          <View style={styles.chapterHeaderActions}>
+            {book && (
+              <>
+                {/* Quiz - só aparece em capítulos normais */}
+                {currentChapter !== 0 && (
                   <QuizButton
                     bookId={currentBookId}
                     chapterNumber={currentChapter}
@@ -1739,43 +1752,47 @@ export default function ChapterReaderScreen() {
                     bibleVersion={bibleAbbrev}
                     isDark={isDark}
                   />
-                  {audioAvailable && (
-                    <AudioPlayer
-                      bookId={currentBookId}
-                      chapterNumber={currentChapter}
-                      bookName={book.name}
-                      isDark={isDark}
-                      onRequestNext={async () => {
-                        if (navigating || loading) return;
-                        const prevChapter = currentChapter;
-                        await navigateChapter("next");
-                        const targetChapter = prevChapter + 1;
-                        setTimeout(() => {
-                          AudioService.loadAndPlay(
-                            currentBookId,
-                            targetChapter
-                          ).catch(() => {});
-                        }, 500);
-                      }}
-                    />
-                  )}
-                </>
-              )}
-              <TouchableOpacity
-                onPress={openSettings}
-                style={styles.settingsButton}
-                accessibilityLabel="Abrir configurações de leitura"
-              >
-                <Ionicons
-                  name="settings-outline"
-                  size={22}
-                  color={isDark ? "#ddd" : "#555"}
-                />
-              </TouchableOpacity>
-            </View>
+                )}
+
+                {/* Áudio - só aparece em capítulos normais */}
+                {currentChapter !== 0 && audioAvailable && (
+                  <AudioPlayer
+                    bookId={currentBookId}
+                    chapterNumber={currentChapter}
+                    bookName={book.name}
+                    isDark={isDark}
+                    onRequestNext={async () => {
+                      if (navigating || loading) return;
+                      const prevChapter = currentChapter;
+                      await navigateChapter("next");
+                      const targetChapter = prevChapter + 1;
+                      setTimeout(() => {
+                        AudioService.loadAndPlay(
+                          currentBookId,
+                          targetChapter
+                        ).catch(() => {});
+                      }, 500);
+                    }}
+                  />
+                )}
+              </>
+            )}
+
+            {/* Botão Settings - sempre visível */}
+            <TouchableOpacity
+              onPress={openSettings}
+              style={styles.settingsButton}
+              accessibilityLabel="Abrir configurações de leitura"
+            >
+              <Ionicons
+                name="settings-outline"
+                size={22}
+                color={isDark ? "#ddd" : "#555"}
+              />
+            </TouchableOpacity>
           </View>
         </View>
-      )}
+      </View>
 
       {/* Content Area - Introduction or Verses */}
       <View style={styles.versesContainer}>
@@ -1785,7 +1802,7 @@ export default function ChapterReaderScreen() {
             style={[styles.versesList, versesListBg]}
             contentContainerStyle={[
               styles.introductionContent,
-              { paddingTop: 16, paddingHorizontal: 16, paddingBottom: 32 },
+              { paddingTop: 16, paddingHorizontal: 16, paddingBottom: 80 },
             ]}
             showsVerticalScrollIndicator={false}
           >
@@ -3612,7 +3629,7 @@ const styles = StyleSheet.create({
   chapterHeaderContent: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "flex-end",
+    justifyContent: "space-between",
     gap: 8,
   },
 
@@ -3990,5 +4007,13 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: "700",
     letterSpacing: 0.5,
+  },
+  introButton: {
+    padding: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    marginRight: 8,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });
