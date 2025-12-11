@@ -1422,7 +1422,7 @@ export default function ChapterReaderScreen() {
 
   ${book?.name} ${verseRange}
 
-  Aplicativo Palavra em Jogo
+  Aplicativo Bíblia em Foco
   Link do app: https://readbible.app`;
 
     const shareTitle =
