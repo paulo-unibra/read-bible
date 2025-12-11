@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Bíblia em Foco - Leia a Bíblia de forma intuitiva, com planos de leitura, quizzes interativos e recursos de áudio. Disponível para Android.">
+    <meta name="keywords" content="Bíblia, leitura bíblica, planos de leitura, quiz bíblico, áudio bíblico, app cristão">
+    <meta name="author" content="Bíblia em Foco">
+    <title>Bíblia em Foco - Sua Jornada Bíblica Começa Aqui</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            overflow-x: hidden;
+        }
+
+        /* Header/Navigation */
+        header {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            z-index: 1000;
+            padding: 1rem 0;
+        }
+
+        nav {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 2rem;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: #1976D2;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .logo::before {
+            content: "📖";
+            font-size: 2rem;
+        }
+
+        nav ul {
+            list-style: none;
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+
+        nav a {
+            text-decoration: none;
+            color: #333;
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+
+        nav a:hover {
+            color: #1976D2;
+        }
+
+        .btn-download {
+            background: linear-gradient(135deg, #1976D2 0%, #1565C0 100%);
+            color: white !important;
+            padding: 0.75rem 1.5rem;
+            border-radius: 50px;
+            font-weight: 600;
+            box-shadow: 0 4px 15px rgba(25, 118, 210, 0.3);
+            transition: all 0.3s;
+        }
+
+        .btn-download:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(25, 118, 210, 0.4);
+        }
+
+        /* Hero Section */
+        .hero {
+            margin-top: 80px;
+            padding: 6rem 2rem;
+            background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%);
+            text-align: center;
+        }
+
+        .hero-content {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            font-weight: 800;
+            color: #0D47A1;
+            margin-bottom: 1.5rem;
+            line-height: 1.2;
+        }
+
+        .hero p {
+            font-size: 1.25rem;
+            color: #424242;
+            margin-bottom: 2.5rem;
+            line-height: 1.8;
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #1976D2 0%, #1565C0 100%);
+            color: white;
+            padding: 1rem 2.5rem;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1.1rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            box-shadow: 0 8px 25px rgba(25, 118, 210, 0.3);
+            transition: all 0.3s;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 35px rgba(25, 118, 210, 0.4);
+        }
+
+        .btn-secondary {
+            background: white;
+            color: #1976D2;
+            padding: 1rem 2.5rem;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1.1rem;
+            border: 2px solid #1976D2;
+            transition: all 0.3s;
+        }
+
+        .btn-secondary:hover {
+            background: #1976D2;
+            color: white;
+        }
+
+        /* Features Section */
+        .features {
+            padding: 6rem 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .section-title {
+            text-align: center;
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #0D47A1;
+            margin-bottom: 3rem;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .feature-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 20px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+            transition: all 0.3s;
+            border: 1px solid #f0f0f0;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.12);
+        }
+
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .feature-card h3 {
+            font-size: 1.5rem;
+            color: #1976D2;
+            margin-bottom: 1rem;
+        }
+
+        .feature-card p {
+            color: #666;
+            line-height: 1.8;
+        }
+
+        /* Screenshots Section */
+        .screenshots {
+            padding: 6rem 2rem;
+            background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%);
+        }
+
+        .screenshots-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .screenshots-grid {
+            display: flex;
+            gap: 2rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 3rem;
+        }
+
+        .screenshot {
+            width: 280px;
+            height: 560px;
+            background: white;
+            border-radius: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+            border: 8px solid #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #999;
+            font-style: italic;
+            transition: transform 0.3s;
+        }
+
+        .screenshot:hover {
+            transform: scale(1.05);
+        }
+
+        /* Stats Section */
+        .stats {
+            padding: 4rem 2rem;
+            background: #0D47A1;
+            color: white;
+        }
+
+        .stats-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 3rem;
+            text-align: center;
+        }
+
+        .stat h3 {
+            font-size: 3rem;
+            font-weight: 800;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        /* CTA Section */
+        .cta {
+            padding: 6rem 2rem;
+            text-align: center;
+            background: white;
+        }
+
+        .cta h2 {
+            font-size: 2.5rem;
+            color: #0D47A1;
+            margin-bottom: 1.5rem;
+        }
+
+        .cta p {
+            font-size: 1.2rem;
+            color: #666;
+            margin-bottom: 2rem;
+        }
+
+        /* Footer */
+        footer {
+            background: #1a1a1a;
+            color: white;
+            padding: 3rem 2rem 2rem;
+        }
+
+        .footer-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 3rem;
+            margin-bottom: 2rem;
+        }
+
+        .footer-section h3 {
+            color: #1976D2;
+            margin-bottom: 1rem;
+        }
+
+        .footer-section ul {
+            list-style: none;
+        }
+
+        .footer-section a {
+            color: #ccc;
+            text-decoration: none;
+            display: block;
+            margin-bottom: 0.5rem;
+            transition: color 0.3s;
+        }
+
+        .footer-section a:hover {
+            color: #1976D2;
+        }
+
+        .footer-bottom {
+            text-align: center;
+            padding-top: 2rem;
+            border-top: 1px solid #333;
+            color: #888;
+        }
+
+        /* Mobile Menu */
+        .mobile-menu-btn {
+            display: none;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #1976D2;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+
+            .hero p {
+                font-size: 1.1rem;
+            }
+
+            nav ul {
+                display: none;
+            }
+
+            .mobile-menu-btn {
+                display: block;
+            }
+
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-container {
+                grid-template-columns: 1fr;
+                gap: 2rem;
+            }
+
+            .screenshot {
+                width: 240px;
+                height: 480px;
+            }
+        }
+
+        /* Animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .fade-in {
+            animation: fadeInUp 0.8s ease-out;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <nav>
+            <div class="logo">Bíblia em Foco</div>
+            <ul>
+                <li><a href="#recursos">Recursos</a></li>
+                <li><a href="#sobre">Sobre</a></li>
+                <li><a href="privacy-policy.html">Privacidade</a></li>
+                <li><a href="#download" class="btn-download">Baixar App</a></li>
+            </ul>
+            <button class="mobile-menu-btn">☰</button>
+        </nav>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-content fade-in">
+            <h1>Sua Jornada Bíblica Começa Aqui</h1>
+            <p>Leia, aprenda e cresça com a Palavra de Deus. Planos de leitura personalizados, quizzes interativos e áudio bíblico - tudo offline!</p>
+            <div class="hero-buttons">
+                <a href="#download" class="btn-primary">
+                    📱 Baixar Grátis
+                </a>
+                <a href="#recursos" class="btn-secondary">Ver Recursos</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features" id="recursos">
+        <h2 class="section-title">Recursos Incríveis</h2>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">📖</div>
+                <h3>Leitura Intuitiva</h3>
+                <p>Interface limpa e moderna para uma experiência de leitura confortável. Personalize o tamanho da fonte e escolha entre tema claro ou escuro.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📚</div>
+                <h3>Múltiplas Versões</h3>
+                <p>Acesse diferentes traduções da Bíblia. Compare versões lado a lado para um estudo mais profundo da Palavra.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📅</div>
+                <h3>Planos de Leitura</h3>
+                <p>Acompanhe seu progresso com planos de leitura personalizados. Crie lembretes e mantenha-se consistente em sua jornada espiritual.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🎯</div>
+                <h3>Quiz Interativo</h3>
+                <p>Teste seu conhecimento bíblico com quizzes por capítulo. Aprenda de forma divertida e acompanhe seu progresso no ranking.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🎧</div>
+                <h3>Áudio Bíblico</h3>
+                <p>Ouça a Bíblia em áudio enquanto trabalha, viaja ou relaxa. Perfeito para quem está sempre em movimento.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📱</div>
+                <h3>100% Offline</h3>
+                <p>Após o download inicial, leia, estude e ouça sem precisar de internet. Seus dados são salvos localmente com total privacidade.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔍</div>
+                <h3>Busca Avançada</h3>
+                <p>Encontre versículos rapidamente com busca inteligente. Filtre por Antigo ou Novo Testamento para resultados precisos.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📊</div>
+                <h3>Ranking e Estatísticas</h3>
+                <p>Acompanhe seu progresso com estatísticas detalhadas. Veja quantos capítulos leu e compete no ranking dos quizzes.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔒</div>
+                <h3>Privacidade Total</h3>
+                <p>Seus dados são seus. Nenhuma informação pessoal é coletada ou compartilhada. 100% focado em privacidade.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Screenshots Section -->
+    <section class="screenshots">
+        <div class="screenshots-container">
+            <h2 class="section-title">Veja Como Funciona</h2>
+            <div class="screenshots-grid">
+                <div class="screenshot">
+                    <span>Tela de Leitura</span>
+                </div>
+                <div class="screenshot">
+                    <span>Quiz Interativo</span>
+                </div>
+                <div class="screenshot">
+                    <span>Planos de Leitura</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Stats Section -->
+    <section class="stats">
+        <div class="stats-container">
+            <div class="stat">
+                <h3>66</h3>
+                <p>Livros Bíblicos</p>
+            </div>
+            <div class="stat">
+                <h3>1.189</h3>
+                <p>Capítulos</p>
+            </div>
+            <div class="stat">
+                <h3>100%</h3>
+                <p>Offline</p>
+            </div>
+            <div class="stat">
+                <h3>0</h3>
+                <p>Anúncios</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- About Section -->
+    <section class="features" id="sobre">
+        <div style="max-width: 800px; margin: 0 auto; text-align: center;">
+            <h2 class="section-title">Sobre o Projeto</h2>
+            <p style="font-size: 1.1rem; color: #666; line-height: 1.8; margin-bottom: 2rem;">
+                O <strong>Bíblia em Foco</strong> nasceu da paixão por tornar a leitura bíblica mais acessível e envolvente. 
+                Nossa missão é ajudar pessoas a desenvolverem o hábito de ler a Palavra de Deus através de uma experiência 
+                moderna, intuitiva e completamente gratuita.
+            </p>
+            <p style="font-size: 1.1rem; color: #666; line-height: 1.8;">
+                Desenvolvido com cuidado por <strong>Paulo Ricardo</strong> e a equipe <strong>Bíblia em Foco</strong>, 
+                nosso compromisso é com a qualidade, privacidade e simplicidade. Sem anúncios, sem rastreamento, 
+                apenas você e a Palavra de Deus.
+            </p>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta" id="download">
+        <h2>Comece Sua Jornada Hoje</h2>
+        <p>Baixe gratuitamente e transforme seu tempo de leitura bíblica</p>
+        <a href="#" class="btn-primary" style="font-size: 1.2rem; padding: 1.25rem 3rem;">
+            📱 Baixar para Android
+        </a>
+        <p style="margin-top: 1rem; color: #999; font-size: 0.9rem;">
+            Disponível em breve na Google Play Store
+        </p>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-content">
+            <div class="footer-section">
+                <h3>Bíblia em Foco</h3>
+                <p style="color: #ccc; line-height: 1.8;">
+                    Transformando a leitura bíblica através da tecnologia, com foco em simplicidade e privacidade.
+                </p>
+            </div>
+            <div class="footer-section">
+                <h3>Links Rápidos</h3>
+                <ul>
+                    <li><a href="#recursos">Recursos</a></li>
+                    <li><a href="#sobre">Sobre</a></li>
+                    <li><a href="#download">Download</a></li>
+                    <li><a href="privacy-policy.html">Política de Privacidade</a></li>
+                </ul>
+            </div>
+            <div class="footer-section">
+                <h3>Suporte</h3>
+                <ul>
+                    <li><a href="mailto:contato@bibliaemfoco.com">contato@bibliaemfoco.com</a></li>
+                    <li><a href="#">Perguntas Frequentes</a></li>
+                    <li><a href="#">Reportar Bug</a></li>
+                    <li><a href="#">Sugerir Recurso</a></li>
+                </ul>
+            </div>
+            <div class="footer-section">
+                <h3>Conecte-se</h3>
+                <ul>
+                    <li><a href="#">Instagram</a></li>
+                    <li><a href="#">Facebook</a></li>
+                    <li><a href="#">YouTube</a></li>
+                    <li><a href="#">Twitter</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2025 Bíblia em Foco. Todos os direitos reservados.</p>
+            <p style="margin-top: 0.5rem; font-size: 0.9rem;">
+                Desenvolvido com ❤️ por Paulo Ricardo e Bíblia em Foco
+            </p>
+        </div>
+    </footer>
+
+    <script>
+        // Smooth scroll
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // Fade in on scroll
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('fade-in');
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.feature-card, .screenshot').forEach(el => {
+            observer.observe(el);
+        });
+    </script>
+</body>
+</html>
