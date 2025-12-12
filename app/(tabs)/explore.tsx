@@ -107,9 +107,9 @@ export default function ExploreScreen() {
 
         {/* About the App */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Sobre o Palavra em Jogo</Text>
+          <Text style={styles.sectionTitle}>Sobre o Bíblia em Foco</Text>
           <Text style={styles.aboutText}>
-            O Palavra em Jogo foi desenvolvido para tornar o estudo da Bíblia mais 
+            O Bíblia em Foco foi desenvolvido para tornar o estudo da Bíblia mais 
             acessível e organizado. Com funcionalidades de leitura livre e 
             planos estruturados, você pode personalizar sua jornada espiritual 
             conforme suas necessidades.

@@ -299,7 +299,7 @@ export class BibleReaderService {
         bookId,
         chapterNumber,
         verseNumber: 1,
-        text: 'Este é um versículo de exemplo para demonstração do aplicativo Palavra em Jogo.'
+        text: 'Este é um versículo de exemplo para demonstração do aplicativo Bíblia em Foco.'
       },
       {
         id: parseInt(`${bookId}${chapterNumber.toString().padStart(3, '0')}002`),
@@ -435,8 +435,8 @@ export class BibleReaderService {
             bookName: 'Gênesis',
             chapterNumber: 1,
             verseNumber: 1,
-            text: 'Este é um versículo de exemplo para demonstração do aplicativo Palavra em Jogo.',
-            highlightedText: 'Este é um versículo de <mark>exemplo</mark> para demonstração do aplicativo Palavra em Jogo.',
+            text: 'Este é um versículo de exemplo para demonstração do aplicativo Bíblia em Foco.',
+            highlightedText: 'Este é um versículo de <mark>exemplo</mark> para demonstração do aplicativo Bíblia em Foco.',
           }
         ];
       }

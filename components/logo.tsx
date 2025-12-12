@@ -39,7 +39,7 @@ export function Logo({ size = 48, color = '#2196F3', showText = true }: LogoProp
           marginLeft: size * 0.2,
           color: color 
         }]}>
-          Palavra em Jogo
+          Bíblia em Foco
         </Text>
       )} */}
     </View>

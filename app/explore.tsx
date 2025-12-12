@@ -67,8 +67,8 @@ export default function ExploreScreen() {
         </View>
 
         <View style={[styles.section,{ backgroundColor: colors.surface }]}> 
-          <Text style={[styles.sectionTitle,{ color: colors.text, fontSize: applyFontScale(20) }]}>Sobre o Palavra em Jogo</Text>
-          <Text style={[styles.aboutText,{ color: colors.text2, fontSize: applyFontScale(16), lineHeight: applyFontScale(24) }]}>O Palavra em Jogo foi desenvolvido para tornar o estudo da Bíblia mais acessível e organizado. Com funcionalidades de leitura livre e planos estruturados, você pode personalizar sua jornada espiritual conforme suas necessidades.</Text>
+          <Text style={[styles.sectionTitle,{ color: colors.text, fontSize: applyFontScale(20) }]}>Sobre o Bíblia em Foco</Text>
+          <Text style={[styles.aboutText,{ color: colors.text2, fontSize: applyFontScale(16), lineHeight: applyFontScale(24) }]}>O Bíblia em Foco foi desenvolvido para tornar o estudo da Bíblia mais acessível e organizado. Com funcionalidades de leitura livre e planos estruturados, você pode personalizar sua jornada espiritual conforme suas necessidades.</Text>
           <View style={styles.featuresList}>
             {['Múltiplas versões da Bíblia','Planos de leitura personalizáveis','Sistema de favoritos','Busca por palavras-chave','Lembretes diários'].map((f,i) => (
               <View key={i} style={styles.featureItem}>
