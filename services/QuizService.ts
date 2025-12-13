@@ -29,33 +29,18 @@ interface QuizSession {
 }
 
 class QuizService {
-  private DRIVE_FOLDER_ID = process.env.EXPO_PUBLIC_QUIZ_DRIVE_FOLDER_ID || process.env.EXPO_PUBLIC_DRIVE_FOLDER_ID; // fallback para pasta geral se não houver específica
-  private API_KEY = process.env.EXPO_PUBLIC_GOOGLE_API_KEY;
+  private BUCKET_NAME = 'bibliaquiz-files';
+  private BUCKET_PATH = 'quizzes'; // Subpasta dentro do bucket
   private availabilityCache = new Map<string, boolean>();
 
   constructor() {
-    // Validação inicial (não quebrar a aplicação, mas avisar)
-    if (!this.DRIVE_FOLDER_ID) {
-      console.warn(
-        '[QuizService] EXPO_PUBLIC_QUIZ_DRIVE_FOLDER_ID não definida. Usando EXPO_PUBLIC_DRIVE_FOLDER_ID como fallback. Caso queira separar a pasta dos quizzes, defina a variável específica.'
-      );
-    }
-    if (!this.API_KEY) {
-      console.warn(
-        '[QuizService] EXPO_PUBLIC_GOOGLE_API_KEY ausente. As requisições ao Google Drive irão falhar até que seja configurada.'
-      );
-    }
+    console.log('[QuizService] Initialized with bucket:', this.BUCKET_NAME, 'path:', this.BUCKET_PATH);
   }
 
   private ensureConfigured() {
-    if (!this.DRIVE_FOLDER_ID) {
+    if (!this.BUCKET_NAME) {
       throw new Error(
-        'Pasta de quizzes não configurada. Defina EXPO_PUBLIC_QUIZ_DRIVE_FOLDER_ID ou EXPO_PUBLIC_DRIVE_FOLDER_ID.'
-      );
-    }
-    if (!this.API_KEY) {
-      throw new Error(
-        'EXPO_PUBLIC_GOOGLE_API_KEY não configurada. Configure para acessar os quizzes do Google Drive.'
+        'Bucket GCS não configurado.'
       );
     }
   }
@@ -63,39 +48,39 @@ class QuizService {
   // Mapeamento de nomes de livros bíblicos para o padrão dos arquivos JSON
   private bookNameMapping: { [key: number]: string } = {
     // Antigo Testamento
-    1: 'genesis',
-    2: 'exodo',
-    3: 'levitico',
-    4: 'numeros',
-    5: 'deuteronomio',
-    6: 'josue',
-    7: 'juizes',
+    1: 'gênesis',
+    2: 'êxodo',
+    3: 'levítico',
+    4: 'números',
+    5: 'deuteronômio',
+    6: 'josué',
+    7: 'juízes',
     8: 'rute',
     9: '1samuel',
     10: '2samuel',
     11: '1reis',
     12: '2reis',
-    13: '1cronicas',
-    14: '2cronicas',
+    13: '1crônicas',
+    14: '2crônicas',
     15: 'esdras',
     16: 'neemias',
     17: 'ester',
-    18: 'jo',
+    18: 'jó',
     19: 'salmos',
-    20: 'proverbios',
+    20: 'provérbios',
     21: 'eclesiastes',
     22: 'cantares',
-    23: 'isaias',
+    23: 'isaías',
     24: 'jeremias',
-    25: 'lamentacoes',
+    25: 'lamentações',
     26: 'ezequiel',
     27: 'daniel',
-    28: 'oseias',
+    28: 'oséias',
     29: 'joel',
-    30: 'amos',
+    30: 'amós',
     31: 'obadias',
     32: 'jonas',
-    33: 'miqueias',
+    33: 'miquéias',
     34: 'naum',
     35: 'habacuque',
     36: 'sofonias',
@@ -106,28 +91,28 @@ class QuizService {
     40: 'mateus',
     41: 'marcos',
     42: 'lucas',
-    43: 'joao',
+    43: 'joão',
     44: 'atos',
     45: 'romanos',
-    46: '1corintios',
-    47: '2corintios',
-    48: 'galatas',
-    49: 'efesios',
+    46: '1coríntios',
+    47: '2coríntios',
+    48: 'gálatas',
+    49: 'efésios',
     50: 'filipenses',
     51: 'colossenses',
     52: '1tessalonicenses',
     53: '2tessalonicenses',
-    54: '1timoteo',
-    55: '2timoteo',
+    54: '1timóteo',
+    55: '2timóteo',
     56: 'tito',
     57: 'filemom',
     58: 'hebreus',
     59: 'tiago',
     60: '1pedro',
     61: '2pedro',
-    62: '1joao',
-    63: '2joao',
-    64: '3joao',
+    62: '1joão',
+    63: '2joão',
+    64: '3joão',
     65: 'judas',
     66: 'apocalipse',
   };
@@ -137,7 +122,19 @@ class QuizService {
     if (!bookName) {
       throw new Error(`Book not found for ID: ${bookId}`);
     }
-    return `${bookName}-${chapter}.json`;
+    // Formato: arc-nome-do-livro-[numero].json
+    // URL encode para caracteres especiais como ê, í, etc.
+    const encodedBookName = encodeURIComponent(bookName);
+    const fileName = `arc-${encodedBookName}-${chapter}.json`;
+    console.log('[QuizService] Generated filename:', fileName, 'from book:', bookName);
+    return fileName;
+  }
+
+  private getQuizUrl(fileName: string): string {
+    // URL completa: https://storage.googleapis.com/bibliaquiz-files/quizzes/arc-genesis-1.json
+    const url = `https://storage.googleapis.com/${this.BUCKET_NAME}/${this.BUCKET_PATH}/${fileName}`;
+    console.log('[QuizService] Full GCS URL:', url);
+    return url;
   }
 
   async checkQuizAvailable(bookId: number, chapter: number): Promise<boolean> {
@@ -145,19 +142,20 @@ class QuizService {
       this.ensureConfigured();
       const fileName = this.getQuizFileName(bookId, chapter);
       const cacheKey = `${fileName}`;
+      
       if (this.availabilityCache.has(cacheKey)) {
         return this.availabilityCache.get(cacheKey)!;
       }
-      const listUrl = `https://www.googleapis.com/drive/v3/files?q='${this.DRIVE_FOLDER_ID}'+in+parents+and+name='${fileName}'&key=${this.API_KEY}&fields=files(id,name)`;
+
+      // URL pública do Google Cloud Storage
+      const gcsUrl = this.getQuizUrl(fileName);
+      console.log('[QuizService] Checking quiz availability:', gcsUrl);
       
-      const response = await fetch(listUrl);
-      if (!response.ok) {
-        this.availabilityCache.set(cacheKey, false);
-        return false;
-      }
+      // Fazer HEAD request para verificar se existe
+      const response = await fetch(gcsUrl, { method: 'HEAD' });
+      const exists = response.ok;
+      console.log('[QuizService] Quiz exists:', exists, 'Status:', response.status);
       
-      const data = await response.json();
-      const exists = data.files && data.files.length > 0;
       this.availabilityCache.set(cacheKey, exists);
       return exists;
     } catch (error) {
@@ -179,40 +177,27 @@ class QuizService {
     try {
       this.ensureConfigured();
       const fileName = this.getQuizFileName(bookId, chapter);
-      const listUrl = `https://www.googleapis.com/drive/v3/files?q='${this.DRIVE_FOLDER_ID}'+in+parents+and+name='${fileName}'&key=${this.API_KEY}&fields=files(id,name)`;
+      console.log('[QuizService] Loading quiz for book:', bookId, 'chapter:', chapter, 'filename:', fileName);
       
-      const response = await fetch(listUrl);
+      // URL pública do Google Cloud Storage
+      const gcsUrl = this.getQuizUrl(fileName);
+      console.log('[QuizService] Fetching from GCS:', gcsUrl);
+      
+      const response = await fetch(gcsUrl);
+      console.log('[QuizService] Response status:', response.status);
+      
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(`Quiz file not found: ${fileName} (HTTP ${response.status})`);
       }
       
-      const data = await response.json();
-      
-      if (!data.files || data.files.length === 0) {
-        throw new Error(`Quiz file not found: ${fileName}`);
-      }
-      
-      const file = data.files[0];
-      if (!file.id) {
-        throw new Error('File ID not found');
-      }
-      
-      // Baixar o conteúdo do arquivo JSON
-      const downloadUrl = `https://drive.google.com/uc?export=download&id=${file.id}`;
-      const downloadResponse = await fetch(downloadUrl);
-      
-      if (!downloadResponse.ok) {
-        throw new Error(`Failed to download quiz: ${downloadResponse.status}`);
-      }
-      
-      const quizData = await downloadResponse.json();
+      const quizData = await response.json();
+      console.log('[QuizService] Quiz loaded successfully:', quizData.name);
       return quizData as Quiz;
     } catch (error) {
       console.error('Error loading quiz:', error);
       throw error;
     }
   }
-
   createQuizSession(quiz: Quiz): QuizSession {
     return {
       quiz,
