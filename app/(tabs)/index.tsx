@@ -195,6 +195,9 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Ad Banner */}
+        <AdBanner />
+
         {/* Today's Reading Card */}
         {todayReading ? (
           <View style={[styles.todayCard, { backgroundColor: colors.card, borderLeftColor: colors.accent, shadowOpacity: isDark ? 0.3 : 0.1 }]}>
@@ -238,9 +241,6 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
         )}
-
-        {/* Ad Banner */}
-        <AdBanner />
 
         {/* Quick Actions */}
         <View style={styles.actionsSection}>

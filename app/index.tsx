@@ -3,6 +3,7 @@ import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AdBanner from '../components/AdBanner';
 import { Logo } from '../components/logo';
 import bibleReaderService from '../services/BibleReaderService';
 import DatabaseService from '../services/DatabaseService';
@@ -126,6 +127,9 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
       <ScrollView style={styles.scrollView} contentContainerStyle={{ paddingBottom: 40 }}>
+        {/* Ad Banner */}
+        <AdBanner />
+
         {todayReading ? (
           <View style={[styles.todayCard,{ backgroundColor: colors.card, borderLeftColor: colors.accent, shadowOpacity: isDark ? 0.3 : 0.1 }]}> 
             <Text style={[styles.todayTitle,{ color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Leitura de Hoje</Text>

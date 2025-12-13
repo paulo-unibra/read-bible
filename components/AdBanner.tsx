@@ -1,24 +1,75 @@
+import Constants from 'expo-constants';
 import React, { useEffect, useState } from 'react';
-import { Platform, View } from 'react-native';
-import { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
+import { Platform, Text, View } from 'react-native';
 
-// IDs de anúncio (use TestIds durante desenvolvimento)
-const adUnitId = __DEV__ 
-  ? TestIds.BANNER 
-  : Platform.OS === 'android' 
-    ? 'ca-app-pub-5942901200629242/XXXXXXXXXX' // Substitua pelo ID real do AdMob
-    : 'ca-app-pub-5942901200629242/YYYYYYYYYY';
+// Componente placeholder que carrega o AdMob apenas em production build
+// Em Expo Go, mostra mensagem informativa
+let BannerAd: any = null;
+let BannerAdSize: any = null;
+let TestIds: any = null;
 
-interface AdBannerProps {
-  size?: BannerAdSize;
+// Verifica se está rodando em ambiente nativo (não Expo Go)
+const isExpoGo = Constants.appOwnership === 'expo';
+
+// Tenta importar AdMob apenas se não estiver no Expo Go
+if (!isExpoGo) {
+  try {
+    const AdMobModule = require('react-native-google-mobile-ads');
+    BannerAd = AdMobModule.BannerAd;
+    BannerAdSize = AdMobModule.BannerAdSize;
+    TestIds = AdMobModule.TestIds;
+  } catch (error) {
+    console.log('[AdBanner] Módulo AdMob não disponível - será carregado em production build');
+  }
 }
 
-export default function AdBanner({ size = BannerAdSize.ANCHORED_ADAPTIVE_BANNER }: AdBannerProps) {
+// IDs de anúncio
+const adUnitId = __DEV__ 
+  ? (TestIds?.BANNER || 'test-banner')
+  : Platform.OS === 'android' 
+    ? 'ca-app-pub-5942901200629242/4108321222' // ID real do bloco de anúncios
+    : 'ca-app-pub-5942901200629242/4108321222';
+
+interface AdBannerProps {
+  size?: any;
+}
+
+export default function AdBanner({ size }: AdBannerProps) {
   const [adLoaded, setAdLoaded] = useState(false);
 
   useEffect(() => {
-    console.log('[AdBanner] Componente montado, ID:', adUnitId);
+    if (BannerAd) {
+      console.log('[AdBanner] Componente montado, ID:', adUnitId);
+    }
   }, []);
+
+  // Se o módulo não estiver disponível (Expo Go), renderiza placeholder
+  if (!BannerAd) {
+    return (
+      <View style={{ 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        marginHorizontal: 16,
+        marginVertical: 12,
+        height: 50,
+        backgroundColor: '#f0f0f0',
+        borderRadius: 8,
+        borderWidth: 2,
+        borderColor: '#d0d0d0',
+        borderStyle: 'dashed',
+      }}>
+        <Text style={{ 
+          color: '#888', 
+          fontSize: 13,
+          fontWeight: '600',
+        }}>
+          📢 Espaço reservado para anúncio
+        </Text>
+      </View>
+    );
+  }
+
+  const bannerSize = size || BannerAdSize.ANCHORED_ADAPTIVE_BANNER;
 
   return (
     <View style={{ 
@@ -29,7 +80,7 @@ export default function AdBanner({ size = BannerAdSize.ANCHORED_ADAPTIVE_BANNER 
     }}>
       <BannerAd
         unitId={adUnitId}
-        size={size}
+        size={bannerSize}
         requestOptions={{
           requestNonPersonalizedAdsOnly: false,
         }}
@@ -37,7 +88,7 @@ export default function AdBanner({ size = BannerAdSize.ANCHORED_ADAPTIVE_BANNER 
           console.log('[AdBanner] Anúncio carregado com sucesso');
           setAdLoaded(true);
         }}
-        onAdFailedToLoad={(error) => {
+        onAdFailedToLoad={(error: any) => {
           console.error('[AdBanner] Erro ao carregar anúncio:', error);
         }}
       />

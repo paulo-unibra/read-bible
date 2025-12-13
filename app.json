@@ -2,7 +2,7 @@
   "expo": {
     "name": "Bíblia em Foco",
     "slug": "ReadBible",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "readbible",
@@ -14,7 +14,7 @@
     },
     "android": {
       "package": "com.readbible.app",
-      "versionCode": 4,
+      "versionCode": 5,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -24,7 +24,7 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "config": {
-        "googleMobileAdsAppId": "ca-app-pub-5942901200629242~1234567890"
+        "googleMobileAdsAppId": "ca-app-pub-5942901200629242~1274274321"
       }
     },
     "web": {
@@ -48,8 +48,8 @@
       [
         "react-native-google-mobile-ads",
         {
-          "androidAppId": "ca-app-pub-5942901200629242~1234567890",
-          "iosAppId": "ca-app-pub-5942901200629242~0987654321"
+          "androidAppId": "ca-app-pub-5942901200629242~1274274321",
+          "iosAppId": "ca-app-pub-5942901200629242~1274274321"
         }
       ]
     ],

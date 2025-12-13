@@ -27,54 +27,28 @@ Configurado com:
 - Inicialização centralizada do AdMob
 - Chamado no `_layout.tsx` principal
 
-## 📋 Próximos Passos
+## 📋 IDs do AdMob Configurados
 
-### 1. Obter IDs Reais do AdMob
+### ✅ IDs Reais do Google AdMob
 
-Atualmente os IDs no código são placeholders. Você precisa:
+Os IDs fornecidos pelo Google AdMob já estão configurados:
 
-1. Acessar [Google AdMob Console](https://apps.admob.com/)
-2. Criar/acessar seu app
-3. Obter os IDs reais:
-   - **App ID Android**: `ca-app-pub-XXXXXXXXXXXXXXXX~YYYYYYYYYY`
-   - **Banner Ad Unit ID**: `ca-app-pub-XXXXXXXXXXXXXXXX/ZZZZZZZZZZ`
+- **App ID**: `ca-app-pub-5942901200629242~1274274321`
+- **Banner Ad Unit ID**: `ca-app-pub-5942901200629242/4108321222`
 
-4. Substituir nos arquivos:
+**Arquivos já atualizados:**
+- ✅ `app.json` - App ID configurado em `android.config.googleMobileAdsAppId`
+- ✅ `app.json` - Plugin configurado com App ID
+- ✅ `components/AdBanner.tsx` - Banner Ad Unit ID configurado
 
-**`app.json`** (linha ~26 e plugin):
-```json
-"config": {
-  "googleMobileAdsAppId": "ca-app-pub-5942901200629242~SEU_APP_ID_REAL"
-}
-```
-
-```json
-[
-  "react-native-google-mobile-ads",
-  {
-    "androidAppId": "ca-app-pub-5942901200629242~SEU_APP_ID_REAL",
-    "iosAppId": "ca-app-pub-5942901200629242~SEU_IOS_APP_ID"
-  }
-]
-```
-
-**`components/AdBanner.tsx`** (linha ~8):
-```typescript
-const adUnitId = __DEV__ 
-  ? TestIds.BANNER 
-  : Platform.OS === 'android' 
-    ? 'ca-app-pub-5942901200629242/SEU_BANNER_AD_UNIT_ID' 
-    : 'ca-app-pub-5942901200629242/SEU_IOS_BANNER_ID';
-```
-
-### 2. Publicar app-ads.txt
+### 1. Publicar app-ads.txt
 
 1. Acesse o domínio registrado no Google Play Console
 2. Faça upload do arquivo `app-ads.txt` na raiz do site
 3. Certifique-se que está acessível em: `seudominio.com/app-ads.txt`
 4. Aguarde o Google validar (pode levar algumas horas)
 
-### 3. Recompilar o App
+### 2. Recompilar o App
 
 Após configurar os IDs reais:
 
@@ -89,14 +63,14 @@ npx expo prebuild --clean
 cd android && ./gradlew bundleRelease
 ```
 
-### 4. Testar em Modo Desenvolvimento
+### 3. Testar em Modo Desenvolvimento
 
 Durante desenvolvimento, o app usa automaticamente IDs de teste do Google:
 - Anúncios aparecem normalmente
 - Não gera receita
 - Não viola políticas do AdMob
 
-### 5. Validar em Produção
+### 4. Validar em Produção
 
 1. Publique o AAB no Google Play
 2. No AdMob Console, verifique:
@@ -130,7 +104,30 @@ import AdBanner from '../../components/AdBanner';
 
 ## 🔍 Debug
 
-Para ver logs dos anúncios:
+### ⚠️ Importante: Expo Go vs Production Build
+
+O `react-native-google-mobile-ads` é um **módulo nativo** e **NÃO funciona no Expo Go**.
+
+**Durante desenvolvimento com Expo Go:**
+- O componente `AdBanner` não renderiza nada
+- Não há erros no console
+- O app funciona normalmente sem anúncios
+
+**Para testar anúncios, você precisa:**
+
+1. **Development Build** (recomendado para testes):
+```bash
+npx expo run:android
+```
+
+2. **Production Build** (AAB final):
+```bash
+cd android && ./gradlew bundleRelease
+```
+
+### Logs para Debug
+
+Para ver logs dos anúncios em production build:
 ```bash
 npx react-native log-android
 # ou
