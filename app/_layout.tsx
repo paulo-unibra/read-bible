@@ -7,15 +7,20 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import "react-native-reanimated";
+import { initializeAds } from "../services/AdService";
 import DatabaseService from "../services/DatabaseService";
 
 export default function RootLayout() {
   // Preferência do usuário, não apenas sistema
   const [userTheme, setUserTheme] = useState<"light" | "dark">("light");
+  
   useEffect(() => {
     (async () => {
       const theme = await DatabaseService.getSetting("theme");
       if (theme === "dark" || theme === "light") setUserTheme(theme);
+      
+      // Inicializar AdMob
+      await initializeAds();
     })();
   }, []);
 

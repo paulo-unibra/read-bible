@@ -3,6 +3,7 @@ import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AdBanner from '../../components/AdBanner';
 import { Logo } from '../../components/logo';
 import bibleReaderService from '../../services/BibleReaderService';
 import DatabaseService from '../../services/DatabaseService';
@@ -237,6 +238,9 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
         )}
+
+        {/* Ad Banner */}
+        <AdBanner />
 
         {/* Quick Actions */}
         <View style={styles.actionsSection}>
