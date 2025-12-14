@@ -5,18 +5,20 @@ import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AdBanner from '../components/AdBanner';
 import { Logo } from '../components/logo';
+import authService, { ReadingPlan, TodayReading } from '../services/AuthService';
 import bibleReaderService from '../services/BibleReaderService';
 import DatabaseService from '../services/DatabaseService';
 import notificationService from '../services/NotificationService';
-import readingPlanService from '../services/ReadingPlanService';
-import { Book, ReadingPlanDay } from '../types';
+import { Book } from '../types';
 
 export default function HomeScreen() {
-  // Planos de leitura desativados temporariamente
-  const [todayReading, setTodayReading] = useState<ReadingPlanDay | null>(null);
+  const [readingPlan, setReadingPlan] = useState<ReadingPlan | null>(null);
+  const [todayReading, setTodayReading] = useState<TodayReading | null>(null);
   const [loading, setLoading] = useState(true);
+  const [creatingPlan, setCreatingPlan] = useState(false);
   const [fontSizePref, setFontSizePref] = useState<'small' | 'medium' | 'large'>('medium');
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
 
   useEffect(() => { initializeApp(); }, []);
@@ -31,7 +33,8 @@ export default function HomeScreen() {
         if (mounted) {
           if (userFont) setFontSizePref(userFont);
           if (userTheme) setTheme(userTheme);
-
+          // Recarregar plano de leitura
+          loadReadingPlan();
         }
       } catch {}
     })();
@@ -42,12 +45,20 @@ export default function HomeScreen() {
     try {
       await DatabaseService.init();
       await notificationService.requestPermissions();
-      // Carregamento de planos desativado (em desenvolvimento)
+      await authService.init();
+      
+      setIsAuthenticated(authService.isAuthenticated());
+      
+      // Carregar plano de leitura se autenticado
+      if (authService.isAuthenticated()) {
+        await loadReadingPlan();
+      }
+      
       const settings = await DatabaseService.getMultipleSettings(['fontSize', 'theme']);
       const userFont = settings.fontSize as 'small' | 'medium' | 'large' | null;
       const userTheme = settings.theme as 'light' | 'dark' | null;
-  if (userFont) setFontSizePref(userFont);
-  if (userTheme) setTheme(userTheme);
+      if (userFont) setFontSizePref(userFont);
+      if (userTheme) setTheme(userTheme);
 
     } catch (e) {
       console.error(e);
@@ -55,25 +66,82 @@ export default function HomeScreen() {
     } finally { setLoading(false); }
   };
 
-  const applyFontScale = useCallback((base: number) => {
-    switch (fontSizePref) { case 'small': return base * 0.9; case 'large': return base * 1.2; default: return base; }
-  }, [fontSizePref]);
+  const loadReadingPlan = async () => {
+    try {
+      const response = await authService.getActivePlan();
+      if (response.success && response.data) {
+        setReadingPlan(response.data.plan);
+        setTodayReading(response.data.todayReading);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar plano:', error);
+    }
+  };
 
-  const isDark = theme === 'dark';
-  const colors = {
-    bg: isDark ? '#121212' : '#f5f5f5', headerBg: isDark ? '#1d1d1d' : '#fff', border: isDark ? '#2b2b2b' : '#e0e0e0',
-    card: isDark ? '#1e1e1e' : '#fff', surfaceAlt: isDark ? '#2a2a2a' : '#f0f0f0', textPrimary: isDark ? '#e0e0e0' : '#333',
-    textSecondary: isDark ? '#b0b0b0' : '#666', accent: isDark ? '#90caf9' : '#2196F3', success: isDark ? '#81c784' : '#4CAF50',
-    progressTrack: isDark ? '#2c2c2c' : '#e0e0e0', progressFill: '#4CAF50', iconMuted: isDark ? '#aaaaaa' : '#666', iconForward: isDark ? '#888' : '#999', emptyIcon: isDark ? '#555' : '#ccc'
-  } as const;
+  const handleStartDailyReading = () => {
+    if (!isAuthenticated) {
+      Alert.alert(
+        'Login Necessário',
+        'Para usar a Leitura Diária, você precisa criar uma conta.',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Criar Conta', onPress: () => router.push('/auth') }
+        ]
+      );
+      return;
+    }
 
-  const showPlansDevAlert = () => {
-    Alert.alert('Em desenvolvimento', 'A funcionalidade de planos de leitura ainda está em desenvolvimento.');
+    if (!readingPlan) {
+      Alert.alert(
+        'Criar Plano',
+        'Você ainda não tem um plano de leitura. Deseja criar um agora?',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Criar', onPress: createPlan }
+        ]
+      );
+      return;
+    }
+
+    // Ir para leitura do dia
+    if (todayReading) {
+      // Aqui você pode navegar para a tela de leitura com os capítulos do dia
+      Alert.alert('Leitura do Dia', `${todayReading.bookName} ${todayReading.startChapter}${todayReading.endChapter !== todayReading.startChapter ? `-${todayReading.endChapter}` : ''}`);
+    }
+  };
+
+  const createPlan = async () => {
+    if (creatingPlan) return; // Evitar double-click
+    
+    try {
+      setCreatingPlan(true);
+      const response = await authService.createReadingPlan();
+      if (response.success) {
+        await loadReadingPlan();
+        Alert.alert('Sucesso', response.message);
+      } else {
+        Alert.alert('Erro', response.message);
+      }
+    } catch (error) {
+      Alert.alert('Erro', 'Falha ao criar plano de leitura');
+    } finally {
+      setCreatingPlan(false);
+    }
   };
 
   const handleMarkReadingComplete = async () => {
-    if (!todayReading) return;
-    try { await readingPlanService.markDayAsCompleted(todayReading.id); setTodayReading({ ...todayReading, isCompleted: true }); Alert.alert('Parabéns!', 'Leitura marcada como concluída! 🎉'); } catch { Alert.alert('Erro','Falha ao marcar leitura'); }
+    if (!todayReading || !readingPlan) return;
+    try {
+      const response = await authService.completeDay(todayReading.day);
+      if (response.success) {
+        Alert.alert('Parabéns!', 'Leitura marcada como concluída! 🎉');
+        await loadReadingPlan();
+      } else {
+        Alert.alert('Erro', response.message);
+      }
+    } catch {
+      Alert.alert('Erro', 'Falha ao marcar leitura');
+    }
   };
 
   const startFreeReading = async () => {
@@ -113,6 +181,18 @@ export default function HomeScreen() {
     } catch { Alert.alert('Erro','Falha ao iniciar leitura livre'); }
   };
 
+  const applyFontScale = useCallback((base: number) => {
+    switch (fontSizePref) { case 'small': return base * 0.9; case 'large': return base * 1.2; default: return base; }
+  }, [fontSizePref]);
+
+  const isDark = theme === 'dark';
+  const colors = {
+    bg: isDark ? '#121212' : '#f5f5f5', headerBg: isDark ? '#1d1d1d' : '#fff', border: isDark ? '#2b2b2b' : '#e0e0e0',
+    card: isDark ? '#1e1e1e' : '#fff', surfaceAlt: isDark ? '#2a2a2a' : '#f0f0f0', textPrimary: isDark ? '#e0e0e0' : '#333',
+    textSecondary: isDark ? '#b0b0b0' : '#666', accent: isDark ? '#90caf9' : '#2196F3', success: isDark ? '#81c784' : '#4CAF50',
+    progressTrack: isDark ? '#2c2c2c' : '#e0e0e0', progressFill: '#4CAF50', iconMuted: isDark ? '#aaaaaa' : '#666', iconForward: isDark ? '#888' : '#999', emptyIcon: isDark ? '#555' : '#ccc'
+  } as const;
+
   if (loading) {
     return <SafeAreaView style={[styles.container,{ backgroundColor: colors.bg }]}><View style={styles.centerContent}><Text style={[styles.loadingText,{ color: colors.textSecondary }]}>Carregando...</Text></View></SafeAreaView>;
   }
@@ -130,15 +210,21 @@ export default function HomeScreen() {
         {/* Ad Banner */}
         <AdBanner />
 
-        {todayReading ? (
+        {/* Plano de Leitura */}
+        {readingPlan && todayReading ? (
           <View style={[styles.todayCard,{ backgroundColor: colors.card, borderLeftColor: colors.accent, shadowOpacity: isDark ? 0.3 : 0.1 }]}> 
-            <Text style={[styles.todayTitle,{ color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Leitura de Hoje</Text>
+            <Text style={[styles.todayTitle,{ color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Leitura de Hoje - Dia {readingPlan.currentDay}/{readingPlan.totalDays}</Text>
             <View style={styles.readingInfo}>
-              {todayReading.readings.map((reading,i) => (
-                <Text key={i} style={[styles.readingText,{ color: colors.textSecondary, fontSize: applyFontScale(16) }]}>
-                  {reading.bookName} {reading.startChapter}{reading.endChapter !== reading.startChapter && `-${reading.endChapter}`}
-                </Text>
-              ))}
+              <Text style={[styles.readingText,{ color: colors.textSecondary, fontSize: applyFontScale(16) }]}>
+                {todayReading.bookName} {todayReading.startChapter}{todayReading.endChapter !== todayReading.startChapter && `-${todayReading.endChapter}`}
+              </Text>
+              <Text style={[styles.readingProgress,{ color: colors.textSecondary, fontSize: applyFontScale(14), marginTop: 8 }]}>
+                Progresso: {readingPlan.completedChapters}/{readingPlan.totalChapters} capítulos ({readingPlan.progress}%)
+              </Text>
+              {/* Barra de progresso */}
+              <View style={[styles.progressBar,{ backgroundColor: colors.progressTrack, marginTop: 8 }]}>
+                <View style={[styles.progressFill,{ backgroundColor: colors.progressFill, width: `${readingPlan.progress}%` }]} />
+              </View>
             </View>
             {!todayReading.isCompleted ? (
               <TouchableOpacity style={styles.completeButton} onPress={handleMarkReadingComplete}>
@@ -152,19 +238,43 @@ export default function HomeScreen() {
               </View>
             )}
           </View>
+        ) : isAuthenticated && readingPlan && !todayReading ? (
+          <View style={[styles.noReadingCard,{ backgroundColor: colors.card, shadowOpacity: isDark ? 0.3 : 0.1 }]}> 
+            <Ionicons name="checkmark-done-circle" size={48} color={colors.success} />
+            <Text style={[styles.noReadingTitle,{ color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Todas as leituras do dia concluídas!</Text>
+            <Text style={[styles.noReadingText,{ color: colors.textSecondary, fontSize: applyFontScale(14), lineHeight: applyFontScale(20) }]}>Volte amanhã para continuar sua jornada</Text>
+          </View>
+        ) : !isAuthenticated ? (
+          <View style={[styles.noReadingCard,{ backgroundColor: colors.card, shadowOpacity: isDark ? 0.3 : 0.1 }]}> 
+            <Ionicons name="calendar-outline" size={48} color={colors.emptyIcon} />
+            <Text style={[styles.noReadingTitle,{ color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Leitura Diária</Text>
+            <Text style={[styles.noReadingText,{ color: colors.textSecondary, fontSize: applyFontScale(14), lineHeight: applyFontScale(20) }]}>Crie uma conta para ter acesso ao plano de leitura anual da Bíblia</Text>
+            <TouchableOpacity style={styles.createPlanButton} onPress={() => router.push('/auth')}>
+              <Text style={[styles.createPlanButtonText,{ fontSize: applyFontScale(16) }]}>Criar Conta</Text>
+            </TouchableOpacity>
+          </View>
         ) : (
           <View style={[styles.noReadingCard,{ backgroundColor: colors.card, shadowOpacity: isDark ? 0.3 : 0.1 }]}> 
             <Ionicons name="calendar-outline" size={48} color={colors.emptyIcon} />
-            <Text style={[styles.noReadingTitle,{ color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Nenhuma leitura programada</Text>
-            <Text style={[styles.noReadingText,{ color: colors.textSecondary, fontSize: applyFontScale(14), lineHeight: applyFontScale(20) }]}>Crie um plano de leitura para começar sua jornada bíblica</Text>
-            <TouchableOpacity style={[styles.createPlanButton, styles.disabledButton]} onPress={showPlansDevAlert}>
-              <Text style={[styles.createPlanButtonText, styles.disabledButtonText,{ fontSize: applyFontScale(16) }]}>Criar Plano</Text>
+            <Text style={[styles.noReadingTitle,{ color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Sem plano de leitura</Text>
+            <Text style={[styles.noReadingText,{ color: colors.textSecondary, fontSize: applyFontScale(14), lineHeight: applyFontScale(20) }]}>Crie seu plano para ler toda a Bíblia até o fim do ano</Text>
+            <TouchableOpacity 
+              style={[styles.createPlanButton, creatingPlan && styles.createPlanButtonDisabled]} 
+              onPress={createPlan}
+              disabled={creatingPlan}
+            >
+              {creatingPlan ? (
+                <Text style={[styles.createPlanButtonText,{ fontSize: applyFontScale(16) }]}>Criando...</Text>
+              ) : (
+                <Text style={[styles.createPlanButtonText,{ fontSize: applyFontScale(16) }]}>Criar Plano</Text>
+              )}
             </TouchableOpacity>
           </View>
         )}
 
         <View style={styles.actionsSection}>
           <Text style={[styles.sectionTitle,{ color: colors.textPrimary, fontSize: applyFontScale(20) }]}>Modo de Leitura</Text>
+          
           <TouchableOpacity style={[styles.actionCard,{ backgroundColor: colors.card, shadowOpacity: isDark ? 0.25 : 0.1 }]} onPress={startFreeReading}>
             <View style={[styles.actionIcon,{ backgroundColor: colors.surfaceAlt }]}><Ionicons name="book-outline" size={32} color={colors.accent} /></View>
             <View style={styles.actionContent}>
@@ -174,14 +284,16 @@ export default function HomeScreen() {
             <Ionicons name="chevron-forward" size={20} color={colors.iconForward} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.actionCard, styles.disabledCard,{ backgroundColor: colors.card, shadowOpacity: isDark ? 0.25 : 0.1 }]} onPress={showPlansDevAlert} activeOpacity={0.8}>
-            <View style={[styles.actionIcon,{ backgroundColor: colors.surfaceAlt }]}><Ionicons name="calendar-outline" size={32} color={isDark ? '#ffb74d' : '#FF9800'} /></View>
-            <View style={styles.actionContent}>
-              <Text style={[styles.actionTitle, styles.disabledText,{ color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Planos de Leitura</Text>
-              <Text style={[styles.actionDescription, styles.disabledText,{ color: colors.textSecondary, fontSize: applyFontScale(14) }]}>Em desenvolvimento</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.iconForward} />
-          </TouchableOpacity>
+          {isAuthenticated && readingPlan && (
+            <TouchableOpacity style={[styles.actionCard,{ backgroundColor: colors.card, shadowOpacity: isDark ? 0.25 : 0.1 }]} onPress={() => router.push('/reading-history')}>
+              <View style={[styles.actionIcon,{ backgroundColor: colors.surfaceAlt }]}><Ionicons name="calendar-outline" size={32} color={isDark ? '#ffb74d' : '#FF9800'} /></View>
+              <View style={styles.actionContent}>
+                <Text style={[styles.actionTitle,{ color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Detalhes da Leitura</Text>
+                <Text style={[styles.actionDescription,{ color: colors.textSecondary, fontSize: applyFontScale(14) }]}>Histórico, próximas leituras e mais</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.iconForward} />
+            </TouchableOpacity>
+          )}
 
           <TouchableOpacity style={[styles.actionCard,{ backgroundColor: colors.card, shadowOpacity: isDark ? 0.25 : 0.1 }]} onPress={() => router.push('/explore')}>
             <View style={[styles.actionIcon,{ backgroundColor: colors.surfaceAlt }]}><Ionicons name="compass-outline" size={32} color={isDark ? '#64b5f6' : '#1976D2'} /></View>
@@ -191,17 +303,6 @@ export default function HomeScreen() {
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.iconForward} />
           </TouchableOpacity>
-
-          {/* {!userLogged && (
-            <TouchableOpacity style={[styles.actionCard,{ backgroundColor: colors.card, shadowOpacity: isDark ? 0.25 : 0.1 }]} onPress={() => router.push('/login')}>
-              <View style={[styles.actionIcon,{ backgroundColor: colors.surfaceAlt }]}><Ionicons name="log-in-outline" size={32} color={isDark ? '#64b5f6' : '#1976D2'} /></View>
-              <View style={styles.actionContent}>
-                <Text style={[styles.actionTitle,{ color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Login</Text>
-                <Text style={[styles.actionDescription,{ color: colors.textSecondary, fontSize: applyFontScale(14) }]}>Entre para salvar seu ranking</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.iconForward} />
-            </TouchableOpacity>
-          )} */}
         </View>
 
         <View style={styles.actionsSection}>
@@ -255,8 +356,10 @@ const styles = StyleSheet.create({
   noReadingTitle: { fontSize: 18, fontWeight: '600', color: '#333', marginTop: 16, marginBottom: 8 },
   noReadingText: { fontSize: 14, color: '#666', textAlign: 'center', marginBottom: 20, lineHeight: 20 },
   createPlanButton: { backgroundColor: '#2196F3', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 },
+  createPlanButtonDisabled: { backgroundColor: '#999', opacity: 0.6 },
   disabledButton: { backgroundColor: '#888' },
   createPlanButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   disabledButtonText: { color: '#eee' },
   disabledText: { opacity: 0.7 },
+  readingProgress: { fontSize: 14, color: '#666', marginTop: 8 },
 });
