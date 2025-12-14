@@ -529,4 +529,432 @@ export default class ReadingPlanController {
       })
     }
   }
+
+  /**
+   * Retorna ranking global de usuários baseado no desempenho de leitura
+   */
+  async getRanking({ response }: HttpContext) {
+    try {
+      const plans = await ReadingPlan.query()
+        .preload('user')
+        .preload('progress', (query) => {
+          query.where('is_completed', true).orderBy('completed_at', 'asc')
+        })
+        .where('is_active', true)
+        .orderBy('completed_chapters', 'desc')
+
+      const ranking = plans.map((plan, index) => {
+        const user = plan.user
+        const progress = plan.progress
+
+        // Calcular estatísticas
+        const totalDaysRead = progress.length
+        const averageChaptersPerDay = totalDaysRead > 0
+          ? (plan.completedChapters / totalDaysRead).toFixed(1)
+          : '0.0'
+
+        // Encontrar horário mais comum de leitura
+        const readingHours = progress.map(p => {
+          if (p.completedAt) {
+            const dt = p.completedAt instanceof DateTime ? p.completedAt : DateTime.fromJSDate(p.completedAt)
+            return dt.hour
+          }
+          return null
+        }).filter(h => h !== null)
+
+        const mostCommonHour = readingHours.length > 0
+          ? Math.round(readingHours.reduce((a, b) => a + b, 0) / readingHours.length)
+          : null
+
+        // Calcular sequência atual (streak)
+        let currentStreak = 0
+
+        for (let i = 0; i < plan.totalDays; i++) {
+          const dayProgress = progress.find(p => p.day === plan.currentDay - i)
+          if (dayProgress && dayProgress.isCompleted) {
+            currentStreak++
+          } else {
+            break
+          }
+        }
+
+        // Última leitura
+        const lastReading = progress.length > 0 && progress[progress.length - 1].completedAt
+          ? (progress[progress.length - 1].completedAt instanceof DateTime
+              ? progress[progress.length - 1].completedAt
+              : DateTime.fromJSDate(progress[progress.length - 1].completedAt!)).toFormat('dd/MM/yyyy HH:mm')
+          : null
+
+        return {
+          position: index + 1,
+          userName: user?.fullName || 'Usuário',
+          userEmail: user?.email || '',
+          planName: plan.name,
+          completedChapters: plan.completedChapters,
+          totalChapters: plan.totalChapters,
+          progressPercentage: Math.round((plan.completedChapters / plan.totalChapters) * 100),
+          currentDay: plan.currentDay,
+          totalDays: plan.totalDays,
+          totalDaysRead,
+          averageChaptersPerDay: parseFloat(averageChaptersPerDay),
+          currentStreak,
+          mostCommonHour,
+          lastReading,
+          startDate: plan.startDate.toFormat('dd/MM/yyyy'),
+          endDate: plan.endDate.toFormat('dd/MM/yyyy')
+        }
+      })
+
+      return response.ok({
+        success: true,
+        data: ranking
+      })
+    } catch (error) {
+      console.error('Erro ao buscar ranking:', error)
+      return response.badRequest({
+        success: false,
+        message: 'Erro ao buscar ranking'
+      })
+    }
+  }
+
+  /**
+   * Retorna página HTML com ranking de usuários
+   */
+  async getRankingPage({ response }: HttpContext) {
+    try {
+      const plans = await ReadingPlan.query()
+        .preload('user')
+        .preload('progress', (query) => {
+          query.where('is_completed', true).orderBy('completed_at', 'asc')
+        })
+        .where('is_active', true)
+        .orderBy('completed_chapters', 'desc')
+
+      const ranking = plans.map((plan, index) => {
+        const user = plan.user
+        const progress = plan.progress
+
+        const totalDaysRead = progress.length
+        const averageChaptersPerDay = totalDaysRead > 0
+          ? (plan.completedChapters / totalDaysRead).toFixed(1)
+          : '0.0'
+
+        const readingHours = progress.map(p => {
+          if (p.completedAt) {
+            const dt = p.completedAt instanceof DateTime ? p.completedAt : DateTime.fromJSDate(p.completedAt)
+            return dt.hour
+          }
+          return null
+        }).filter(h => h !== null)
+
+        const mostCommonHour = readingHours.length > 0
+          ? Math.round(readingHours.reduce((a, b) => a + b, 0) / readingHours.length)
+          : null
+
+        let currentStreak = 0
+        for (let i = 0; i < plan.totalDays; i++) {
+          const dayProgress = progress.find(p => p.day === plan.currentDay - i)
+          if (dayProgress && dayProgress.isCompleted) {
+            currentStreak++
+          } else {
+            break
+          }
+        }
+
+        const lastReading = progress.length > 0 && progress[progress.length - 1].completedAt
+          ? (progress[progress.length - 1].completedAt instanceof DateTime
+              ? progress[progress.length - 1].completedAt
+              : DateTime.fromJSDate(progress[progress.length - 1].completedAt!)).toFormat('dd/MM/yyyy HH:mm')
+          : 'Nunca'
+
+        return {
+          position: index + 1,
+          userName: user?.fullName || 'Usuário',
+          completedChapters: plan.completedChapters,
+          totalChapters: plan.totalChapters,
+          progressPercentage: Math.round((plan.completedChapters / plan.totalChapters) * 100),
+          currentDay: plan.currentDay,
+          totalDays: plan.totalDays,
+          totalDaysRead,
+          averageChaptersPerDay,
+          currentStreak,
+          mostCommonHour: mostCommonHour ? `${mostCommonHour}:00` : 'N/A',
+          lastReading
+        }
+      })
+
+      const html = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ranking de Leitura Bíblica</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .header {
+      background: white;
+      border-radius: 16px;
+      padding: 32px;
+      margin-bottom: 24px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+
+    .header h1 {
+      color: #667eea;
+      font-size: 36px;
+      margin-bottom: 8px;
+    }
+
+    .header p {
+      color: #666;
+      font-size: 16px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+
+    .stat-card h3 {
+      color: #999;
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+
+    .stat-card p {
+      color: #333;
+      font-size: 28px;
+      font-weight: bold;
+    }
+
+    .ranking-table {
+      background: white;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    thead {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    th {
+      padding: 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    td {
+      padding: 16px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    tbody tr:hover {
+      background: #f8f9ff;
+    }
+
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    .position {
+      font-weight: bold;
+      font-size: 20px;
+      color: #667eea;
+      width: 60px;
+      text-align: center;
+    }
+
+    .position.gold { color: #FFD700; }
+    .position.silver { color: #C0C0C0; }
+    .position.bronze { color: #CD7F32; }
+
+    .user-name {
+      font-weight: 600;
+      color: #333;
+      font-size: 16px;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 8px;
+      background: #f0f0f0;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+      transition: width 0.3s ease;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      background: #667eea;
+      color: white;
+    }
+
+    .badge.streak {
+      background: #f59e0b;
+    }
+
+    .badge.time {
+      background: #10b981;
+    }
+
+    .stat-value {
+      color: #666;
+      font-size: 14px;
+    }
+
+    @media (max-width: 768px) {
+      .header h1 {
+        font-size: 24px;
+      }
+
+      table {
+        font-size: 12px;
+      }
+
+      th, td {
+        padding: 8px;
+      }
+
+      .hide-mobile {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🏆 Ranking de Leitura Bíblica</h1>
+      <p>Desempenho dos usuários na jornada de leitura</p>
+    </div>
+
+    <div class="stats">
+      <div class="stat-card">
+        <h3>Total de Leitores</h3>
+        <p>${ranking.length}</p>
+      </div>
+      <div class="stat-card">
+        <h3>Capítulos Lidos</h3>
+        <p>${ranking.reduce((sum, r) => sum + r.completedChapters, 0)}</p>
+      </div>
+      <div class="stat-card">
+        <h3>Média de Progresso</h3>
+        <p>${ranking.length > 0 ? Math.round(ranking.reduce((sum, r) => sum + r.progressPercentage, 0) / ranking.length) : 0}%</p>
+      </div>
+      <div class="stat-card">
+        <h3>Maior Sequência</h3>
+        <p>${ranking.length > 0 ? Math.max(...ranking.map(r => r.currentStreak)) : 0} dias</p>
+      </div>
+    </div>
+
+    <div class="ranking-table">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Usuário</th>
+            <th>Progresso</th>
+            <th class="hide-mobile">Dias de Leitura</th>
+            <th class="hide-mobile">Média/Dia</th>
+            <th class="hide-mobile">Sequência</th>
+            <th class="hide-mobile">Horário Comum</th>
+            <th>Última Leitura</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${ranking.map(r => `
+            <tr>
+              <td class="position ${r.position === 1 ? 'gold' : r.position === 2 ? 'silver' : r.position === 3 ? 'bronze' : ''}">${r.position}º</td>
+              <td>
+                <div class="user-name">${r.userName}</div>
+                <div class="stat-value">${r.currentDay}/${r.totalDays} dias</div>
+              </td>
+              <td>
+                <div class="stat-value">${r.completedChapters}/${r.totalChapters} capítulos</div>
+                <div class="progress-bar">
+                  <div class="progress-fill" style="width: ${r.progressPercentage}%"></div>
+                </div>
+              </td>
+              <td class="hide-mobile">
+                <span class="badge">${r.totalDaysRead} dias</span>
+              </td>
+              <td class="hide-mobile">
+                <span class="stat-value">${r.averageChaptersPerDay} cap/dia</span>
+              </td>
+              <td class="hide-mobile">
+                <span class="badge streak">🔥 ${r.currentStreak}</span>
+              </td>
+              <td class="hide-mobile">
+                <span class="badge time">🕐 ${r.mostCommonHour}</span>
+              </td>
+              <td>
+                <span class="stat-value">${r.lastReading}</span>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</body>
+</html>
+      `
+
+      return response.header('Content-Type', 'text/html; charset=utf-8').send(html)
+    } catch (error) {
+      console.error('Erro ao gerar página de ranking:', error)
+      return response.status(500).send('<h1>Erro ao carregar ranking</h1>')
+    }
+  }
 }

@@ -7,12 +7,12 @@
 |
 */
 
+import AuthController from '#controllers/auth_controller'
+import QueueController from '#controllers/queue_controller'
+import QuizController from '#controllers/quiz_controller'
+import ReadingPlanController from '#controllers/reading_plan_controller'
 import router from '@adonisjs/core/services/router'
 import { middleware } from './kernel.js'
-import QuizController from '#controllers/quiz_controller'
-import QueueController from '#controllers/queue_controller'
-import AuthController from '#controllers/auth_controller'
-import ReadingPlanController from '#controllers/reading_plan_controller'
 
 router.get('/', async () => {
   return {
@@ -34,6 +34,10 @@ router.post('/reading-plans/unmark', [ReadingPlanController, 'unmarkDay']).use(m
 router.get('/reading-plans/history', [ReadingPlanController, 'getHistory']).use(middleware.auth())
 router.get('/reading-plans/all-history', [ReadingPlanController, 'getAllHistory']).use(middleware.auth())
 router.delete('/reading-plans', [ReadingPlanController, 'deletePlan']).use(middleware.auth())
+
+// Ranking routes (public)
+router.get('/ranking', [ReadingPlanController, 'getRanking'])
+router.get('/ranking/page', [ReadingPlanController, 'getRankingPage'])
 
 // Quiz individual
 router.post('/generate-quiz', [QuizController, 'generate'])

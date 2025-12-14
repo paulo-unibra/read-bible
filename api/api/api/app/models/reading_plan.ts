@@ -1,7 +1,8 @@
-import { DateTime } from 'luxon'
-import { BaseModel, column, belongsTo } from '@adonisjs/lucid/orm'
-import type { BelongsTo } from '@adonisjs/lucid/types/relations'
+import ReadingProgress from '#models/reading_progress'
 import User from '#models/user'
+import { BaseModel, belongsTo, column, hasMany } from '@adonisjs/lucid/orm'
+import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
+import { DateTime } from 'luxon'
 
 export default class ReadingPlan extends BaseModel {
   static table = 'reading_plans'
@@ -50,4 +51,9 @@ export default class ReadingPlan extends BaseModel {
 
   @belongsTo(() => User)
   declare user: BelongsTo<typeof User>
+
+  @hasMany(() => ReadingProgress, {
+    foreignKey: 'readingPlanId'
+  })
+  declare progress: HasMany<typeof ReadingProgress>
 }

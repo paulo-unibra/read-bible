@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ranking de Leitura Bíblica</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    .header {
+      background: white;
+      border-radius: 16px;
+      padding: 32px;
+      margin-bottom: 24px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    
+    .header h1 {
+      color: #667eea;
+      font-size: 36px;
+      margin-bottom: 8px;
+    }
+    
+    .header p {
+      color: #666;
+      font-size: 16px;
+    }
+    
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    
+    .stat-card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+    
+    .stat-card h3 {
+      color: #999;
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+    
+    .stat-card p {
+      color: #333;
+      font-size: 28px;
+      font-weight: bold;
+    }
+    
+    .ranking-table {
+      background: white;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+    }
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    
+    thead {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    
+    th {
+      padding: 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    td {
+      padding: 16px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    
+    tbody tr:hover {
+      background: #f8f9ff;
+    }
+    
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+    
+    .position {
+      font-weight: bold;
+      font-size: 20px;
+      color: #667eea;
+      width: 60px;
+      text-align: center;
+    }
+    
+    .position.gold { color: #FFD700; }
+    .position.silver { color: #C0C0C0; }
+    .position.bronze { color: #CD7F32; }
+    
+    .user-name {
+      font-weight: 600;
+      color: #333;
+      font-size: 16px;
+    }
+    
+    .progress-bar {
+      width: 100%;
+      height: 8px;
+      background: #f0f0f0;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+      transition: width 0.3s ease;
+    }
+    
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      background: #667eea;
+      color: white;
+    }
+    
+    .badge.streak {
+      background: #f59e0b;
+    }
+    
+    .badge.time {
+      background: #10b981;
+    }
+    
+    .stat-value {
+      color: #666;
+      font-size: 14px;
+    }
+    
+    .loading {
+      text-align: center;
+      padding: 60px 20px;
+      color: white;
+      font-size: 18px;
+    }
+    
+    .error {
+      background: #fee;
+      color: #c33;
+      padding: 20px;
+      border-radius: 8px;
+      text-align: center;
+      margin: 20px 0;
+    }
+    
+    .refresh-btn {
+      background: white;
+      color: #667eea;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 16px;
+      transition: transform 0.2s;
+    }
+    
+    .refresh-btn:hover {
+      transform: scale(1.05);
+    }
+    
+    @media (max-width: 768px) {
+      .header h1 {
+        font-size: 24px;
+      }
+      
+      table {
+        font-size: 12px;
+      }
+      
+      th, td {
+        padding: 8px;
+      }
+      
+      .hide-mobile {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🏆 Ranking de Leitura Bíblica</h1>
+      <p>Desempenho dos usuários na jornada de leitura</p>
+      <button class="refresh-btn" onclick="loadRanking()">🔄 Atualizar</button>
+    </div>
+    
+    <div id="loading" class="loading">
+      Carregando ranking...
+    </div>
+    
+    <div id="error" style="display: none;"></div>
+    
+    <div id="content" style="display: none;">
+      <div class="stats">
+        <div class="stat-card">
+          <h3>Total de Leitores</h3>
+          <p id="stat-total">0</p>
+        </div>
+        <div class="stat-card">
+          <h3>Capítulos Lidos</h3>
+          <p id="stat-chapters">0</p>
+        </div>
+        <div class="stat-card">
+          <h3>Média de Progresso</h3>
+          <p id="stat-progress">0%</p>
+        </div>
+        <div class="stat-card">
+          <h3>Maior Sequência</h3>
+          <p id="stat-streak">0 dias</p>
+        </div>
+      </div>
+      
+      <div class="ranking-table">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Usuário</th>
+              <th>Progresso</th>
+              <th class="hide-mobile">Dias de Leitura</th>
+              <th class="hide-mobile">Média/Dia</th>
+              <th class="hide-mobile">Sequência</th>
+              <th class="hide-mobile">Horário Comum</th>
+              <th>Última Leitura</th>
+            </tr>
+          </thead>
+          <tbody id="ranking-body">
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_URL = 'http://192.168.1.4:1999';
+    
+    async function loadRanking() {
+      const loadingEl = document.getElementById('loading');
+      const errorEl = document.getElementById('error');
+      const contentEl = document.getElementById('content');
+      
+      // Mostrar loading
+      loadingEl.style.display = 'block';
+      errorEl.style.display = 'none';
+      contentEl.style.display = 'none';
+      
+      try {
+        const response = await fetch(`${API_URL}/ranking`);
+        
+        if (!response.ok) {
+          throw new Error(`Erro na API: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+          throw new Error(result.message || 'Erro ao carregar ranking');
+        }
+        
+        const ranking = result.data;
+        
+        // Calcular estatísticas
+        const totalReaders = ranking.length;
+        const totalChapters = ranking.reduce((sum, r) => sum + r.completedChapters, 0);
+        const avgProgress = totalReaders > 0 
+          ? Math.round(ranking.reduce((sum, r) => sum + r.progressPercentage, 0) / totalReaders)
+          : 0;
+        const maxStreak = totalReaders > 0 
+          ? Math.max(...ranking.map(r => r.currentStreak))
+          : 0;
+        
+        // Atualizar estatísticas
+        document.getElementById('stat-total').textContent = totalReaders;
+        document.getElementById('stat-chapters').textContent = totalChapters;
+        document.getElementById('stat-progress').textContent = `${avgProgress}%`;
+        document.getElementById('stat-streak').textContent = `${maxStreak} dias`;
+        
+        // Gerar tabela
+        const tbody = document.getElementById('ranking-body');
+        tbody.innerHTML = '';
+        
+        ranking.forEach(r => {
+          const positionClass = r.position === 1 ? 'gold' : r.position === 2 ? 'silver' : r.position === 3 ? 'bronze' : '';
+          
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td class="position ${positionClass}">${r.position}º</td>
+            <td>
+              <div class="user-name">${r.userName}</div>
+              <div class="stat-value">${r.currentDay}/${r.totalDays} dias</div>
+            </td>
+            <td>
+              <div class="stat-value">${r.completedChapters}/${r.totalChapters} capítulos</div>
+              <div class="progress-bar">
+                <div class="progress-fill" style="width: ${r.progressPercentage}%"></div>
+              </div>
+            </td>
+            <td class="hide-mobile">
+              <span class="badge">${r.totalDaysRead} dias</span>
+            </td>
+            <td class="hide-mobile">
+              <span class="stat-value">${r.averageChaptersPerDay} cap/dia</span>
+            </td>
+            <td class="hide-mobile">
+              <span class="badge streak">🔥 ${r.currentStreak}</span>
+            </td>
+            <td class="hide-mobile">
+              <span class="badge time">🕐 ${r.mostCommonHour !== null ? r.mostCommonHour + ':00' : 'N/A'}</span>
+            </td>
+            <td>
+              <span class="stat-value">${r.lastReading || 'Nunca'}</span>
+            </td>
+          `;
+          tbody.appendChild(row);
+        });
+        
+        // Mostrar conteúdo
+        loadingEl.style.display = 'none';
+        contentEl.style.display = 'block';
+        
+      } catch (error) {
+        console.error('Erro ao carregar ranking:', error);
+        
+        loadingEl.style.display = 'none';
+        errorEl.style.display = 'block';
+        errorEl.className = 'error';
+        errorEl.innerHTML = `
+          <strong>Erro ao carregar ranking</strong><br>
+          ${error.message}<br>
+          <button class="refresh-btn" onclick="loadRanking()">Tentar Novamente</button>
+        `;
+      }
+    }
+    
+    // Carregar ao abrir a página
+    loadRanking();
+    
+    // Auto-refresh a cada 30 segundos
+    setInterval(loadRanking, 30000);
+  </script>
+</body>
+</html>
