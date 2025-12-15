@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View, StatusBar } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import authService, { ReadingPlan, TodayReading } from '../services/AuthService';
 import DatabaseService from '../services/DatabaseService';
 
@@ -179,15 +179,15 @@ export default function ReadingHistoryScreen() {
     return (
       <View style={[styles.container, { backgroundColor: colors.bg }]}>
         <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.headerBg} />
-        <View style={[styles.header, { backgroundColor: colors.headerBg, borderBottomColor: colors.border }]}>
+        {/* <View style={[styles.header, { backgroundColor: colors.headerBg, borderBottomColor: colors.border }]}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: colors.textPrimary, fontSize: applyFontScale(20) }]}>
-            Detalhes da Leitura
+            Detalhes da Leitura2
           </Text>
           <View style={{ width: 40 }} />
-        </View>
+        </View> */}
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color={colors.accent} />
           <Text style={[styles.loadingText, { color: colors.textSecondary, fontSize: applyFontScale(16) }]}>
@@ -201,17 +201,17 @@ export default function ReadingHistoryScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.headerBg} />
-      <View style={[styles.header, { backgroundColor: colors.headerBg, borderBottomColor: colors.border }]}>
+      {/* <View style={[styles.header, { backgroundColor: colors.headerBg, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.textPrimary, fontSize: applyFontScale(20) }]}>
-          Detalhes da Leitura
+          Detalhes da Leitura3
         </Text>
         <TouchableOpacity onPress={handleDeletePlan} style={styles.deleteButton}>
           <Ionicons name="trash-outline" size={24} color={colors.danger} />
         </TouchableOpacity>
-      </View>
+      </View> */}
 
       <ScrollView style={styles.scrollView}>
         {/* Próxima Leitura */}
@@ -237,7 +237,7 @@ export default function ReadingHistoryScreen() {
                   <Text style={[styles.nextReadingLabel, { color: colors.accent, fontSize: applyFontScale(12) }]}>
                     Pendente
                   </Text>
-                </View>
+                </View> 
               </View>
               
               {!nextReading.isCompleted && (
