@@ -240,23 +240,23 @@ export default function ReadingHistoryScreen() {
                 </View> 
               </View>
               
-              {!nextReading.isCompleted && (
-                <TouchableOpacity
-                  style={[styles.markButton, { backgroundColor: colors.success }]}
-                  onPress={() => handleToggleReading({
-                    id: 0,
-                    day: nextReading.day,
-                    bookName: nextReading.bookName,
-                    startChapter: nextReading.startChapter,
-                    endChapter: nextReading.endChapter,
-                    isCompleted: false,
-                    completedAt: null,
-                    updatedAt: new Date().toISOString()
-                  })}
-                >
-                  <Ionicons name="checkmark-circle" size={20} color="#fff" />
-                </TouchableOpacity>
-              )}
+                {!nextReading.isCompleted && (
+                  <TouchableOpacity
+                    style={[styles.markButton, { backgroundColor: colors.success }]}
+                    onPress={() => handleToggleReading({
+                      id: 0,
+                      day: nextReading.day,
+                      bookName: nextReading.bookName,
+                      startChapter: nextReading.startChapter,
+                      endChapter: nextReading.endChapter,
+                      isCompleted: false,
+                      completedAt: null,
+                      updatedAt: new Date().toISOString()
+                    })}
+                  >
+                    <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                  </TouchableOpacity>
+                )}
             </View>
           </View>
         )}
