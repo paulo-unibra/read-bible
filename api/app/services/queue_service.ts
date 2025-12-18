@@ -1,5 +1,5 @@
-import DeepSeekService from '#services/deep_seek_service'
 import CloudStorageService from '#services/cloud_storage_service'
+import DeepSeekService from '#services/deep_seek_service'
 import env from '#start/env'
 
 interface QueueJob {
@@ -41,7 +41,7 @@ export default class QueueService {
     'Ezequiel': 48, 'Daniel': 12, 'Oséias': 14, 'Joel': 3, 'Amós': 9,
     'Obadias': 1, 'Jonas': 4, 'Miquéias': 7, 'Naum': 3, 'Habacuque': 3,
     'Sofonias': 3, 'Ageu': 2, 'Zacarias': 14, 'Malaquias': 4,
-    
+
     // Novo Testamento
     'Mateus': 28, 'Marcos': 16, 'Lucas': 24, 'João': 21, 'Atos': 28,
     'Romanos': 16, '1 Coríntios': 16, '2 Coríntios': 13, 'Gálatas': 6, 'Efésios': 6,
@@ -53,7 +53,7 @@ export default class QueueService {
 
   static createBookJob(bookName: string, bibleVersion: string): BookJob {
     const totalChapters = this.bookChapters[bookName]
-    
+
     if (!totalChapters) {
       throw new Error(`Livro "${bookName}" não encontrado. Verifique o nome.`)
     }
