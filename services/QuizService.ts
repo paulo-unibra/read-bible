@@ -1,3 +1,5 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 interface Question {
   id: string;
   pergunta: string;
@@ -265,6 +267,122 @@ class QuizService {
     if (percentage >= 70) return "Bom trabalho! 👍";
     if (percentage >= 60) return "Razoável. Que tal revisar o capítulo? 📖";
     return "Precisa estudar mais este capítulo. 📚";
+  }
+
+  // Mapeamento reverso de bookId para nome do livro
+  private getBookName(bookId: number): string {
+    const mapping: { [key: number]: string } = {
+      1: 'Gênesis', 2: 'Êxodo', 3: 'Levítico', 4: 'Números', 5: 'Deuteronômio',
+      6: 'Josué', 7: 'Juízes', 8: 'Rute', 9: '1 Samuel', 10: '2 Samuel',
+      11: '1 Reis', 12: '2 Reis', 13: '1 Crônicas', 14: '2 Crônicas',
+      15: 'Esdras', 16: 'Neemias', 17: 'Ester', 18: 'Jó', 19: 'Salmos',
+      20: 'Provérbios', 21: 'Eclesiastes', 22: 'Cantares', 23: 'Isaías',
+      24: 'Jeremias', 25: 'Lamentações', 26: 'Ezequiel', 27: 'Daniel',
+      28: 'Oséias', 29: 'Joel', 30: 'Amós', 31: 'Obadias', 32: 'Jonas',
+      33: 'Miquéias', 34: 'Naum', 35: 'Habacuque', 36: 'Sofonias',
+      37: 'Ageu', 38: 'Zacarias', 39: 'Malaquias', 40: 'Mateus',
+      41: 'Marcos', 42: 'Lucas', 43: 'João', 44: 'Atos', 45: 'Romanos',
+      46: '1 Coríntios', 47: '2 Coríntios', 48: 'Gálatas', 49: 'Efésios',
+      50: 'Filipenses', 51: 'Colossenses', 52: '1 Tessalonicenses',
+      53: '2 Tessalonicenses', 54: '1 Timóteo', 55: '2 Timóteo',
+      56: 'Tito', 57: 'Filemom', 58: 'Hebreus', 59: 'Tiago',
+      60: '1 Pedro', 61: '2 Pedro', 62: '1 João', 63: '2 João',
+      64: '3 João', 65: 'Judas', 66: 'Apocalipse'
+    };
+    return mapping[bookId] || 'Desconhecido';
+  }
+
+  async getQuizId(
+    bookId: number,
+    chapter: number,
+    bibleVersion: string = 'ARC'
+  ): Promise<number | null> {
+    try {
+      const API_URL = process.env.EXPO_PUBLIC_API_URL;
+      const bookName = this.getBookName(bookId);
+
+      console.log('[QuizService] Buscando quizId:', { bookName, chapter, bibleVersion });
+
+      const response = await fetch(
+        `${API_URL}/quizzes?bookName=${encodeURIComponent(bookName)}&bibleVersion=${bibleVersion}`
+      );
+
+      if (!response.ok) {
+        console.warn('[QuizService] Failed to fetch quiz list. Status:', response.status);
+        return null;
+      }
+
+      const result = await response.json();
+      console.log('[QuizService] Quiz list response:', result);
+
+      if (!result.success || !result.quizzes) {
+        console.warn('[QuizService] Invalid response format');
+        return null;
+      }
+
+      // Encontrar o quiz com o capítulo correspondente
+      const quiz = result.quizzes.find(
+        (q: any) => q.chapter === chapter && q.bookName === bookName
+      );
+
+      console.log('[QuizService] Quiz encontrado:', quiz);
+
+      return quiz?.id || null;
+    } catch (error) {
+      console.error('[QuizService] Error fetching quiz ID:', error);
+      return null;
+    }
+  }
+
+  async submitQuizResult(
+    bookId: number,
+    chapter: number,
+    correctAnswers: number,
+    totalQuestions: number,
+    timeSeconds: number,
+    bibleVersion: string = 'ARC'
+  ): Promise<void> {
+    try {
+      const API_URL = process.env.EXPO_PUBLIC_API_URL;
+      const token = await AsyncStorage.getItem('@auth_token');
+
+      if (!token) {
+        console.warn('[QuizService] No token found, skipping result submission');
+        return;
+      }
+
+      // Buscar quizId do backend
+      const quizId = await this.getQuizId(bookId, chapter, bibleVersion);
+      if (!quizId) {
+        console.warn('[QuizService] Quiz not found in database, skipping result submission');
+        return;
+      }
+
+      const response = await fetch(`${API_URL}/quiz-results`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          quizId,
+          correctAnswers,
+          totalQuestions,
+          timeSeconds,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Erro ao salvar resultado');
+      }
+
+      const result = await response.json();
+      console.log('[QuizService] Result submitted successfully:', result);
+    } catch (error) {
+      console.error('[QuizService] Error submitting quiz result:', error);
+      // Não lançar erro para não quebrar a experiência do usuário
+    }
   }
 }
 

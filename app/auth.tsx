@@ -1,16 +1,24 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import React, { useState } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import React, { useEffect, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import authService from '../services/AuthService';
 
 export default function AuthScreen() {
+  const params = useLocalSearchParams();
   const [isLogin, setIsLogin] = useState(true);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Mostrar mensagem se veio dos params
+  useEffect(() => {
+    if (params.message && typeof params.message === 'string') {
+      Alert.alert('Login Necessário', params.message);
+    }
+  }, [params.message]);
 
   const handleAuth = async () => {
     if (!email || !password || (!isLogin && !name)) {
@@ -79,7 +87,7 @@ export default function AuthScreen() {
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.header}>
             <Ionicons name="book" size={64} color="#2196F3" />
-            <Text style={styles.title}>Leitura Diária</Text>
+            <Text style={styles.title}>Bíblia em Foco</Text>
             <Text style={styles.subtitle}>
               {isLogin ? 'Entre para continuar' : 'Crie sua conta e comece hoje'}
             </Text>
@@ -131,6 +139,15 @@ export default function AuthScreen() {
                 {loading ? 'Aguarde...' : isLogin ? 'Entrar' : 'Criar Conta'}
               </Text>
             </TouchableOpacity>
+
+            {isLogin && (
+              <TouchableOpacity
+                style={styles.forgotButton}
+                onPress={() => router.push('/forgot-password')}
+              >
+                <Text style={styles.forgotText}>Esqueceu a senha?</Text>
+              </TouchableOpacity>
+            )}
 
             <TouchableOpacity
               style={styles.switchButton}
@@ -229,6 +246,14 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: '600',
+  },
+  forgotButton: {
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  forgotText: {
+    color: '#2196F3',
+    fontSize: 14,
   },
   switchButton: {
     marginTop: 20,

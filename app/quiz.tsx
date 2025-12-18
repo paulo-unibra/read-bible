@@ -16,6 +16,7 @@ import {
     SafeAreaView,
     useSafeAreaInsets,
 } from "react-native-safe-area-context";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from "../constants/theme";
 import QuizService, {
     Quiz,
@@ -71,6 +72,18 @@ export default function QuizScreen() {
   const loadQuiz = useCallback(async () => {
     try {
       setLoading(true);
+      
+      // Verificar autenticação
+      const token = await AsyncStorage.getItem('@auth_token');
+      if (!token) {
+        // Redirecionar para tela de login
+        router.replace({
+          pathname: '/auth',
+          params: { message: 'Faça login para realizar um questionário' }
+        });
+        return;
+      }
+      
       const quizData = await QuizService.loadQuiz(bookId, chapterNumber);
       setQuiz(quizData);
 
@@ -226,9 +239,11 @@ export default function QuizScreen() {
   // Registrar entrada de ranking quando resultados mostrados
   useEffect(() => {
     if (showResult && session && !rankingRegistered) {
-      // Sem autenticação, usar ID anônimo
+      // Calcular estatísticas
+      const score = QuizService.calculateScore(session);
+      
+      // Registrar no ranking local (sem autenticação)
       try {
-        const score = QuizService.calculateScore(session);
         RankingService.addEntry({
           userId: 'anonymous-user',
           bookId: bookId,
@@ -241,11 +256,30 @@ export default function QuizScreen() {
           averageTimeMs: score.averageTime,
         });
       } catch (e) {
-        console.warn("Falha ao registrar ranking", e);
+        console.warn("Falha ao registrar ranking local", e);
       }
+
+      // Enviar resultado para o backend (requer autenticação)
+      const submitResult = async () => {
+        try {
+          await QuizService.submitQuizResult(
+            bookId,
+            chapterNumber,
+            score.correct,
+            score.total,
+            Math.round(score.totalTime / 1000), // converter ms para segundos
+            bibleVersion
+          );
+          console.log('[QuizScreen] Resultado enviado ao backend');
+        } catch (error) {
+          console.warn('[QuizScreen] Erro ao enviar resultado:', error);
+        }
+      };
+      submitResult();
+      
       setRankingRegistered(true);
     }
-  }, [showResult, session, rankingRegistered, bookId, chapterNumber]);
+  }, [showResult, session, rankingRegistered, bookId, chapterNumber, bibleVersion]);
 
   const handleAnswerSelect = (answer: string) => {
     if (selectedAnswer || !session) return;

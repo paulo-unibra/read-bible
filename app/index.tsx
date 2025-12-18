@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,6 +12,7 @@ import notificationService from '../services/NotificationService';
 import { Book } from '../types';
 
 export default function HomeScreen() {
+  const params = useLocalSearchParams();
   const [readingPlan, setReadingPlan] = useState<ReadingPlan | null>(null);
   const [todayReading, setTodayReading] = useState<TodayReading | null>(null);
   const [loading, setLoading] = useState(true);
@@ -22,6 +23,13 @@ export default function HomeScreen() {
 
 
   useEffect(() => { initializeApp(); }, []);
+
+  // Mostrar mensagem se veio dos params
+  useEffect(() => {
+    if (params.message && typeof params.message === 'string') {
+      Alert.alert('Login Necessário', params.message);
+    }
+  }, [params.message]);
 
   useFocusEffect(useCallback(() => {
     let mounted = true;

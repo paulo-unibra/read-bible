@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ranking de Quizzes Bíblicos</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    .header {
+      background: white;
+      border-radius: 16px;
+      padding: 32px;
+      margin-bottom: 24px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    
+    .header h1 {
+      color: #667eea;
+      font-size: 36px;
+      margin-bottom: 8px;
+    }
+    
+    .header p {
+      color: #666;
+      font-size: 16px;
+    }
+    
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    
+    .stat-card {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    
+    .stat-card h3 {
+      color: #666;
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .stat-card p {
+      color: #667eea;
+      font-size: 32px;
+      font-weight: bold;
+    }
+    
+    .ranking-table {
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+      overflow-x: auto;
+    }
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    
+    thead {
+      background: #f8f9fa;
+    }
+    
+    th {
+      padding: 16px;
+      text-align: left;
+      font-weight: 600;
+      color: #666;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    td {
+      padding: 16px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    
+    tr:last-child td {
+      border-bottom: none;
+    }
+    
+    .position {
+      font-weight: bold;
+      font-size: 18px;
+      color: #667eea;
+      width: 60px;
+    }
+    
+    .position.gold { color: #FFD700; }
+    .position.silver { color: #C0C0C0; }
+    .position.bronze { color: #CD7F32; }
+    
+    .user-name {
+      font-weight: 600;
+      color: #333;
+      font-size: 16px;
+    }
+    
+    .stat-value {
+      color: #999;
+      font-size: 14px;
+    }
+    
+    .badge {
+      display: inline-block;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      background: #e3f2fd;
+      color: #1976d2;
+    }
+    
+    .badge.score {
+      background: #e8f5e9;
+      color: #388e3c;
+    }
+    
+    .loading {
+      text-align: center;
+      padding: 60px 20px;
+      color: white;
+      font-size: 18px;
+    }
+    
+    .error {
+      background: white;
+      border-radius: 16px;
+      padding: 32px;
+      text-align: center;
+      color: #d32f2f;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+    }
+    
+    .refresh-btn {
+      margin-top: 16px;
+      padding: 12px 24px;
+      background: #667eea;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: 600;
+    }
+    
+    .refresh-btn:hover {
+      background: #5568d3;
+    }
+    
+    @media (max-width: 768px) {
+      .hide-mobile {
+        display: none;
+      }
+      
+      .header h1 {
+        font-size: 24px;
+      }
+      
+      .stat-card p {
+        font-size: 24px;
+      }
+      
+      th, td {
+        padding: 12px 8px;
+        font-size: 13px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="loading" class="loading">
+      <h2>🎯 Carregando Ranking...</h2>
+      <p>Aguarde enquanto buscamos os dados...</p>
+    </div>
+    
+    <div id="error" class="error" style="display: none;"></div>
+    
+    <div id="content" style="display: none;">
+      <div class="header">
+        <h1>🎯 Ranking de Quizzes Bíblicos</h1>
+        <p>Os melhores desempenhos em questionários bíblicos</p>
+      </div>
+      
+      <div class="stats">
+        <div class="stat-card">
+          <h3>Total de Jogadores</h3>
+          <p id="stat-players">0</p>
+        </div>
+        
+        <div class="stat-card">
+          <h3>Total de Quizzes</h3>
+          <p id="stat-quizzes">0</p>
+        </div>
+        
+        <div class="stat-card">
+          <h3>Média Geral</h3>
+          <p id="stat-avg"><span style="font-size: 24px;">%</span></p>
+        </div>
+        
+        <div class="stat-card">
+          <h3>Melhor Score</h3>
+          <p id="stat-best"><span style="font-size: 24px;">%</span></p>
+        </div>
+      </div>
+      
+      <div class="ranking-table">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Usuário</th>
+              <th>Score Médio</th>
+              <th class="hide-mobile">Total de Quizzes</th>
+              <th class="hide-mobile">Acertos</th>
+              <th class="hide-mobile">Total de Perguntas</th>
+            </tr>
+          </thead>
+          <tbody id="ranking-body">
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // const API_URL = 'https://146.190.138.248:1999';
+    const API_URL = 'http://127.0.0.1:1999';
+    
+    async function loadRanking() {
+      const loadingEl = document.getElementById('loading');
+      const errorEl = document.getElementById('error');
+      const contentEl = document.getElementById('content');
+      
+      // Mostrar loading
+      loadingEl.style.display = 'block';
+      errorEl.style.display = 'none';
+      contentEl.style.display = 'none';
+      
+      try {
+        const response = await fetch(`${API_URL}/quiz-results/ranking?limit=50`);
+        
+        if (!response.ok) {
+          throw new Error(`Erro na API: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+          throw new Error(result.message || 'Erro ao carregar ranking');
+        }
+        
+        const ranking = result.ranking;
+        
+        // Calcular estatísticas
+        const totalPlayers = ranking.length;
+        const totalQuizzes = ranking.reduce((sum, r) => sum + r.totalQuizzes, 0);
+        const avgScore = totalPlayers > 0 
+          ? Math.round(ranking.reduce((sum, r) => sum + r.avgScore, 0) / totalPlayers)
+          : 0;
+        const bestScore = totalPlayers > 0 
+          ? Math.max(...ranking.map(r => r.avgScore))
+          : 0;
+        
+        // Atualizar estatísticas
+        document.getElementById('stat-players').textContent = totalPlayers;
+        document.getElementById('stat-quizzes').textContent = totalQuizzes;
+        document.getElementById('stat-avg').innerHTML = `${avgScore}<span style="font-size: 24px;">%</span>`;
+        document.getElementById('stat-best').innerHTML = `${bestScore}<span style="font-size: 24px;">%</span>`;
+        
+        // Gerar tabela
+        const tbody = document.getElementById('ranking-body');
+        tbody.innerHTML = '';
+        
+        ranking.forEach(r => {
+          const positionClass = r.position === 1 ? 'gold' : r.position === 2 ? 'silver' : r.position === 3 ? 'bronze' : '';
+          
+          const accuracyPercent = r.totalQuestions > 0 
+            ? Math.round((r.totalCorrect / r.totalQuestions) * 100)
+            : 0;
+          
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td class="position ${positionClass}">${r.position}º</td>
+            <td>
+              <div class="user-name">${r.userName}</div>
+              <div class="stat-value">${r.totalQuizzes} quiz${r.totalQuizzes !== 1 ? 'zes' : ''} completado${r.totalQuizzes !== 1 ? 's' : ''}</div>
+            </td>
+            <td>
+              <span class="badge score">${r.avgScore}%</span>
+            </td>
+            <td class="hide-mobile">
+              <span class="badge">${r.totalQuizzes}</span>
+            </td>
+            <td class="hide-mobile">
+              <span class="stat-value">${r.totalCorrect} / ${r.totalQuestions} (${accuracyPercent}%)</span>
+            </td>
+            <td class="hide-mobile">
+              <span class="stat-value">${r.totalQuestions}</span>
+            </td>
+          `;
+          tbody.appendChild(row);
+        });
+        
+        // Mostrar conteúdo
+        loadingEl.style.display = 'none';
+        contentEl.style.display = 'block';
+        
+      } catch (error) {
+        console.error('Erro ao carregar ranking:', error);
+        
+        loadingEl.style.display = 'none';
+        errorEl.style.display = 'block';
+        errorEl.className = 'error';
+        errorEl.innerHTML = `
+          <strong>Erro ao carregar ranking</strong><br>
+          ${error.message}<br>
+          <button class="refresh-btn" onclick="loadRanking()">Tentar Novamente</button>
+        `;
+      }
+    }
+    
+    // Carregar ao abrir a página
+    loadRanking();
+    
+    // Auto-refresh a cada 30 segundos
+    setInterval(loadRanking, 30000);
+  </script>
+</body>
+</html>

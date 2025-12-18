@@ -3,6 +3,8 @@ import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import authService from '../services/AuthService';
 import DatabaseService from '../services/DatabaseService';
 import googleDriveService from '../services/GoogleDriveService';
 import notificationService from '../services/NotificationService';
@@ -189,6 +191,34 @@ export default function SettingsScreen() {
     );
   };
 
+  const handleLogout = () => {
+    Alert.alert(
+      'Sair da Conta',
+      'Deseja realmente sair da sua conta?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Sair',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await authService.logout();
+              Alert.alert('Sucesso', 'Você saiu da sua conta', [
+                {
+                  text: 'OK',
+                  onPress: () => router.replace('/auth'),
+                },
+              ]);
+            } catch (error) {
+              console.error('Logout error:', error);
+              Alert.alert('Erro', 'Falha ao sair da conta. Tente novamente.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
 
 
   return (
@@ -342,6 +372,19 @@ export default function SettingsScreen() {
               </View>
             </TouchableOpacity>
           )}
+        </View>
+
+        {/* Account Management */}
+        <View style={[styles.section, { backgroundColor: colors.sectionBg }]}>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Conta</Text>
+          
+          <TouchableOpacity 
+            style={[styles.dangerButton, { backgroundColor: colors.dangerBg, borderColor: colors.dangerBorder, marginBottom: 12 }]} 
+            onPress={handleLogout}
+          >
+            <Ionicons name="log-out-outline" size={24} color={colors.dangerText} />
+            <Text style={[styles.dangerButtonText, { color: colors.dangerText, fontSize: applyFontScale(16) }]}>Sair da Conta</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Data Management */}
