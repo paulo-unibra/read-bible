@@ -163,10 +163,11 @@ export default class QuizResultController {
       const users = await User.query().whereIn('id', userIds)
 
       const ranking = results.map((r, index) => {
-        const user = users.find((u) => u.id === r.$extras.user_id)
+        const userId = r.userId || r.$extras.user_id
+        const user = users.find((u) => u.id === userId)
         return {
           position: index + 1,
-          userId: r.$extras.user_id,
+          userId: userId,
           userName: user?.name || 'Usuário',
           avgScore: Math.round(r.$extras.avg_score),
           totalQuizzes: r.$extras.total_quizzes,
