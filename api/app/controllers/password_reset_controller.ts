@@ -1,8 +1,7 @@
-import type { HttpContext } from '@adonisjs/core/http'
-import User from '#models/user'
 import PasswordReset from '#models/password_reset'
+import User from '#models/user'
+import type { HttpContext } from '@adonisjs/core/http'
 import { DateTime } from 'luxon'
-import hash from '@adonisjs/core/services/hash'
 
 export default class PasswordResetController {
   /**
@@ -34,10 +33,7 @@ export default class PasswordResetController {
       const token = Math.floor(100000 + Math.random() * 900000).toString()
 
       // Invalidar tokens anteriores não usados
-      await PasswordReset.query()
-        .where('email', email)
-        .where('used', false)
-        .update({ used: true })
+      await PasswordReset.query().where('email', email).where('used', false).update({ used: true })
 
       // Criar novo token (expira em 30 minutos)
       await PasswordReset.create({

@@ -1,7 +1,7 @@
-import type { HttpContext } from '@adonisjs/core/http'
-import QuizResult from '#models/quiz_result'
 import Quiz from '#models/quiz'
+import QuizResult from '#models/quiz_result'
 import User from '#models/user'
+import type { HttpContext } from '@adonisjs/core/http'
 
 export default class QuizResultController {
   /**
@@ -151,7 +151,7 @@ export default class QuizResultController {
       // Buscar dados dos usuários
       const userIds = results.map((r) => r.userId || r.$extras.user_id)
       console.log('[QuizResultController] UserIds encontrados:', userIds)
-      
+
       if (userIds.length === 0) {
         console.log('[QuizResultController] UserIds vazio, retornando ranking vazio')
         return response.ok({
@@ -159,7 +159,7 @@ export default class QuizResultController {
           ranking: [],
         })
       }
-      
+
       const users = await User.query().whereIn('id', userIds)
 
       const ranking = results.map((r, index) => {

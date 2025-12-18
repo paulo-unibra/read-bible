@@ -1,7 +1,7 @@
-import type { HttpContext } from '@adonisjs/core/http'
-import DeepSeekService from '#services/deep_seek_service'
 import Quiz from '#models/quiz'
 import QuizQuestion from '#models/quiz_question'
+import DeepSeekService from '#services/deep_seek_service'
+import type { HttpContext } from '@adonisjs/core/http'
 
 export default class QuizController {
   async generate({ request, response }: HttpContext) {
@@ -63,7 +63,7 @@ export default class QuizController {
       // Salvar quiz no banco de dados
       console.log('[QuizController] Salvando quiz no banco de dados...')
       const testament = this.getTestament(bookName)
-      
+
       const quiz = await Quiz.create({
         bookName,
         chapter: parseInt(chapter),
@@ -117,7 +117,7 @@ export default class QuizController {
       'Oséias', 'Joel', 'Amós', 'Obadias', 'Jonas', 'Miquéias',
       'Naum', 'Habacuque', 'Sofonias', 'Ageu', 'Zacarias', 'Malaquias'
     ]
-    
+
     return oldTestamentBooks.includes(bookName) ? 'old' : 'new'
   }
 
@@ -127,23 +127,23 @@ export default class QuizController {
   async list({ request, response }: HttpContext) {
     try {
       const { testament, bookName, bibleVersion } = request.qs()
-      
+
       const query = Quiz.query().preload('questions', (q) => q.orderBy('order', 'asc'))
-      
+
       if (testament) {
         query.where('testament', testament)
       }
-      
+
       if (bookName) {
         query.where('book_name', bookName)
       }
-      
+
       if (bibleVersion) {
         query.where('bible_version', bibleVersion)
       }
-      
+
       const quizzes = await query.orderBy('created_at', 'desc')
-      
+
       return response.ok({
         success: true,
         quizzes: quizzes.map(quiz => ({
@@ -175,7 +175,7 @@ export default class QuizController {
         .where('id', params.id)
         .preload('questions', (q) => q.orderBy('order', 'asc'))
         .firstOrFail()
-      
+
       return response.ok({
         success: true,
         quiz: {

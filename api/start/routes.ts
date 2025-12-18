@@ -7,13 +7,13 @@
 |
 */
 
-import AuthController from '#controllers/auth_controller'
-import ImportController from '#controllers/import_controller'
-import PasswordResetController from '#controllers/password_reset_controller'
-import QueueController from '#controllers/queue_controller'
-import QuizController from '#controllers/quiz_controller'
-import QuizResultController from '#controllers/quiz_result_controller'
-import ReadingPlanController from '#controllers/reading_plan_controller'
+const AuthController = () => import('#controllers/auth_controller')
+const ImportController = () => import('#controllers/import_controller')
+const PasswordResetController = () => import('#controllers/password_reset_controller')
+const QueueController = () => import('#controllers/queue_controller')
+const QuizController = () => import('#controllers/quiz_controller')
+const QuizResultController = () => import('#controllers/quiz_result_controller')
+const ReadingPlanController = () => import('#controllers/reading_plan_controller')
 import router from '@adonisjs/core/services/router'
 import { middleware } from './kernel.js'
 
@@ -37,10 +37,14 @@ router.post('/password/reset', [PasswordResetController, 'resetPassword'])
 // Reading Plan routes (protected)
 router.post('/reading-plans', [ReadingPlanController, 'create']).use(middleware.auth())
 router.get('/reading-plans/active', [ReadingPlanController, 'getActive']).use(middleware.auth())
-router.post('/reading-plans/complete', [ReadingPlanController, 'completeDay']).use(middleware.auth())
+router
+  .post('/reading-plans/complete', [ReadingPlanController, 'completeDay'])
+  .use(middleware.auth())
 router.post('/reading-plans/unmark', [ReadingPlanController, 'unmarkDay']).use(middleware.auth())
 router.get('/reading-plans/history', [ReadingPlanController, 'getHistory']).use(middleware.auth())
-router.get('/reading-plans/all-history', [ReadingPlanController, 'getAllHistory']).use(middleware.auth())
+router
+  .get('/reading-plans/all-history', [ReadingPlanController, 'getAllHistory'])
+  .use(middleware.auth())
 router.delete('/reading-plans', [ReadingPlanController, 'deletePlan']).use(middleware.auth())
 
 // Ranking routes (public)
@@ -66,4 +70,3 @@ router.get('/queue/jobs', [QueueController, 'listJobs'])
 // Import routes
 router.get('/import/quizzes', [ImportController, 'importQuizzes'])
 router.get('/queue/books', [QueueController, 'listBooks'])
-

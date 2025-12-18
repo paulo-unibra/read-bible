@@ -1,10 +1,9 @@
+import Quiz from '#models/quiz'
+import QuizQuestion from '#models/quiz_question'
+import env from '#start/env'
 import { BaseCommand, args } from '@adonisjs/core/ace'
 import type { CommandOptions } from '@adonisjs/core/types/ace'
 import { Storage } from '@google-cloud/storage'
-import env from '#start/env'
-import db from '@adonisjs/lucid/services/db'
-import Quiz from '#models/quiz'
-import QuizQuestion from '#models/quiz_question'
 
 export default class ImportQuizzes extends BaseCommand {
   static commandName = 'import:quizzes'
@@ -97,17 +96,17 @@ export default class ImportQuizzes extends BaseCommand {
             bibleVersion = parts[0].toUpperCase()
 
             // Verificar se o segundo elemento é um número (ex: 1-samuel)
-            if (!isNaN(parseInt(parts[1]))) {
+            if (!isNaN(Number.parseInt(parts[1]))) {
               // Formato: arc-1-samuel-1
               const bookNumber = parts[1]
               const bookBaseName = parts.slice(2, -1).join('-')
               bookName = `${bookNumber} ${this.capitalizeBookName(bookBaseName)}`
-              chapter = parseInt(parts[parts.length - 1])
+              chapter = Number.parseInt(parts[parts.length - 1])
             } else {
               // Formato: arc-genesis-1
               const bookBaseName = parts.slice(1, -1).join('-')
               bookName = this.capitalizeBookName(bookBaseName)
-              chapter = parseInt(parts[parts.length - 1])
+              chapter = Number.parseInt(parts[parts.length - 1])
             }
           } else {
             this.logger.warning(`⚠️  Formato de arquivo inválido: ${file.name}`)

@@ -1,8 +1,8 @@
-import type { HttpContext } from '@adonisjs/core/http'
-import { Storage } from '@google-cloud/storage'
-import env from '#start/env'
 import Quiz from '#models/quiz'
 import QuizQuestion from '#models/quiz_question'
+import env from '#start/env'
+import type { HttpContext } from '@adonisjs/core/http'
+import { Storage } from '@google-cloud/storage'
 
 export default class ImportController {
   /**
@@ -76,17 +76,17 @@ export default class ImportController {
           if (parts.length >= 3) {
             bibleVersion = parts[0].toUpperCase()
 
-            if (!isNaN(parseInt(parts[1]))) {
+            if (!isNaN(Number.parseInt(parts[1]))) {
               // Formato: arc-1-samuel-1
               const bookNumber = parts[1]
               const bookBaseName = parts.slice(2, -1).join('-')
               bookName = `${bookNumber} ${this.capitalizeBookName(bookBaseName)}`
-              chapter = parseInt(parts[parts.length - 1])
+              chapter = Number.parseInt(parts[parts.length - 1])
             } else {
               // Formato: arc-genesis-1
               const bookBaseName = parts.slice(1, -1).join('-')
               bookName = this.capitalizeBookName(bookBaseName)
-              chapter = parseInt(parts[parts.length - 1])
+              chapter = Number.parseInt(parts[parts.length - 1])
             }
           } else {
             console.warn(`⚠️  Formato inválido: ${file.name}`)

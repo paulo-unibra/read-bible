@@ -1,6 +1,6 @@
-import { DateTime } from 'luxon'
 import { BaseModel, column, hasMany } from '@adonisjs/lucid/orm'
 import type { HasMany } from '@adonisjs/lucid/types/relations'
+import { DateTime } from 'luxon'
 import QuizQuestion from './quiz_question.js'
 
 export default class Quiz extends BaseModel {
