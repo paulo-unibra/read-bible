@@ -114,17 +114,26 @@ export default function HomeScreen() {
     if (creatingPlan) return; // Evitar double-click
     
     try {
+      console.log('[CreatePlan] Iniciando criação de plano...');
       setCreatingPlan(true);
+      console.log('[CreatePlan] Chamando authService.createReadingPlan()...');
       const response = await authService.createReadingPlan();
+      console.log('[CreatePlan] Resposta recebida:', JSON.stringify(response, null, 2));
+      
       if (response.success) {
+        console.log('[CreatePlan] Plano criado com sucesso, carregando dados...');
         await loadReadingPlan();
         Alert.alert('Sucesso', response.message);
       } else {
-        Alert.alert('Erro', response.message);
+        console.error('[CreatePlan] Erro na resposta:', response.message);
+        Alert.alert('Erro', response.message || 'Erro ao criar plano de leitura');
       }
     } catch (error) {
-      Alert.alert('Erro', 'Falha ao criar plano de leitura');
+      console.error('[CreatePlan] Exceção capturada:', error);
+      console.error('[CreatePlan] Stack trace:', error instanceof Error ? error.stack : 'N/A');
+      Alert.alert('Erro', `Falha ao criar plano de leitura: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
+      console.log('[CreatePlan] Finalizando...');
       setCreatingPlan(false);
     }
   };
