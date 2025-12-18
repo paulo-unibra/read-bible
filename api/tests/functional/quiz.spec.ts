@@ -10,7 +10,7 @@ test.group('Quiz generation', () => {
     })
   })
 
-  test('example quiz structure', async () => {
+  test('example quiz structure', async ({ assert }) => {
     // Este teste mostra o formato esperado do quiz
     const expectedQuizFormat = {
       name: 'Salmos 1',
@@ -26,9 +26,9 @@ test.group('Quiz generation', () => {
     }
 
     // Valida que possui todas as propriedades necessárias
-    expect(expectedQuizFormat).toHaveProperty('name')
-    expect(expectedQuizFormat).toHaveProperty('category')
-    expect(expectedQuizFormat).toHaveProperty('questions')
-    expect(Array.isArray(expectedQuizFormat.questions)).toBe(true)
+    assert.property(expectedQuizFormat, 'name')
+    assert.property(expectedQuizFormat, 'category')
+    assert.property(expectedQuizFormat, 'questions')
+    assert.isArray(expectedQuizFormat.questions)
   })
 })

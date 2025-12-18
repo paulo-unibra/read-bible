@@ -579,10 +579,11 @@ export default class ReadingPlanController {
         }
 
         // Última leitura
-        const lastReading = progress.length > 0 && progress[progress.length - 1].completedAt
-          ? (progress[progress.length - 1].completedAt instanceof DateTime
-              ? progress[progress.length - 1].completedAt
-              : DateTime.fromJSDate(progress[progress.length - 1].completedAt!)).toFormat('dd/MM/yyyy HH:mm')
+        const lastProgress = progress.length > 0 ? progress[progress.length - 1] : null
+        const lastReading = lastProgress?.completedAt
+          ? (lastProgress.completedAt instanceof DateTime
+              ? lastProgress.completedAt
+              : DateTime.fromJSDate(lastProgress.completedAt)).toFormat('dd/MM/yyyy HH:mm')
           : null
 
         return {
@@ -662,10 +663,11 @@ export default class ReadingPlanController {
           }
         }
 
-        const lastReading = progress.length > 0 && progress[progress.length - 1].completedAt
-          ? (progress[progress.length - 1].completedAt instanceof DateTime
-              ? progress[progress.length - 1].completedAt
-              : DateTime.fromJSDate(progress[progress.length - 1].completedAt!)).toFormat('dd/MM/yyyy HH:mm')
+        const lastProgressItem = progress.length > 0 ? progress[progress.length - 1] : null
+        const lastReading = lastProgressItem?.completedAt
+          ? (lastProgressItem.completedAt instanceof DateTime
+              ? lastProgressItem.completedAt
+              : DateTime.fromJSDate(lastProgressItem.completedAt)).toFormat('dd/MM/yyyy HH:mm')
           : 'Nunca'
 
         return {

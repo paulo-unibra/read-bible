@@ -103,7 +103,7 @@ export default class QueueService {
     return Array.from(this.bookJobs.values())
   }
 
-  private static async processQueue() {
+  static async processQueue() {
     if (this.isProcessing) return
 
     this.isProcessing = true
