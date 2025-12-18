@@ -61,7 +61,7 @@
     "googleapis": "^144.0.0",
     "luxon": "^3.7.2",
     "mysql2": "^3.15.3",
-    "openai": "^4.77.3",
+    "openai": "^4.104.0",
     "reflect-metadata": "^0.2.2"
   },
   "hotHook": {
