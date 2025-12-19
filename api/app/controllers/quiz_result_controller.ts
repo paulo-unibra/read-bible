@@ -168,7 +168,7 @@ export default class QuizResultController {
         return {
           position: index + 1,
           userId: userId,
-          userName: user?.name || 'Usuário',
+          userName: user?.fullName || 'Usuário',
           avgScore: Math.round(r.$extras.avg_score),
           totalQuizzes: r.$extras.total_quizzes,
           totalCorrect: r.$extras.total_correct,
