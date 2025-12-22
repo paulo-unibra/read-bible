@@ -8,6 +8,7 @@
 */
 
 const AuthController = () => import('#controllers/auth_controller')
+const BibleCuriositiesController = () => import('#controllers/bible_curiosities_controller')
 const ImportController = () => import('#controllers/import_controller')
 const PasswordResetController = () => import('#controllers/password_reset_controller')
 const QueueController = () => import('#controllers/queue_controller')
@@ -70,3 +71,13 @@ router.get('/queue/jobs', [QueueController, 'listJobs'])
 // Import routes
 router.get('/import/quizzes', [ImportController, 'importQuizzes'])
 router.get('/queue/books', [QueueController, 'listBooks'])
+
+// Bible Curiosities routes
+router.post('/curiosities/generate', [BibleCuriositiesController, 'generate'])
+router.get('/curiosities/today', [BibleCuriositiesController, 'getToday'])
+router
+  .post('/curiosities/:id/favorite', [BibleCuriositiesController, 'toggleFavorite'])
+  .use(middleware.auth())
+router
+  .get('/curiosities/favorites', [BibleCuriositiesController, 'getFavorites'])
+  .use(middleware.auth())

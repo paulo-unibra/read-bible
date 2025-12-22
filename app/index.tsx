@@ -4,8 +4,10 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AdBanner from '../components/AdBanner';
+import BibleCuriosityCard from '../components/BibleCuriosityCard';
 import { Logo } from '../components/logo';
 import authService, { ReadingPlan, TodayReading } from '../services/AuthService';
+import bibleCuriosityService, { BibleCuriosity } from '../services/BibleCuriosityService';
 import bibleReaderService from '../services/BibleReaderService';
 import DatabaseService from '../services/DatabaseService';
 import notificationService from '../services/NotificationService';
@@ -15,6 +17,7 @@ export default function HomeScreen() {
   const params = useLocalSearchParams();
   const [readingPlan, setReadingPlan] = useState<ReadingPlan | null>(null);
   const [todayReadings, setTodayReadings] = useState<TodayReading[]>([]);
+  const [curiosity, setCuriosity] = useState<BibleCuriosity | null>(null);
   const [loading, setLoading] = useState(true);
   const [creatingPlan, setCreatingPlan] = useState(false);
   const [fontSizePref, setFontSizePref] = useState<'small' | 'medium' | 'large'>('medium');
@@ -62,6 +65,9 @@ export default function HomeScreen() {
         await loadReadingPlan();
       }
       
+      // Carregar curiosidade do dia
+      await loadCuriosity();
+      
       const settings = await DatabaseService.getMultipleSettings(['fontSize', 'theme']);
       const userFont = settings.fontSize as 'small' | 'medium' | 'large' | null;
       const userTheme = settings.theme as 'light' | 'dark' | null;
@@ -85,6 +91,17 @@ export default function HomeScreen() {
       }
     } catch (error) {
       console.error('Erro ao carregar plano:', error);
+    }
+  };
+
+  const loadCuriosity = async () => {
+    try {
+      const response = await bibleCuriosityService.getTodayCuriosity();
+      if (response.success && response.data) {
+        setCuriosity(response.data);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar curiosidade:', error);
     }
   };
 
@@ -222,7 +239,9 @@ export default function HomeScreen() {
     <SafeAreaView style={[styles.container,{ backgroundColor: colors.bg }]}> 
       {/* Header fixo */}
       <View style={[styles.header,{ backgroundColor: colors.headerBg, borderBottomColor: colors.border }]}> 
-        <Logo size={36} />
+        <TouchableOpacity onPress={startFreeReading}>
+          <Logo size={36} />
+        </TouchableOpacity>
         <TouchableOpacity style={styles.settingsButton} onPress={() => router.push('/settings')}>
           <Ionicons name="settings-outline" size={24} color={colors.iconMuted} />
         </TouchableOpacity>
@@ -230,6 +249,14 @@ export default function HomeScreen() {
       <ScrollView style={styles.scrollView} contentContainerStyle={{ paddingBottom: 40 }}>
         {/* Ad Banner */}
         <AdBanner />
+
+        {/* Curiosidade Bíblica */}
+        {curiosity && (
+          <BibleCuriosityCard 
+            curiosity={curiosity} 
+            onFavoriteChange={loadCuriosity}
+          />
+        )}
 
         {/* Plano de Leitura */}
         {readingPlan && todayReadings.length ? (

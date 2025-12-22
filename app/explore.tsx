@@ -28,9 +28,21 @@ export default function ExploreScreen() {
         <View style={[styles.statsSection,{ backgroundColor: colors.surface }]}> 
           <Text style={[styles.sectionTitle,{ color: colors.text, fontSize: applyFontScale(20) }]}>Estatísticas</Text>
           <View style={styles.statsGrid}>
-            <View style={[styles.statCard,{ backgroundColor: colors.surfaceAlt }]}> <Ionicons name="book-outline" size={32} color={isDark? '#90caf9':'#2196F3'} /> <Text style={[styles.statNumber,{ color: colors.text, fontSize: applyFontScale(24) }]}>66</Text><Text style={[styles.statLabel,{ color: colors.text2 }]}>Livros da Bíblia</Text></View>
-            <View style={[styles.statCard,{ backgroundColor: colors.surfaceAlt }]}> <Ionicons name="library-outline" size={32} color={isDark? '#ffcc80':'#FF9800'} /> <Text style={[styles.statNumber,{ color: colors.text, fontSize: applyFontScale(24) }]}>1,189</Text><Text style={[styles.statLabel,{ color: colors.text2 }]}>Capítulos</Text></View>
-            <View style={[styles.statCard,{ backgroundColor: colors.surfaceAlt }]}> <Ionicons name="document-text-outline" size={32} color={isDark? '#81c784':'#4CAF50'} /> <Text style={[styles.statNumber,{ color: colors.text, fontSize: applyFontScale(24) }]}>31,102</Text><Text style={[styles.statLabel,{ color: colors.text2 }]}>Versículos</Text></View>
+            <View style={[styles.statCard,{ backgroundColor: colors.surfaceAlt }]}>
+              <Ionicons name="book-outline" size={32} color={isDark? '#90caf9':'#2196F3'} />
+              <Text style={[styles.statNumber,{ color: colors.text, fontSize: applyFontScale(24) }]}>66</Text>
+              <Text style={[styles.statLabel,{ color: colors.text2 }]}>Livros da Bíblia</Text>
+            </View>
+            <View style={[styles.statCard,{ backgroundColor: colors.surfaceAlt }]}>
+              <Ionicons name="library-outline" size={32} color={isDark? '#ffcc80':'#FF9800'} />
+              <Text style={[styles.statNumber,{ color: colors.text, fontSize: applyFontScale(24) }]}>1,189</Text>
+              <Text style={[styles.statLabel,{ color: colors.text2 }]}>Capítulos</Text>
+            </View>
+            <View style={[styles.statCard,{ backgroundColor: colors.surfaceAlt }]}>
+              <Ionicons name="document-text-outline" size={32} color={isDark? '#81c784':'#4CAF50'} />
+              <Text style={[styles.statNumber,{ color: colors.text, fontSize: applyFontScale(24) }]}>31,102</Text>
+              <Text style={[styles.statLabel,{ color: colors.text2 }]}>Versículos</Text>
+            </View>
           </View>
         </View>
 
