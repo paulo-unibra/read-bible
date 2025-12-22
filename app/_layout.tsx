@@ -26,20 +26,24 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={userTheme === "dark" ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen name="explore" options={{ headerShown: false }} />
-        <Stack.Screen name="bible-manager" options={{ headerShown: false }} />
-        <Stack.Screen name="free-reading" options={{ headerShown: false }} />
-        <Stack.Screen name="chapter-reader" options={{ headerShown: false }} />
-        <Stack.Screen name="reading-plans" options={{ headerShown: false }} />
-        <Stack.Screen name="settings" options={{ headerShown: false }} />
-        <Stack.Screen name="quiz" options={{ headerShown: false }} />
-  <Stack.Screen name="login" options={{ headerShown: false }} />
-  <Stack.Screen name="ranking" options={{ headerShown: false }} />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="explore" />
+        <Stack.Screen name="bible-manager" />
+        <Stack.Screen name="free-reading" />
+        <Stack.Screen name="chapter-reader" />
+        <Stack.Screen name="reading-plans" />
+        <Stack.Screen name="settings" />
+        <Stack.Screen name="quiz" />
+        <Stack.Screen name="login" />
+        <Stack.Screen name="ranking" />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="auth" />
+        <Stack.Screen name="forgot-password" />
+        <Stack.Screen name="reading-history" />
         <Stack.Screen
           name="modal"
-          options={{ presentation: "modal", headerShown: false }}
+          options={{ presentation: "modal" }}
         />
       </Stack>
   <StatusBar style={userTheme === "dark" ? "light" : "dark"} />

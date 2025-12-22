@@ -218,6 +218,39 @@ export default function SettingsScreen() {
     );
   };
 
+  const handleDeleteReadingPlan = () => {
+    Alert.alert(
+      'Excluir Plano de Leitura',
+      'Esta ação irá excluir seu plano de leitura atual e todo o progresso. Esta ação não pode ser desfeita.\n\nDeseja continuar?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const response = await authService.deletePlan();
+              
+              if (response.success) {
+                Alert.alert('Sucesso', 'Plano de leitura excluído com sucesso', [
+                  {
+                    text: 'OK',
+                    onPress: () => router.replace('/(tabs)'),
+                  },
+                ]);
+              } else {
+                Alert.alert('Erro', response.message || 'Falha ao excluir plano de leitura');
+              }
+            } catch (error) {
+              console.error('Delete plan error:', error);
+              Alert.alert('Erro', 'Falha ao excluir plano de leitura. Tente novamente.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
 
 
   return (
@@ -377,6 +410,14 @@ export default function SettingsScreen() {
         <View style={[styles.section, { backgroundColor: colors.sectionBg }]}>
           <Text style={[styles.sectionTitle, { color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Conta</Text>
           
+          <TouchableOpacity 
+            style={[styles.dangerButton, { backgroundColor: colors.dangerBg, borderColor: colors.dangerBorder, marginBottom: 12 }]} 
+            onPress={handleDeleteReadingPlan}
+          >
+            <Ionicons name="book-outline" size={24} color={colors.dangerText} />
+            <Text style={[styles.dangerButtonText, { color: colors.dangerText, fontSize: applyFontScale(16) }]}>Excluir Plano de Leitura</Text>
+          </TouchableOpacity>
+
           <TouchableOpacity 
             style={[styles.dangerButton, { backgroundColor: colors.dangerBg, borderColor: colors.dangerBorder, marginBottom: 12 }]} 
             onPress={handleLogout}

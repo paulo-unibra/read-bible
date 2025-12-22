@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import authService, { ReadingPlan, TodayReading } from '../services/AuthService';
+import authService, { ReadingPlan } from '../services/AuthService';
 import DatabaseService from '../services/DatabaseService';
 
 interface ReadingHistoryItem {
@@ -23,7 +23,7 @@ interface GroupedHistory {
 export default function ReadingHistoryScreen() {
   const [history, setHistory] = useState<ReadingHistoryItem[]>([]);
   const [groupedHistory, setGroupedHistory] = useState<GroupedHistory>({});
-  const [nextReading, setNextReading] = useState<TodayReading | null>(null);
+  const [upcomingReadings, setUpcomingReadings] = useState<ReadingHistoryItem[]>([]);
   const [plan, setPlan] = useState<ReadingPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
@@ -50,11 +50,10 @@ export default function ReadingHistoryScreen() {
     try {
       setLoading(true);
       
-      // Carregar plano ativo e próxima leitura
+      // Carregar plano ativo
       const planResponse = await authService.getActivePlan();
       if (planResponse.success && planResponse.data) {
         setPlan(planResponse.data.plan);
-        setNextReading(planResponse.data.todayReading);
       }
       
       // Carregar histórico completo
@@ -62,7 +61,18 @@ export default function ReadingHistoryScreen() {
       
       if (response.success && response.data) {
         setHistory(response.data);
-        groupByMonth(response.data);
+        
+        // Separar leituras concluídas e próximas
+        const completed = response.data.filter(item => item.isCompleted);
+        
+        // Pegar próximas leituras não concluídas, ordenando pelo dia
+        const upcoming = response.data
+          .filter(item => !item.isCompleted)
+          .sort((a, b) => a.day - b.day)
+          .slice(0, 5); // Próximas 5 leituras
+        
+        setUpcomingReadings(upcoming);
+        groupByMonth(completed);
       }
     } catch (error) {
       console.error('Erro ao carregar histórico:', error);
@@ -74,12 +84,11 @@ export default function ReadingHistoryScreen() {
   const groupByMonth = (items: ReadingHistoryItem[]) => {
     const grouped: GroupedHistory = {};
     
-    // Filtrar apenas leituras concluídas e ordenar por updatedAt desc
-    const completedItems = items
-      .filter(item => item.isCompleted)
+    // Ordenar por updatedAt desc
+    const sortedItems = items
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
     
-    completedItems.forEach(item => {
+    sortedItems.forEach(item => {
       const date = new Date(item.updatedAt);
       const monthYear = date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
       
@@ -201,87 +210,129 @@ export default function ReadingHistoryScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.headerBg} />
-      {/* <View style={[styles.header, { backgroundColor: colors.headerBg, borderBottomColor: colors.border }]}>
+      <View style={[styles.header, { backgroundColor: colors.headerBg, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.textPrimary, fontSize: applyFontScale(20) }]}>
-          Detalhes da Leitura3
+          Detalhes da Leitura
         </Text>
         <TouchableOpacity onPress={handleDeletePlan} style={styles.deleteButton}>
           <Ionicons name="trash-outline" size={24} color={colors.danger} />
         </TouchableOpacity>
-      </View> */}
+      </View>
 
       <ScrollView style={styles.scrollView}>
-        {/* Próxima Leitura */}
-        {nextReading && (
-          <View style={styles.nextReadingSection}>
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary, fontSize: applyFontScale(18) }]}>
-              Próxima Leitura
-            </Text>
-            <View
-              style={[styles.nextReadingCard, { backgroundColor: colors.card, borderLeftColor: colors.accent }]}
-            >
-              <View style={styles.historyInfo}>
-                <View style={[styles.dayBadge, { backgroundColor: colors.accent }]}>
-                  <Text style={[styles.dayNumber, { fontSize: applyFontScale(16) }]}>
-                    Dia {nextReading.day}
-                  </Text>
-                </View>
-                <View style={styles.readingDetails}>
-                  <Text style={[styles.bookName, { color: colors.textPrimary, fontSize: applyFontScale(16) }]}>
-                    {nextReading.bookName} {nextReading.startChapter}
-                    {nextReading.endChapter !== nextReading.startChapter && `-${nextReading.endChapter}`}
-                  </Text>
-                  <Text style={[styles.nextReadingLabel, { color: colors.accent, fontSize: applyFontScale(12) }]}>
-                    Pendente
-                  </Text>
-                </View> 
-              </View>
-              
-                {!nextReading.isCompleted && (
-                  <TouchableOpacity
-                    style={[styles.markButton, { backgroundColor: colors.success }]}
-                    onPress={() => handleToggleReading({
-                      id: 0,
-                      day: nextReading.day,
-                      bookName: nextReading.bookName,
-                      startChapter: nextReading.startChapter,
-                      endChapter: nextReading.endChapter,
-                      isCompleted: false,
-                      completedAt: null,
-                      updatedAt: new Date().toISOString()
-                    })}
-                  >
-                    <Ionicons name="checkmark-circle" size={20} color="#fff" />
-                  </TouchableOpacity>
-                )}
-            </View>
-          </View>
-        )}
-
         {/* Plan Info */}
         {plan && (
           <View style={styles.planInfoSection}>
             <View style={[styles.planInfoCard, { backgroundColor: colors.card }]}>
-              <Text style={[styles.planName, { color: colors.textPrimary, fontSize: applyFontScale(16) }]}>
+              <Text style={[styles.planName, { color: colors.textPrimary, fontSize: applyFontScale(18) }]}>
                 {plan.name}
               </Text>
-              <Text style={[styles.planStats, { color: colors.textSecondary, fontSize: applyFontScale(14) }]}>
-                Dia {plan.currentDay} de {plan.totalDays}
-              </Text>
-              <Text style={[styles.planStats, { color: colors.textSecondary, fontSize: applyFontScale(14) }]}>
-                {plan.completedChapters} de {plan.totalChapters} capítulos ({Math.round((plan.completedChapters / plan.totalChapters) * 100)}%)
-              </Text>
+              <View style={styles.progressContainer}>
+                <View style={styles.progressBar}>
+                  <View 
+                    style={[
+                      styles.progressFill, 
+                      { 
+                        width: `${plan.progress}%`,
+                        backgroundColor: colors.accent 
+                      }
+                    ]} 
+                  />
+                </View>
+                <Text style={[styles.progressText, { color: colors.textSecondary, fontSize: applyFontScale(12) }]}>
+                  {plan.progress}%
+                </Text>
+              </View>
+              <View style={styles.statsRow}>
+                <View style={styles.statItem}>
+                  <Text style={[styles.statValue, { color: colors.textPrimary, fontSize: applyFontScale(20) }]}>
+                    {plan.currentDay}
+                  </Text>
+                  <Text style={[styles.statLabel, { color: colors.textSecondary, fontSize: applyFontScale(12) }]}>
+                    Dia atual
+                  </Text>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statItem}>
+                  <Text style={[styles.statValue, { color: colors.textPrimary, fontSize: applyFontScale(20) }]}>
+                    {plan.totalDays}
+                  </Text>
+                  <Text style={[styles.statLabel, { color: colors.textSecondary, fontSize: applyFontScale(12) }]}>
+                    Total de dias
+                  </Text>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statItem}>
+                  <Text style={[styles.statValue, { color: colors.textPrimary, fontSize: applyFontScale(20) }]}>
+                    {plan.completedChapters}
+                  </Text>
+                  <Text style={[styles.statLabel, { color: colors.textSecondary, fontSize: applyFontScale(12) }]}>
+                    Capítulos lidos
+                  </Text>
+                </View>
+              </View>
             </View>
+          </View>
+        )}
+
+        {/* Próximas Leituras */}
+        {upcomingReadings.length > 0 && (
+          <View style={styles.upcomingSection}>
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary, fontSize: applyFontScale(18) }]}>
+              Próximas Leituras
+            </Text>
+            {upcomingReadings.map((reading, index) => (
+              <View
+                key={reading.id}
+                style={[
+                  styles.upcomingCard, 
+                  { 
+                    backgroundColor: colors.card, 
+                    borderLeftColor: index === 0 ? colors.accent : colors.textSecondary,
+                    opacity: index === 0 ? 1 : 0.7
+                  }
+                ]}
+              >
+                <View style={styles.historyInfo}>
+                  <View style={[
+                    styles.dayBadge, 
+                    { backgroundColor: index === 0 ? colors.accent : colors.textSecondary }
+                  ]}>
+                    <Text style={[styles.dayNumber, { fontSize: applyFontScale(14) }]}>
+                      Dia {reading.day}
+                    </Text>
+                  </View>
+                  <View style={styles.readingDetails}>
+                    <Text style={[styles.bookName, { color: colors.textPrimary, fontSize: applyFontScale(16) }]}>
+                      {reading.bookName} {reading.startChapter}
+                      {reading.endChapter !== reading.startChapter && `-${reading.endChapter}`}
+                    </Text>
+                    {index === 0 && (
+                      <Text style={[styles.nextReadingLabel, { color: colors.accent, fontSize: applyFontScale(12) }]}>
+                        🔥 Próxima leitura
+                      </Text>
+                    )}
+                  </View>
+                </View>
+                
+                <TouchableOpacity
+                  style={[styles.markButton, { backgroundColor: colors.success }]}
+                  onPress={() => handleToggleReading(reading)}
+                >
+                  <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            ))}
           </View>
         )}
 
         {/* Histórico */}
         <View style={styles.historySection}>
           <Text style={[styles.sectionTitle, { color: colors.textPrimary, fontSize: applyFontScale(18) }]}>
-            Leituras Concluídas
+            Leituras Concluídas ({history.filter(h => h.isCompleted).length})
           </Text>
         </View>
 
@@ -358,6 +409,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
+    marginBottom: 8,
   },
   backButton: {
     padding: 8,
@@ -371,6 +423,7 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+    marginBottom: 30
   },
   centerContent: {
     flex: 1,
@@ -380,6 +433,83 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 16,
+  },
+  planInfoSection: {
+    padding: 16,
+    paddingBottom: 8,
+  },
+  planInfoCard: {
+    padding: 20,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 3,
+  },
+  planName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
+  },
+  progressContainer: {
+    marginBottom: 16,
+  },
+  progressBar: {
+    height: 8,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 4,
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  progressText: {
+    fontSize: 12,
+    textAlign: 'right',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: '#e0e0e0',
+  },
+  statValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  upcomingSection: {
+    padding: 16,
+    paddingTop: 8,
+  },
+  upcomingCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+    marginBottom: 8,
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 2,
   },
   nextReadingSection: {
     padding: 16,
@@ -406,24 +536,6 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 20,
     marginLeft: 8,
-  },
-  planInfoSection: {
-    paddingHorizontal: 16,
-    paddingBottom: 8,
-  },
-  planInfoCard: {
-    padding: 16,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 3,
-  },
-  planName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 4,
   },
   planStats: {
     fontSize: 14,

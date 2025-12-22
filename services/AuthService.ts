@@ -30,6 +30,7 @@ export interface ReadingPlan {
 }
 
 export interface TodayReading {
+  id: number;
   day: number;
   bookName: string;
   startChapter: number;
@@ -175,35 +176,15 @@ class AuthService {
    */
   async createReadingPlan(): Promise<any> {
     try {
-      // Debug detalhado do token
-      console.log('[AuthService] 🔍 DEBUG DETALHADO:');
-      console.log('[AuthService] API_URL:', API_URL);
-      console.log('[AuthService] Token presente:', !!this.token);
-      console.log('[AuthService] Token length:', this.token?.length);
-      console.log('[AuthService] Token (primeiros 20 chars):', this.token?.substring(0, 20));
-      console.log('[AuthService] Token (últimos 10 chars):', this.token?.substring(this.token.length - 10));
-      
       // Verificar token no AsyncStorage
       const storedToken = await AsyncStorage.getItem('@auth_token');
-      console.log('[AuthService] Token do AsyncStorage presente:', !!storedToken);
-      console.log('[AuthService] Tokens são iguais:', storedToken === this.token);
       
       if (storedToken !== this.token) {
         console.warn('[AuthService] ⚠️ ATENÇÃO: Token em memória diferente do AsyncStorage!');
         console.log('[AuthService] Token em memória:', this.token?.substring(0, 30) + '...');
         console.log('[AuthService] Token no storage:', storedToken?.substring(0, 30) + '...');
       }
-      
-      // Gerar comando curl para testes no Insomnia
-      const curlCommand = `curl -X POST '${API_URL}/reading-plans' \\
-  -H 'Authorization: Bearer ${this.token}' \\
-  -H 'Content-Type: application/json' \\
-  -v`;
-      
-      console.log('[AuthService] 📋 CURL para Insomnia:');
-      console.log(curlCommand);
-      console.log('');
-      
+
       const response = await fetch(`${API_URL}/reading-plans`, {
         method: 'POST',
         headers: {
@@ -258,7 +239,7 @@ class AuthService {
   /**
    * Obter plano ativo
    */
-  async getActivePlan(): Promise<{ success: boolean; data: { plan: ReadingPlan; todayReading: TodayReading } | null }> {
+  async getActivePlan(): Promise<{ success: boolean; data: { plan: ReadingPlan; todayReadings: TodayReading[] } | null }> {
     try {
       const response = await fetch(`${API_URL}/reading-plans/active`, {
         method: 'GET',
@@ -282,6 +263,8 @@ class AuthService {
    */
   async completeDay(day: number): Promise<any> {
     try {
+
+      console.log('Chamando completeDay com day:', day);
       const response = await fetch(`${API_URL}/reading-plans/complete`, {
         method: 'POST',
         headers: {

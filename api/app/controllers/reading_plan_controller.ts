@@ -72,7 +72,7 @@ const BIBLE_STRUCTURE = [
   { name: '2 João', chapters: 1 },
   { name: '3 João', chapters: 1 },
   { name: 'Judas', chapters: 1 },
-  { name: 'Apocalipse', chapters: 22 }
+  { name: 'Apocalipse', chapters: 22 },
 ]
 
 export default class ReadingPlanController {
@@ -92,7 +92,7 @@ export default class ReadingPlanController {
       if (existingPlan) {
         return response.conflict({
           success: false,
-          message: 'Você já possui um plano de leitura ativo'
+          message: 'Você já possui um plano de leitura ativo',
         })
       }
 
@@ -134,7 +134,7 @@ export default class ReadingPlanController {
         totalDays: totalDays,
         chaptersPerDay: chaptersPerDay,
         totalChapters: totalChapters,
-        completedChapters: 0
+        completedChapters: 0,
       })
 
       // Gerar progresso diário
@@ -151,16 +151,16 @@ export default class ReadingPlanController {
             endDate: plan.endDate.toISO(),
             totalDays: plan.totalDays,
             chaptersPerDay: plan.chaptersPerDay,
-            totalChapters: plan.totalChapters
-          }
-        }
+            totalChapters: plan.totalChapters,
+          },
+        },
       })
     } catch (error) {
       console.error('Erro ao criar plano:', error)
       return response.badRequest({
         success: false,
         message: 'Erro ao criar plano de leitura',
-        error: error.message
+        error: error.message,
       })
     }
   }
@@ -180,7 +180,7 @@ export default class ReadingPlanController {
       if (!plan) {
         return response.ok({
           success: true,
-          data: null
+          data: null,
         })
       }
 
@@ -189,7 +189,6 @@ export default class ReadingPlanController {
         .where('reading_plan_id', plan.id)
         .where('day', plan.currentDay)
         .where('is_completed', false)
-        .first()
 
       return response.ok({
         success: true,
@@ -202,21 +201,22 @@ export default class ReadingPlanController {
             chaptersPerDay: plan.chaptersPerDay,
             completedChapters: plan.completedChapters,
             totalChapters: plan.totalChapters,
-            progress: Math.round((plan.completedChapters / plan.totalChapters) * 100)
+            progress: Math.round((plan.completedChapters / plan.totalChapters) * 100),
           },
-          todayReading: todayReading ? {
-            day: todayReading.day,
-            bookName: todayReading.bookName,
-            startChapter: todayReading.startChapter,
-            endChapter: todayReading.endChapter,
-            isCompleted: todayReading.isCompleted
-          } : null
-        }
+          todayReadings: todayReading.map((r) => ({
+            id: r.id,
+            day: r.day,
+            bookName: r.bookName,
+            startChapter: r.startChapter,
+            endChapter: r.endChapter,
+            isCompleted: r.isCompleted,
+          })),
+        },
       })
     } catch (error) {
       return response.badRequest({
         success: false,
-        message: 'Erro ao buscar plano de leitura'
+        message: 'Erro ao buscar plano de leitura',
       })
     }
   }
@@ -226,8 +226,11 @@ export default class ReadingPlanController {
    */
   async completeDay({ auth, request, response }: HttpContext) {
     try {
+      console.log('TESTEE COMPLETE DAY')
       const user = auth.user!
       const { day } = request.only(['day'])
+
+      console.log('DAY: ', day)
 
       const plan = await ReadingPlan.query()
         .where('user_id', user.id)
@@ -237,7 +240,7 @@ export default class ReadingPlanController {
       if (!plan) {
         return response.notFound({
           success: false,
-          message: 'Plano de leitura não encontrado'
+          message: 'Plano de leitura não encontrado',
         })
       }
 
@@ -264,13 +267,13 @@ export default class ReadingPlanController {
         message: 'Leitura do dia concluída!',
         data: {
           completedChapters: plan.completedChapters,
-          progress: Math.round((plan.completedChapters / plan.totalChapters) * 100)
-        }
+          progress: Math.round((plan.completedChapters / plan.totalChapters) * 100),
+        },
       })
     } catch (error) {
       return response.badRequest({
         success: false,
-        message: 'Erro ao marcar leitura como concluída'
+        message: 'Erro ao marcar leitura como concluída',
       })
     }
   }
@@ -285,11 +288,11 @@ export default class ReadingPlanController {
     let currentChapter = 1
 
     while (bookIndex < BIBLE_STRUCTURE.length) {
-      const book = BIBLE_STRUCTURE[bookIndex]
       let chaptersForToday = 0
 
       // Distribuir capítulos para o dia atual
       while (chaptersForToday < chaptersPerDay && bookIndex < BIBLE_STRUCTURE.length) {
+        const book = BIBLE_STRUCTURE[bookIndex]
         const chaptersRemaining = book.chapters - currentChapter + 1
         const chaptersNeeded = chaptersPerDay - chaptersForToday
         const chaptersToAdd = Math.min(chaptersRemaining, chaptersNeeded)
@@ -304,7 +307,7 @@ export default class ReadingPlanController {
           bookName: book.name,
           startChapter: startChapter,
           endChapter: endChapter,
-          isCompleted: false
+          isCompleted: false,
         })
 
         chaptersForToday += chaptersToAdd
@@ -321,7 +324,10 @@ export default class ReadingPlanController {
       currentDay++
 
       // Parar se já distribuiu todos os capítulos ou atingiu o limite de dias
-      if (chaptersDistributed >= BIBLE_STRUCTURE.reduce((sum, b) => sum + b.chapters, 0) || currentDay > totalDays) {
+      if (
+        chaptersDistributed >= BIBLE_STRUCTURE.reduce((sum, b) => sum + b.chapters, 0) ||
+        currentDay > totalDays
+      ) {
         break
       }
     }
@@ -342,7 +348,7 @@ export default class ReadingPlanController {
       if (!plan) {
         return response.ok({
           success: true,
-          data: []
+          data: [],
         })
       }
 
@@ -354,7 +360,7 @@ export default class ReadingPlanController {
 
       return response.ok({
         success: true,
-        data: history.map(h => ({
+        data: history.map((h) => ({
           id: h.id,
           day: h.day,
           bookName: h.bookName,
@@ -362,13 +368,13 @@ export default class ReadingPlanController {
           endChapter: h.endChapter,
           isCompleted: h.isCompleted,
           completedAt: h.completedAt?.toISO(),
-          updatedAt: h.updatedAt.toISO()
-        }))
+          updatedAt: h.updatedAt.toISO(),
+        })),
       })
     } catch (error) {
       return response.badRequest({
         success: false,
-        message: 'Erro ao buscar histórico'
+        message: 'Erro ao buscar histórico',
       })
     }
   }
@@ -388,18 +394,18 @@ export default class ReadingPlanController {
       if (!plan) {
         return response.ok({
           success: true,
-          data: []
+          data: [],
         })
       }
 
       const history = await ReadingProgress.query()
         .where('reading_plan_id', plan.id)
-        .orderBy('updated_at', 'desc')
+        .orderBy('day', 'asc')
         .limit(100)
 
       return response.ok({
         success: true,
-        data: history.map(h => ({
+        data: history.map((h) => ({
           id: h.id,
           day: h.day,
           bookName: h.bookName,
@@ -407,13 +413,13 @@ export default class ReadingPlanController {
           endChapter: h.endChapter,
           isCompleted: h.isCompleted,
           completedAt: h.completedAt?.toISO(),
-          updatedAt: h.updatedAt.toISO()
-        }))
+          updatedAt: h.updatedAt.toISO(),
+        })),
       })
     } catch (error) {
       return response.badRequest({
         success: false,
-        message: 'Erro ao buscar histórico completo'
+        message: 'Erro ao buscar histórico completo',
       })
     }
   }
@@ -434,7 +440,7 @@ export default class ReadingPlanController {
       if (!plan) {
         return response.notFound({
           success: false,
-          message: 'Plano de leitura não encontrado'
+          message: 'Plano de leitura não encontrado',
         })
       }
 
@@ -446,7 +452,7 @@ export default class ReadingPlanController {
       if (readings.length === 0) {
         return response.notFound({
           success: false,
-          message: 'Leitura não encontrada'
+          message: 'Leitura não encontrada',
         })
       }
 
@@ -454,18 +460,15 @@ export default class ReadingPlanController {
       let chaptersToUnmark = 0
       for (const reading of readings) {
         if (reading.isCompleted) {
-          chaptersToUnmark += (reading.endChapter - reading.startChapter + 1)
+          chaptersToUnmark += reading.endChapter - reading.startChapter + 1
         }
       }
 
       // Desmarcar as leituras
-      await ReadingProgress.query()
-        .where('reading_plan_id', plan.id)
-        .where('day', day)
-        .update({
-          isCompleted: false,
-          completedAt: null
-        })
+      await ReadingProgress.query().where('reading_plan_id', plan.id).where('day', day).update({
+        isCompleted: false,
+        completedAt: null,
+      })
 
       // Atualizar plano
       plan.completedChapters = Math.max(0, plan.completedChapters - chaptersToUnmark)
@@ -479,13 +482,13 @@ export default class ReadingPlanController {
 
       return response.ok({
         success: true,
-        message: 'Leitura desmarcada com sucesso'
+        message: 'Leitura desmarcada com sucesso',
       })
     } catch (error) {
       console.error('Erro ao desmarcar leitura:', error)
       return response.badRequest({
         success: false,
-        message: 'Erro ao desmarcar leitura'
+        message: 'Erro ao desmarcar leitura',
       })
     }
   }
@@ -505,27 +508,25 @@ export default class ReadingPlanController {
       if (!plan) {
         return response.notFound({
           success: false,
-          message: 'Plano de leitura não encontrado'
+          message: 'Plano de leitura não encontrado',
         })
       }
 
       // Excluir progresso de leitura (CASCADE vai fazer isso automaticamente)
-      await ReadingProgress.query()
-        .where('reading_plan_id', plan.id)
-        .delete()
+      await ReadingProgress.query().where('reading_plan_id', plan.id).delete()
 
       // Excluir plano
       await plan.delete()
 
       return response.ok({
         success: true,
-        message: 'Plano de leitura excluído com sucesso'
+        message: 'Plano de leitura excluído com sucesso',
       })
     } catch (error) {
       console.error('Erro ao excluir plano:', error)
       return response.badRequest({
         success: false,
-        message: 'Erro ao excluir plano de leitura'
+        message: 'Erro ao excluir plano de leitura',
       })
     }
   }
@@ -549,28 +550,33 @@ export default class ReadingPlanController {
 
         // Calcular estatísticas
         const totalDaysRead = progress.length
-        const averageChaptersPerDay = totalDaysRead > 0
-          ? (plan.completedChapters / totalDaysRead).toFixed(1)
-          : '0.0'
+        const averageChaptersPerDay =
+          totalDaysRead > 0 ? (plan.completedChapters / totalDaysRead).toFixed(1) : '0.0'
 
         // Encontrar horário mais comum de leitura
-        const readingHours = progress.map(p => {
-          if (p.completedAt) {
-            const dt = p.completedAt instanceof DateTime ? p.completedAt : DateTime.fromJSDate(p.completedAt)
-            return dt.hour
-          }
-          return null
-        }).filter(h => h !== null)
+        const readingHours = progress
+          .map((p) => {
+            if (p.completedAt) {
+              const dt =
+                p.completedAt instanceof DateTime
+                  ? p.completedAt
+                  : DateTime.fromJSDate(p.completedAt)
+              return dt.hour
+            }
+            return null
+          })
+          .filter((h) => h !== null)
 
-        const mostCommonHour = readingHours.length > 0
-          ? Math.round(readingHours.reduce((a, b) => a + b, 0) / readingHours.length)
-          : null
+        const mostCommonHour =
+          readingHours.length > 0
+            ? Math.round(readingHours.reduce((a, b) => a + b, 0) / readingHours.length)
+            : null
 
         // Calcular sequência atual (streak)
         let currentStreak = 0
 
         for (let i = 0; i < plan.totalDays; i++) {
-          const dayProgress = progress.find(p => p.day === plan.currentDay - i)
+          const dayProgress = progress.find((p) => p.day === plan.currentDay - i)
           if (dayProgress && dayProgress.isCompleted) {
             currentStreak++
           } else {
@@ -583,7 +589,8 @@ export default class ReadingPlanController {
         const lastReading = lastProgress?.completedAt
           ? (lastProgress.completedAt instanceof DateTime
               ? lastProgress.completedAt
-              : DateTime.fromJSDate(lastProgress.completedAt)).toFormat('dd/MM/yyyy HH:mm')
+              : DateTime.fromJSDate(lastProgress.completedAt)
+            ).toFormat('dd/MM/yyyy HH:mm')
           : null
 
         return {
@@ -597,24 +604,24 @@ export default class ReadingPlanController {
           currentDay: plan.currentDay,
           totalDays: plan.totalDays,
           totalDaysRead,
-          averageChaptersPerDay: parseFloat(averageChaptersPerDay),
+          averageChaptersPerDay: Number.parseFloat(averageChaptersPerDay),
           currentStreak,
           mostCommonHour,
           lastReading,
           startDate: plan.startDate.toFormat('dd/MM/yyyy'),
-          endDate: plan.endDate.toFormat('dd/MM/yyyy')
+          endDate: plan.endDate.toFormat('dd/MM/yyyy'),
         }
       })
 
       return response.ok({
         success: true,
-        data: ranking
+        data: ranking,
       })
     } catch (error) {
       console.error('Erro ao buscar ranking:', error)
       return response.badRequest({
         success: false,
-        message: 'Erro ao buscar ranking'
+        message: 'Erro ao buscar ranking',
       })
     }
   }
@@ -637,25 +644,30 @@ export default class ReadingPlanController {
         const progress = plan.progress
 
         const totalDaysRead = progress.length
-        const averageChaptersPerDay = totalDaysRead > 0
-          ? (plan.completedChapters / totalDaysRead).toFixed(1)
-          : '0.0'
+        const averageChaptersPerDay =
+          totalDaysRead > 0 ? (plan.completedChapters / totalDaysRead).toFixed(1) : '0.0'
 
-        const readingHours = progress.map(p => {
-          if (p.completedAt) {
-            const dt = p.completedAt instanceof DateTime ? p.completedAt : DateTime.fromJSDate(p.completedAt)
-            return dt.hour
-          }
-          return null
-        }).filter(h => h !== null)
+        const readingHours = progress
+          .map((p) => {
+            if (p.completedAt) {
+              const dt =
+                p.completedAt instanceof DateTime
+                  ? p.completedAt
+                  : DateTime.fromJSDate(p.completedAt)
+              return dt.hour
+            }
+            return null
+          })
+          .filter((h) => h !== null)
 
-        const mostCommonHour = readingHours.length > 0
-          ? Math.round(readingHours.reduce((a, b) => a + b, 0) / readingHours.length)
-          : null
+        const mostCommonHour =
+          readingHours.length > 0
+            ? Math.round(readingHours.reduce((a, b) => a + b, 0) / readingHours.length)
+            : null
 
         let currentStreak = 0
         for (let i = 0; i < plan.totalDays; i++) {
-          const dayProgress = progress.find(p => p.day === plan.currentDay - i)
+          const dayProgress = progress.find((p) => p.day === plan.currentDay - i)
           if (dayProgress && dayProgress.isCompleted) {
             currentStreak++
           } else {
@@ -667,7 +679,8 @@ export default class ReadingPlanController {
         const lastReading = lastProgressItem?.completedAt
           ? (lastProgressItem.completedAt instanceof DateTime
               ? lastProgressItem.completedAt
-              : DateTime.fromJSDate(lastProgressItem.completedAt)).toFormat('dd/MM/yyyy HH:mm')
+              : DateTime.fromJSDate(lastProgressItem.completedAt)
+            ).toFormat('dd/MM/yyyy HH:mm')
           : 'Nunca'
 
         return {
@@ -682,7 +695,7 @@ export default class ReadingPlanController {
           averageChaptersPerDay,
           currentStreak,
           mostCommonHour: mostCommonHour ? `${mostCommonHour}:00` : 'N/A',
-          lastReading
+          lastReading,
         }
       })
 
@@ -896,7 +909,7 @@ export default class ReadingPlanController {
       </div>
       <div class="stat-card">
         <h3>Maior Sequência</h3>
-        <p>${ranking.length > 0 ? Math.max(...ranking.map(r => r.currentStreak)) : 0} dias</p>
+        <p>${ranking.length > 0 ? Math.max(...ranking.map((r) => r.currentStreak)) : 0} dias</p>
       </div>
     </div>
 
@@ -915,7 +928,9 @@ export default class ReadingPlanController {
           </tr>
         </thead>
         <tbody>
-          ${ranking.map(r => `
+          ${ranking
+            .map(
+              (r) => `
             <tr>
               <td class="position ${r.position === 1 ? 'gold' : r.position === 2 ? 'silver' : r.position === 3 ? 'bronze' : ''}">${r.position}º</td>
               <td>
@@ -944,7 +959,9 @@ export default class ReadingPlanController {
                 <span class="stat-value">${r.lastReading}</span>
               </td>
             </tr>
-          `).join('')}
+          `
+            )
+            .join('')}
         </tbody>
       </table>
     </div>

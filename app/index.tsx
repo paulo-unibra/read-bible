@@ -14,7 +14,7 @@ import { Book } from '../types';
 export default function HomeScreen() {
   const params = useLocalSearchParams();
   const [readingPlan, setReadingPlan] = useState<ReadingPlan | null>(null);
-  const [todayReading, setTodayReading] = useState<TodayReading | null>(null);
+  const [todayReadings, setTodayReadings] = useState<TodayReading[]>([]);
   const [loading, setLoading] = useState(true);
   const [creatingPlan, setCreatingPlan] = useState(false);
   const [fontSizePref, setFontSizePref] = useState<'small' | 'medium' | 'large'>('medium');
@@ -79,7 +79,9 @@ export default function HomeScreen() {
       const response = await authService.getActivePlan();
       if (response.success && response.data) {
         setReadingPlan(response.data.plan);
-        setTodayReading(response.data.todayReading);
+
+        console.log('Today Reading:', response.data.todayReadings);
+        setTodayReadings(response.data.todayReadings);
       }
     } catch (error) {
       console.error('Erro ao carregar plano:', error);
@@ -112,9 +114,10 @@ export default function HomeScreen() {
     }
 
     // Ir para leitura do dia
-    if (todayReading) {
+    if (todayReadings) {
       // Aqui você pode navegar para a tela de leitura com os capítulos do dia
-      Alert.alert('Leitura do Dia', `${todayReading.bookName} ${todayReading.startChapter}${todayReading.endChapter !== todayReading.startChapter ? `-${todayReading.endChapter}` : ''}`);
+      // Alert.alert('Leitura do Dia', `${todayReading.bookName} ${todayReading.startChapter}${todayReading.endChapter !== todayReading.startChapter ? `-${todayReading.endChapter}` : ''}`);
+      Alert
     }
   };
 
@@ -147,9 +150,10 @@ export default function HomeScreen() {
   };
 
   const handleMarkReadingComplete = async () => {
-    if (!todayReading || !readingPlan) return;
+    if (!todayReadings.length || !readingPlan) return;
     try {
-      const response = await authService.completeDay(todayReading.day);
+      console.log('TESTE: ', todayReadings);
+      const response = await authService.completeDay(todayReadings[0].day);
       if (response.success) {
         Alert.alert('Parabéns!', 'Leitura marcada como concluída! 🎉');
         await loadReadingPlan();
@@ -228,12 +232,17 @@ export default function HomeScreen() {
         <AdBanner />
 
         {/* Plano de Leitura */}
-        {readingPlan && todayReading ? (
+        {readingPlan && todayReadings.length ? (
           <View style={[styles.todayCard,{ backgroundColor: colors.card, borderLeftColor: colors.accent, shadowOpacity: isDark ? 0.3 : 0.1 }]}> 
             <Text style={[styles.todayTitle,{ color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Leitura de Hoje - Dia {readingPlan.currentDay}/{readingPlan.totalDays}</Text>
             <View style={styles.readingInfo}>
               <Text style={[styles.readingText,{ color: colors.textSecondary, fontSize: applyFontScale(16) }]}>
-                {todayReading.bookName} {todayReading.startChapter}{todayReading.endChapter !== todayReading.startChapter && `-${todayReading.endChapter}`}
+                {todayReadings.map((reading, index) => (
+                  <Text key={reading.id}>
+                    {reading.bookName} {reading.startChapter}{reading.endChapter !== reading.startChapter ? `-${reading.endChapter}` : ''}
+                    {index < todayReadings.length - 1 ? ', ' : ''}
+                  </Text>
+                ))}
               </Text>
               <Text style={[styles.readingProgress,{ color: colors.textSecondary, fontSize: applyFontScale(14), marginTop: 8 }]}>
                 Progresso: {readingPlan.completedChapters}/{readingPlan.totalChapters} capítulos ({readingPlan.progress}%)
@@ -243,7 +252,7 @@ export default function HomeScreen() {
                 <View style={[styles.progressFill,{ backgroundColor: colors.progressFill, width: `${readingPlan.progress}%` }]} />
               </View>
             </View>
-            {!todayReading.isCompleted ? (
+            {!todayReadings[0].isCompleted ? (
               <TouchableOpacity style={styles.completeButton} onPress={handleMarkReadingComplete}>
                 <Ionicons name="checkmark-circle" size={20} color="#fff" />
                 <Text style={[styles.completeButtonText,{ fontSize: applyFontScale(16) }]}>Marcar como Lida</Text>
@@ -255,7 +264,7 @@ export default function HomeScreen() {
               </View>
             )}
           </View>
-        ) : isAuthenticated && readingPlan && !todayReading ? (
+        ) : isAuthenticated && readingPlan && !todayReadings.length ? (
           <View style={[styles.noReadingCard,{ backgroundColor: colors.card, shadowOpacity: isDark ? 0.3 : 0.1 }]}> 
             <Ionicons name="checkmark-done-circle" size={48} color={colors.success} />
             <Text style={[styles.noReadingTitle,{ color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Todas as leituras do dia concluídas!</Text>
