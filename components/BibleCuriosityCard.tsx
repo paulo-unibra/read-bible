@@ -3,11 +3,11 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Sharing from "expo-sharing";
 import React, { useRef, useState } from "react";
 import {
-    Alert,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  Alert,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from "react-native";
 import QRCode from "react-native-qrcode-svg";
 import ViewShot from "react-native-view-shot";
@@ -39,6 +39,7 @@ export default function BibleCuriosityCard({
 }: BibleCuriosityCardProps) {
   const [isFavorited, setIsFavorited] = useState(curiosity.isFavorited);
   const [isLoading, setIsLoading] = useState(false);
+  const [showFooter, setShowFooter] = useState(false);
   const viewShotRef = useRef<ViewShot>(null);
 
   // Gera cor aleatória baseada no ID da curiosidade (consistente)
@@ -49,13 +50,23 @@ export default function BibleCuriosityCard({
     try {
       setIsLoading(true);
 
+      // Mostra o footer antes de capturar
+      setShowFooter(true);
+
+      // Aguarda um pouco para o footer renderizar
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
       // Captura o componente como imagem
       if (!viewShotRef.current) {
         Alert.alert("Erro", "Componente não está pronto");
+        setShowFooter(false);
         return;
       }
 
       const uri = await viewShotRef.current.capture();
+
+      // Esconde o footer após capturar
+      setShowFooter(false);
 
       // Compartilha apenas a imagem
       const canShare = await Sharing.isAvailableAsync();
@@ -71,6 +82,7 @@ export default function BibleCuriosityCard({
     } catch (error: any) {
       console.error("Erro ao compartilhar:", error);
       Alert.alert("Erro", "Não foi possível compartilhar");
+      setShowFooter(false);
     } finally {
       setIsLoading(false);
     }
@@ -117,28 +129,31 @@ export default function BibleCuriosityCard({
               <Ionicons name="bulb" size={24} color={palette.text} />
             </View>
             <Text style={[styles.title, { color: palette.text }]}>
-              💡 Curiosidade do Dia
+               Curiosidade do Dia
             </Text>
           </View>
+          
           <Text style={[styles.content, { color: palette.text }]}>
             {curiosity.content}
           </Text>
 
-          <View style={styles.footer}>
-            <View style={styles.footerContent}>
-              <Text style={[styles.appName, { color: palette.text }]}>
-                Baixe Bíblia em Foco
-              </Text>
-              <View style={styles.qrContainer}>
-                <QRCode
-                  value="https://play.google.com/store/apps/details?id=com.readbible.app"
-                  size={40}
-                  color="#000000"
-                  backgroundColor="#FFFFFF"
-                />
+          {showFooter && (
+            <View style={styles.footer}>
+              <View style={styles.footerContent}>
+                <Text style={[styles.appName, { color: palette.text }]}>
+                  Baixe Bíblia em Foco
+                </Text>
+                <View style={styles.qrContainer}>
+                  <QRCode
+                    value="https://play.google.com/store/apps/details?id=com.readbible.app"
+                    size={40}
+                    color="#000000"
+                    backgroundColor="#FFFFFF"
+                  />
+                </View>
               </View>
             </View>
-          </View>
+          )}
         </LinearGradient>
       </ViewShot>
 
@@ -204,7 +219,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontStyle: "italic",
     flex: 1,
-    marginVertical: 12,
+    marginVertical: 5,
   },
   footer: {
     alignItems: "center",
