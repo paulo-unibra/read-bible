@@ -215,7 +215,7 @@ export default function ReadingHistoryScreen() {
           <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.textPrimary, fontSize: applyFontScale(20) }]}>
-          Detalhes da Leitura
+          Seu Plano de Leitura
         </Text>
         <TouchableOpacity onPress={handleDeletePlan} style={styles.deleteButton}>
           <Ionicons name="trash-outline" size={24} color={colors.danger} />

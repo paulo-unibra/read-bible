@@ -314,7 +314,7 @@ export default function HomeScreen() {
             <TouchableOpacity style={[styles.actionCard,{ backgroundColor: colors.card, shadowOpacity: isDark ? 0.25 : 0.1 }]} onPress={() => router.push('/reading-history')}>
               <View style={[styles.actionIcon,{ backgroundColor: colors.surfaceAlt }]}><Ionicons name="calendar-outline" size={32} color={isDark ? '#ffb74d' : '#FF9800'} /></View>
               <View style={styles.actionContent}>
-                <Text style={[styles.actionTitle,{ color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Detalhes da Leitura</Text>
+                <Text style={[styles.actionTitle,{ color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Seu Plano de Leitura</Text>
                 <Text style={[styles.actionDescription,{ color: colors.textSecondary, fontSize: applyFontScale(14) }]}>Histórico, próximas leituras e mais</Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color={colors.iconForward} />
