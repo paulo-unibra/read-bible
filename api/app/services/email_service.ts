@@ -1,5 +1,5 @@
-import nodemailer from 'nodemailer'
 import env from '#start/env'
+import nodemailer from 'nodemailer'
 
 class EmailService {
   private transporter: nodemailer.Transporter
@@ -89,24 +89,24 @@ class EmailService {
             <div class="header">
               <h1>📖 Bíblia em Foco</h1>
             </div>
-            
+
             <p>Olá, <strong>${userName}</strong>!</p>
-            
+
             <p>Você solicitou a recuperação de senha da sua conta no aplicativo <strong>Bíblia em Foco</strong>.</p>
-            
+
             <div class="token-box">
               <p style="margin: 0 0 10px 0; font-size: 14px; color: #666;">Seu código de recuperação é:</p>
               <div class="token">${token}</div>
             </div>
-            
+
             <div class="info">
               <p style="margin: 0;"><strong>⏰ Atenção:</strong> Este código expira em <strong>30 minutos</strong>.</p>
             </div>
-            
+
             <p>Digite este código no aplicativo para redefinir sua senha.</p>
-            
+
             <p class="warning">⚠️ Se você não solicitou esta recuperação, ignore este e-mail.</p>
-            
+
             <div class="footer">
               <p>Este é um e-mail automático, por favor não responda.</p>
               <p>© ${new Date().getFullYear()} Bíblia em Foco - Todos os direitos reservados</p>

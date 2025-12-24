@@ -1,5 +1,5 @@
-import { BaseCommand } from '@adonisjs/core/ace'
 import emailService from '#services/email_service'
+import { BaseCommand } from '@adonisjs/core/ace'
 import { CommandOptions } from '@adonisjs/core/types/ace'
 
 export default class TestEmail extends BaseCommand {
