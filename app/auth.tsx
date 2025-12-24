@@ -3,9 +3,11 @@ import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTheme } from '../hooks/theme-context';
 import authService from '../services/AuthService';
 
 export default function AuthScreen() {
+  const { colors, isDark } = useTheme();
   const params = useLocalSearchParams();
   const [isLogin, setIsLogin] = useState(true);
   const [name, setName] = useState('');
@@ -79,27 +81,28 @@ export default function AuthScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.header}>
-            <Ionicons name="book" size={64} color="#2196F3" />
-            <Text style={styles.title}>Bíblia em Foco</Text>
-            <Text style={styles.subtitle}>
+            <Ionicons name="book" size={64} color={colors.primary} />
+            <Text style={[styles.title, { color: colors.textPrimary }]}>Bíblia em Foco</Text>
+            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
               {isLogin ? 'Entre para continuar' : 'Crie sua conta e comece hoje'}
             </Text>
           </View>
 
           <View style={styles.form}>
             {!isLogin && (
-              <View style={styles.inputContainer}>
-                <Ionicons name="person-outline" size={20} color="#666" style={styles.inputIcon} />
+              <View style={[styles.inputContainer, { backgroundColor: colors.card }]}>
+                <Ionicons name="person-outline" size={20} color={colors.iconMuted} style={styles.inputIcon} />
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { color: colors.textPrimary }]}
                   placeholder="Nome completo"
+                  placeholderTextColor={colors.textSecondary}
                   value={name}
                   onChangeText={setName}
                   autoCapitalize="words"
@@ -107,11 +110,12 @@ export default function AuthScreen() {
               </View>
             )}
 
-            <View style={styles.inputContainer}>
-              <Ionicons name="mail-outline" size={20} color="#666" style={styles.inputIcon} />
+            <View style={[styles.inputContainer, { backgroundColor: colors.card }]}>
+              <Ionicons name="mail-outline" size={20} color={colors.iconMuted} style={styles.inputIcon} />
               <TextInput
-                style={styles.input}
+                style={[styles.input, { color: colors.textPrimary }]}
                 placeholder="Email"
+                placeholderTextColor={colors.textSecondary}
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
@@ -119,11 +123,12 @@ export default function AuthScreen() {
               />
             </View>
 
-            <View style={styles.inputContainer}>
-              <Ionicons name="lock-closed-outline" size={20} color="#666" style={styles.inputIcon} />
+            <View style={[styles.inputContainer, { backgroundColor: colors.card }]}>
+              <Ionicons name="lock-closed-outline" size={20} color={colors.iconMuted} style={styles.inputIcon} />
               <TextInput
-                style={styles.input}
+                style={[styles.input, { color: colors.textPrimary }]}
                 placeholder="Senha"
+                placeholderTextColor={colors.textSecondary}
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
@@ -131,7 +136,7 @@ export default function AuthScreen() {
             </View>
 
             <TouchableOpacity
-              style={[styles.button, loading && styles.buttonDisabled]}
+              style={[styles.button, { backgroundColor: colors.primary }, loading && styles.buttonDisabled]}
               onPress={handleAuth}
               disabled={loading}
             >
@@ -145,7 +150,7 @@ export default function AuthScreen() {
                 style={styles.forgotButton}
                 onPress={() => router.push('/forgot-password')}
               >
-                <Text style={styles.forgotText}>Esqueceu a senha?</Text>
+                <Text style={[styles.forgotText, { color: colors.primary }]}>Esqueceu a senha?</Text>
               </TouchableOpacity>
             )}
 
@@ -153,7 +158,7 @@ export default function AuthScreen() {
               style={styles.switchButton}
               onPress={() => setIsLogin(!isLogin)}
             >
-              <Text style={styles.switchText}>
+              <Text style={[styles.switchText, { color: colors.primary }]}>
                 {isLogin ? 'Não tem conta? Cadastre-se' : 'Já tem conta? Entre'}
               </Text>
             </TouchableOpacity>

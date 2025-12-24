@@ -249,16 +249,22 @@ export default class ReadingPlanController {
         .where('reading_plan_id', plan.id)
         .where('day', day)
 
-      // Marcar como concluídas
+      // Marcar como concluídas e calcular total de capítulos
       const now = DateTime.now()
+      let chaptersCompleted = 0
+
       for (const reading of readings) {
+        // Calcular quantos capítulos nesta leitura
+        const chaptersInReading = reading.endChapter - reading.startChapter + 1
+        chaptersCompleted += chaptersInReading
+
         reading.isCompleted = true
         reading.completedAt = now
         await reading.save()
       }
 
       // Atualizar plano
-      plan.completedChapters += readings.length
+      plan.completedChapters += chaptersCompleted
       plan.currentDay = day + 1
       await plan.save()
 
@@ -420,6 +426,49 @@ export default class ReadingPlanController {
       return response.badRequest({
         success: false,
         message: 'Erro ao buscar histórico completo',
+      })
+    }
+  }
+
+  /**
+   * Buscar todas as leituras do plano (para exportação)
+   */
+  async getAllReadings({ auth, response }: HttpContext) {
+    try {
+      const user = auth.user!
+
+      const plan = await ReadingPlan.query()
+        .where('user_id', user.id)
+        .where('is_active', true)
+        .first()
+
+      if (!plan) {
+        return response.notFound({
+          success: false,
+          message: 'Plano de leitura não encontrado',
+        })
+      }
+
+      const allReadings = await ReadingProgress.query()
+        .where('reading_plan_id', plan.id)
+        .orderBy('day', 'asc')
+
+      return response.ok({
+        success: true,
+        data: allReadings.map((r) => ({
+          id: r.id,
+          day: r.day,
+          bookName: r.bookName,
+          startChapter: r.startChapter,
+          endChapter: r.endChapter,
+          isCompleted: r.isCompleted,
+        })),
+      })
+    } catch (error) {
+      console.error('Erro ao buscar todas as leituras:', error)
+      return response.badRequest({
+        success: false,
+        message: 'Erro ao buscar todas as leituras',
       })
     }
   }

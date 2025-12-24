@@ -259,6 +259,28 @@ class AuthService {
   }
 
   /**
+   * Obter todas as leituras do plano ativo
+   */
+  async getAllPlanReadings(): Promise<{ success: boolean; data: TodayReading[] | null }> {
+    try {
+      const response = await fetch(`${API_URL}/reading-plans/all-readings`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${this.token}`,
+        },
+      });
+
+      return await response.json();
+    } catch (error) {
+      console.error('Erro ao buscar todas as leituras:', error);
+      return {
+        success: false,
+        data: null,
+      };
+    }
+  }
+
+  /**
    * Completar leitura do dia
    */
   async completeDay(day: number): Promise<any> {

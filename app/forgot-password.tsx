@@ -13,9 +13,11 @@ import {
     View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTheme } from '../hooks/theme-context';
 import passwordResetService from '../services/PasswordResetService';
 
 export default function ForgotPasswordScreen() {
+  const { colors } = useTheme();
   const [step, setStep] = useState<'email' | 'token' | 'password'>('email');
   const [email, setEmail] = useState('');
   const [token, setToken] = useState('');
@@ -110,19 +112,19 @@ export default function ForgotPasswordScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#667eea" />
+            <Ionicons name="arrow-back" size={24} color={colors.primary} />
           </TouchableOpacity>
 
           <View style={styles.header}>
-            <Text style={styles.title}>Recuperar Senha</Text>
-            <Text style={styles.subtitle}>
+            <Text style={[styles.title, { color: colors.textPrimary }]}>Recuperar Senha</Text>
+            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
               {step === 'email' && 'Digite seu email para receber o código de recuperação'}
               {step === 'token' && 'Digite o código de 6 dígitos enviado para seu email'}
               {step === 'password' && 'Digite sua nova senha'}
@@ -132,11 +134,12 @@ export default function ForgotPasswordScreen() {
           <View style={styles.form}>
             {step === 'email' && (
               <>
-                <View style={styles.inputContainer}>
-                  <Ionicons name="mail-outline" size={20} color="#999" style={styles.icon} />
+                <View style={[styles.inputContainer, { backgroundColor: colors.card }]}>
+                  <Ionicons name="mail-outline" size={20} color={colors.iconMuted} style={styles.icon} />
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, { color: colors.textPrimary }]}
                     placeholder="Email"
+                    placeholderTextColor={colors.textSecondary}
                     value={email}
                     onChangeText={setEmail}
                     keyboardType="email-address"
@@ -146,7 +149,7 @@ export default function ForgotPasswordScreen() {
                 </View>
 
                 <TouchableOpacity
-                  style={[styles.button, loading && styles.buttonDisabled]}
+                  style={[styles.button, { backgroundColor: colors.primary }, loading && styles.buttonDisabled]}
                   onPress={handleRequestReset}
                   disabled={loading}
                 >
@@ -159,11 +162,12 @@ export default function ForgotPasswordScreen() {
 
             {step === 'token' && (
               <>
-                <View style={styles.inputContainer}>
-                  <Ionicons name="key-outline" size={20} color="#999" style={styles.icon} />
+                <View style={[styles.inputContainer, { backgroundColor: colors.card }]}>
+                  <Ionicons name="key-outline" size={20} color={colors.iconMuted} style={styles.icon} />
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, { color: colors.textPrimary }]}
                     placeholder="Código de 6 dígitos"
+                    placeholderTextColor={colors.textSecondary}
                     value={token}
                     onChangeText={setToken}
                     keyboardType="number-pad"
@@ -173,7 +177,7 @@ export default function ForgotPasswordScreen() {
                 </View>
 
                 <TouchableOpacity
-                  style={[styles.button, loading && styles.buttonDisabled]}
+                  style={[styles.button, { backgroundColor: colors.primary }, loading && styles.buttonDisabled]}
                   onPress={handleVerifyToken}
                   disabled={loading}
                 >
@@ -187,18 +191,19 @@ export default function ForgotPasswordScreen() {
                   onPress={() => setStep('email')}
                   disabled={loading}
                 >
-                  <Text style={styles.linkText}>Não recebeu o código? Reenviar</Text>
+                  <Text style={[styles.linkText, { color: colors.primary }]}>Não recebeu o código? Reenviar</Text>
                 </TouchableOpacity>
               </>
             )}
 
             {step === 'password' && (
               <>
-                <View style={styles.inputContainer}>
-                  <Ionicons name="lock-closed-outline" size={20} color="#999" style={styles.icon} />
+                <View style={[styles.inputContainer, { backgroundColor: colors.card }]}>
+                  <Ionicons name="lock-closed-outline" size={20} color={colors.iconMuted} style={styles.icon} />
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, { color: colors.textPrimary }]}
                     placeholder="Nova senha"
+                    placeholderTextColor={colors.textSecondary}
                     value={newPassword}
                     onChangeText={setNewPassword}
                     secureTextEntry
@@ -206,11 +211,12 @@ export default function ForgotPasswordScreen() {
                   />
                 </View>
 
-                <View style={styles.inputContainer}>
-                  <Ionicons name="lock-closed-outline" size={20} color="#999" style={styles.icon} />
+                <View style={[styles.inputContainer, { backgroundColor: colors.card }]}>
+                  <Ionicons name="lock-closed-outline" size={20} color={colors.iconMuted} style={styles.icon} />
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, { color: colors.textPrimary }]}
                     placeholder="Confirmar senha"
+                    placeholderTextColor={colors.textSecondary}
                     value={confirmPassword}
                     onChangeText={setConfirmPassword}
                     secureTextEntry
@@ -219,7 +225,7 @@ export default function ForgotPasswordScreen() {
                 </View>
 
                 <TouchableOpacity
-                  style={[styles.button, loading && styles.buttonDisabled]}
+                  style={[styles.button, { backgroundColor: colors.primary }, loading && styles.buttonDisabled]}
                   onPress={handleResetPassword}
                   disabled={loading}
                 >

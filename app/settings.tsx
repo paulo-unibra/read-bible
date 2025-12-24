@@ -235,7 +235,7 @@ export default function SettingsScreen() {
                 Alert.alert('Sucesso', 'Plano de leitura excluído com sucesso', [
                   {
                     text: 'OK',
-                    onPress: () => router.replace('/(tabs)'),
+                    onPress: () => router.replace('/'),
                   },
                 ]);
               } else {

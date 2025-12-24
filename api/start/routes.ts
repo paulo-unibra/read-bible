@@ -46,6 +46,9 @@ router.get('/reading-plans/history', [ReadingPlanController, 'getHistory']).use(
 router
   .get('/reading-plans/all-history', [ReadingPlanController, 'getAllHistory'])
   .use(middleware.auth())
+router
+  .get('/reading-plans/all-readings', [ReadingPlanController, 'getAllReadings'])
+  .use(middleware.auth())
 router.delete('/reading-plans', [ReadingPlanController, 'deletePlan']).use(middleware.auth())
 
 // Ranking routes (public)
