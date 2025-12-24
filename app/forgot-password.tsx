@@ -38,10 +38,6 @@ export default function ForgotPasswordScreen() {
       if (response.success) {
         Alert.alert('Sucesso', response.message);
         setStep('token');
-        // Em desenvolvimento, mostrar o token
-        if (response.token) {
-          Alert.alert('Token de Desenvolvimento', `Seu token é: ${response.token}`);
-        }
       } else {
         Alert.alert('Erro', response.message);
       }

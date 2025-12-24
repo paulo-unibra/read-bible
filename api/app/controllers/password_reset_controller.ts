@@ -1,5 +1,6 @@
 import PasswordReset from '#models/password_reset'
 import User from '#models/user'
+import emailService from '#services/email_service'
 import type { HttpContext } from '@adonisjs/core/http'
 import { DateTime } from 'luxon'
 
@@ -43,14 +44,18 @@ export default class PasswordResetController {
         used: false,
       })
 
-      // TODO: Enviar email com o token
-      console.log(`[PasswordReset] Token para ${email}: ${token}`)
+      // Enviar email com o token
+      try {
+        await emailService.sendPasswordResetToken(email, token, user.name)
+        console.log(`[PasswordReset] E-mail enviado para ${email}`)
+      } catch (emailError) {
+        console.error('[PasswordReset] Erro ao enviar e-mail:', emailError)
+        // Continua mesmo se o e-mail falhar, para não bloquear o usuário
+      }
 
-      // Por enquanto, retornar o token na resposta (APENAS PARA DESENVOLVIMENTO)
       return response.ok({
         success: true,
         message: 'Token de recuperação enviado para seu email.',
-        token, // REMOVER EM PRODUÇÃO
       })
     } catch (error) {
       console.error('[PasswordResetController] Erro ao solicitar reset:', error)
