@@ -96,7 +96,9 @@ export default class BibleCuriositiesController {
         })
       }
 
-      const data = await deepseekResponse.json()
+      const data = (await deepseekResponse.json()) as {
+        choices: Array<{ message: { content: string } }>
+      }
       const curiosityContent = data.choices[0].message.content.trim()
 
       // Salvar no banco

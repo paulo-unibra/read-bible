@@ -46,7 +46,7 @@ export default class PasswordResetController {
 
       // Enviar email com o token
       try {
-        await emailService.sendPasswordResetToken(email, token, user.name)
+        await emailService.sendPasswordResetToken(email, token, user.fullName || 'Usuário')
         console.log(`[PasswordReset] E-mail enviado para ${email}`)
       } catch (emailError) {
         console.error('[PasswordReset] Erro ao enviar e-mail:', emailError)
