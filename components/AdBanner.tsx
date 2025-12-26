@@ -36,11 +36,16 @@ interface AdBannerProps {
 
 export default function AdBanner({ size }: AdBannerProps) {
   const [adLoaded, setAdLoaded] = useState(false);
+  const [adError, setAdError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (BannerAd) {
-      console.log('[AdBanner] Componente montado, ID:', adUnitId);
-    }
+    console.log('[AdBanner] Ambiente:', {
+      isExpoGo,
+      isDev: __DEV__,
+      hasBannerAd: !!BannerAd,
+      adUnitId,
+      platform: Platform.OS,
+    });
   }, []);
 
   // Se o módulo não estiver disponível (Expo Go), renderiza placeholder
@@ -65,6 +70,9 @@ export default function AdBanner({ size }: AdBannerProps) {
         }}>
           📢 Espaço reservado para anúncio
         </Text>
+        <Text style={{ color: '#999', fontSize: 10, marginTop: 4 }}>
+          {isExpoGo ? 'Expo Go' : 'Módulo não carregado'}
+        </Text>
       </View>
     );
   }
@@ -76,8 +84,25 @@ export default function AdBanner({ size }: AdBannerProps) {
       alignItems: 'center', 
       justifyContent: 'center',
       marginVertical: 10,
-      minHeight: adLoaded ? undefined : 50,
+      minHeight: 50,
     }}>
+      {!adLoaded && !adError && (
+        <View style={{ padding: 10 }}>
+          <Text style={{ color: '#999', fontSize: 12 }}>Carregando anúncio...</Text>
+        </View>
+      )}
+      {adError && (
+        <View style={{ 
+          padding: 8, 
+          backgroundColor: '#f0f0f0', 
+          borderRadius: 4,
+          marginHorizontal: 16,
+        }}>
+          <Text style={{ color: '#666', fontSize: 10, textAlign: 'center' }}>
+            Nenhum anúncio disponível no momento
+          </Text>
+        </View>
+      )}
       <BannerAd
         unitId={adUnitId}
         size={bannerSize}
@@ -85,11 +110,22 @@ export default function AdBanner({ size }: AdBannerProps) {
           requestNonPersonalizedAdsOnly: false,
         }}
         onAdLoaded={() => {
-          console.log('[AdBanner] Anúncio carregado com sucesso');
+          console.log('[AdBanner] ✅ Anúncio carregado com sucesso');
           setAdLoaded(true);
+          setAdError(null);
         }}
         onAdFailedToLoad={(error: any) => {
-          console.error('[AdBanner] Erro ao carregar anúncio:', error);
+          const errorCode = error?.code;
+          const errorMsg = error?.message || JSON.stringify(error);
+          
+          // Código 3 = NO_FILL (sem anúncios disponíveis)
+          if (errorCode === 3) {
+            console.log('[AdBanner] ℹ️  Nenhum anúncio disponível no momento (NO_FILL)');
+            setAdError('NO_FILL');
+          } else {
+            console.error('[AdBanner] ❌ Erro ao carregar anúncio:', errorMsg);
+            setAdError(errorMsg);
+          }
         }}
       />
     </View>
