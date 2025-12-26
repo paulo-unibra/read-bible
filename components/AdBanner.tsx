@@ -83,7 +83,6 @@ export default function AdBanner({ size }: AdBannerProps) {
     <View style={{ 
       alignItems: 'center', 
       justifyContent: 'center',
-      marginVertical: 10,
       minHeight: 50,
     }}>
       {!adLoaded && !adError && (
