@@ -12,7 +12,7 @@
 - [x] androidAppId configurado
 
 ### 3. IDs de Anúncio
-- [x] Banner Ad Unit: `ca-app-pub-5942901200629242/4108321222`
+- [x] Banner Ad Unit (Home): `ca-app-pub-5942901200629242/1666856687`
 - [x] Usando ID de teste em `__DEV__`
 - [x] Usando ID real em produção
 
@@ -122,7 +122,7 @@ Execute estes passos na ordem:
 
 **Para conferir no AdMob:**
 - App ID: `ca-app-pub-5942901200629242~1274274321`
-- Banner Unit ID: `ca-app-pub-5942901200629242/4108321222`
+- Banner Unit ID (Home): `ca-app-pub-5942901200629242/1666856687`
 - Package: `com.readbible.app`
 
 ## 📱 Códigos de Erro Comuns

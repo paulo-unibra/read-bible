@@ -27,8 +27,8 @@ if (!isExpoGo) {
 const adUnitId = __DEV__ 
   ? (TestIds?.BANNER || 'test-banner')
   : Platform.OS === 'android' 
-    ? 'ca-app-pub-5942901200629242/4108321222' // ID real do bloco de anúncios
-    : 'ca-app-pub-5942901200629242/4108321222';
+    ? 'ca-app-pub-5942901200629242/1666856687' // ID real do bloco de anúncios Home
+    : 'ca-app-pub-5942901200629242/1666856687';
 
 interface AdBannerProps {
   size?: any;

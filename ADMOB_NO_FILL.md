@@ -23,7 +23,7 @@ Quando você registra um app novo no AdMob, pode levar:
 
 **Status no seu caso:**
 - App ID: `ca-app-pub-5942901200629242~1274274321`
-- Banner Unit: `ca-app-pub-5942901200629242/4108321222`
+- Banner Unit (Home): `ca-app-pub-5942901200629242/1666856687`
 
 **Solução:**
 - Aguarde 24-48h após o primeiro registro
@@ -71,7 +71,7 @@ Muitas requisições em pouco tempo podem resultar em NO_FILL temporário.
    // No código atual, já está configurado
    const adUnitId = __DEV__ 
      ? TestIds.BANNER  // ID de teste - sempre tem anúncios
-     : 'ca-app-pub-5942901200629242/4108321222' // ID real
+     : 'ca-app-pub-5942901200629242/1666856687' // ID real (Home)
    ```
 
 ### ✅ Longo Prazo (Google)

@@ -49,16 +49,16 @@ class AudioService {
     2: "exodo",
     3: "levitico",
     4: "numeros",
-    5: "deuteronomio",
+    5: "deutoronomio",
     6: "josue",
     7: "juizes",
     8: "rute",
-    9: "1samuel",
-    10: "2samuel",
-    11: "1reis",
-    12: "2reis",
-    13: "1cronicas",
-    14: "2cronicas",
+    9: "1-samuel",
+    10: "2-samuel",
+    11: "1-reis",
+    12: "2-reis",
+    13: "1-cronicas",
+    14: "2-cronicas",
     15: "esdras",
     16: "neemias",
     17: "ester",
@@ -91,25 +91,25 @@ class AudioService {
     43: "joao",
     44: "atos",
     45: "romanos",
-    46: "1corintios",
-    47: "2corintios",
+    46: "1-corintios",
+    47: "2-corintios",
     48: "galatas",
     49: "efesios",
     50: "filipenses",
     51: "colossenses",
-    52: "1tessalonicenses",
-    53: "2tessalonicenses",
-    54: "1timoteo",
-    55: "2timoteo",
+    52: "1-tessalonicenses",
+    53: "2-tessalonicenses",
+    54: "1-timoteo",
+    55: "2-timoteo",
     56: "tito",
     57: "filemom",
     58: "hebreus",
     59: "tiago",
-    60: "1pedro",
-    61: "2pedro",
-    62: "1joao",
-    63: "2joao",
-    64: "3joao",
+    60: "1-pedro",
+    61: "2-pedro",
+    62: "1-joao",
+    63: "2-joao",
+    64: "3-joao",
     65: "judas",
     66: "apocalipse", // Como no exemplo: "apocalipse-7.mp3"
   };
@@ -185,7 +185,9 @@ class AudioService {
     if (!bookName) {
       throw new Error(`Book not found for ID: ${bookId}`);
     }
-    return `${bookName}-${chapter}.mp3`;
+    const fileName = `${bookName}-${chapter}.mp3`;
+    console.log('[AudioService] Generated filename:', { bookId, bookName, chapter, fileName });
+    return fileName;
   }
 
   private async ensureAudioDir() {
@@ -199,13 +201,24 @@ class AudioService {
 
   private async resolveDriveFileId(fileName: string): Promise<string> {
     const listUrl = `https://www.googleapis.com/drive/v3/files?q='${this.DRIVE_FOLDER_ID}'+in+parents+and+name='${fileName}'&key=${this.API_KEY}&fields=files(id,name)`;
+    console.log('[AudioService] Searching Drive for file:', fileName);
+    console.log('[AudioService] Drive URL query:', listUrl);
+    
     const response = await fetch(listUrl);
     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    
     const data = await response.json();
-    if (!data.files || data.files.length === 0)
+    console.log('[AudioService] Drive search result:', data);
+    
+    if (!data.files || data.files.length === 0) {
+      console.error('[AudioService] Audio file not found in Drive:', fileName);
       throw new Error(`Audio file not found: ${fileName}`);
+    }
+    
     const file = data.files[0];
     if (!file.id) throw new Error("File ID not found");
+    
+    console.log('[AudioService] Found file in Drive:', { id: file.id, name: file.name });
     return file.id;
   }
 

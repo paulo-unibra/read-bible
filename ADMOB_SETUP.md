@@ -34,7 +34,7 @@ Configurado com:
 Os IDs fornecidos pelo Google AdMob já estão configurados:
 
 - **App ID**: `ca-app-pub-5942901200629242~1274274321`
-- **Banner Ad Unit ID**: `ca-app-pub-5942901200629242/4108321222`
+- **Banner Ad Unit ID (Home)**: `ca-app-pub-5942901200629242/1666856687`
 
 **Arquivos já atualizados:**
 - ✅ `app.json` - App ID configurado em `android.config.googleMobileAdsAppId`
