@@ -1818,16 +1818,24 @@ export default function ChapterReaderScreen() {
                     bookName={book.name}
                     isDark={isDark}
                     onRequestNext={async () => {
-                      if (navigating || loading) return;
+                      console.log('[ChapterReader] onRequestNext called', { navigating, loading, currentChapter });
+                      if (navigating || loading) {
+                        console.log('[ChapterReader] Skipping - already navigating or loading');
+                        return;
+                      }
                       const prevChapter = currentChapter;
+                      console.log('[ChapterReader] Navigating to next chapter from', prevChapter);
                       await navigateChapter("next");
                       const targetChapter = prevChapter + 1;
-                      setTimeout(() => {
-                        AudioService.loadAndPlay(
-                          currentBookId,
-                          targetChapter
-                        ).catch(() => {});
-                      }, 500);
+                      console.log('[ChapterReader] Starting audio for chapter', targetChapter);
+                      
+                      // Chamar diretamente sem setTimeout para funcionar com tela bloqueada
+                      try {
+                        await AudioService.loadAndPlay(currentBookId, targetChapter, { bookName: book.name });
+                        console.log('[ChapterReader] Next audio loaded and playing successfully');
+                      } catch (err) {
+                        console.error('[ChapterReader] Error loading next audio:', err);
+                      }
                     }}
                   />
                 )}
