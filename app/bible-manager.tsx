@@ -2,22 +2,35 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    FlatList,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  FlatList,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useTheme } from "../hooks/theme-context";
 import DatabaseService from "../services/DatabaseService";
 import googleDriveService from "../services/GoogleDriveService";
 import { Bible, DriveFile } from "../types";
 
 export default function BibleManagerScreen() {
   const router = useRouter();
+  const { colors, isDark } = useTheme();
+  
+  // Criar compatibilidade com a estrutura theme antiga
+  const theme = {
+    background: colors.bg,
+    card: colors.card,
+    border: colors.border,
+    text: colors.textPrimary,
+    subText: colors.textSecondary,
+    primary: colors.primary,
+  };
+  
   const [availableBibles, setAvailableBibles] = useState<DriveFile[]>([]);
   const [localBibles, setLocalBibles] = useState<Bible[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,6 +73,9 @@ export default function BibleManagerScreen() {
     try {
       setDownloading(driveFile.id);
 
+      // Verificar se é a primeira Bíblia
+      const isFirstBible = localBibles.length === 0;
+
       await googleDriveService.downloadBible(driveFile);
 
       const bibleInfo = googleDriveService.parseBibleInfo(driveFile.name);
@@ -82,7 +98,28 @@ export default function BibleManagerScreen() {
       const updatedLocalBibles = await DatabaseService.getBibles();
       setLocalBibles(updatedLocalBibles);
 
-      Alert.alert("Sucesso", `Bíblia "${bible.name}" baixada com sucesso!`);
+      // Se for a primeira Bíblia, redirecionar para Gênesis 1
+      if (isFirstBible) {
+        Alert.alert(
+          "Sucesso",
+          `Bíblia "${bible.name}" baixada com sucesso!`,
+          [
+            {
+              text: "OK",
+              onPress: () => router.push({
+                pathname: "/chapter-reader",
+                params: { 
+                  bibleId: bible.id,
+                  bookId: "1", 
+                  chapterNumber: "1" 
+                }
+              }),
+            },
+          ]
+        );
+      } else {
+        Alert.alert("Sucesso", `Bíblia "${bible.name}" baixada com sucesso!`);
+      }
     } catch (error) {
       console.error("Error downloading bible:", error);
       Alert.alert("Erro", "Falha ao baixar a Bíblia");
@@ -133,12 +170,12 @@ export default function BibleManagerScreen() {
     const isDownloadingThis = downloading === item.id;
 
     return (
-      <View style={styles.bibleCard}>
+      <View style={[styles.bibleCard, { backgroundColor: theme.card }]}>
         <View style={styles.bibleInfo}>
-          <Text style={styles.bibleName}>{bibleInfo.name}</Text>
-          <Text style={styles.bibleDetails}>{bibleInfo.abbreviation}</Text>
+          <Text style={[styles.bibleName, { color: theme.text }]}>{bibleInfo.name}</Text>
+          <Text style={[styles.bibleDetails, { color: theme.subText }]}>{bibleInfo.abbreviation}</Text>
           {item.size && (
-            <Text style={styles.bibleSize}>
+            <Text style={[styles.bibleSize, { color: theme.subText }]}>
               {(parseInt(item.size) / 1024 / 1024).toFixed(1)} MB
             </Text>
           )}
@@ -172,10 +209,10 @@ export default function BibleManagerScreen() {
   };
 
   const renderLocalBible = ({ item }: { item: Bible }) => (
-    <View style={styles.bibleCard}>
+    <View style={[styles.bibleCard, { backgroundColor: theme.card }]}>
       <View style={styles.bibleInfo}>
-        <Text style={styles.bibleName}>{item.name}</Text>
-        <Text style={styles.bibleDetails}>
+        <Text style={[styles.bibleName, { color: theme.text }]}>{item.name}</Text>
+        <Text style={[styles.bibleDetails, { color: theme.subText }]}>
           {item.abbreviation}
         </Text>
       </View>
@@ -193,41 +230,41 @@ export default function BibleManagerScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+        <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
           <TouchableOpacity
             onPress={() => router.back()}
             style={styles.backButton}
           >
-            <Ionicons name="arrow-back" size={24} color="#333" />
+            <Ionicons name="arrow-back" size={24} color={theme.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Gerenciar Bíblias</Text>
+          <Text style={[styles.headerTitle, { color: theme.text }]}>Gerenciar Bíblias</Text>
         </View>
         <View style={styles.centerContent}>
-          <ActivityIndicator size="large" color="#2196F3" />
-          <Text style={styles.loadingText}>Carregando...</Text>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={[styles.loadingText, { color: theme.subText }]}>Carregando...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+      <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
         <TouchableOpacity
           onPress={() => router.back()}
           style={styles.backButton}
         >
-          <Ionicons name="arrow-back" size={24} color="#333" />
+          <Ionicons name="arrow-back" size={24} color={theme.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Gerenciar Bíblias</Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>Gerenciar Bíblias</Text>
         <TouchableOpacity onPress={loadData} style={styles.refreshButton}>
-          <Ionicons name="refresh" size={24} color="#333" />
+          <Ionicons name="refresh" size={24} color={theme.text} />
         </TouchableOpacity>
       </View>
 
       <View style={styles.content}>
-        <Text style={styles.sectionTitle}>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>
           Bíblias Baixadas ({localBibles.length})
         </Text>
         {localBibles.length > 0 ? (
@@ -240,12 +277,12 @@ export default function BibleManagerScreen() {
           />
         ) : (
           <View style={styles.emptyState}>
-            <Ionicons name="book-outline" size={48} color="#ccc" />
-            <Text style={styles.emptyText}>Nenhuma Bíblia baixada</Text>
+            <Ionicons name="book-outline" size={48} color={theme.subText} />
+            <Text style={[styles.emptyText, { color: theme.subText }]}>Nenhuma Bíblia baixada</Text>
           </View>
         )}
 
-        <Text style={styles.sectionTitle}>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>
           Disponíveis para Download ({availableBibles.length})
         </Text>
         <FlatList
@@ -263,16 +300,13 @@ export default function BibleManagerScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     padding: 16,
-    backgroundColor: "#fff",
     borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
   },
   backButton: {
     padding: 8,
@@ -280,7 +314,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: "bold",
-    color: "#333",
   },
   refreshButton: {
     padding: 8,
@@ -293,7 +326,6 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: "#666",
   },
   content: {
     flex: 1,
@@ -302,7 +334,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#333",
     marginBottom: 16,
     marginTop: 16,
   },
@@ -312,7 +343,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   bibleCard: {
-    backgroundColor: "#fff",
     flexDirection: "row",
     alignItems: "center",
     padding: 16,
@@ -333,21 +363,17 @@ const styles = StyleSheet.create({
   bibleName: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#333",
     marginBottom: 4,
   },
   bibleDetails: {
     fontSize: 14,
-    color: "#666",
     marginBottom: 2,
   },
   bibleSize: {
     fontSize: 12,
-    color: "#999",
   },
   downloadDate: {
     fontSize: 12,
-    color: "#999",
   },
   bibleActions: {
     marginLeft: 16,
@@ -391,7 +417,6 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: "#999",
     marginTop: 16,
   },
 });
