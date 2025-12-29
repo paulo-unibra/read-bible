@@ -310,7 +310,7 @@ export default function HomeScreen() {
         `/chapter-reader?bibleId=${lastReading.bibleId}&bookId=${lastReading.bookId}&chapterNumber=${lastReading.chapterNumber}`
       );
     } catch {
-      Alert.alert("Erro", "Falha ao iniciar leitura livre");
+      Alert.alert("Erro", "Falha ao abrir Bíblia");
     }
   };
 
@@ -757,7 +757,7 @@ export default function HomeScreen() {
                   { color: colors.textPrimary, fontSize: applyFontScale(18) },
                 ]}
               >
-                Leitura Livre
+                Bíblia
               </Text>
               <Text
                 style={[
@@ -765,7 +765,51 @@ export default function HomeScreen() {
                   { color: colors.textSecondary, fontSize: applyFontScale(14) },
                 ]}
               >
-                Navegue por livros, capítulos e versículos
+                Leia livros, capítulos e versículos
+              </Text>
+            </View>
+            <Ionicons
+              name="chevron-forward"
+              size={20}
+              color={colors.iconForward}
+            />
+          </TouchableOpacity>
+
+          {/* Harpa Cristã */}
+          <TouchableOpacity
+            style={[
+              styles.actionCard,
+              {
+                backgroundColor: colors.card,
+                shadowOpacity: isDark ? 0.25 : 0.1,
+              },
+            ]}
+            onPress={() => router.push("/harpa")}
+          >
+            <View
+              style={[
+                styles.actionIcon,
+                { backgroundColor: colors.surfaceAlt },
+              ]}
+            >
+              <Ionicons name="musical-notes-outline" size={32} color={isDark ? "#81c784" : "#4CAF50"} />
+            </View>
+            <View style={styles.actionContent}>
+              <Text
+                style={[
+                  styles.actionTitle,
+                  { color: colors.textPrimary, fontSize: applyFontScale(18) },
+                ]}
+              >
+                Harpa Cristã
+              </Text>
+              <Text
+                style={[
+                  styles.actionDescription,
+                  { color: colors.textSecondary, fontSize: applyFontScale(14) },
+                ]}
+              >
+                640 hinos da Harpa Cristã
               </Text>
             </View>
             <Ionicons
