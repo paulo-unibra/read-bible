@@ -17,6 +17,7 @@ import {
     SafeAreaView,
     useSafeAreaInsets,
 } from "react-native-safe-area-context";
+import AdBanner from "../components/AdBanner";
 import { Colors } from "../constants/theme";
 import QuizService, {
     Quiz,
@@ -576,6 +577,9 @@ export default function QuizScreen() {
           {session.currentQuestionIndex + 1} de {session.quiz.questions.length}
         </Text>
       </View>
+
+      {/* Banner de Anúncio no Topo */}
+      <AdBanner adUnitId="ca-app-pub-5942901200629242/6311806560" />
 
       {/* Timer */}
       <View

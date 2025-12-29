@@ -23,20 +23,21 @@ if (!isExpoGo) {
   }
 }
 
-// IDs de anúncio
-const adUnitId = __DEV__ 
-  ? (TestIds?.BANNER || 'test-banner')
-  : Platform.OS === 'android' 
-    ? 'ca-app-pub-5942901200629242/1666856687' // ID real do bloco de anúncios Home
-    : 'ca-app-pub-5942901200629242/1666856687';
-
 interface AdBannerProps {
   size?: any;
+  adUnitId?: string; // ID customizado do bloco de anúncio
 }
 
-export default function AdBanner({ size }: AdBannerProps) {
+export default function AdBanner({ size, adUnitId: customAdUnitId }: AdBannerProps) {
   const [adLoaded, setAdLoaded] = useState(false);
   const [adError, setAdError] = useState<string | null>(null);
+
+  // Usar ID customizado se fornecido, senão usa o padrão (Home)
+  const adUnitId = customAdUnitId || (__DEV__ 
+    ? (TestIds?.BANNER || 'test-banner')
+    : Platform.OS === 'android' 
+      ? 'ca-app-pub-5942901200629242/1666856687' // ID real do bloco de anúncios Home
+      : 'ca-app-pub-5942901200629242/1666856687');
 
   useEffect(() => {
     console.log('[AdBanner] Ambiente:', {

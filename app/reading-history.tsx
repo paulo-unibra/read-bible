@@ -148,9 +148,13 @@ export default function ReadingHistoryScreen() {
             try {
               const response = await authService.deletePlan();
               if (response.success) {
-                Alert.alert('Sucesso', 'Plano de leitura excluído', [
-                  { text: 'OK', onPress: () => router.back() }
-                ]);
+                // Voltar para home (vai disparar useFocusEffect e recarregar)
+                router.push('/');
+                
+                // Mostrar mensagem de sucesso após um pequeno delay
+                setTimeout(() => {
+                  Alert.alert('Sucesso', 'Plano de leitura excluído');
+                }, 300);
               } else {
                 Alert.alert('Erro', response.message);
               }

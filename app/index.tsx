@@ -644,7 +644,7 @@ export default function HomeScreen() {
             </Text>
             <TouchableOpacity
               style={styles.createPlanButton}
-              onPress={() => router.push("/auth")}
+              onPress={() => router.push("/auth?mode=register")}
             >
               <Text
                 style={[

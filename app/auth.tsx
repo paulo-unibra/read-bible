@@ -9,7 +9,7 @@ import authService from '../services/AuthService';
 export default function AuthScreen() {
   const { colors, isDark } = useTheme();
   const params = useLocalSearchParams();
-  const [isLogin, setIsLogin] = useState(true);
+  const [isLogin, setIsLogin] = useState(params.mode !== 'register');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -39,12 +39,8 @@ export default function AuthScreen() {
           {
             text: 'OK',
             onPress: () => {
-              // Criar plano de leitura automaticamente após cadastro
-              if (!isLogin) {
-                createReadingPlan();
-              } else {
-                router.replace('/');
-              }
+              // Redirecionar para home após login ou cadastro
+              router.replace('/');
             },
           },
         ]);
@@ -169,7 +165,7 @@ export default function AuthScreen() {
             <Text style={styles.infoText}>
               {isLogin
                 ? 'Entre para acessar seu plano de leitura'
-                : 'Ao criar sua conta, será gerado automaticamente um plano de leitura para você ler toda a Bíblia até o fim do ano!'}
+                : 'Crie sua conta para ter acesso ao plano de leitura anual da Bíblia'}
             </Text>
           </View>
         </ScrollView>
