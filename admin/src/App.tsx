@@ -1,11 +1,11 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { AuthProvider } from './contexts/AuthContext'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import ProtectedRoute from './components/ProtectedRoute'
-import Login from './pages/Login'
+import { AuthProvider } from './contexts/AuthContext'
 import Dashboard from './pages/Dashboard'
-import Users from './pages/Users'
+import Login from './pages/Login'
 import Permissions from './pages/Permissions'
 import Quizzes from './pages/Quizzes'
+import Users from './pages/Users'
 
 function App() {
   return (

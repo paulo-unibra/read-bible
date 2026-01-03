@@ -42,7 +42,7 @@ export default class User extends compose(BaseModel, AuthFinder) {
    */
   async hasPermission(permission: string): Promise<boolean> {
     await this.load('roles')
-    return this.roles.some(role => 
+    return this.roles.some(role =>
       role.permissions.includes(permission)
     )
   }

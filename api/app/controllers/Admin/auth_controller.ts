@@ -1,8 +1,8 @@
-import User from '#models/user'
 import Permission from '#models/permission'
 import Role from '#models/role'
-import hash from '@adonisjs/core/services/hash'
+import User from '#models/user'
 import type { HttpContext } from '@adonisjs/core/http'
+import hash from '@adonisjs/core/services/hash'
 
 export default class AuthController {
   /**
@@ -15,19 +15,19 @@ export default class AuthController {
     try {
       // Buscar usuário por email
       const user = await User.findBy('email', email)
-      
+
       if (!user) {
-        return response.unauthorized({ 
-          error: 'Credenciais inválidas' 
+        return response.unauthorized({
+          error: 'Credenciais inválidas'
         })
       }
 
       // Verificar senha
       const isPasswordValid = await hash.verify(user.password, password)
-      
+
       if (!isPasswordValid) {
-        return response.unauthorized({ 
-          error: 'Credenciais inválidas' 
+        return response.unauthorized({
+          error: 'Credenciais inválidas'
         })
       }
 
@@ -36,10 +36,10 @@ export default class AuthController {
 
       // Verificar se tem permissão para acessar painel
       const hasAccess = await user.hasPermission('acessar_painel_administrativo')
-      
+
       if (!hasAccess) {
-        return response.forbidden({ 
-          error: 'Você não tem permissão para acessar o painel administrativo' 
+        return response.forbidden({
+          error: 'Você não tem permissão para acessar o painel administrativo'
         })
       }
 
@@ -69,8 +69,8 @@ export default class AuthController {
       })
     } catch (error) {
       console.error('Erro no login admin:', error)
-      return response.internalServerError({ 
-        error: 'Erro ao processar login' 
+      return response.internalServerError({
+        error: 'Erro ao processar login'
       })
     }
   }
@@ -81,7 +81,7 @@ export default class AuthController {
   async logout({ auth, response }: HttpContext) {
     const user = auth.getUserOrFail()
     await User.accessTokens.delete(user, user.currentAccessToken.identifier)
-    
+
     return response.ok({ message: 'Logout realizado com sucesso' })
   }
 
@@ -134,8 +134,8 @@ export default class AuthController {
       )
     } catch (error) {
       console.error('Erro ao listar usuários:', error)
-      return response.internalServerError({ 
-        error: 'Erro ao listar usuários' 
+      return response.internalServerError({
+        error: 'Erro ao listar usuários'
       })
     }
   }
@@ -150,8 +150,8 @@ export default class AuthController {
       return response.ok(permissions)
     } catch (error) {
       console.error('Erro ao listar permissões:', error)
-      return response.internalServerError({ 
-        error: 'Erro ao listar permissões' 
+      return response.internalServerError({
+        error: 'Erro ao listar permissões'
       })
     }
   }
@@ -171,16 +171,16 @@ export default class AuthController {
 
       // Validar campos obrigatórios
       if (!name || !slug) {
-        return response.badRequest({ 
-          error: 'Nome e slug são obrigatórios' 
+        return response.badRequest({
+          error: 'Nome e slug são obrigatórios'
         })
       }
 
       // Verificar se slug já existe
       const existingPermission = await Permission.findBy('slug', slug)
       if (existingPermission) {
-        return response.conflict({ 
-          error: 'Já existe uma permissão com este slug' 
+        return response.conflict({
+          error: 'Já existe uma permissão com este slug'
         })
       }
 
@@ -196,8 +196,8 @@ export default class AuthController {
       return response.created(permission)
     } catch (error) {
       console.error('Erro ao criar permissão:', error)
-      return response.internalServerError({ 
-        error: 'Erro ao criar permissão' 
+      return response.internalServerError({
+        error: 'Erro ao criar permissão'
       })
     }
   }
@@ -212,8 +212,8 @@ export default class AuthController {
       return response.ok(roles)
     } catch (error) {
       console.error('Erro ao listar roles:', error)
-      return response.internalServerError({ 
-        error: 'Erro ao listar roles' 
+      return response.internalServerError({
+        error: 'Erro ao listar roles'
       })
     }
   }
@@ -227,31 +227,31 @@ export default class AuthController {
       const { permissionSlug } = request.only(['permissionSlug'])
 
       if (!permissionSlug) {
-        return response.badRequest({ 
-          error: 'Slug da permissão é obrigatório' 
+        return response.badRequest({
+          error: 'Slug da permissão é obrigatório'
         })
       }
 
       // Buscar role
       const role = await Role.find(roleId)
       if (!role) {
-        return response.notFound({ 
-          error: 'Role não encontrada' 
+        return response.notFound({
+          error: 'Role não encontrada'
         })
       }
 
       // Verificar se permissão existe
       const permission = await Permission.findBy('slug', permissionSlug)
       if (!permission) {
-        return response.notFound({ 
-          error: 'Permissão não encontrada' 
+        return response.notFound({
+          error: 'Permissão não encontrada'
         })
       }
 
       // Verificar se já tem a permissão
       if (role.permissions.includes(permissionSlug)) {
-        return response.conflict({ 
-          error: 'Role já possui esta permissão' 
+        return response.conflict({
+          error: 'Role já possui esta permissão'
         })
       }
 
@@ -262,8 +262,8 @@ export default class AuthController {
       return response.ok(role)
     } catch (error) {
       console.error('Erro ao adicionar permissão à role:', error)
-      return response.internalServerError({ 
-        error: 'Erro ao adicionar permissão à role' 
+      return response.internalServerError({
+        error: 'Erro ao adicionar permissão à role'
       })
     }
   }
@@ -277,23 +277,23 @@ export default class AuthController {
       const { permissionSlug } = request.only(['permissionSlug'])
 
       if (!permissionSlug) {
-        return response.badRequest({ 
-          error: 'Slug da permissão é obrigatório' 
+        return response.badRequest({
+          error: 'Slug da permissão é obrigatório'
         })
       }
 
       // Buscar role
       const role = await Role.find(roleId)
       if (!role) {
-        return response.notFound({ 
-          error: 'Role não encontrada' 
+        return response.notFound({
+          error: 'Role não encontrada'
         })
       }
 
       // Verificar se tem a permissão
       if (!role.permissions.includes(permissionSlug)) {
-        return response.notFound({ 
-          error: 'Role não possui esta permissão' 
+        return response.notFound({
+          error: 'Role não possui esta permissão'
         })
       }
 
@@ -304,8 +304,8 @@ export default class AuthController {
       return response.ok(role)
     } catch (error) {
       console.error('Erro ao remover permissão da role:', error)
-      return response.internalServerError({ 
-        error: 'Erro ao remover permissão da role' 
+      return response.internalServerError({
+        error: 'Erro ao remover permissão da role'
       })
     }
   }

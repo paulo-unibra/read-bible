@@ -1,5 +1,5 @@
+import type { LoginResponse, User } from '../types/auth';
 import api from './api';
-import type { User, LoginResponse } from '../types/auth';
 
 class AuthService {
   async login(email: string, password: string): Promise<LoginResponse> {

@@ -93,7 +93,7 @@ router.group(() => {
   router.post('/login', [AdminAuthController, 'login'])
   router.post('/logout', [AdminAuthController, 'logout']).use(middleware.auth({ guards: ['api'] }))
   router.get('/me', [AdminAuthController, 'me']).use(middleware.auth({ guards: ['api'] }))
-  
+
   // Protected admin routes (requerem autenticação)
   router.group(() => {
     router.get('/users', [AdminAuthController, 'listUsers'])
@@ -102,7 +102,7 @@ router.group(() => {
     router.get('/roles', [AdminAuthController, 'listRoles'])
     router.post('/roles/:roleId/permissions', [AdminAuthController, 'addPermissionToRole'])
     router.delete('/roles/:roleId/permissions', [AdminAuthController, 'removePermissionFromRole'])
-    
+
     // Quiz management
     router.get('/quizzes', [AdminQuizController, 'index'])
     router.get('/quizzes/stats', [AdminQuizController, 'stats'])

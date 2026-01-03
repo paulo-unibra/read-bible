@@ -40,7 +40,7 @@ export default class AdminQuizController {
         .paginate(page, perPage)
 
       return response.ok({
-        data: quizzes.all().map(quiz => ({
+        data: quizzes.all().map((quiz) => ({
           id: quiz.id,
           bookName: quiz.bookName,
           chapter: quiz.chapter,
@@ -55,8 +55,8 @@ export default class AdminQuizController {
       })
     } catch (error) {
       console.error('Erro ao listar quizzes:', error)
-      return response.internalServerError({ 
-        error: 'Erro ao listar quizzes' 
+      return response.internalServerError({
+        error: 'Erro ao listar quizzes',
       })
     }
   }
@@ -79,7 +79,7 @@ export default class AdminQuizController {
         testament: quiz.testament,
         category: quiz.category,
         cloudStorageUrl: quiz.cloudStorageUrl,
-        questions: quiz.questions.map(q => ({
+        questions: quiz.questions.map((q) => ({
           id: q.id,
           questionId: q.questionId,
           pergunta: q.pergunta,
@@ -92,8 +92,8 @@ export default class AdminQuizController {
       })
     } catch (error) {
       console.error('Erro ao buscar quiz:', error)
-      return response.notFound({ 
-        error: 'Quiz não encontrado' 
+      return response.notFound({
+        error: 'Quiz não encontrado',
       })
     }
   }
@@ -109,12 +109,12 @@ export default class AdminQuizController {
         'bibleVersion',
         'testament',
         'category',
-        'questions'
+        'questions',
       ])
 
       if (!bookName || !chapter || !bibleVersion) {
-        return response.badRequest({ 
-          error: 'bookName, chapter e bibleVersion são obrigatórios' 
+        return response.badRequest({
+          error: 'bookName, chapter e bibleVersion são obrigatórios',
         })
       }
 
@@ -126,15 +126,15 @@ export default class AdminQuizController {
         .first()
 
       if (existingQuiz) {
-        return response.conflict({ 
-          error: 'Quiz já existe para este livro, capítulo e versão' 
+        return response.conflict({
+          error: 'Quiz já existe para este livro, capítulo e versão',
         })
       }
 
       // Criar quiz
       const quiz = await Quiz.create({
         bookName,
-        chapter: parseInt(chapter),
+        chapter: Number.parseInt(chapter),
         bibleVersion,
         testament: testament || this.getTestament(bookName),
         category: category || 'geral',
@@ -143,8 +143,7 @@ export default class AdminQuizController {
 
       // Criar questões se fornecidas
       if (questions && Array.isArray(questions)) {
-        for (let i = 0; i < questions.length; i++) {
-          const question = questions[i]
+        for (const [i, question] of questions.entries()) {
           await QuizQuestion.create({
             quizId: quiz.id,
             questionId: question.questionId || `q${i + 1}`,
@@ -165,8 +164,8 @@ export default class AdminQuizController {
       })
     } catch (error) {
       console.error('Erro ao criar quiz:', error)
-      return response.internalServerError({ 
-        error: 'Erro ao criar quiz' 
+      return response.internalServerError({
+        error: 'Erro ao criar quiz',
       })
     }
   }
@@ -177,20 +176,20 @@ export default class AdminQuizController {
   async update({ params, request, response }: HttpContext) {
     try {
       const quiz = await Quiz.findOrFail(params.id)
-      
+
       const { bookName, chapter, bibleVersion, testament, category, questions } = request.only([
         'bookName',
         'chapter',
         'bibleVersion',
         'testament',
         'category',
-        'questions'
+        'questions',
       ])
 
       // Atualizar dados básicos
       quiz.merge({
         bookName: bookName || quiz.bookName,
-        chapter: chapter ? parseInt(chapter) : quiz.chapter,
+        chapter: chapter ? Number.parseInt(chapter) : quiz.chapter,
         bibleVersion: bibleVersion || quiz.bibleVersion,
         testament: testament || quiz.testament,
         category: category || quiz.category,
@@ -204,8 +203,7 @@ export default class AdminQuizController {
         await QuizQuestion.query().where('quiz_id', quiz.id).delete()
 
         // Criar novas questões
-        for (let i = 0; i < questions.length; i++) {
-          const question = questions[i]
+        for (const [i, question] of questions.entries()) {
           await QuizQuestion.create({
             quizId: quiz.id,
             questionId: question.questionId || `q${i + 1}`,
@@ -222,8 +220,8 @@ export default class AdminQuizController {
       })
     } catch (error) {
       console.error('Erro ao atualizar quiz:', error)
-      return response.internalServerError({ 
-        error: 'Erro ao atualizar quiz' 
+      return response.internalServerError({
+        error: 'Erro ao atualizar quiz',
       })
     }
   }
@@ -234,10 +232,10 @@ export default class AdminQuizController {
   async destroy({ params, response }: HttpContext) {
     try {
       const quiz = await Quiz.findOrFail(params.id)
-      
+
       // Deletar questões associadas
       await QuizQuestion.query().where('quiz_id', quiz.id).delete()
-      
+
       // Deletar quiz
       await quiz.delete()
 
@@ -246,8 +244,8 @@ export default class AdminQuizController {
       })
     } catch (error) {
       console.error('Erro ao deletar quiz:', error)
-      return response.internalServerError({ 
-        error: 'Erro ao deletar quiz' 
+      return response.internalServerError({
+        error: 'Erro ao deletar quiz',
       })
     }
   }
@@ -277,8 +275,8 @@ export default class AdminQuizController {
         .first()
 
       if (existingQuiz) {
-        return response.conflict({ 
-          error: 'Quiz já existe para este livro, capítulo e versão. Edite ou delete o existente.' 
+        return response.conflict({
+          error: 'Quiz já existe para este livro, capítulo e versão. Edite ou delete o existente.',
         })
       }
 
@@ -290,7 +288,7 @@ export default class AdminQuizController {
       const testament = this.getTestament(bookName)
       const quiz = await Quiz.create({
         bookName,
-        chapter: parseInt(chapter),
+        chapter: Number.parseInt(chapter),
         bibleVersion,
         testament,
         category: quizData.category,
@@ -329,13 +327,45 @@ export default class AdminQuizController {
    */
   private getTestament(bookName: string): string {
     const oldTestamentBooks = [
-      'Gênesis', 'Êxodo', 'Levítico', 'Números', 'Deuteronômio',
-      'Josué', 'Juízes', 'Rute', '1 Samuel', '2 Samuel', '1 Reis', '2 Reis',
-      '1 Crônicas', '2 Crônicas', 'Esdras', 'Neemias', 'Ester',
-      'Jó', 'Salmos', 'Provérbios', 'Eclesiastes', 'Cantares',
-      'Isaías', 'Jeremias', 'Lamentações', 'Ezequiel', 'Daniel',
-      'Oséias', 'Joel', 'Amós', 'Obadias', 'Jonas', 'Miquéias',
-      'Naum', 'Habacuque', 'Sofonias', 'Ageu', 'Zacarias', 'Malaquias'
+      'Gênesis',
+      'Êxodo',
+      'Levítico',
+      'Números',
+      'Deuteronômio',
+      'Josué',
+      'Juízes',
+      'Rute',
+      '1 Samuel',
+      '2 Samuel',
+      '1 Reis',
+      '2 Reis',
+      '1 Crônicas',
+      '2 Crônicas',
+      'Esdras',
+      'Neemias',
+      'Ester',
+      'Jó',
+      'Salmos',
+      'Provérbios',
+      'Eclesiastes',
+      'Cantares',
+      'Isaías',
+      'Jeremias',
+      'Lamentações',
+      'Ezequiel',
+      'Daniel',
+      'Oséias',
+      'Joel',
+      'Amós',
+      'Obadias',
+      'Jonas',
+      'Miquéias',
+      'Naum',
+      'Habacuque',
+      'Sofonias',
+      'Ageu',
+      'Zacarias',
+      'Malaquias',
     ]
 
     return oldTestamentBooks.includes(bookName) ? 'old' : 'new'
@@ -351,7 +381,7 @@ export default class AdminQuizController {
         .select('testament')
         .count('* as count')
         .groupBy('testament')
-      
+
       const byVersion = await Quiz.query()
         .select('bible_version')
         .count('* as count')
@@ -359,19 +389,19 @@ export default class AdminQuizController {
 
       return response.ok({
         total: total[0].$extras.total,
-        byTestament: byTestament.map(item => ({
+        byTestament: byTestament.map((item) => ({
           testament: item.testament,
           count: item.$extras.count,
         })),
-        byVersion: byVersion.map(item => ({
+        byVersion: byVersion.map((item) => ({
           version: item.bibleVersion,
           count: item.$extras.count,
         })),
       })
     } catch (error) {
       console.error('Erro ao obter estatísticas:', error)
-      return response.internalServerError({ 
-        error: 'Erro ao obter estatísticas' 
+      return response.internalServerError({
+        error: 'Erro ao obter estatísticas',
       })
     }
   }

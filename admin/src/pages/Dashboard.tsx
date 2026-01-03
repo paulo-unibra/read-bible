@@ -1,6 +1,6 @@
 import React from 'react';
-import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import './Dashboard.css';
 
 const Dashboard: React.FC = () => {
