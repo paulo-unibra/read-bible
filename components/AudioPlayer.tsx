@@ -2,16 +2,16 @@ import { Ionicons } from "@expo/vector-icons";
 import Slider from "@react-native-community/slider";
 import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Modal,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Modal,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import AudioService from "../services/AudioService";
-
+import AdBanner from "./AdBanner";
 interface AudioPlayerProps {
   bookId: number;
   chapterNumber: number;
@@ -112,6 +112,9 @@ const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
             </View>
           ) : (
             <View style={styles.audioContent}>
+              {/* Ad Banner */}
+              <AdBanner />
+
               <View style={styles.chapterInfo}>
                 <Text style={[styles.chapterName, { color: textColor }]}>
                   {bookName} {chapterNumber}
@@ -465,6 +468,7 @@ const styles = StyleSheet.create({
   },
   audioContent: {
     padding: 24,
+    paddingTop: 16,
     alignItems: "center",
   },
   chapterInfo: {
