@@ -1,4 +1,5 @@
 import BibleCuriosity from '#models/bible_curiosity'
+import Role from '#models/role'
 import { DbAccessTokensProvider } from '@adonisjs/auth/access_tokens'
 import { withAuthFinder } from '@adonisjs/auth/mixins/lucid'
 import { compose } from '@adonisjs/core/helpers'
@@ -29,6 +30,41 @@ export default class User extends compose(BaseModel, AuthFinder) {
     pivotTable: 'bible_curiosity_favorites',
   })
   declare favoriteCuriosities: ManyToMany<typeof BibleCuriosity>
+
+  @manyToMany(() => Role, {
+    pivotTable: 'user_roles',
+    pivotTimestamps: true
+  })
+  declare roles: ManyToMany<typeof Role>
+
+  /**
+   * Verifica se o usuário tem uma permissão específica
+   */
+  async hasPermission(permission: string): Promise<boolean> {
+    await this.load('roles')
+    return this.roles.some(role => 
+      role.permissions.includes(permission)
+    )
+  }
+
+  /**
+   * Verifica se o usuário tem pelo menos uma das permissões fornecidas
+   */
+  async hasAnyPermission(permissions: string[]): Promise<boolean> {
+    await this.load('roles')
+    return this.roles.some(role =>
+      role.permissions.some(p => permissions.includes(p))
+    )
+  }
+
+  /**
+   * Verifica se o usuário tem todas as permissões fornecidas
+   */
+  async hasAllPermissions(permissions: string[]): Promise<boolean> {
+    await this.load('roles')
+    const userPermissions = this.roles.flatMap(role => role.permissions)
+    return permissions.every(p => userPermissions.includes(p))
+  }
 
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime

@@ -8,6 +8,8 @@
 */
 
 const AuthController = () => import('#controllers/auth_controller')
+const AdminAuthController = () => import('#controllers/Admin/auth_controller')
+const AdminQuizController = () => import('#controllers/Admin/quiz_controller')
 const BibleCuriositiesController = () => import('#controllers/bible_curiosities_controller')
 const ImportController = () => import('#controllers/import_controller')
 const PasswordResetController = () => import('#controllers/password_reset_controller')
@@ -84,3 +86,30 @@ router
 router
   .get('/curiosities/favorites', [BibleCuriositiesController, 'getFavorites'])
   .use(middleware.auth())
+
+// Admin routes
+router.group(() => {
+  // Auth
+  router.post('/login', [AdminAuthController, 'login'])
+  router.post('/logout', [AdminAuthController, 'logout']).use(middleware.auth({ guards: ['api'] }))
+  router.get('/me', [AdminAuthController, 'me']).use(middleware.auth({ guards: ['api'] }))
+  
+  // Protected admin routes (requerem autenticação)
+  router.group(() => {
+    router.get('/users', [AdminAuthController, 'listUsers'])
+    router.get('/permissions', [AdminAuthController, 'listPermissions'])
+    router.post('/permissions', [AdminAuthController, 'createPermission'])
+    router.get('/roles', [AdminAuthController, 'listRoles'])
+    router.post('/roles/:roleId/permissions', [AdminAuthController, 'addPermissionToRole'])
+    router.delete('/roles/:roleId/permissions', [AdminAuthController, 'removePermissionFromRole'])
+    
+    // Quiz management
+    router.get('/quizzes', [AdminQuizController, 'index'])
+    router.get('/quizzes/stats', [AdminQuizController, 'stats'])
+    router.get('/quizzes/:id', [AdminQuizController, 'show'])
+    router.post('/quizzes', [AdminQuizController, 'store'])
+    router.put('/quizzes/:id', [AdminQuizController, 'update'])
+    router.delete('/quizzes/:id', [AdminQuizController, 'destroy'])
+    router.post('/quizzes/generate-ai', [AdminQuizController, 'generateWithAI'])
+  }).use(middleware.auth({ guards: ['api'] }))
+}).prefix('/admin')
