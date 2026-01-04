@@ -1,6 +1,6 @@
 import Quiz from '#models/quiz'
-import QuizQuestion from '#models/quiz_question'
 import QuizGenerationJob from '#models/quiz_generation_job'
+import QuizQuestion from '#models/quiz_question'
 import DeepSeekService from '#services/deep_seek_service'
 import { DateTime } from 'luxon'
 
@@ -27,7 +27,7 @@ export default class QuizGenerationService {
       // Se chapter foi especificado, gera apenas um
       if (job.chapter !== null) {
         console.log(`[JOB ${jobId}] 📄 Gerando apenas capítulo ${job.chapter}`)
-        
+
         await this.generateSingleQuiz(
           job.bookName,
           job.chapter,
@@ -36,16 +36,18 @@ export default class QuizGenerationService {
           createdQuizzes,
           errors
         )
-        
+
         job.processedChapters = 1
         job.progress = 100
       } else {
         // Gera para todos os capítulos
         console.log(`[JOB ${jobId}] 🔄 Gerando livro completo...`)
-        
+
         for (let chapterNum = 1; chapterNum <= job.totalChapters; chapterNum++) {
-          console.log(`[JOB ${jobId}] ⏳ Processando capítulo ${chapterNum}/${job.totalChapters}...`)
-          
+          console.log(
+            `[JOB ${jobId}] ⏳ Processando capítulo ${chapterNum}/${job.totalChapters}...`
+          )
+
           await this.generateSingleQuiz(
             job.bookName,
             chapterNum,
@@ -156,20 +158,51 @@ export default class QuizGenerationService {
 
   private getTestament(bookName: string): 'old' | 'new' {
     const oldTestamentBooks = [
-      'Gênesis', 'Êxodo', 'Levítico', 'Números', 'Deuteronômio',
-      'Josué', 'Juízes', 'Rute', '1 Samuel', '2 Samuel',
-      '1 Reis', '2 Reis', '1 Crônicas', '2 Crônicas', 'Esdras',
-      'Neemias', 'Ester', 'Jó', 'Salmos', 'Provérbios',
-      'Eclesiastes', 'Cânticos', 'Isaías', 'Jeremias', 'Lamentações',
-      'Ezequiel', 'Daniel', 'Oséias', 'Joel', 'Amós',
-      'Obadias', 'Jonas', 'Miquéias', 'Naum', 'Habacuque',
-      'Sofonias', 'Ageu', 'Zacarias', 'Malaquias'
+      'Gênesis',
+      'Êxodo',
+      'Levítico',
+      'Números',
+      'Deuteronômio',
+      'Josué',
+      'Juízes',
+      'Rute',
+      '1 Samuel',
+      '2 Samuel',
+      '1 Reis',
+      '2 Reis',
+      '1 Crônicas',
+      '2 Crônicas',
+      'Esdras',
+      'Neemias',
+      'Ester',
+      'Jó',
+      'Salmos',
+      'Provérbios',
+      'Eclesiastes',
+      'Cânticos',
+      'Isaías',
+      'Jeremias',
+      'Lamentações',
+      'Ezequiel',
+      'Daniel',
+      'Oséias',
+      'Joel',
+      'Amós',
+      'Obadias',
+      'Jonas',
+      'Miquéias',
+      'Naum',
+      'Habacuque',
+      'Sofonias',
+      'Ageu',
+      'Zacarias',
+      'Malaquias',
     ]
 
     return oldTestamentBooks.includes(bookName) ? 'old' : 'new'
   }
 
   private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms))
+    return new Promise((resolve) => setTimeout(resolve, ms))
   }
 }

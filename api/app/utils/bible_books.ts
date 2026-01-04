@@ -47,7 +47,7 @@ export const BIBLE_BOOKS: BibleBook[] = [
   { name: 'Ageu', chapters: 2, testament: 'old' },
   { name: 'Zacarias', chapters: 14, testament: 'old' },
   { name: 'Malaquias', chapters: 4, testament: 'old' },
-  
+
   // Novo Testamento
   { name: 'Mateus', chapters: 28, testament: 'new' },
   { name: 'Marcos', chapters: 16, testament: 'new' },
@@ -79,7 +79,7 @@ export const BIBLE_BOOKS: BibleBook[] = [
 ]
 
 export function getBibleBookByName(name: string): BibleBook | undefined {
-  return BIBLE_BOOKS.find(book => book.name.toLowerCase() === name.toLowerCase())
+  return BIBLE_BOOKS.find((book) => book.name.toLowerCase() === name.toLowerCase())
 }
 
 export function getChapterCount(bookName: string): number {

@@ -1,9 +1,9 @@
   import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import JobProgressModal from '../components/JobProgressModal';
+import { BIBLE_BOOKS, getChapterOptions } from '../constants/bibleBooks';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
-import { BIBLE_BOOKS, getBibleBookByName, getChapterOptions } from '../constants/bibleBooks';
-import JobProgressModal from '../components/JobProgressModal';
 import './Quizzes.css';
 
 interface Quiz {

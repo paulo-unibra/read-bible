@@ -1,9 +1,9 @@
 import Quiz from '#models/quiz'
-import QuizQuestion from '#models/quiz_question'
 import QuizGenerationJob from '#models/quiz_generation_job'
+import QuizQuestion from '#models/quiz_question'
 import QuizGenerationService from '#services/quiz_generation_service'
-import { getChapterCount, getTestament } from '../../utils/bible_books.js'
 import type { HttpContext } from '@adonisjs/core/http'
+import { getChapterCount } from '../../utils/bible_books.js'
 
 export default class AdminQuizController {
   /**
@@ -271,7 +271,7 @@ export default class AdminQuizController {
 
       // Determinar total de capítulos
       const totalChapters = chapter ? 1 : getChapterCount(bookName)
-      
+
       if (totalChapters === 0) {
         return response.badRequest({
           error: 'Livro não encontrado ou inválido',
@@ -293,18 +293,20 @@ export default class AdminQuizController {
 
       console.log(`📋 Job criado: ID=${job.id}`)
       console.log(`   📖 ${bookName} (${bibleVersion})`)
-      console.log(`   📝 ${chapter ? `Capítulo ${chapter}` : `Livro completo (${totalChapters} capítulos)`}`)
+      console.log(
+        `   📝 ${chapter ? `Capítulo ${chapter}` : `Livro completo (${totalChapters} capítulos)`}`
+      )
 
       // Processar job em background (não aguarda)
       const service = new QuizGenerationService()
-      service.processJob(job.id).catch(err => {
+      service.processJob(job.id).catch((err) => {
         console.error(`❌ Erro ao processar job ${job.id} em background:`, err)
       })
 
       return response.created({
         jobId: job.id,
-        message: chapter 
-          ? 'Job de geração criado com sucesso' 
+        message: chapter
+          ? 'Job de geração criado com sucesso'
           : `Job criado para gerar ${totalChapters} capítulos`,
         totalChapters,
       })
