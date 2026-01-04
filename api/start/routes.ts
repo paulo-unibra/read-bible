@@ -10,6 +10,7 @@
 const AuthController = () => import('#controllers/auth_controller')
 const AdminAuthController = () => import('#controllers/Admin/auth_controller')
 const AdminQuizController = () => import('#controllers/Admin/quiz_controller')
+const AdminReportController = () => import('#controllers/Admin/report_controller')
 const BibleCuriositiesController = () => import('#controllers/bible_curiosities_controller')
 const ImportController = () => import('#controllers/import_controller')
 const PasswordResetController = () => import('#controllers/password_reset_controller')
@@ -111,5 +112,8 @@ router.group(() => {
     router.put('/quizzes/:id', [AdminQuizController, 'update'])
     router.delete('/quizzes/:id', [AdminQuizController, 'destroy'])
     router.post('/quizzes/generate-ai', [AdminQuizController, 'generateWithAI'])
+
+    // Reports
+    router.get('/reports/general-stats', [AdminReportController, 'getGeneralStats'])
   }).use(middleware.auth({ guards: ['api'] }))
 }).prefix('/admin')

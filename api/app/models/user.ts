@@ -41,7 +41,7 @@ export default class User extends compose(BaseModel, AuthFinder) {
    * Verifica se o usuário tem uma permissão específica
    */
   async hasPermission(permission: string): Promise<boolean> {
-    await this.load('roles')
+    await this.load('roles' as any)
     return this.roles.some(role =>
       role.permissions.includes(permission)
     )
@@ -51,7 +51,7 @@ export default class User extends compose(BaseModel, AuthFinder) {
    * Verifica se o usuário tem pelo menos uma das permissões fornecidas
    */
   async hasAnyPermission(permissions: string[]): Promise<boolean> {
-    await this.load('roles')
+    await this.load('roles' as any)
     return this.roles.some(role =>
       role.permissions.some(p => permissions.includes(p))
     )
@@ -61,7 +61,7 @@ export default class User extends compose(BaseModel, AuthFinder) {
    * Verifica se o usuário tem todas as permissões fornecidas
    */
   async hasAllPermissions(permissions: string[]): Promise<boolean> {
-    await this.load('roles')
+    await this.load('roles' as any)
     const userPermissions = this.roles.flatMap(role => role.permissions)
     return permissions.every(p => userPermissions.includes(p))
   }
