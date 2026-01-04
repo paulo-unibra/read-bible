@@ -112,6 +112,7 @@ router.group(() => {
     router.put('/quizzes/:id', [AdminQuizController, 'update'])
     router.delete('/quizzes/:id', [AdminQuizController, 'destroy'])
     router.post('/quizzes/generate-ai', [AdminQuizController, 'generateWithAI'])
+    router.get('/quizzes/jobs/:jobId', [AdminQuizController, 'getJobStatus'])
 
     // Reports
     router.get('/reports/general-stats', [AdminReportController, 'getGeneralStats'])

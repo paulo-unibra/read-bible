@@ -1,0 +1,110 @@
+.job-progress-content {
+  padding: 20px;
+}
+
+.job-info {
+  margin-bottom: 24px;
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.job-info p {
+  margin: 8px 0;
+  font-size: 14px;
+  color: #333;
+}
+
+.progress-bar-container {
+  width: 100%;
+  height: 40px;
+  background: #e9ecef;
+  border-radius: 20px;
+  overflow: hidden;
+  margin: 24px 0;
+  position: relative;
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  font-size: 14px;
+  transition: width 0.5s ease;
+  min-width: 40px;
+}
+
+.progress-details {
+  margin-top: 24px;
+}
+
+.progress-details p {
+  margin: 12px 0;
+  font-size: 14px;
+  color: #333;
+}
+
+.job-errors {
+  margin-top: 16px;
+  padding: 16px;
+  background: #fff3cd;
+  border-left: 4px solid #ffc107;
+  border-radius: 4px;
+}
+
+.job-errors p {
+  margin: 0 0 12px 0;
+  color: #856404;
+  font-weight: bold;
+}
+
+.job-errors ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.job-errors li {
+  margin: 6px 0;
+  color: #856404;
+  font-size: 13px;
+}
+
+.success-message {
+  margin-top: 24px;
+  padding: 16px;
+  background: #d4edda;
+  border-left: 4px solid #28a745;
+  border-radius: 4px;
+  text-align: center;
+}
+
+.success-message p {
+  margin: 8px 0;
+  color: #155724;
+  font-weight: 500;
+}
+
+.error-message {
+  margin-top: 24px;
+  padding: 16px;
+  background: #f8d7da;
+  border-left: 4px solid #dc3545;
+  border-radius: 4px;
+  text-align: center;
+}
+
+.error-message p {
+  margin: 8px 0;
+  color: #721c24;
+}
+
+.loading {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+  font-size: 16px;
+}

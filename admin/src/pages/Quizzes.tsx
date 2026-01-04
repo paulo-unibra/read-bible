@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from 'react';
+  import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
+import { BIBLE_BOOKS, getBibleBookByName, getChapterOptions } from '../constants/bibleBooks';
+import JobProgressModal from '../components/JobProgressModal';
 import './Quizzes.css';
 
 interface Quiz {
@@ -45,10 +47,13 @@ const Quizzes: React.FC = () => {
   // Modals
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
+  const [showJobProgressModal, setShowJobProgressModal] = useState(false);
+  const [currentJobId, setCurrentJobId] = useState<number | null>(null);
   const [selectedQuiz, setSelectedQuiz] = useState<QuizDetail | null>(null);
   const [createMode, setCreateMode] = useState<'manual' | 'ai'>('manual');
   const [isEditingView, setIsEditingView] = useState(false);
   const [editedQuestions, setEditedQuestions] = useState<QuizQuestion[]>([]);
+  const [availableChapters, setAvailableChapters] = useState<number[]>([]);
   
   // Form states
   const [formData, setFormData] = useState({
@@ -77,7 +82,13 @@ const Quizzes: React.FC = () => {
   const loadAvailableBooks = async () => {
     try {
       const response = await api.get('/admin/quizzes?perPage=1000');
-      const books = [...new Set(response.data.data.map((q: Quiz) => q.bookName))].sort();
+      const booksInDatabase = new Set(response.data.data.map((q: Quiz) => q.bookName));
+      
+      // Ordenar pelos livros da Bíblia que existem no banco
+      const books = BIBLE_BOOKS
+        .map(book => book.name)
+        .filter(bookName => booksInDatabase.has(bookName));
+      
       setAvailableBooks(books);
     } catch (err) {
       console.error('Erro ao carregar livros disponíveis:', err);
@@ -147,7 +158,14 @@ const Quizzes: React.FC = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    
+    if (name === 'bookName') {
+      const chapters = getChapterOptions(value);
+      setAvailableChapters(chapters);
+      setFormData(prev => ({ ...prev, bookName: value, chapter: '' }));
+    } else {
+      setFormData(prev => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleEditQuestion = (questionIndex: number, field: 'pergunta' | 'respostaCorreta', value: string) => {
@@ -245,19 +263,31 @@ const Quizzes: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      await api.post('/admin/quizzes/generate-ai', {
+      const payload: any = {
         bookName: formData.bookName,
-        chapter: formData.chapter,
         bibleVersion: formData.bibleVersion,
-      });
+      };
       
-      handleCloseModals();
-      loadQuizzes();
+      // Só adiciona chapter se foi informado (senão gera para o livro todo)
+      if (formData.chapter) {
+        payload.chapter = formData.chapter;
+      }
+      
+      const response = await api.post('/admin/quizzes/generate-ai', payload);
+      
+      // Fechar modal de criação e abrir modal de progresso
+      setShowCreateModal(false);
+      setCurrentJobId(response.data.jobId);
+      setShowJobProgressModal(true);
     } catch (err: any) {
       setFormError(err.response?.data?.error || 'Erro ao gerar questionário com IA');
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleJobComplete = () => {
+    loadQuizzes();
   };
 
   const handleDelete = async (id: number) => {
@@ -451,27 +481,39 @@ const Quizzes: React.FC = () => {
                 <form onSubmit={handleAISubmit}>
                   <div className="form-group">
                     <label>Livro da Bíblia *</label>
-                    <input
-                      type="text"
+                    <select
                       name="bookName"
                       value={formData.bookName}
                       onChange={handleInputChange}
-                      placeholder="Ex: Gênesis, João, Romanos"
                       required
-                    />
+                    >
+                      <option value="">Selecione um livro</option>
+                      <optgroup label="Antigo Testamento">
+                        {BIBLE_BOOKS.filter(b => b.testament === 'old').map(book => (
+                          <option key={book.name} value={book.name}>{book.name}</option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="Novo Testamento">
+                        {BIBLE_BOOKS.filter(b => b.testament === 'new').map(book => (
+                          <option key={book.name} value={book.name}>{book.name}</option>
+                        ))}
+                      </optgroup>
+                    </select>
                   </div>
 
                   <div className="form-group">
-                    <label>Capítulo *</label>
-                    <input
-                      type="number"
+                    <label>Capítulo (opcional)</label>
+                    <select
                       name="chapter"
                       value={formData.chapter}
                       onChange={handleInputChange}
-                      placeholder="Ex: 1, 2, 3"
-                      min="1"
-                      required
-                    />
+                      disabled={!formData.bookName}
+                    >
+                      <option value="">Livro completo (todos os capítulos)</option>
+                      {availableChapters.map(num => (
+                        <option key={num} value={num}>Capítulo {num}</option>
+                      ))}
+                    </select>
                   </div>
 
                   <div className="form-group">
@@ -485,7 +527,8 @@ const Quizzes: React.FC = () => {
                   </div>
 
                   <div className="info-box">
-                    <p>💡 A IA irá ler o capítulo especificado e gerar automaticamente 10 questões de múltipla escolha com 4 alternativas cada.</p>
+                    <p>💡 A IA irá gerar automaticamente 10 questões de múltipla escolha com 4 alternativas cada.</p>
+                    <p><strong>Dica:</strong> Se não informar o capítulo, a IA criará questionários para todo o livro!</p>
                   </div>
 
                   <div className="modal-footer">
@@ -674,6 +717,18 @@ const Quizzes: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal de Progresso do Job */}
+      {showJobProgressModal && currentJobId && (
+        <JobProgressModal
+          jobId={currentJobId}
+          onClose={() => {
+            setShowJobProgressModal(false);
+            setCurrentJobId(null);
+          }}
+          onComplete={handleJobComplete}
+        />
       )}
     </div>
   );

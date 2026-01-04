@@ -1,6 +1,8 @@
 import Quiz from '#models/quiz'
 import QuizQuestion from '#models/quiz_question'
-import DeepSeekService from '#services/deep_seek_service'
+import QuizGenerationJob from '#models/quiz_generation_job'
+import QuizGenerationService from '#services/quiz_generation_service'
+import { getChapterCount, getTestament } from '../../utils/bible_books.js'
 import type { HttpContext } from '@adonisjs/core/http'
 
 export default class AdminQuizController {
@@ -251,7 +253,7 @@ export default class AdminQuizController {
   }
 
   /**
-   * Gera quiz usando IA (DeepSeek)
+   * Gera quiz usando IA (DeepSeek) - cria job para processamento em background
    */
   async generateWithAI({ request, response }: HttpContext) {
     try {
@@ -261,63 +263,86 @@ export default class AdminQuizController {
         'bibleVersion',
       ])
 
-      if (!bookName || !chapter || !bibleVersion) {
+      if (!bookName || !bibleVersion) {
         return response.badRequest({
-          error: 'bookName, chapter e bibleVersion são obrigatórios',
+          error: 'bookName e bibleVersion são obrigatórios',
         })
       }
 
-      // Verificar se quiz já existe
-      const existingQuiz = await Quiz.query()
-        .where('book_name', bookName)
-        .where('chapter', chapter)
-        .where('bible_version', bibleVersion)
-        .first()
-
-      if (existingQuiz) {
-        return response.conflict({
-          error: 'Quiz já existe para este livro, capítulo e versão. Edite ou delete o existente.',
+      // Determinar total de capítulos
+      const totalChapters = chapter ? 1 : getChapterCount(bookName)
+      
+      if (totalChapters === 0) {
+        return response.badRequest({
+          error: 'Livro não encontrado ou inválido',
         })
       }
 
-      // Gerar quiz usando DeepSeek
-      const deepSeekService = new DeepSeekService()
-      const quizData = await deepSeekService.generateQuiz(bookName, chapter, bibleVersion)
-
-      // Salvar quiz no banco
-      const testament = this.getTestament(bookName)
-      const quiz = await Quiz.create({
+      // Criar job
+      const job = await QuizGenerationJob.create({
         bookName,
-        chapter: Number.parseInt(chapter),
         bibleVersion,
-        testament,
-        category: quizData.category,
-        cloudStorageUrl: null,
+        chapter: chapter ? Number.parseInt(chapter) : null,
+        totalChapters,
+        processedChapters: 0,
+        createdQuizzes: '[]',
+        errors: null,
+        status: 'pending',
+        progress: 0,
       })
 
-      // Salvar questões
-      for (let i = 0; i < quizData.questions.length; i++) {
-        const question = quizData.questions[i]
-        await QuizQuestion.create({
-          quizId: quiz.id,
-          questionId: question.id,
-          pergunta: question.pergunta,
-          alternativas: question.alternativas,
-          respostaCorreta: question.respostaCorreta,
-          order: i + 1,
-        })
-      }
+      console.log(`📋 Job criado: ID=${job.id}`)
+      console.log(`   📖 ${bookName} (${bibleVersion})`)
+      console.log(`   📝 ${chapter ? `Capítulo ${chapter}` : `Livro completo (${totalChapters} capítulos)`}`)
+
+      // Processar job em background (não aguarda)
+      const service = new QuizGenerationService()
+      service.processJob(job.id).catch(err => {
+        console.error(`❌ Erro ao processar job ${job.id} em background:`, err)
+      })
 
       return response.created({
-        id: quiz.id,
-        message: 'Quiz gerado com IA com sucesso',
-        questionsCount: quizData.questions.length,
+        jobId: job.id,
+        message: chapter 
+          ? 'Job de geração criado com sucesso' 
+          : `Job criado para gerar ${totalChapters} capítulos`,
+        totalChapters,
       })
     } catch (error) {
-      console.error('Erro ao gerar quiz com IA:', error)
+      console.error('Erro ao criar job de geração:', error)
       return response.internalServerError({
-        error: 'Erro ao gerar quiz com IA',
+        error: 'Erro ao criar job de geração',
         message: error.message,
+      })
+    }
+  }
+
+  /**
+   * Consulta status de um job de geração
+   */
+  async getJobStatus({ params, response }: HttpContext) {
+    try {
+      const job = await QuizGenerationJob.findOrFail(params.jobId)
+
+      return response.ok({
+        id: job.id,
+        bookName: job.bookName,
+        bibleVersion: job.bibleVersion,
+        chapter: job.chapter,
+        totalChapters: job.totalChapters,
+        processedChapters: job.processedChapters,
+        createdQuizzes: job.createdQuizzes ? JSON.parse(job.createdQuizzes) : [],
+        errors: job.errors ? JSON.parse(job.errors) : [],
+        status: job.status,
+        progress: job.progress,
+        createdAt: job.createdAt.toISO(),
+        updatedAt: job.updatedAt.toISO(),
+        completedAt: job.completedAt?.toISO() || null,
+      })
+    } catch (error) {
+      console.error('Erro ao buscar status do job:', error)
+      return response.notFound({
+        error: 'Job não encontrado',
       })
     }
   }
