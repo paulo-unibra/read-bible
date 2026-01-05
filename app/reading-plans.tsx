@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { Alert, FlatList, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import readingPlanService from '../services/ReadingPlanService';
@@ -12,13 +12,17 @@ export default function ReadingPlansScreen() {
   const [plans, setPlans] = useState<ReadingPlan[]>([]);
   const [selectedPlan, setSelectedPlan] = useState<ReadingPlan | null>(null);
   const [planDays, setPlanDays] = useState<ReadingPlanDay[]>([]);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [newPlanName, setNewPlanName] = useState('');
-  const [newPlanType, setNewPlanType] = useState<'monthly' | 'yearly' | 'custom'>('monthly');
 
   useEffect(() => {
     loadPlans();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Reload plans when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadPlans();
+    }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  );
 
   const loadPlans = async () => {
     try {
@@ -45,50 +49,7 @@ export default function ReadingPlansScreen() {
     }
   };
 
-  const handleCreatePlan = async () => {
-    if (!newPlanName.trim()) {
-      Alert.alert('Erro', 'Digite um nome para o plano');
-      return;
-    }
 
-    try {
-      const startDate = new Date();
-      let newPlan: ReadingPlan;
-
-      switch (newPlanType) {
-        case 'monthly':
-          newPlan = await readingPlanService.createMonthlyPlan(
-            newPlanName,
-            startDate,
-            'new-testament'
-          );
-          break;
-        case 'yearly':
-          newPlan = await readingPlanService.createYearlyPlan(newPlanName, startDate);
-          break;
-        case 'custom':
-          const endDate = new Date();
-          endDate.setMonth(endDate.getMonth() + 3); // 3 months default
-          newPlan = await readingPlanService.createCustomPlan(
-            newPlanName,
-            startDate,
-            endDate,
-            [19, 20] // Psalms and Proverbs
-          );
-          break;
-      }
-
-      setShowCreateModal(false);
-      setNewPlanName('');
-      await loadPlans();
-      selectPlan(newPlan);
-      
-      Alert.alert('Sucesso', 'Plano de leitura criado com sucesso!');
-    } catch (error) {
-      console.error('Error creating plan:', error);
-      Alert.alert('Erro', 'Falha ao criar plano de leitura');
-    }
-  };
 
   const markDayAsCompleted = async (day: ReadingPlanDay) => {
     try {
@@ -108,6 +69,44 @@ export default function ReadingPlansScreen() {
       console.error('Error marking day as completed:', error);
       Alert.alert('Erro', 'Falha ao marcar dia como concluído');
     }
+  };
+
+  const deletePlan = async (plan: ReadingPlan) => {
+    Alert.alert(
+      'Excluir Plano',
+      `Deseja realmente excluir o plano "${plan.name}"? Esta ação não pode ser desfeita.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await readingPlanService.deletePlan(plan.id);
+              
+              // Update local state
+              const updatedPlans = plans.filter(p => p.id !== plan.id);
+              setPlans(updatedPlans);
+              
+              // If deleted plan was selected, select another or clear
+              if (selectedPlan?.id === plan.id) {
+                if (updatedPlans.length > 0) {
+                  selectPlan(updatedPlans[0]);
+                } else {
+                  setSelectedPlan(null);
+                  setPlanDays([]);
+                }
+              }
+              
+              Alert.alert('Sucesso', 'Plano excluído com sucesso!');
+            } catch (error) {
+              console.error('Error deleting plan:', error);
+              Alert.alert('Erro', 'Falha ao excluir plano');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const getCalendarMarkedDates = () => {
@@ -139,32 +138,40 @@ export default function ReadingPlansScreen() {
   };
 
   const renderPlan = ({ item }: { item: ReadingPlan }) => (
-    <TouchableOpacity 
-      style={[
-        styles.planCard,
-        selectedPlan?.id === item.id && styles.selectedPlanCard
-      ]}
-      onPress={() => selectPlan(item)}
-    >
-      <Text style={styles.planName}>{item.name}</Text>
-      <Text style={styles.planType}>
-        {item.type === 'monthly' ? 'Mensal' : 
-         item.type === 'yearly' ? 'Anual' : 'Personalizado'}
-      </Text>
-      <View style={styles.planProgress}>
-        <Text style={styles.planProgressText}>
-          {item.completedDays}/{item.totalDays} dias
+    <View style={[
+      styles.planCard,
+      selectedPlan?.id === item.id && styles.selectedPlanCard
+    ]}>
+      <TouchableOpacity 
+        style={styles.planCardContent}
+        onPress={() => selectPlan(item)}
+      >
+        <Text style={styles.planName}>{item.name}</Text>
+        <Text style={styles.planType}>
+          {item.type === 'monthly' ? 'Mensal' : 
+           item.type === 'yearly' ? 'Anual' : 'Personalizado'}
         </Text>
-        <View style={styles.progressBar}>
-          <View 
-            style={[
-              styles.progressFill,
-              { width: `${(item.completedDays / item.totalDays) * 100}%` }
-            ]}
-          />
+        <View style={styles.planProgress}>
+          <Text style={styles.planProgressText}>
+            {item.completedDays}/{item.totalDays} dias
+          </Text>
+          <View style={styles.progressBar}>
+            <View 
+              style={[
+                styles.progressFill,
+                { width: `${(item.completedDays / item.totalDays) * 100}%` }
+              ]}
+            />
+          </View>
         </View>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+      <TouchableOpacity 
+        style={styles.deletePlanButton}
+        onPress={() => deletePlan(item)}
+      >
+        <Ionicons name="trash-outline" size={20} color="#f44336" />
+      </TouchableOpacity>
+    </View>
   );
 
   const renderReading = ({ item }: { item: ReadingPlanDay }) => (
@@ -213,7 +220,7 @@ export default function ReadingPlansScreen() {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Planos de Leitura</Text>
         <TouchableOpacity 
-          onPress={() => setShowCreateModal(true)} 
+          onPress={() => router.push('/select-plan-template')} 
           style={styles.addButton}
         >
           <Ionicons name="add" size={24} color="#333" />
@@ -229,7 +236,7 @@ export default function ReadingPlansScreen() {
           </Text>
           <TouchableOpacity 
             style={styles.createFirstPlanButton}
-            onPress={() => setShowCreateModal(true)}
+            onPress={() => router.push('/select-plan-template')}
           >
             <Text style={styles.createFirstPlanButtonText}>Criar Plano</Text>
           </TouchableOpacity>
@@ -295,66 +302,7 @@ export default function ReadingPlansScreen() {
         </View>
       )}
 
-      {/* Create Plan Modal */}
-      <Modal
-        visible={showCreateModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowCreateModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Novo Plano de Leitura</Text>
-            
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Nome do plano"
-              value={newPlanName}
-              onChangeText={setNewPlanName}
-            />
-            
-            <Text style={styles.modalLabel}>Tipo do Plano:</Text>
-            <View style={styles.planTypeOptions}>
-              {[
-                { key: 'monthly', label: 'Mensal (30 dias)' },
-                { key: 'yearly', label: 'Anual (365 dias)' },
-                { key: 'custom', label: 'Personalizado' }
-              ].map(option => (
-                <TouchableOpacity
-                  key={option.key}
-                  style={[
-                    styles.planTypeOption,
-                    newPlanType === option.key && styles.selectedPlanType
-                  ]}
-                  onPress={() => setNewPlanType(option.key as any)}
-                >
-                  <Text style={[
-                    styles.planTypeOptionText,
-                    newPlanType === option.key && styles.selectedPlanTypeText
-                  ]}>
-                    {option.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            
-            <View style={styles.modalButtons}>
-              <TouchableOpacity 
-                style={styles.modalCancelButton}
-                onPress={() => setShowCreateModal(false)}
-              >
-                <Text style={styles.modalCancelButtonText}>Cancelar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.modalCreateButton}
-                onPress={handleCreatePlan}
-              >
-                <Text style={styles.modalCreateButtonText}>Criar</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -435,6 +383,15 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 3.84,
     elevation: 5,
+  },
+  planCardContent: {
+    flex: 1,
+  },
+  deletePlanButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    padding: 4,
   },
   selectedPlanCard: {
     borderWidth: 2,
@@ -564,90 +521,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 24,
-    width: '90%',
-    maxWidth: 400,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  modalInput: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    marginBottom: 16,
-  },
-  modalLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 12,
-  },
-  planTypeOptions: {
-    marginBottom: 24,
-  },
-  planTypeOption: {
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  selectedPlanType: {
-    backgroundColor: '#2196F3',
-    borderColor: '#2196F3',
-  },
-  planTypeOptionText: {
-    fontSize: 16,
-    color: '#333',
-    textAlign: 'center',
-  },
-  selectedPlanTypeText: {
-    color: '#fff',
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  modalCancelButton: {
-    flex: 1,
-    padding: 12,
-    marginRight: 8,
-    borderRadius: 8,
-    backgroundColor: '#f5f5f5',
-  },
-  modalCancelButtonText: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-  },
-  modalCreateButton: {
-    flex: 1,
-    padding: 12,
-    marginLeft: 8,
-    borderRadius: 8,
-    backgroundColor: '#2196F3',
-  },
-  modalCreateButtonText: {
-    fontSize: 16,
-    color: '#fff',
-    fontWeight: '600',
-    textAlign: 'center',
   },
 });

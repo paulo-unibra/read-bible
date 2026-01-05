@@ -7,6 +7,7 @@ import authService from '../services/AuthService';
 import DatabaseService from '../services/DatabaseService';
 import googleDriveService from '../services/GoogleDriveService';
 import notificationService from '../services/NotificationService';
+import readingPlanService from '../services/ReadingPlanService';
 import { Bible } from '../types';
 
 export default function SettingsScreen() {
@@ -229,9 +230,29 @@ export default function SettingsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              const response = await authService.deletePlan();
+              console.log('🗑️ [DEBUG] Iniciando exclusão de planos...');
               
-              if (response.success) {
+              // Primeiro, excluir planos locais (templates customizados)
+              const localPlans = await readingPlanService.getActivePlans();
+              console.log('🗑️ [DEBUG] Planos locais encontrados:', localPlans.length);
+              
+              if (localPlans.length > 0) {
+                console.log('🗑️ [DEBUG] Planos locais:', localPlans.map(p => ({ id: p.id, name: p.name, type: p.type })));
+                
+                for (const plan of localPlans) {
+                  console.log(`🗑️ [DEBUG] Excluindo plano local: ${plan.id} - ${plan.name}`);
+                  await readingPlanService.deletePlan(plan.id);
+                  console.log(`✅ [DEBUG] Plano local excluído: ${plan.id}`);
+                }
+              }
+              
+              // Depois, tentar excluir plano do backend (se existir)
+              console.log('🗑️ [DEBUG] Tentando excluir plano do backend...');
+              const response = await authService.deletePlan();
+              console.log('🗑️ [DEBUG] Resposta do backend:', response);
+              
+              if (response.success || localPlans.length > 0) {
+                console.log('✅ [DEBUG] Planos excluídos com sucesso!');
                 Alert.alert('Sucesso', 'Plano de leitura excluído com sucesso', [
                   {
                     text: 'OK',
@@ -239,10 +260,11 @@ export default function SettingsScreen() {
                   },
                 ]);
               } else {
+                console.log('❌ [DEBUG] Falha ao excluir:', response.message);
                 Alert.alert('Erro', response.message || 'Falha ao excluir plano de leitura');
               }
             } catch (error) {
-              console.error('Delete plan error:', error);
+              console.error('❌ [DEBUG] Delete plan error:', error);
               Alert.alert('Erro', 'Falha ao excluir plano de leitura. Tente novamente.');
             }
           },

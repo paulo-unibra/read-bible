@@ -92,9 +92,15 @@ const Dashboard: React.FC = () => {
           </div>
 
           <div className="dashboard-card">
-            <h3>📖 Conteúdo</h3>
-            <p>Gerenciar conteúdo do aplicativo</p>
-            <button className="card-button" disabled>Em breve</button>
+            <h3>📖 Planos de Leitura</h3>
+            <p>Gerenciar planos de leitura</p>
+            <button 
+              className="card-button" 
+              onClick={() => navigate('/reading-plans')}
+              disabled={!hasPermission('gerenciar_conteudo')}
+            >
+              {hasPermission('gerenciar_conteudo') ? 'Acessar' : 'Sem permissão'}
+            </button>
           </div>
 
           <div className="dashboard-card">

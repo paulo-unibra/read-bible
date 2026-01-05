@@ -10,6 +10,7 @@
 const AuthController = () => import('#controllers/auth_controller')
 const AdminAuthController = () => import('#controllers/Admin/auth_controller')
 const AdminQuizController = () => import('#controllers/Admin/quiz_controller')
+const AdminReadingPlanTemplateController = () => import('#controllers/Admin/reading_plan_template_controller')
 const AdminReportController = () => import('#controllers/Admin/report_controller')
 const BibleCuriositiesController = () => import('#controllers/bible_curiosities_controller')
 const ImportController = () => import('#controllers/import_controller')
@@ -18,6 +19,7 @@ const QueueController = () => import('#controllers/queue_controller')
 const QuizController = () => import('#controllers/quiz_controller')
 const QuizResultController = () => import('#controllers/quiz_result_controller')
 const ReadingPlanController = () => import('#controllers/reading_plan_controller')
+const ReadingPlanTemplateController = () => import('#controllers/reading_plan_template_controller')
 import router from '@adonisjs/core/services/router'
 import { middleware } from './kernel.js'
 
@@ -57,6 +59,10 @@ router.delete('/reading-plans', [ReadingPlanController, 'deletePlan']).use(middl
 // Ranking routes (public)
 router.get('/ranking', [ReadingPlanController, 'getRanking'])
 router.get('/ranking/page', [ReadingPlanController, 'getRankingPage'])
+
+// Reading Plan Templates (public - for mobile app)
+router.get('/reading-plan-templates', [ReadingPlanTemplateController, 'index'])
+router.get('/reading-plan-templates/:id', [ReadingPlanTemplateController, 'show'])
 
 // Quiz routes
 router.post('/generate-quiz', [QuizController, 'generate'])
@@ -113,6 +119,13 @@ router.group(() => {
     router.delete('/quizzes/:id', [AdminQuizController, 'destroy'])
     router.post('/quizzes/generate-ai', [AdminQuizController, 'generateWithAI'])
     router.get('/quizzes/jobs/:jobId', [AdminQuizController, 'getJobStatus'])
+
+    // Reading Plan Templates management
+    router.get('/reading-plan-templates', [AdminReadingPlanTemplateController, 'index'])
+    router.get('/reading-plan-templates/:id', [AdminReadingPlanTemplateController, 'show'])
+    router.post('/reading-plan-templates', [AdminReadingPlanTemplateController, 'store'])
+    router.put('/reading-plan-templates/:id', [AdminReadingPlanTemplateController, 'update'])
+    router.delete('/reading-plan-templates/:id', [AdminReadingPlanTemplateController, 'destroy'])
 
     // Reports
     router.get('/reports/general-stats', [AdminReportController, 'getGeneralStats'])

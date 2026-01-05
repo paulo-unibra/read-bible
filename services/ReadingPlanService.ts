@@ -1,8 +1,136 @@
 import { Reading, ReadingPlan, ReadingPlanDay } from '../types';
 import DatabaseService from './DatabaseService';
 
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:1999';
+
 export class ReadingPlanService {
   
+  async createDefaultAnnualPlan(customName: string): Promise<ReadingPlan> {
+    try {
+      // Criar plano anual local (não usa backend, apenas SQLite local como os templates)
+      const startDate = new Date();
+      const endDate = new Date(startDate.getFullYear(), 11, 31, 23, 59, 59);
+      const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+      
+      const planId = `annual_${Date.now()}`;
+
+      const plan: ReadingPlan = {
+        id: planId,
+        name: customName,
+        type: 'annual',
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        isActive: true,
+        createdDate: new Date().toISOString(),
+        totalDays,
+        completedDays: 0,
+      };
+
+      await this.savePlan(plan);
+
+      // Gerar leituras distribuídas pela Bíblia inteira
+      const readings = this.generateFullBibleReadings(startDate, totalDays);
+      
+      // Atualizar o planId em cada dia
+      const readingsWithPlanId = readings.map(reading => ({
+        ...reading,
+        id: `${planId}_${reading.id}`,
+        planId,
+      }));
+      
+      await this.savePlanDays(planId, readingsWithPlanId);
+
+      return plan;
+    } catch (error) {
+      console.error('Error creating default annual plan:', error);
+      throw error;
+    }
+  }
+  
+  async getTemplates() {
+    try {
+      console.log('Buscando templates de:', `${API_URL}/reading-plan-templates`);
+      const response = await fetch(`${API_URL}/reading-plan-templates`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch templates');
+      }
+      const data = await response.json();
+      console.log('Templates recebidos:', data);
+      return data.templates || [];
+    } catch (error) {
+      console.error('Error fetching templates:', error);
+      throw error;
+    }
+  }
+
+  async createPlanFromTemplate(templateId: number, customName: string): Promise<ReadingPlan> {
+    try {
+      // Fetch template details
+      const response = await fetch(`${API_URL}/reading-plan-templates/${templateId}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch template');
+      }
+      const template = await response.json();
+
+      const startDate = new Date();
+      let endDate = new Date(startDate);
+
+      // Calculate end date based on template type
+      if (template.type === 'annual') {
+        // Annual plan goes until end of current year
+        endDate = new Date(startDate.getFullYear(), 11, 31, 23, 59, 59);
+      } else {
+        // Use template duration
+        endDate.setDate(endDate.getDate() + template.duration);
+      }
+
+      const planId = `template_${templateId}_${Date.now()}`;
+      const totalDays = template.readings.length;
+
+      const plan: ReadingPlan = {
+        id: planId,
+        name: customName,
+        type: template.type,
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        isActive: true,
+        createdDate: new Date().toISOString(),
+        totalDays,
+        completedDays: 0,
+      };
+
+      await this.savePlan(plan);
+
+      // Convert template readings to plan days
+      const planDays: ReadingPlanDay[] = template.readings.map((reading: any, index: number) => {
+        const dayDate = new Date(startDate);
+        dayDate.setDate(dayDate.getDate() + index);
+
+        // Format readings from bookReadings array
+        const readingsText = reading.bookReadings
+          .map((br: any) => `${br.book} ${br.chapters.join(', ')}`)
+          .join(' | ');
+
+        return {
+          id: `${planId}_day_${index + 1}`,
+          planId,
+          dayNumber: reading.day,
+          date: dayDate.toISOString(),
+          readings: readingsText,
+          description: reading.description || '',
+          isCompleted: false,
+        };
+      });
+
+      await this.savePlanDays(planId, planDays);
+
+      return plan;
+    } catch (error) {
+      console.error('Error creating plan from template:', error);
+      throw error;
+    }
+  }
+
   async createMonthlyPlan(name: string, startDate: Date, type: 'new-testament' | 'psalms-proverbs'): Promise<ReadingPlan> {
     const endDate = new Date(startDate);
     endDate.setMonth(endDate.getMonth() + 1);
@@ -156,6 +284,43 @@ export class ReadingPlanService {
       'UPDATE reading_plan_days SET isCompleted = 1, completedDate = ? WHERE id = ?',
       [new Date().toISOString(), dayId]
     );
+  }
+
+  async deletePlan(planId: string): Promise<void> {
+    console.log(`🗑️ [ReadingPlanService] Iniciando exclusão do plano: ${planId}`);
+    
+    await DatabaseService.init();
+    const db = (DatabaseService as any).db;
+    
+    // Primeiro, verificar se o plano existe
+    const existingPlan = await db.getFirstAsync(
+      'SELECT * FROM reading_plans WHERE id = ?',
+      [planId]
+    );
+    console.log(`🗑️ [ReadingPlanService] Plano encontrado:`, existingPlan);
+    
+    // Verificar quantos dias existem
+    const daysCount = await db.getFirstAsync(
+      'SELECT COUNT(*) as count FROM reading_plan_days WHERE planId = ?',
+      [planId]
+    );
+    console.log(`🗑️ [ReadingPlanService] Dias do plano:`, daysCount);
+    
+    // Excluir os dias do plano
+    console.log(`🗑️ [ReadingPlanService] Excluindo dias do plano...`);
+    await db.runAsync(
+      'DELETE FROM reading_plan_days WHERE planId = ?',
+      [planId]
+    );
+    console.log(`✅ [ReadingPlanService] Dias excluídos`);
+    
+    // Excluir o plano
+    console.log(`🗑️ [ReadingPlanService] Excluindo plano...`);
+    await db.runAsync(
+      'DELETE FROM reading_plans WHERE id = ?',
+      [planId]
+    );
+    console.log(`✅ [ReadingPlanService] Plano excluído com sucesso!`);
   }
 
   async getTodayReading(planId: string): Promise<ReadingPlanDay | null> {

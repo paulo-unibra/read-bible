@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard'
 import Login from './pages/Login'
 import Permissions from './pages/Permissions'
 import Quizzes from './pages/Quizzes'
+import ReadingPlanTemplates from './pages/ReadingPlanTemplates'
 import Reports from './pages/Reports'
 import Users from './pages/Users'
 
@@ -43,6 +44,14 @@ function App() {
             element={
               <ProtectedRoute permission="gerenciar_questionarios">
                 <Quizzes />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reading-plans"
+            element={
+              <ProtectedRoute permission="gerenciar_conteudo">
+                <ReadingPlanTemplates />
               </ProtectedRoute>
             }
           />

@@ -23,6 +23,7 @@ import bibleCuriosityService, {
 import bibleReaderService from "../services/BibleReaderService";
 import DatabaseService from "../services/DatabaseService";
 import pdfExportService from "../services/PdfExportService";
+import readingPlanService from "../services/ReadingPlanService";
 import { Book } from "../types";
 
 export default function HomeScreen() {
@@ -31,13 +32,13 @@ export default function HomeScreen() {
   const [todayReadings, setTodayReadings] = useState<TodayReading[]>([]);
   const [curiosity, setCuriosity] = useState<BibleCuriosity | null>(null);
   const [loading, setLoading] = useState(true);
-  const [creatingPlan, setCreatingPlan] = useState(false);
   const [fontSizePref, setFontSizePref] = useState<
     "small" | "medium" | "large"
   >("medium");
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userName, setUserName] = useState<string>("");
+  const [hasLocalPlan, setHasLocalPlan] = useState(false);
 
   useEffect(() => {
     initializeApp();
@@ -118,12 +119,56 @@ export default function HomeScreen() {
 
   const loadReadingPlan = async () => {
     try {
+      // Primeiro busca planos locais (templates customizados tem prioridade)
+      const localPlans = await readingPlanService.getActivePlans();
+      if (localPlans.length > 0) {
+        setHasLocalPlan(true);
+        // Pega o primeiro plano ativo local
+        const plan = localPlans[0];
+        
+        // Busca o dia de hoje do plano
+        const planDays = await readingPlanService.getPlanDays(plan.id);
+        const today = new Date().toISOString().split('T')[0];
+        const todayDay = planDays.find(day => day.date.startsWith(today));
+        
+        // Converte para o formato esperado pela tela
+        setReadingPlan({
+          ...plan,
+          currentDay: todayDay?.dayNumber || 1,
+          chaptersPerDay: 0,
+          totalChapters: 0,
+          completedChapters: plan.completedDays,
+          progress: Math.round((plan.completedDays / plan.totalDays) * 100),
+        });
+        
+        // Converte readings para o formato esperado
+        if (todayDay) {
+          // readings pode ser string ou array, precisa lidar com ambos
+          const readingsText = typeof todayDay.readings === 'string' 
+            ? todayDay.readings 
+            : Array.isArray(todayDay.readings) 
+              ? todayDay.readings.map(r => `${r.bookName} ${r.startChapter}${r.endChapter !== r.startChapter ? `-${r.endChapter}` : ''}`).join(' | ')
+              : '';
+          
+          setTodayReadings([{
+            id: todayDay.id,
+            day: todayDay.dayNumber,
+            bookName: readingsText,
+            startChapter: 0,
+            endChapter: 0,
+            isCompleted: todayDay.isCompleted,
+          }]);
+        }
+        return;
+      }
+      
+      // Se não encontrou planos locais, busca do backend (sistema antigo - apenas para retrocompatibilidade)
       const response = await authService.getActivePlan();
       if (response.success && response.data) {
         setReadingPlan(response.data.plan);
-
         console.log("Today Reading:", response.data.todayReadings);
         setTodayReadings(response.data.todayReadings);
+        setHasLocalPlan(false);
       }
     } catch (error) {
       console.error("Erro ao carregar plano:", error);
@@ -178,7 +223,7 @@ export default function HomeScreen() {
         "Você ainda não tem um plano de leitura. Deseja criar um agora?",
         [
           { text: "Cancelar", style: "cancel" },
-          { text: "Criar", onPress: createPlan },
+          { text: "Criar", onPress: () => router.push("/select-plan-template") },
         ]
       );
       return;
@@ -192,54 +237,20 @@ export default function HomeScreen() {
     }
   };
 
-  const createPlan = async () => {
-    if (creatingPlan) return; // Evitar double-click
-
-    try {
-      console.log("[CreatePlan] Iniciando criação de plano...");
-      setCreatingPlan(true);
-      console.log("[CreatePlan] Chamando authService.createReadingPlan()...");
-      const response = await authService.createReadingPlan();
-      console.log(
-        "[CreatePlan] Resposta recebida:",
-        JSON.stringify(response, null, 2)
-      );
-
-      if (response.success) {
-        console.log(
-          "[CreatePlan] Plano criado com sucesso, carregando dados..."
-        );
-        await loadReadingPlan();
-        Alert.alert("Sucesso", response.message);
-      } else {
-        console.error("[CreatePlan] Erro na resposta:", response.message);
-        Alert.alert(
-          "Erro",
-          response.message || "Erro ao criar plano de leitura"
-        );
-      }
-    } catch (error) {
-      console.error("[CreatePlan] Exceção capturada:", error);
-      console.error(
-        "[CreatePlan] Stack trace:",
-        error instanceof Error ? error.stack : "N/A"
-      );
-      Alert.alert(
-        "Erro",
-        `Falha ao criar plano de leitura: ${
-          error instanceof Error ? error.message : String(error)
-        }`
-      );
-    } finally {
-      console.log("[CreatePlan] Finalizando...");
-      setCreatingPlan(false);
-    }
-  };
-
   const handleMarkReadingComplete = async () => {
     if (!todayReadings.length || !readingPlan) return;
     try {
       console.log("TESTE: ", todayReadings);
+      
+      // Se é um plano local (template)
+      if (hasLocalPlan) {
+        await readingPlanService.markDayAsCompleted(todayReadings[0].id);
+        Alert.alert("Parabéns!", "Leitura marcada como concluída! 🎉");
+        await loadReadingPlan();
+        return;
+      }
+      
+      // Se é plano do backend (padrão)
       const response = await authService.completeDay(todayReadings[0].day);
       if (response.success) {
         Alert.alert("Parabéns!", "Leitura marcada como concluída! 🎉");
@@ -692,32 +703,17 @@ export default function HomeScreen() {
               Crie seu plano para ler toda a Bíblia até o fim do ano
             </Text>
             <TouchableOpacity
-              style={[
-                styles.createPlanButton,
-                creatingPlan && styles.createPlanButtonDisabled,
-              ]}
-              onPress={createPlan}
-              disabled={creatingPlan}
+              style={styles.createPlanButton}
+              onPress={() => router.push("/select-plan-template")}
             >
-              {creatingPlan ? (
-                <Text
-                  style={[
-                    styles.createPlanButtonText,
-                    { fontSize: applyFontScale(16) },
-                  ]}
-                >
-                  Criando...
-                </Text>
-              ) : (
-                <Text
-                  style={[
-                    styles.createPlanButtonText,
-                    { fontSize: applyFontScale(16) },
-                  ]}
-                >
-                  Criar Plano
-                </Text>
-              )}
+              <Text
+                style={[
+                  styles.createPlanButtonText,
+                  { fontSize: applyFontScale(16) },
+                ]}
+              >
+                Criar Plano
+              </Text>
             </TouchableOpacity>
           </View>
         )}
