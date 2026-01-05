@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { BIBLE_BOOKS } from '../constants/bibleBooks';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
-import { BIBLE_BOOKS } from '../constants/bibleBooks';
 import './ReadingPlanTemplates.css';
 
 interface Template {

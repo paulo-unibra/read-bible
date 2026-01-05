@@ -2,23 +2,23 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Alert,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AdBanner from "../components/AdBanner";
 import BibleCuriosityCard from "../components/BibleCuriosityCard";
 import { Logo } from "../components/logo";
 import authService, {
-  ReadingPlan,
-  TodayReading,
+    ReadingPlan,
+    TodayReading,
 } from "../services/AuthService";
 import bibleCuriosityService, {
-  BibleCuriosity,
+    BibleCuriosity,
 } from "../services/BibleCuriosityService";
 import bibleReaderService from "../services/BibleReaderService";
 import DatabaseService from "../services/DatabaseService";
