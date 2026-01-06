@@ -83,8 +83,8 @@ export default function ReadingHistoryScreen() {
         setPlan(planResponse.data.plan);
       }
       
-      // Carregar histórico completo
-      const response = await authService.getAllHistory();
+      // Carregar TODAS as leituras do plano (não apenas histórico)
+      const response = await authService.getAllPlanReadings();
       
       if (response.success && response.data) {
         setHistory(response.data);
@@ -98,6 +98,10 @@ export default function ReadingHistoryScreen() {
             .filter(item => !item.isCompleted)
             .sort((a, b) => a.day - b.day)
         );
+        
+        console.log('Total de leituras do plano:', response.data.length);
+        console.log('Leituras concluídas:', completed.length);
+        console.log('Próximas leituras (dias):', upcomingByDay.length);
         
         // Pegar próximos 5 dias
         setUpcomingReadings(upcomingByDay.slice(0, 5));
@@ -314,12 +318,12 @@ export default function ReadingHistoryScreen() {
         )}
 
         {/* Próximas Leituras */}
-        {upcomingReadings.length > 0 && (
-          <View style={styles.upcomingSection}>
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary, fontSize: applyFontScale(18) }]}>
-              Próximas Leituras
-            </Text>
-            {upcomingReadings.map((dayReading, index) => (
+        <View style={styles.upcomingSection}>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary, fontSize: applyFontScale(18) }]}>
+            Próximas Leituras
+          </Text>
+          {upcomingReadings.length > 0 ? (
+            upcomingReadings.map((dayReading, index) => (
               <View
                 key={dayReading.day}
                 style={[
@@ -372,9 +376,19 @@ export default function ReadingHistoryScreen() {
                   <Ionicons name="checkmark-circle" size={20} color="#fff" />
                 </TouchableOpacity>
               </View>
-            ))}
-          </View>
-        )}
+            ))
+          ) : (
+            <View style={[styles.emptyUpcomingCard, { backgroundColor: colors.card }]}>
+              <Ionicons name="checkmark-done-circle" size={48} color={colors.success} />
+              <Text style={[styles.emptyUpcomingTitle, { color: colors.textPrimary, fontSize: applyFontScale(16) }]}>
+                Você está em dia!
+              </Text>
+              <Text style={[styles.emptyUpcomingText, { color: colors.textSecondary, fontSize: applyFontScale(14) }]}>
+                Todas as leituras disponíveis foram concluídas. Continue acessando para mais conteúdo.
+              </Text>
+            </View>
+          )}
+        </View>
 
         {/* Histórico */}
         <View style={styles.historySection}>
@@ -400,7 +414,7 @@ export default function ReadingHistoryScreen() {
                 {monthYear.charAt(0).toUpperCase() + monthYear.slice(1)}
               </Text>
               
-              {groupedHistory[monthYear].map(dayReading => (
+              {groupedHistory[monthYear].slice(0, 5).map(dayReading => (
                 <View
                   key={dayReading.day}
                   style={[styles.historyCard, { backgroundColor: colors.card, borderLeftColor: colors.success }]}
@@ -604,6 +618,28 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 14,
     textAlign: 'center',
+  },
+  emptyUpcomingCard: {
+    padding: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 3,
+  },
+  emptyUpcomingTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  emptyUpcomingText: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
   },
   monthSection: {
     padding: 16,

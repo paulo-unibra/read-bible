@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTheme } from '../hooks/theme-context';
 import readingPlanService from '../services/ReadingPlanService';
 
 interface PlanTemplate {
@@ -18,6 +19,8 @@ interface PlanTemplate {
 
 export default function SelectPlanTemplateScreen() {
   const router = useRouter();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const [templates, setTemplates] = useState<PlanTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [customName, setCustomName] = useState('');
@@ -219,12 +222,22 @@ export default function SelectPlanTemplateScreen() {
     );
   };
 
+  const colors = {
+    bg: isDark ? '#1a1a1a' : '#f5f5f5',
+    card: isDark ? '#2a2a2a' : '#ffffff',
+    text: isDark ? '#ffffff' : '#333333',
+    textSecondary: isDark ? '#b0b0b0' : '#666666',
+    accent: isDark ? '#8b5cf6' : '#8b5cf6',
+    border: isDark ? '#404040' : '#e0e0e0',
+    headerBg: isDark ? '#242424' : '#ffffff',
+  };
+
   if (loading && templates.length === 0) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#8b5cf6" />
-          <Text style={styles.loadingText}>Carregando templates...</Text>
+          <ActivityIndicator size="large" color={colors.accent} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Carregando templates...</Text>
         </View>
       </SafeAreaView>
     );

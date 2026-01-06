@@ -23,6 +23,7 @@ export default function HymnViewerScreen() {
   const [loading, setLoading] = useState(true);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [fontSizePref, setFontSizePref] = useState<'small' | 'medium' | 'large'>('medium');
+  const [hymnFontSize, setHymnFontSize] = useState<'small' | 'medium' | 'large'>('medium');
 
   useEffect(() => {
     loadSettings();
@@ -32,13 +33,24 @@ export default function HymnViewerScreen() {
 
   const loadSettings = async () => {
     try {
-      const settings = await DatabaseService.getMultipleSettings(['fontSize', 'theme']);
+      const settings = await DatabaseService.getMultipleSettings(['fontSize', 'theme', 'hymnFontSize']);
       const userFont = settings.fontSize as 'small' | 'medium' | 'large' | null;
       const userTheme = settings.theme as 'light' | 'dark' | null;
+      const userHymnFont = settings.hymnFontSize as 'small' | 'medium' | 'large' | null;
       if (userFont) setFontSizePref(userFont);
       if (userTheme) setTheme(userTheme);
+      if (userHymnFont) setHymnFontSize(userHymnFont);
     } catch (error) {
       console.error('Erro ao carregar configurações:', error);
+    }
+  };
+
+  const changeHymnFontSize = async (size: 'small' | 'medium' | 'large') => {
+    setHymnFontSize(size);
+    try {
+      await DatabaseService.saveSetting('hymnFontSize', size);
+    } catch (error) {
+      console.error('Erro ao salvar tamanho da fonte:', error);
     }
   };
 
@@ -60,6 +72,17 @@ export default function HymnViewerScreen() {
         return base * 0.9;
       case 'large':
         return base * 1.2;
+      default:
+        return base;
+    }
+  };
+
+  const applyHymnFontScale = (base: number) => {
+    switch (hymnFontSize) {
+      case 'small':
+        return base * 0.85;
+      case 'large':
+        return base * 1.3;
       default:
         return base;
     }
@@ -92,7 +115,7 @@ export default function HymnViewerScreen() {
           <Text
             style={[
               styles.verseLabel,
-              { color: colors.accent, fontSize: applyFontScale(14) },
+              { color: colors.accent, fontSize: applyHymnFontScale(14) },
             ]}
           >
             Coro
@@ -105,7 +128,7 @@ export default function HymnViewerScreen() {
               styles.verseLine,
               {
                 color: colors.textPrimary,
-                fontSize: applyFontScale(16),
+                fontSize: applyHymnFontScale(16),
                 fontStyle: isChorus ? 'italic' : 'normal',
               },
             ]}
@@ -195,7 +218,26 @@ export default function HymnViewerScreen() {
         <Text style={[styles.headerTitle, { color: colors.textPrimary, fontSize: applyFontScale(20) }]} numberOfLines={1}>
           Hino {hymn.number}
         </Text>
-        <View style={{ width: 40 }} />
+        <View style={styles.fontControls}>
+          <TouchableOpacity 
+            onPress={() => changeHymnFontSize('small')}
+            style={[styles.fontButton, hymnFontSize === 'small' && { backgroundColor: colors.accent }]}
+          >
+            <Text style={[styles.fontButtonText, { color: hymnFontSize === 'small' ? '#fff' : colors.textPrimary }]}>A</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            onPress={() => changeHymnFontSize('medium')}
+            style={[styles.fontButton, hymnFontSize === 'medium' && { backgroundColor: colors.accent }]}
+          >
+            <Text style={[styles.fontButtonText, styles.fontButtonMedium, { color: hymnFontSize === 'medium' ? '#fff' : colors.textPrimary }]}>A</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            onPress={() => changeHymnFontSize('large')}
+            style={[styles.fontButton, hymnFontSize === 'large' && { backgroundColor: colors.accent }]}
+          >
+            <Text style={[styles.fontButtonText, styles.fontButtonLarge, { color: hymnFontSize === 'large' ? '#fff' : colors.textPrimary }]}>A</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
@@ -205,14 +247,14 @@ export default function HymnViewerScreen() {
         {/* Header Card */}
         <View style={[styles.headerCard, { backgroundColor: colors.card }]}>
           <View style={[styles.hymnNumberBadge, { backgroundColor: colors.accent }]}>
-            <Text style={[styles.hymnNumberText, { fontSize: applyFontScale(24) }]}>
+            <Text style={[styles.hymnNumberText, { fontSize: applyHymnFontScale(24) }]}>
               {hymn.number}
             </Text>
           </View>
           <Text
             style={[
               styles.hymnTitle,
-              { color: colors.textPrimary, fontSize: applyFontScale(22) },
+              { color: colors.textPrimary, fontSize: applyHymnFontScale(22) },
             ]}
           >
             {hymn.title}
@@ -221,7 +263,7 @@ export default function HymnViewerScreen() {
             <Text
               style={[
                 styles.hymnAuthor,
-                { color: colors.textSecondary, fontSize: applyFontScale(14) },
+                { color: colors.textSecondary, fontSize: applyHymnFontScale(14) },
               ]}
             >
               {hymn.author}
@@ -231,7 +273,7 @@ export default function HymnViewerScreen() {
             <Text
               style={[
                 styles.hymnCopyright,
-                { color: colors.textSecondary, fontSize: applyFontScale(12) },
+                { color: colors.textSecondary, fontSize: applyHymnFontScale(12) },
               ]}
             >
               {hymn.copyright}
@@ -268,6 +310,29 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     flex: 1,
     textAlign: 'center',
+  },
+  fontControls: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  fontButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ccc',
+  },
+  fontButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  fontButtonMedium: {
+    fontSize: 16,
+  },
+  fontButtonLarge: {
+    fontSize: 18,
   },
   scrollView: {
     flex: 1,

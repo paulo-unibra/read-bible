@@ -2,23 +2,24 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AdBanner from "../components/AdBanner";
 import BibleCuriosityCard from "../components/BibleCuriosityCard";
 import { Logo } from "../components/logo";
 import authService, {
-  ReadingPlan,
-  TodayReading,
+    ReadingPlan,
+    TodayReading,
 } from "../services/AuthService";
 import bibleCuriosityService, {
-  BibleCuriosity,
+    BibleCuriosity,
 } from "../services/BibleCuriosityService";
 import bibleReaderService from "../services/BibleReaderService";
 import DatabaseService from "../services/DatabaseService";
@@ -40,6 +41,7 @@ export default function HomeScreen() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userName, setUserName] = useState<string>("");
   const [hasLocalPlan, setHasLocalPlan] = useState(false);
+  const [markingComplete, setMarkingComplete] = useState(false);
 
   useEffect(() => {
     initializeApp();
@@ -130,8 +132,10 @@ export default function HomeScreen() {
         // Busca o próximo dia não concluído do plano
         const planDays = await readingPlanService.getPlanDays(plan.id);
 
-        // Busca o primeiro dia que NÃO está concluído
-        const nextDay = planDays.find((day) => !day.isCompleted);
+        // Busca o primeiro dia que NÃO está concluído (ordenado por número do dia)
+        const nextDay = planDays
+          .sort((a, b) => a.dayNumber - b.dayNumber)
+          .find((day) => !day.isCompleted);
 
         // Calcular total de capítulos do plano
         const totalChapters = planDays.reduce((sum, day) => {
@@ -182,7 +186,7 @@ export default function HomeScreen() {
           //     : "";
 
         } else {
-          // Se não há mais dias, limpa as leituras
+          // Se não há mais dias não concluídos, limpa as leituras
           setTodayReadings([]);
           setTodayDayId(null);
         }
@@ -190,13 +194,39 @@ export default function HomeScreen() {
       }
 
       // Se não encontrou planos locais, busca do backend (sistema antigo - apenas para retrocompatibilidade)
-      const response = await authService.getActivePlan();
-      if (response.success && response.data) {
-        setReadingPlan(response.data.plan);
-        console.log("Today Reading:", response.data.todayReadings);
-        setTodayReadings(response.data.todayReadings);
-        setTodayDayId(null); // Backend não usa IDs locais
+      const planResponse = await authService.getActivePlan();
+      if (planResponse.success && planResponse.data) {
+        setReadingPlan(planResponse.data.plan);
         setHasLocalPlan(false);
+        
+        // Buscar TODAS as leituras do plano para encontrar a próxima não concluída
+        const allReadingsResponse = await authService.getAllPlanReadings();
+        if (allReadingsResponse.success && allReadingsResponse.data) {
+          // Encontra a primeira leitura não concluída
+          const nextReadings = allReadingsResponse.data
+            .filter(reading => !reading.isCompleted)
+            .sort((a, b) => a.day - b.day);
+          
+          if (nextReadings.length > 0) {
+            // Agrupar leituras do mesmo dia
+            const firstDay = nextReadings[0].day;
+            const todayReadings = nextReadings.filter(r => r.day === firstDay);
+            
+            console.log("Próxima leitura não concluída (dia):", firstDay);
+            console.log("Leituras do dia:", todayReadings);
+            
+            setTodayReadings(todayReadings);
+          } else {
+            // Todas as leituras foram concluídas
+            console.log("Todas as leituras do plano foram concluídas!");
+            setTodayReadings([]);
+          }
+        } else {
+          // Fallback para o comportamento antigo se falhar
+          setTodayReadings(planResponse.data.todayReadings);
+        }
+        
+        setTodayDayId(null); // Backend não usa IDs locais
       }
     } catch (error) {
       console.error("Erro ao carregar plano:", error);
@@ -269,34 +299,64 @@ export default function HomeScreen() {
   };
 
   const handleMarkReadingComplete = async () => {
-    if (!todayReadings.length || !readingPlan) return;
+    if (!todayReadings.length || !readingPlan || markingComplete) return;
+    
     try {
+      setMarkingComplete(true);
       console.log("TESTE: ", todayReadings);
 
       // Se é um plano local (template)
       if (hasLocalPlan) {
         if (!todayDayId) {
           Alert.alert("Erro", "ID do dia não encontrado");
+          setMarkingComplete(false);
           return;
         }
         await readingPlanService.markDayAsCompleted(todayDayId);
-        Alert.alert("Parabéns!", "Leitura marcada como concluída! 🎉");
         await loadReadingPlan();
+        
+        // Alerta de parabéns após atualizar
+        setTimeout(() => {
+          Alert.alert(
+            "🎉 Parabéns!",
+            "Leitura marcada como concluída!\n\nContinue firme em sua jornada de leitura bíblica.",
+            [
+              {
+                text: "Continuar",
+                style: "default"
+              }
+            ]
+          );
+        }, 300);
         return;
       }
 
       // Se é plano do backend (padrão)
       const response = await authService.completeDay(todayReadings[0].day);
       if (response.success) {
-        Alert.alert("Parabéns!", "Leitura marcada como concluída! 🎉");
         await loadReadingPlan();
+        
+        // Alerta de parabéns após atualizar
+        setTimeout(() => {
+          Alert.alert(
+            "🎉 Parabéns!",
+            "Leitura marcada como concluída!\n\nContinue firme em sua jornada de leitura bíblica.",
+            [
+              {
+                text: "Continuar",
+                style: "default"
+              }
+            ]
+          );
+        }, 300);
       } else {
         Alert.alert("Erro", response.message);
       }
     } catch(error) {
       console.log('Erro ao marcar leitura como completa:', error);
-
       Alert.alert("Erro", "Falha ao marcar leitura");
+    } finally {
+      setMarkingComplete(false);
     }
   };
 
@@ -423,6 +483,7 @@ export default function HomeScreen() {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
         <View style={styles.centerContent}>
+          <ActivityIndicator size="large" color={colors.accent} />
           <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
             Carregando...
           </Text>
@@ -588,17 +649,25 @@ export default function HomeScreen() {
             </View>
             {!todayReadings[0].isCompleted ? (
               <TouchableOpacity
-                style={styles.completeButton}
+                style={[
+                  styles.completeButton,
+                  markingComplete && { opacity: 0.7 }
+                ]}
                 onPress={handleMarkReadingComplete}
+                disabled={markingComplete}
               >
-                <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                {markingComplete ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                )}
                 <Text
                   style={[
                     styles.completeButtonText,
                     { fontSize: applyFontScale(16) },
                   ]}
                 >
-                  Marcar como Lida
+                  {markingComplete ? "Marcando..." : "Marcar como Lida"}
                 </Text>
               </TouchableOpacity>
             ) : (

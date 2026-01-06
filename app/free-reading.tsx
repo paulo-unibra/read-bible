@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTheme } from '../hooks/theme-context';
 import bibleReaderService from '../services/BibleReaderService';
 import DatabaseService from '../services/DatabaseService';
 import { Bible, Book, Chapter, SearchResult } from '../types';
@@ -11,6 +12,8 @@ type ViewMode = 'books' | 'chapters' | 'search';
 
 export default function FreeReadingScreen() {
   const router = useRouter();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const [bibles, setBibles] = useState<Bible[]>([]);
   const [selectedBible, setSelectedBible] = useState<Bible | null>(null);
   const [books, setBooks] = useState<Book[]>([]);
@@ -180,12 +183,22 @@ export default function FreeReadingScreen() {
     </TouchableOpacity>
   );
 
+  const colors = {
+    bg: isDark ? '#1a1a1a' : '#f5f5f5',
+    card: isDark ? '#2a2a2a' : '#ffffff',
+    text: isDark ? '#ffffff' : '#333333',
+    textSecondary: isDark ? '#b0b0b0' : '#666666',
+    accent: isDark ? '#8b5cf6' : '#2196F3',
+    border: isDark ? '#404040' : '#e0e0e0',
+    headerBg: isDark ? '#242424' : '#ffffff',
+  };
+
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
         <View style={styles.centerContent}>
-          <ActivityIndicator size="large" color="#2196F3" />
-          <Text style={styles.loadingText}>Carregando...</Text>
+          <ActivityIndicator size="large" color={colors.accent} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Carregando...</Text>
         </View>
       </SafeAreaView>
     );
