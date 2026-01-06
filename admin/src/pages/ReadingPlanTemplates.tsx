@@ -49,6 +49,7 @@ const ReadingPlanTemplates: React.FC = () => {
   const [readings, setReadings] = useState<Reading[]>([]);
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [importSuccess, setImportSuccess] = useState('');
 
   const { hasPermission, logout } = useAuth();
   const navigate = useNavigate();
@@ -226,6 +227,62 @@ const ReadingPlanTemplates: React.FC = () => {
     navigate('/login');
   };
 
+  const handleImportJson = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const jsonData = JSON.parse(event.target?.result as string);
+        
+        // Validar estrutura básica
+        if (!jsonData.name || !jsonData.readings || !Array.isArray(jsonData.readings)) {
+          setFormError('JSON inválido: deve conter "name" e "readings" (array)');
+          return;
+        }
+
+        // Preencher formulário com dados do JSON
+        setFormData({
+          name: jsonData.name || '',
+          description: jsonData.description || '',
+          type: jsonData.type || 'custom',
+          duration: jsonData.duration?.toString() || jsonData.readings.length.toString(),
+          testament: jsonData.testament || 'both',
+          isActive: jsonData.isActive !== undefined ? jsonData.isActive : true,
+          order: jsonData.order || 0,
+        });
+
+        // Preencher leituras
+        const importedReadings: Reading[] = jsonData.readings.map((reading: any, index: number) => ({
+          day: reading.day || index + 1,
+          bookReadings: Array.isArray(reading.bookReadings) 
+            ? reading.bookReadings.map((br: any) => ({
+                book: br.book || '',
+                chapters: Array.isArray(br.chapters) ? br.chapters : []
+              }))
+            : [],
+          description: reading.description || ''
+        }));
+
+        setReadings(importedReadings);
+        setImportSuccess(`✅ JSON importado com sucesso! ${importedReadings.length} leituras carregadas.`);
+        setTimeout(() => setImportSuccess(''), 5000);
+        setFormError('');
+      } catch (error) {
+        setFormError(`Erro ao processar JSON: ${error instanceof Error ? error.message : 'Formato inválido'}`);
+      }
+    };
+
+    reader.onerror = () => {
+      setFormError('Erro ao ler arquivo');
+    };
+
+    reader.readAsText(file);
+    // Limpar input para permitir reimportar o mesmo arquivo
+    e.target.value = '';
+  };
+
   const getTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
       annual: 'Anual',
@@ -333,6 +390,24 @@ const ReadingPlanTemplates: React.FC = () => {
 
             <form onSubmit={handleSubmit} className="template-form">
               {formError && <div className="form-error">{formError}</div>}
+              {importSuccess && <div className="form-success">{importSuccess}</div>}
+
+              {/* Botão de Importar JSON */}
+              <div className="import-section">
+                <label htmlFor="json-import" className="import-button">
+                  📥 Importar JSON
+                  <input
+                    id="json-import"
+                    type="file"
+                    accept=".json"
+                    onChange={handleImportJson}
+                    style={{ display: 'none' }}
+                  />
+                </label>
+                <span className="import-hint">
+                  Importar plano de leitura a partir de arquivo JSON
+                </span>
+              </div>
 
               <div className="form-row">
                 <div className="form-group">

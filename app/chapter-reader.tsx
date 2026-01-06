@@ -147,6 +147,7 @@ export default function ChapterReaderScreen() {
   const [selectedReferenceIndex, setSelectedReferenceIndex] = useState(0);
   const [selectedReferenceVerse, setSelectedReferenceVerse] =
     useState<Verse | null>(null);
+  const [selectedReferenceBookName, setSelectedReferenceBookName] = useState<string>("");
   const [referenceVerseLoading, setReferenceVerseLoading] = useState(false);
   const [showAllReferences, setShowAllReferences] = useState(false);
 
@@ -1223,6 +1224,9 @@ export default function ChapterReaderScreen() {
       if (verse) {
         setSelectedReferenceVerse(verse);
         setSelectedReferenceIndex(index);
+        // Buscar nome do livro
+        const bookName = await getBookNameById(verse.bookId);
+        setSelectedReferenceBookName(bookName);
       }
     } catch (error) {
       console.error("Error loading selected reference:", error);
@@ -2360,11 +2364,14 @@ export default function ChapterReaderScreen() {
           <View
             style={[
               styles.referencesModal,
-              // calculateModalHeight()
+              isDark && { backgroundColor: "#1e1e1e" },
             ]}
           >
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Referências Bíblicas</Text>
+            <View style={[
+              styles.modalHeader,
+              isDark && { backgroundColor: "#1d1d1d", borderBottomColor: "#333" }
+            ]}>
+              <Text style={[styles.modalTitle, { color: isDark ? "#e0e0e0" : "#333" }]}>Referências Bíblicas</Text>
               <TouchableOpacity
                 onPress={() => setReferencesModalVisible(false)}
               >
@@ -2376,7 +2383,10 @@ export default function ChapterReaderScreen() {
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              style={styles.referenceLinksContainer}
+              style={[
+                styles.referenceLinksContainer,
+                isDark && { backgroundColor: "#2a2a2a", borderBottomColor: "#444" }
+              ]}
               contentContainerStyle={styles.referenceLinksContent}
             >
               <View style={styles.referenceTabs}>
@@ -2389,6 +2399,7 @@ export default function ChapterReaderScreen() {
                         onPress={() => selectReference(index)}
                         style={[
                           styles.referenceTabCompact,
+                          isDark && { backgroundColor: "#2a2a2a" },
                           index === selectedReferenceIndex &&
                             styles.selectedReferenceTab,
                         ]}
@@ -2396,6 +2407,7 @@ export default function ChapterReaderScreen() {
                         <Text
                           style={[
                             styles.referenceTabText,
+                            { color: isDark ? "#e0e0e0" : "#333" },
                             index === selectedReferenceIndex &&
                               styles.selectedReferenceTabText,
                           ]}
@@ -2405,10 +2417,13 @@ export default function ChapterReaderScreen() {
                       </TouchableOpacity>
                     ))}
                     <TouchableOpacity
-                      style={styles.moreReferencesTab}
+                      style={[
+                        styles.moreReferencesTab,
+                        isDark && { backgroundColor: "#2a2a2a" }
+                      ]}
                       onPress={() => setShowAllReferences(true)}
                     >
-                      <Text style={styles.moreReferencesText}>
+                      <Text style={[styles.moreReferencesText, { color: isDark ? "#e0e0e0" : "#333" }]}>
                         +{currentReferences.length - 4}
                       </Text>
                     </TouchableOpacity>
@@ -2423,6 +2438,7 @@ export default function ChapterReaderScreen() {
                         currentReferences.length > 6
                           ? styles.referenceTabCompact
                           : styles.referenceTab,
+                        isDark && { backgroundColor: "#2a2a2a" },
                         index === selectedReferenceIndex &&
                           styles.selectedReferenceTab,
                       ]}
@@ -2430,6 +2446,7 @@ export default function ChapterReaderScreen() {
                       <Text
                         style={[
                           styles.referenceTabText,
+                          { color: isDark ? "#e0e0e0" : "#333" },
                           index === selectedReferenceIndex &&
                             styles.selectedReferenceTabText,
                         ]}
@@ -2446,13 +2463,16 @@ export default function ChapterReaderScreen() {
             {referenceVerseLoading ? (
               <View style={styles.referenceLoadingContainer}>
                 <ActivityIndicator size="large" color="#2196F3" />
-                <Text style={styles.loadingText}>Carregando referência...</Text>
+                <Text style={[styles.loadingText, { color: isDark ? "#e0e0e0" : "#333" }]}>Carregando referência...</Text>
               </View>
             ) : selectedReferenceVerse ? (
-              <View style={styles.referenceVerseCard}>
+              <View style={[
+                styles.referenceVerseCard,
+                isDark && { backgroundColor: "#2a2a2a" }
+              ]}>
                 <View style={styles.referenceVerseHeader}>
-                  <Text style={styles.referenceVerseTitle}>
-                    {`${selectedReferenceVerse.bookId} ${selectedReferenceVerse.chapterNumber}:${selectedReferenceVerse.verseNumber}`}
+                  <Text style={[styles.referenceVerseTitle, { color: isDark ? "#e0e0e0" : "#333" }]}>
+                    {`${selectedReferenceBookName} ${selectedReferenceVerse.chapterNumber}:${selectedReferenceVerse.verseNumber}`}
                   </Text>
                   <TouchableOpacity
                     onPress={() =>
@@ -2465,13 +2485,13 @@ export default function ChapterReaderScreen() {
                     <Ionicons name="expand-outline" size={16} color="#2196F3" />
                   </TouchableOpacity>
                 </View>
-                <Text style={styles.referenceVerseText}>
+                <Text style={[styles.referenceVerseText, { color: isDark ? "#d4d4d4" : "#666" }]}>
                   {selectedReferenceVerse.text}
                 </Text>
               </View>
             ) : (
               <View style={styles.referenceErrorContainer}>
-                <Text style={styles.referenceErrorText}>
+                <Text style={[styles.referenceErrorText, { color: isDark ? "#b0b0b0" : "#666" }]}>
                   Versículo não encontrado.
                 </Text>
               </View>

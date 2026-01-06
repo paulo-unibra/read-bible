@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3333';
+export const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:1999';
 
 export interface User {
   id: number;
@@ -229,6 +229,62 @@ class AuthService {
       console.error('[AuthService] Tipo do erro:', error instanceof Error ? error.constructor.name : typeof error);
       console.error('[AuthService] Mensagem:', error instanceof Error ? error.message : String(error));
       console.error('[AuthService] Stack:', error instanceof Error ? error.stack : 'N/A');
+      return {
+        success: false,
+        message: `Erro ao conectar com o servidor: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
+  }
+
+  /**
+   * Criar plano de leitura customizado (sequencial ou intercalado)
+   */
+  async createCustomReadingPlan(planData: {
+    name: string;
+    type: string;
+    startDate: string;
+    endDate: string;
+    totalDays: number;
+    readings: any[];
+  }): Promise<{ success: boolean; message: string; data?: any }> {
+    try {
+      console.log('[AuthService] 📤 INÍCIO createCustomReadingPlan');
+      console.log('[AuthService] Plano:', planData.name);
+      console.log('[AuthService] Type:', planData.type);
+      console.log('[AuthService] Leituras:', planData.readings.length);
+      console.log('[AuthService] Token presente?', !!this.token);
+      console.log('[AuthService] URL:', `${API_URL}/reading-plans/custom`);
+      
+      const requestBody = JSON.stringify(planData);
+      console.log('[AuthService] Tamanho do body:', requestBody.length, 'bytes');
+      
+      const response = await fetch(`${API_URL}/reading-plans/custom`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: requestBody,
+      });
+
+      console.log('[AuthService] ✅ Resposta recebida - Status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[AuthService] ❌ Erro ao criar plano customizado:', errorText);
+        return {
+          success: false,
+          message: `Erro HTTP ${response.status}: ${errorText || response.statusText}`,
+        };
+      }
+      
+      const jsonData = await response.json();
+      console.log('[AuthService] ✅ Plano customizado criado no backend:', jsonData);
+      return jsonData;
+    } catch (error) {
+      console.error('[AuthService] ❌ EXCEÇÃO ao criar plano customizado:', error);
+      console.error('[AuthService] Tipo:', error instanceof Error ? error.constructor.name : typeof error);
+      console.error('[AuthService] Mensagem:', error instanceof Error ? error.message : String(error));
       return {
         success: false,
         message: `Erro ao conectar com o servidor: ${error instanceof Error ? error.message : String(error)}`,

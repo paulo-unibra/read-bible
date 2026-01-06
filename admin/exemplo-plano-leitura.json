@@ -1,0 +1,45 @@
+{
+  "name": "Plano de Leitura Exemplo",
+  "description": "Um plano de leitura de exemplo para importação",
+  "type": "custom",
+  "duration": 365,
+  "testament": "both",
+  "isActive": true,
+  "order": 0,
+  "readings": [
+    {
+      "day": 1,
+      "bookReadings": [
+        {
+          "book": "Genesis",
+          "chapters": [1, 2]
+        }
+      ],
+      "description": "Criação do mundo"
+    },
+    {
+      "day": 2,
+      "bookReadings": [
+        {
+          "book": "Genesis",
+          "chapters": [3, 4, 5]
+        }
+      ],
+      "description": "A queda e os primeiros descendentes"
+    },
+    {
+      "day": 3,
+      "bookReadings": [
+        {
+          "book": "Genesis",
+          "chapters": [6, 7, 8]
+        },
+        {
+          "book": "Salmos",
+          "chapters": [1]
+        }
+      ],
+      "description": "O dilúvio e um salmo"
+    }
+  ]
+}

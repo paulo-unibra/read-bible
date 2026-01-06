@@ -16,14 +16,21 @@ interface ReadingHistoryItem {
   updatedAt: string;
 }
 
+interface DayReadings {
+  day: number;
+  readings: ReadingHistoryItem[];
+  isCompleted: boolean;
+  completedAt: string | null;
+}
+
 interface GroupedHistory {
-  [monthYear: string]: ReadingHistoryItem[];
+  [monthYear: string]: DayReadings[];
 }
 
 export default function ReadingHistoryScreen() {
   const [history, setHistory] = useState<ReadingHistoryItem[]>([]);
   const [groupedHistory, setGroupedHistory] = useState<GroupedHistory>({});
-  const [upcomingReadings, setUpcomingReadings] = useState<ReadingHistoryItem[]>([]);
+  const [upcomingReadings, setUpcomingReadings] = useState<DayReadings[]>([]);
   const [plan, setPlan] = useState<ReadingPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
@@ -46,6 +53,26 @@ export default function ReadingHistoryScreen() {
     }
   };
 
+  const groupByDay = (items: ReadingHistoryItem[]): DayReadings[] => {
+    const dayMap = new Map<number, ReadingHistoryItem[]>();
+    
+    items.forEach(item => {
+      if (!dayMap.has(item.day)) {
+        dayMap.set(item.day, []);
+      }
+      dayMap.get(item.day)!.push(item);
+    });
+    
+    return Array.from(dayMap.entries())
+      .map(([day, readings]) => ({
+        day,
+        readings,
+        isCompleted: readings.every(r => r.isCompleted),
+        completedAt: readings[0]?.completedAt || null,
+      }))
+      .sort((a, b) => a.day - b.day);
+  };
+
   const loadHistory = async () => {
     try {
       setLoading(true);
@@ -65,13 +92,15 @@ export default function ReadingHistoryScreen() {
         // Separar leituras concluídas e próximas
         const completed = response.data.filter(item => item.isCompleted);
         
-        // Pegar próximas leituras não concluídas, ordenando pelo dia
-        const upcoming = response.data
-          .filter(item => !item.isCompleted)
-          .sort((a, b) => a.day - b.day)
-          .slice(0, 5); // Próximas 5 leituras
+        // Agrupar próximas leituras por dia
+        const upcomingByDay = groupByDay(
+          response.data
+            .filter(item => !item.isCompleted)
+            .sort((a, b) => a.day - b.day)
+        );
         
-        setUpcomingReadings(upcoming);
+        // Pegar próximos 5 dias
+        setUpcomingReadings(upcomingByDay.slice(0, 5));
         groupByMonth(completed);
       }
     } catch (error) {
@@ -84,44 +113,55 @@ export default function ReadingHistoryScreen() {
   const groupByMonth = (items: ReadingHistoryItem[]) => {
     const grouped: GroupedHistory = {};
     
-    // Ordenar por updatedAt desc
-    const sortedItems = items
-      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+    // Agrupar por dia primeiro
+    const dayReadings = groupByDay(items);
     
-    sortedItems.forEach(item => {
-      const date = new Date(item.updatedAt);
+    // Ordenar por updatedAt desc
+    const sortedDays = dayReadings
+      .sort((a, b) => {
+        const dateA = a.completedAt ? new Date(a.completedAt).getTime() : 0;
+        const dateB = b.completedAt ? new Date(b.completedAt).getTime() : 0;
+        return dateB - dateA;
+      });
+    
+    sortedDays.forEach(dayReading => {
+      const date = new Date(dayReading.completedAt!);
       const monthYear = date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
       
       if (!grouped[monthYear]) {
         grouped[monthYear] = [];
       }
       
-      grouped[monthYear].push(item);
+      grouped[monthYear].push(dayReading);
     });
     
     setGroupedHistory(grouped);
   };
 
-  const handleToggleReading = async (item: ReadingHistoryItem) => {
-    const action = item.isCompleted ? 'desmarcar' : 'marcar';
-    const actionTitle = item.isCompleted ? 'Desmarcar Leitura' : 'Marcar Leitura';
+  const handleToggleReading = async (dayReading: DayReadings) => {
+    const action = dayReading.isCompleted ? 'desmarcar' : 'marcar';
+    const actionTitle = dayReading.isCompleted ? 'Desmarcar Leitura' : 'Marcar Leitura';
+    
+    const readingsText = dayReading.readings
+      .map(r => `${r.bookName} ${r.startChapter}${r.endChapter !== r.startChapter ? `-${r.endChapter}` : ''}`)
+      .join('\n');
     
     Alert.alert(
       actionTitle,
-      `Deseja realmente ${action} a leitura do dia ${item.day}?\n${item.bookName} ${item.startChapter}${item.endChapter !== item.startChapter ? `-${item.endChapter}` : ''}`,
+      `Deseja realmente ${action} a leitura do dia ${dayReading.day}?\n\n${readingsText}`,
       [
         { text: 'Cancelar', style: 'cancel' },
         {
-          text: item.isCompleted ? 'Desmarcar' : 'Marcar',
-          style: item.isCompleted ? 'destructive' : 'default',
+          text: dayReading.isCompleted ? 'Desmarcar' : 'Marcar',
+          style: dayReading.isCompleted ? 'destructive' : 'default',
           onPress: async () => {
             try {
-              const response = item.isCompleted 
-                ? await authService.unmarkDay(item.day)
-                : await authService.completeDay(item.day);
+              const response = dayReading.isCompleted 
+                ? await authService.unmarkDay(dayReading.day)
+                : await authService.completeDay(dayReading.day);
                 
               if (response.success) {
-                Alert.alert('Sucesso', `Leitura ${item.isCompleted ? 'desmarcada' : 'marcada'} com sucesso`);
+                Alert.alert('Sucesso', `Leitura ${dayReading.isCompleted ? 'desmarcada' : 'marcada'} com sucesso`);
                 loadHistory();
               } else {
                 Alert.alert('Erro', response.message);
@@ -192,15 +232,6 @@ export default function ReadingHistoryScreen() {
     return (
       <View style={[styles.container, { backgroundColor: colors.bg }]}>
         <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.headerBg} />
-        {/* <View style={[styles.header, { backgroundColor: colors.headerBg, borderBottomColor: colors.border }]}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.textPrimary, fontSize: applyFontScale(20) }]}>
-            Detalhes da Leitura2
-          </Text>
-          <View style={{ width: 40 }} />
-        </View> */}
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color={colors.accent} />
           <Text style={[styles.loadingText, { color: colors.textSecondary, fontSize: applyFontScale(16) }]}>
@@ -288,9 +319,9 @@ export default function ReadingHistoryScreen() {
             <Text style={[styles.sectionTitle, { color: colors.textPrimary, fontSize: applyFontScale(18) }]}>
               Próximas Leituras
             </Text>
-            {upcomingReadings.map((reading, index) => (
+            {upcomingReadings.map((dayReading, index) => (
               <View
-                key={reading.id}
+                key={dayReading.day}
                 style={[
                   styles.upcomingCard, 
                   { 
@@ -306,16 +337,28 @@ export default function ReadingHistoryScreen() {
                     { backgroundColor: index === 0 ? colors.accent : colors.textSecondary }
                   ]}>
                     <Text style={[styles.dayNumber, { fontSize: applyFontScale(14) }]}>
-                      Dia {reading.day}
+                      Dia {dayReading.day}
                     </Text>
                   </View>
                   <View style={styles.readingDetails}>
-                    <Text style={[styles.bookName, { color: colors.textPrimary, fontSize: applyFontScale(16) }]}>
-                      {reading.bookName} {reading.startChapter}
-                      {reading.endChapter !== reading.startChapter && `-${reading.endChapter}`}
-                    </Text>
+                    {dayReading.readings.map((reading, rIndex) => (
+                      <Text 
+                        key={reading.id}
+                        style={[
+                          styles.bookName, 
+                          { 
+                            color: colors.textPrimary, 
+                            fontSize: applyFontScale(16),
+                            marginBottom: rIndex < dayReading.readings.length - 1 ? 4 : 0
+                          }
+                        ]}
+                      >
+                        {reading.bookName} {reading.startChapter}
+                        {reading.endChapter !== reading.startChapter && `-${reading.endChapter}`}
+                      </Text>
+                    ))}
                     {index === 0 && (
-                      <Text style={[styles.nextReadingLabel, { color: colors.accent, fontSize: applyFontScale(12) }]}>
+                      <Text style={[styles.nextReadingLabel, { color: colors.accent, fontSize: applyFontScale(12), marginTop: 4 }]}>
                         🔥 Próxima leitura
                       </Text>
                     )}
@@ -324,7 +367,7 @@ export default function ReadingHistoryScreen() {
                 
                 <TouchableOpacity
                   style={[styles.markButton, { backgroundColor: colors.success }]}
-                  onPress={() => handleToggleReading(reading)}
+                  onPress={() => handleToggleReading(dayReading)}
                 >
                   <Ionicons name="checkmark-circle" size={20} color="#fff" />
                 </TouchableOpacity>
@@ -357,24 +400,36 @@ export default function ReadingHistoryScreen() {
                 {monthYear.charAt(0).toUpperCase() + monthYear.slice(1)}
               </Text>
               
-              {groupedHistory[monthYear].map(item => (
+              {groupedHistory[monthYear].map(dayReading => (
                 <View
-                  key={item.id}
+                  key={dayReading.day}
                   style={[styles.historyCard, { backgroundColor: colors.card, borderLeftColor: colors.success }]}
                 >
                   <View style={styles.historyInfo}>
                     <View style={[styles.dayBadge, { backgroundColor: colors.success }]}>
                       <Text style={[styles.dayNumber, { fontSize: applyFontScale(16) }]}>
-                        Dia {item.day}
+                        Dia {dayReading.day}
                       </Text>
                     </View>
                     <View style={styles.readingDetails}>
-                      <Text style={[styles.bookName, { color: colors.textPrimary, fontSize: applyFontScale(16) }]}>
-                        {item.bookName} {item.startChapter}
-                        {item.endChapter !== item.startChapter && `-${item.endChapter}`}
-                      </Text>
-                      <Text style={[styles.completedDate, { color: colors.textSecondary, fontSize: applyFontScale(12) }]}>
-                        {new Date(item.completedAt!).toLocaleDateString('pt-BR', {
+                      {dayReading.readings.map((reading, index) => (
+                        <Text 
+                          key={reading.id}
+                          style={[
+                            styles.bookName, 
+                            { 
+                              color: colors.textPrimary, 
+                              fontSize: applyFontScale(16),
+                              marginBottom: index < dayReading.readings.length - 1 ? 4 : 0
+                            }
+                          ]}
+                        >
+                          {reading.bookName} {reading.startChapter}
+                          {reading.endChapter !== reading.startChapter && `-${reading.endChapter}`}
+                        </Text>
+                      ))}
+                      <Text style={[styles.completedDate, { color: colors.textSecondary, fontSize: applyFontScale(12), marginTop: 4 }]}>
+                        {new Date(dayReading.completedAt!).toLocaleDateString('pt-BR', {
                           day: '2-digit',
                           month: '2-digit',
                           year: 'numeric',
@@ -387,7 +442,7 @@ export default function ReadingHistoryScreen() {
                   
                   <TouchableOpacity
                     style={[styles.unmarkButton, { backgroundColor: colors.danger }]}
-                    onPress={() => handleToggleReading(item)}
+                    onPress={() => handleToggleReading(dayReading)}
                   >
                     <Ionicons name="close-circle" size={20} color="#fff" />
                   </TouchableOpacity>
@@ -515,23 +570,6 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
   },
-  nextReadingSection: {
-    padding: 16,
-    paddingBottom: 8,
-  },
-  nextReadingCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    borderRadius: 12,
-    borderLeftWidth: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 3,
-  },
   nextReadingLabel: {
     fontSize: 12,
     fontWeight: '600',
@@ -540,9 +578,6 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 20,
     marginLeft: 8,
-  },
-  planStats: {
-    fontSize: 14,
   },
   historySection: {
     paddingHorizontal: 16,

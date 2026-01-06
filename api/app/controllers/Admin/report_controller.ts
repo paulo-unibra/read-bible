@@ -22,14 +22,32 @@ export default class ReportController {
         .countDistinct('user_id as total')
       const usersWithActivePlanCount = Number(usersWithActivePlan[0].total)
 
-      // Usuários com leitura em dia (completaram a leitura de hoje)
-      const today = new Date().toISOString().split('T')[0]
-      const usersUpToDate = await db
-        .from('reading_progress')
-        .whereRaw('DATE(completed_at) = ?', [today])
-        .where('is_completed', true)
-        .countDistinct('reading_plan_id as total')
-      const usersUpToDateCount = Number(usersUpToDate[0].total)
+      // Usuários com leitura em dia (baseado no cronograma individual de cada plano)
+      // Calcula quantos dias deveriam ter sido completados baseado em start_date e total_days
+      const usersUpToDate = await db.rawQuery(`
+        SELECT COUNT(DISTINCT rp.id) as total
+        FROM reading_plans rp
+        WHERE rp.is_active = true
+          AND DATE(rp.start_date) <= CURDATE()
+          AND DATE(rp.end_date) >= CURDATE()
+          AND (
+            -- Calcula quantos dias já foram completados
+            SELECT COUNT(*)
+            FROM reading_progress prog
+            WHERE prog.reading_plan_id = rp.id
+              AND prog.is_completed = true
+          ) >= LEAST(
+            -- Dias esperados: proporção do plano que deveria estar completa
+            -- Se 50% do tempo passou, deveria ter 50% dos dias completos
+            CEIL(
+              rp.total_days * 
+              (DATEDIFF(CURDATE(), DATE(rp.start_date)) / 
+               DATEDIFF(DATE(rp.end_date), DATE(rp.start_date)))
+            ),
+            rp.total_days
+          )
+      `)
+      const usersUpToDateCount = Number(usersUpToDate[0][0].total)
 
       // Total de planos de leitura criados
       const totalPlans = await ReadingPlan.query().count('* as total')
@@ -79,6 +97,22 @@ export default class ReportController {
         .countDistinct('reading_plan_id as total')
       const activeUsersCount = Number(activeUsers[0].total)
 
+      // Usuários com plano ativo mas que ainda não iniciaram nenhuma leitura
+      const usersNotStarted = await db.rawQuery(`
+        SELECT COUNT(DISTINCT rp.id) as total
+        FROM reading_plans rp
+        WHERE rp.is_active = true
+          AND DATE(rp.start_date) <= CURDATE()
+          AND DATE(rp.end_date) >= CURDATE()
+          AND (
+            SELECT COUNT(*)
+            FROM reading_progress prog
+            WHERE prog.reading_plan_id = rp.id
+              AND prog.is_completed = true
+          ) = 0
+      `)
+      const usersNotStartedCount = Number(usersNotStarted[0][0].total)
+
       // Planos de leitura por tipo
       const plansByType = await db
         .from('reading_plans')
@@ -103,6 +137,7 @@ export default class ReportController {
           withQuizResults: usersWithQuizResultsCount,
           newInLast30Days: newUsersCount,
           activeInLast7Days: activeUsersCount,
+          notStartedReading: usersNotStartedCount,
         },
         readingPlans: {
           total: totalPlansCount,

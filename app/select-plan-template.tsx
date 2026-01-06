@@ -38,12 +38,26 @@ export default function SelectPlanTemplateScreen() {
     const daysRemaining = getDaysUntilEndOfYear();
     return {
       id: -1, // ID negativo para indicar que é o template padrão
-      name: `Plano Anual ${new Date().getFullYear()}`,
-      description: `Leia toda a Bíblia até o final do ano. Faltam ${daysRemaining} dias para completar sua jornada espiritual.`,
-      type: 'annual',
+      name: `Plano Sequencial ${new Date().getFullYear()}`,
+      description: `Leia toda a Bíblia de forma sequencial até o final do ano. Faltam ${daysRemaining} dias para completar sua jornada espiritual.`,
+      type: 'sequential',
       duration: daysRemaining,
       testament: 'both',
       readingsCount: 1189, // Total de capítulos da Bíblia
+      isActive: true,
+    };
+  };
+
+  const createInterleavedTemplate = (): PlanTemplate => {
+    const daysRemaining = getDaysUntilEndOfYear();
+    return {
+      id: -2, // ID -2 para o template intercalado
+      name: `Plano Intercalado ${new Date().getFullYear()}`,
+      description: `Leia Antigo e Novo Testamento juntos até o fim do ano. Faltam ${daysRemaining} dias para completar sua jornada espiritual.`,
+      type: 'custom',
+      duration: daysRemaining,
+      testament: 'both',
+      readingsCount: 1189,
       isActive: true,
     };
   };
@@ -53,9 +67,10 @@ export default function SelectPlanTemplateScreen() {
       setLoading(true);
       const data = await readingPlanService.getTemplates();
       
-      // Adicionar template padrão no início
-      const defaultTemplate = createDefaultTemplate();
-      setTemplates([defaultTemplate, ...data]);
+      // Adicionar templates padrão no início
+      const sequentialTemplate = createDefaultTemplate();
+      const interleavedTemplate = createInterleavedTemplate();
+      setTemplates([sequentialTemplate, interleavedTemplate, ...data]);
     } catch (error) {
       console.error('Error loading templates:', error);
       Alert.alert('Erro', 'Falha ao carregar templates de planos');
@@ -81,14 +96,35 @@ export default function SelectPlanTemplateScreen() {
       return;
     }
 
+    // Verificar autenticação para plano intercalado
+    if (selectedTemplate.id === -2) {
+      const authService = (await import('../services/AuthService')).default;
+      if (!authService.isAuthenticated()) {
+        Alert.alert(
+          'Login Necessário',
+          'O plano intercalado requer autenticação. Por favor, faça login primeiro.',
+          [
+            { text: 'Cancelar', style: 'cancel' },
+            { text: 'Fazer Login', onPress: () => router.push('/auth') },
+          ]
+        );
+        return;
+      }
+    }
+
     try {
       setLoading(true);
       
-      // Se for o template padrão (ID -1), usar a função antiga de criar plano anual
+      // Se for o template sequencial (ID -1), usar função de criar plano anual
       if (selectedTemplate.id === -1) {
         await readingPlanService.createDefaultAnnualPlan(customName);
-      } else {
-        // Senão, usar template do banco de dados
+      } 
+      // Se for o template intercalado (ID -2), usar função de criar plano intercalado
+      else if (selectedTemplate.id === -2) {
+        await readingPlanService.createInterleavedPlan(customName);
+      } 
+      // Senão, usar template do banco de dados
+      else {
         await readingPlanService.createPlanFromTemplate(selectedTemplate.id, customName);
       }
       
@@ -102,9 +138,10 @@ export default function SelectPlanTemplateScreen() {
           },
         ]
       );
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating plan:', error);
-      Alert.alert('Erro', 'Falha ao criar plano de leitura');
+      const errorMessage = error?.message || 'Falha ao criar plano de leitura';
+      Alert.alert('Erro', errorMessage);
       setLoading(false);
     }
   };

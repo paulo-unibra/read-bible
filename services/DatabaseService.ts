@@ -36,6 +36,9 @@ class DatabaseService {
         await this.createTablesOnConnection(connection);
       }
       
+      // Sempre executar migração de schema (verifica se é necessário internamente)
+      await this.migrateSchema(connection);
+      
       return connection;
     } catch (error) {
       console.error("Erro ao criar nova conexão:", error);
@@ -125,20 +128,23 @@ class DatabaseService {
       CREATE TABLE IF NOT EXISTS reading_plans (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
+        type TEXT NOT NULL,
         description TEXT,
         totalDays INTEGER NOT NULL,
+        completedDays INTEGER DEFAULT 0,
         currentDay INTEGER DEFAULT 1,
+        startDate TEXT NOT NULL,
+        endDate TEXT NOT NULL,
         isActive INTEGER DEFAULT 0,
         createdDate TEXT DEFAULT CURRENT_TIMESTAMP
       );
 
       CREATE TABLE IF NOT EXISTS reading_plan_days (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id TEXT PRIMARY KEY,
         planId TEXT NOT NULL,
         dayNumber INTEGER NOT NULL,
-        bibleId TEXT NOT NULL,
-        bookId INTEGER NOT NULL,
-        chapterNumber INTEGER NOT NULL,
+        date TEXT NOT NULL,
+        readings TEXT NOT NULL,
         isCompleted INTEGER DEFAULT 0,
         completedDate TEXT,
         FOREIGN KEY (planId) REFERENCES reading_plans (id) ON DELETE CASCADE,
@@ -154,6 +160,68 @@ class DatabaseService {
         UNIQUE(bibleId, bookId, chapterNumber)
       );
     `);
+  }
+
+  // Migração de schema - atualizar tabelas antigas
+  private async migrateSchema(db: SQLite.SQLiteDatabase): Promise<void> {
+    try {
+      console.log('🔄 Verificando necessidade de migração do schema...');
+      
+      // Verificar se a coluna 'type' existe em reading_plans
+      const tableInfo = await db.getAllAsync('PRAGMA table_info(reading_plans)') as any[];
+      const hasTypeColumn = tableInfo.some((col: any) => col.name === 'type');
+      const hasStartDateColumn = tableInfo.some((col: any) => col.name === 'startDate');
+      const hasEndDateColumn = tableInfo.some((col: any) => col.name === 'endDate');
+      const hasCompletedDaysColumn = tableInfo.some((col: any) => col.name === 'completedDays');
+      
+      if (!hasTypeColumn || !hasStartDateColumn || !hasEndDateColumn || !hasCompletedDaysColumn) {
+        console.log('⚠️ Schema desatualizado detectado! Migrando tabela reading_plans...');
+        
+        // Backup dos dados existentes
+        const existingPlans = await db.getAllAsync('SELECT * FROM reading_plans');
+        console.log(`📦 Backup de ${existingPlans.length} planos existentes`);
+        
+        // Dropar e recriar tabela
+        await db.execAsync('DROP TABLE IF EXISTS reading_plans');
+        await db.execAsync('DROP TABLE IF EXISTS reading_plan_days');
+        
+        // Recriar com novo schema
+        await db.execAsync(`
+          CREATE TABLE IF NOT EXISTS reading_plans (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            type TEXT NOT NULL,
+            description TEXT,
+            totalDays INTEGER NOT NULL,
+            completedDays INTEGER DEFAULT 0,
+            currentDay INTEGER DEFAULT 1,
+            startDate TEXT NOT NULL,
+            endDate TEXT NOT NULL,
+            isActive INTEGER DEFAULT 0,
+            createdDate TEXT DEFAULT CURRENT_TIMESTAMP
+          );
+
+          CREATE TABLE IF NOT EXISTS reading_plan_days (
+            id TEXT PRIMARY KEY,
+            planId TEXT NOT NULL,
+            dayNumber INTEGER NOT NULL,
+            date TEXT NOT NULL,
+            readings TEXT NOT NULL,
+            isCompleted INTEGER DEFAULT 0,
+            completedDate TEXT,
+            FOREIGN KEY (planId) REFERENCES reading_plans (id) ON DELETE CASCADE,
+            UNIQUE(planId, dayNumber)
+          );
+        `);
+        
+        console.log('✅ Migração de schema concluída!');
+      } else {
+        console.log('✅ Schema já está atualizado');
+      }
+    } catch (error) {
+      console.error('❌ Erro ao migrar schema:', error);
+      // Não lançar erro para não quebrar a inicialização
+    }
   }
 
 

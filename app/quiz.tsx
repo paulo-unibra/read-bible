@@ -4,25 +4,25 @@ import { useTheme } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Animated,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Animated,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import {
-    SafeAreaView,
-    useSafeAreaInsets,
+  SafeAreaView,
+  useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import AdBanner from "../components/AdBanner";
 import { Colors } from "../constants/theme";
 import QuizService, {
-    Quiz,
-    QuizResult,
-    QuizSession,
+  Quiz,
+  QuizResult,
+  QuizSession,
 } from "../services/QuizService";
 import RankingService from "../services/RankingService";
 
@@ -579,11 +579,14 @@ export default function QuizScreen() {
       </View>
 
       {/* Banner de Anúncio no Topo */}
-      <AdBanner adUnitId="ca-app-pub-5942901200629242/6311806560" />
+      <AdBanner />
 
       {/* Timer */}
       <View
-        style={[styles.timerContainer, { backgroundColor: theme.background }]}
+        style={[styles.timerContainer, { backgroundColor: 
+          
+          theme.background
+         }]}
       >
         <Animated.View
           style={[
@@ -798,7 +801,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 20,
     backgroundColor: "#fff",
-    marginBottom: 20,
+    marginBottom: 10,
   },
   timerCircle: {
     width: 80,
@@ -822,8 +825,9 @@ const styles = StyleSheet.create({
   },
   questionContainer: {
     padding: 20,
+    paddingTop: 0,
     backgroundColor: "#fff",
-    marginBottom: 20,
+    marginBottom: 0,
   },
   questionText: {
     fontSize: 18,

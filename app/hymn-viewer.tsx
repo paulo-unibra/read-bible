@@ -2,18 +2,19 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AdBanner from '../components/AdBanner';
 import DatabaseService from '../services/DatabaseService';
-import harpaService, { Hymn, HymnVerse } from '../services/HarpaService';export default function HymnViewerScreen() {
+import harpaService, { Hymn, HymnVerse } from '../services/HarpaService';
+export default function HymnViewerScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const hymnNumber = parseInt(params.hymnNumber as string);

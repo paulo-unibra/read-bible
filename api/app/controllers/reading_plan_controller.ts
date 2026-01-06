@@ -166,6 +166,136 @@ export default class ReadingPlanController {
   }
 
   /**
+   * Criar plano de leitura customizado (sequencial ou intercalado)
+   */
+  async createCustom({ auth, request, response }: HttpContext) {
+    try {
+      console.log('🔵 [API] createCustom - INÍCIO')
+      const user = auth.user!
+      console.log('👤 [API] Usuário autenticado:', { id: user.id, email: user.email })
+      
+      const { name, type, startDate, endDate, totalDays, readings } = request.only([
+        'name',
+        'type',
+        'startDate',
+        'endDate',
+        'totalDays',
+        'readings',
+      ])
+
+      console.log('📦 [API] Dados recebidos:', {
+        name,
+        type,
+        startDate,
+        endDate,
+        totalDays,
+        readingsCount: readings?.length || 0
+      })
+
+      // Verificar se já existe um plano ativo
+      console.log('🔍 [API] Verificando planos ativos existentes...')
+      const existingPlan = await ReadingPlan.query()
+        .where('user_id', user.id)
+        .where('is_active', true)
+        .first()
+
+      if (existingPlan) {
+        console.log('⚠️ [API] Usuário já possui plano ativo:', existingPlan.id)
+        return response.conflict({
+          success: false,
+          message: 'Você já possui um plano de leitura ativo',
+        })
+      }
+
+      console.log('✅ [API] Nenhum plano ativo encontrado, criando novo...')
+      
+      // Criar plano customizado
+      const planData = {
+        userId: user.id,
+        name: name || `Plano ${type === 'sequential' ? 'Sequencial' : 'Intercalado'} ${DateTime.now().year}`,
+        type: type || 'custom',
+        startDate: DateTime.fromISO(startDate),
+        endDate: DateTime.fromISO(endDate),
+        isActive: true,
+        currentDay: 1,
+        totalDays: totalDays,
+        chaptersPerDay: 0, // Será calculado depois
+        totalChapters: 0, // Será calculado depois
+        completedChapters: 0,
+      }
+      
+      console.log('💾 [API] Salvando plano no banco:', planData)
+      const plan = await ReadingPlan.create(planData)
+      console.log('✅ [API] Plano salvo com ID:', plan.id)
+
+      // Salvar leituras customizadas se fornecidas
+      if (readings && Array.isArray(readings)) {
+        console.log(`📚 [API] Salvando ${readings.length} dias de leitura...`)
+        let totalChapters = 0
+        let savedCount = 0
+        
+        for (const reading of readings) {
+          // Criar um registro separado para cada livro do dia (intercalado AT + NT)
+          for (const bookReading of reading.readings) {
+            await ReadingProgress.create({
+              readingPlanId: plan.id,
+              day: reading.dayNumber,
+              bookName: bookReading.bookName,
+              startChapter: bookReading.startChapter,
+              endChapter: bookReading.endChapter,
+              isCompleted: false,
+            })
+            
+            savedCount++
+            
+            // Contar capítulos deste livro
+            totalChapters += (bookReading.endChapter - bookReading.startChapter + 1)
+          }
+          
+          if (reading.dayNumber % 50 === 0) {
+            console.log(`   📖 [API] Processados ${reading.dayNumber}/${readings.length} dias (${savedCount} registros)...`)
+          }
+        }
+        
+        console.log(`✅ [API] ${savedCount} registros de leitura salvos (${readings.length} dias). Total de capítulos: ${totalChapters}`)
+        
+        // Atualizar totais
+        plan.totalChapters = totalChapters
+        plan.chaptersPerDay = Math.ceil(totalChapters / totalDays)
+        await plan.save()
+        console.log('✅ [API] Plano atualizado com totais')
+      } else {
+        console.log('⚠️ [API] Nenhuma leitura fornecida')
+      }
+
+      console.log('🎉 [API] Plano customizado criado com sucesso!')
+      return response.created({
+        success: true,
+        message: 'Plano de leitura customizado criado com sucesso',
+        data: {
+          plan: {
+            id: plan.id,
+            name: plan.name,
+            type: plan.type,
+            startDate: plan.startDate.toISO(),
+            endDate: plan.endDate.toISO(),
+            totalDays: plan.totalDays,
+            totalChapters: plan.totalChapters,
+          },
+        },
+      })
+    } catch (error) {
+      console.error('❌ [API] ERRO ao criar plano customizado:', error)
+      console.error('❌ [API] Stack trace:', error.stack)
+      return response.badRequest({
+        success: false,
+        message: 'Erro ao criar plano de leitura customizado',
+        error: error.message,
+      })
+    }
+  }
+
+  /**
    * Obter plano ativo do usuário
    */
   async getActive({ auth, response }: HttpContext) {

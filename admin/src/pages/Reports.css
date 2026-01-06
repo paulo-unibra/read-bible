@@ -251,6 +251,33 @@
   font-style: italic;
 }
 
+/* Period buttons for Play Store stats */
+.period-button {
+  background-color: #f0f0f0;
+  border: 1px solid #ddd;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.period-button:hover {
+  background-color: #e0e0e0;
+  border-color: #ccc;
+}
+
+.period-button.active {
+  background-color: #667eea;
+  color: white;
+  border-color: #667eea;
+}
+
+.stat-card.danger {
+  background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+}
+
 /* Responsividade */
 @media (max-width: 768px) {
   .reports-header {
@@ -279,6 +306,11 @@
   }
 
   .stat-label {
+    font-size: 12px;
+  }
+  
+  .period-button {
+    padding: 6px 12px;
     font-size: 12px;
   }
 }

@@ -2,23 +2,23 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AdBanner from "../components/AdBanner";
 import BibleCuriosityCard from "../components/BibleCuriosityCard";
 import { Logo } from "../components/logo";
 import authService, {
-    ReadingPlan,
-    TodayReading,
+  ReadingPlan,
+  TodayReading,
 } from "../services/AuthService";
 import bibleCuriosityService, {
-    BibleCuriosity,
+  BibleCuriosity,
 } from "../services/BibleCuriosityService";
 import bibleReaderService from "../services/BibleReaderService";
 import DatabaseService from "../services/DatabaseService";
@@ -30,6 +30,7 @@ export default function HomeScreen() {
   const params = useLocalSearchParams();
   const [readingPlan, setReadingPlan] = useState<ReadingPlan | null>(null);
   const [todayReadings, setTodayReadings] = useState<TodayReading[]>([]);
+  const [todayDayId, setTodayDayId] = useState<string | null>(null);
   const [curiosity, setCuriosity] = useState<BibleCuriosity | null>(null);
   const [loading, setLoading] = useState(true);
   const [fontSizePref, setFontSizePref] = useState<
@@ -125,49 +126,76 @@ export default function HomeScreen() {
         setHasLocalPlan(true);
         // Pega o primeiro plano ativo local
         const plan = localPlans[0];
-        
-        // Busca o dia de hoje do plano
+
+        // Busca o próximo dia não concluído do plano
         const planDays = await readingPlanService.getPlanDays(plan.id);
-        const today = new Date().toISOString().split('T')[0];
-        const todayDay = planDays.find(day => day.date.startsWith(today));
-        
+
+        // Busca o primeiro dia que NÃO está concluído
+        const nextDay = planDays.find((day) => !day.isCompleted);
+
+        // Calcular total de capítulos do plano
+        const totalChapters = planDays.reduce((sum, day) => {
+          return sum + day.readings.reduce((chapterSum, reading) => {
+            return chapterSum + (reading.endChapter - reading.startChapter + 1);
+          }, 0);
+        }, 0);
+
+        // Calcular capítulos completados
+        const completedChapters = planDays
+          .filter(day => day.isCompleted)
+          .reduce((sum, day) => {
+            return sum + day.readings.reduce((chapterSum, reading) => {
+              return chapterSum + (reading.endChapter - reading.startChapter + 1);
+            }, 0);
+          }, 0);
+
         // Converte para o formato esperado pela tela
         setReadingPlan({
           ...plan,
-          currentDay: todayDay?.dayNumber || 1,
+          currentDay: nextDay?.dayNumber || plan.totalDays,
           chaptersPerDay: 0,
-          totalChapters: 0,
-          completedChapters: plan.completedDays,
+          totalChapters,
+          completedChapters,
           progress: Math.round((plan.completedDays / plan.totalDays) * 100),
         });
-        
+
         // Converte readings para o formato esperado
-        if (todayDay) {
-          // readings pode ser string ou array, precisa lidar com ambos
-          const readingsText = typeof todayDay.readings === 'string' 
-            ? todayDay.readings 
-            : Array.isArray(todayDay.readings) 
-              ? todayDay.readings.map(r => `${r.bookName} ${r.startChapter}${r.endChapter !== r.startChapter ? `-${r.endChapter}` : ''}`).join(' | ')
-              : '';
-          
-          setTodayReadings([{
-            id: todayDay.id,
-            day: todayDay.dayNumber,
-            bookName: readingsText,
-            startChapter: 0,
-            endChapter: 0,
-            isCompleted: todayDay.isCompleted,
-          }]);
+        if (nextDay) {
+          setTodayReadings(nextDay.readings);
+          setTodayDayId(nextDay.id); // Guardar o ID do dia do plano
+
+          // // readings pode ser string ou array, precisa lidar com ambos
+          // const readingsText =
+          //   typeof nextDay.readings === "string"
+          //     ? nextDay.readings
+          //     : Array.isArray(nextDay.readings)
+          //     ? nextDay.readings
+          //         .map(
+          //           (r) =>
+          //             `${r.bookName} ${r.startChapter}${
+          //               r.endChapter !== r.startChapter
+          //                 ? `-${r.endChapter}`
+          //                 : ""
+          //             }`
+          //         )
+          //         .join(" | ")
+          //     : "";
+
+        } else {
+          // Se não há mais dias, limpa as leituras
+          setTodayReadings([]);
+          setTodayDayId(null);
         }
         return;
       }
-      
+
       // Se não encontrou planos locais, busca do backend (sistema antigo - apenas para retrocompatibilidade)
       const response = await authService.getActivePlan();
       if (response.success && response.data) {
         setReadingPlan(response.data.plan);
         console.log("Today Reading:", response.data.todayReadings);
         setTodayReadings(response.data.todayReadings);
+        setTodayDayId(null); // Backend não usa IDs locais
         setHasLocalPlan(false);
       }
     } catch (error) {
@@ -223,7 +251,10 @@ export default function HomeScreen() {
         "Você ainda não tem um plano de leitura. Deseja criar um agora?",
         [
           { text: "Cancelar", style: "cancel" },
-          { text: "Criar", onPress: () => router.push("/select-plan-template") },
+          {
+            text: "Criar",
+            onPress: () => router.push("/select-plan-template"),
+          },
         ]
       );
       return;
@@ -241,15 +272,19 @@ export default function HomeScreen() {
     if (!todayReadings.length || !readingPlan) return;
     try {
       console.log("TESTE: ", todayReadings);
-      
+
       // Se é um plano local (template)
       if (hasLocalPlan) {
-        await readingPlanService.markDayAsCompleted(todayReadings[0].id);
+        if (!todayDayId) {
+          Alert.alert("Erro", "ID do dia não encontrado");
+          return;
+        }
+        await readingPlanService.markDayAsCompleted(todayDayId);
         Alert.alert("Parabéns!", "Leitura marcada como concluída! 🎉");
         await loadReadingPlan();
         return;
       }
-      
+
       // Se é plano do backend (padrão)
       const response = await authService.completeDay(todayReadings[0].day);
       if (response.success) {
@@ -258,7 +293,9 @@ export default function HomeScreen() {
       } else {
         Alert.alert("Erro", response.message);
       }
-    } catch {
+    } catch(error) {
+      console.log('Erro ao marcar leitura como completa:', error);
+
       Alert.alert("Erro", "Falha ao marcar leitura");
     }
   };
@@ -438,7 +475,7 @@ export default function HomeScreen() {
             style={[styles.loginButton, { backgroundColor: colors.primary }]}
             onPress={() => router.push("/auth")}
           >
-            <Text style={[styles.loginButtonText, { color: '#FFFFFF' }]}>
+            <Text style={[styles.loginButtonText, { color: "#FFFFFF" }]}>
               Entrar
             </Text>
           </TouchableOpacity>
@@ -788,7 +825,11 @@ export default function HomeScreen() {
                 { backgroundColor: colors.surfaceAlt },
               ]}
             >
-              <Ionicons name="musical-notes-outline" size={32} color={isDark ? "#81c784" : "#4CAF50"} />
+              <Ionicons
+                name="musical-notes-outline"
+                size={32}
+                color={isDark ? "#81c784" : "#4CAF50"}
+              />
             </View>
             <View style={styles.actionContent}>
               <Text

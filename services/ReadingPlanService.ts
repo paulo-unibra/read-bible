@@ -40,9 +40,112 @@ export class ReadingPlanService {
       
       await this.savePlanDays(planId, readingsWithPlanId);
 
+      // Sincronizar com backend
+      try {
+        console.log('☁️ Sincronizando plano sequencial com backend...');
+        const authService = (await import('./AuthService')).default;
+        
+        const token = authService.getToken();
+        const user = authService.getUser();
+        
+        if (!token || !user) {
+          console.log('⚠️ Usuário não autenticado - plano mantido apenas localmente');
+          return plan;
+        }
+        
+        console.log('👤 Usuário autenticado:', user.email);
+        
+        const backendResponse = await authService.createCustomReadingPlan({
+          name: customName,
+          type: 'sequential',
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString(),
+          totalDays,
+          readings: readingsWithPlanId,
+        });
+        
+        if (backendResponse.success) {
+          console.log('✅ Plano sincronizado com backend:', backendResponse.data?.plan?.id);
+        } else {
+          console.warn('⚠️ Plano salvo localmente mas falhou ao sincronizar com backend:', backendResponse.message);
+        }
+      } catch (backendError) {
+        console.warn('⚠️ Erro ao sincronizar com backend (plano mantido localmente):', backendError);
+      }
+
       return plan;
     } catch (error) {
       console.error('Error creating default annual plan:', error);
+      throw error;
+    }
+  }
+
+  async createInterleavedPlan(customName: string): Promise<ReadingPlan> {
+    try {
+      console.log('🔄 Criando plano intercalado no backend:', customName);
+      
+      // Verificar autenticação
+      const authService = (await import('./AuthService')).default;
+      const token = authService.getToken();
+      const user = authService.getUser();
+      
+      if (!token || !user) {
+        throw new Error('Usuário não autenticado. É necessário estar logado para criar um plano intercalado.');
+      }
+      
+      console.log('👤 Usuário autenticado:', user.email);
+      
+      const startDate = new Date();
+      const endDate = new Date(startDate.getFullYear(), 11, 31, 23, 59, 59);
+      const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+      
+      console.log('📅 Datas:', { startDate, endDate, totalDays });
+
+      // Gerar leituras intercaladas (AT + NT)
+      console.log('📖 Gerando leituras intercaladas...');
+      const readings = this.generateInterleavedBibleReadings(startDate, totalDays);
+      console.log(`✅ ${readings.length} leituras geradas`);
+      
+      const planId = `interleaved_${Date.now()}`;
+      const readingsWithPlanId = readings.map(reading => ({
+        ...reading,
+        id: `${planId}_${reading.id}`,
+        planId,
+      }));
+
+      // Criar plano APENAS no backend (não salva localmente)
+      console.log('☁️ Criando plano intercalado no backend...');
+      const backendResponse = await authService.createCustomReadingPlan({
+        name: customName,
+        type: 'interleaved',
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        totalDays,
+        readings: readingsWithPlanId,
+      });
+      
+      if (!backendResponse.success) {
+        throw new Error(backendResponse.message || 'Falha ao criar plano no backend');
+      }
+      
+      console.log('✅ Plano criado no backend com ID:', backendResponse.data?.plan?.id);
+      
+      // Retornar o plano do backend
+      const plan: ReadingPlan = {
+        id: backendResponse.data?.plan?.id || planId,
+        name: customName,
+        type: 'interleaved',
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        isActive: true,
+        createdDate: new Date().toISOString(),
+        totalDays,
+        completedDays: 0,
+      };
+
+      return plan;
+    } catch (error) {
+      console.error('❌ Error creating interleaved plan:', error);
       throw error;
     }
   }
@@ -216,24 +319,72 @@ export class ReadingPlanService {
   }
 
   private async savePlan(plan: ReadingPlan): Promise<void> {
-    await DatabaseService.init();
-    const db = (DatabaseService as any).db;
-    
-    await db.runAsync(
-      'INSERT INTO reading_plans (id, name, type, startDate, endDate, isActive, createdDate, totalDays, completedDays) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [plan.id, plan.name, plan.type, plan.startDate, plan.endDate, plan.isActive ? 1 : 0, plan.createdDate, plan.totalDays, plan.completedDays]
-    );
+    try {
+      console.log('💾 [savePlan] Inicializando banco...');
+      await DatabaseService.init();
+      const db = (DatabaseService as any).db;
+      
+      console.log('💾 [savePlan] Executando INSERT...', {
+        id: plan.id,
+        name: plan.name,
+        type: plan.type,
+        isActive: plan.isActive ? 1 : 0
+      });
+      
+      const result = await db.runAsync(
+        'INSERT INTO reading_plans (id, name, type, startDate, endDate, isActive, createdDate, totalDays, completedDays) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [plan.id, plan.name, plan.type, plan.startDate, plan.endDate, plan.isActive ? 1 : 0, plan.createdDate, plan.totalDays, plan.completedDays]
+      );
+      
+      console.log('✅ [savePlan] INSERT executado, result:', result);
+      
+      // Verificar se foi realmente salvo
+      const verification = await db.getFirstAsync(
+        'SELECT * FROM reading_plans WHERE id = ?',
+        [plan.id]
+      );
+      console.log('🔍 [savePlan] Verificação após INSERT:', verification);
+      
+      if (!verification) {
+        throw new Error('Plano não foi salvo no banco de dados!');
+      }
+    } catch (error) {
+      console.error('❌ [savePlan] ERRO ao salvar plano:', error);
+      throw error;
+    }
   }
 
   private async savePlanDays(planId: string, readings: ReadingPlanDay[]): Promise<void> {
-    await DatabaseService.init();
-    const db = (DatabaseService as any).db;
-    
-    for (const reading of readings) {
-      await db.runAsync(
-        'INSERT INTO reading_plan_days (id, planId, dayNumber, date, readings, isCompleted, completedDate) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [reading.id, planId, reading.dayNumber, reading.date, JSON.stringify(reading.readings), reading.isCompleted ? 1 : 0, reading.completedDate || null]
+    try {
+      console.log(`💾 [savePlanDays] Salvando ${readings.length} dias para plano ${planId}`);
+      await DatabaseService.init();
+      const db = (DatabaseService as any).db;
+      
+      let savedCount = 0;
+      for (const reading of readings) {
+        const readingWithPlanId = { ...reading, planId };
+        await db.runAsync(
+          'INSERT INTO reading_plan_days (id, planId, dayNumber, date, readings, isCompleted, completedDate) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [readingWithPlanId.id, planId, readingWithPlanId.dayNumber, readingWithPlanId.date, JSON.stringify(readingWithPlanId.readings), readingWithPlanId.isCompleted ? 1 : 0, readingWithPlanId.completedDate]
+        );
+        savedCount++;
+        
+        if (savedCount % 50 === 0) {
+          console.log(`   📝 Salvos ${savedCount}/${readings.length} dias...`);
+        }
+      }
+      
+      console.log(`✅ [savePlanDays] ${savedCount} dias salvos com sucesso`);
+      
+      // Verificar quantos foram realmente salvos
+      const verification = await db.getFirstAsync(
+        'SELECT COUNT(*) as count FROM reading_plan_days WHERE planId = ?',
+        [planId]
       );
+      console.log('🔍 [savePlanDays] Verificação após INSERTs:', verification);
+    } catch (error) {
+      console.error('❌ [savePlanDays] ERRO ao salvar dias:', error);
+      throw error;
     }
   }
 
@@ -280,10 +431,50 @@ export class ReadingPlanService {
     await DatabaseService.init();
     const db = (DatabaseService as any).db;
     
+    // Pegar o planId e o dayNumber do dia
+    const day = await db.getFirstAsync(
+      'SELECT planId, dayNumber FROM reading_plan_days WHERE id = ?',
+      [dayId]
+    );
+    
+    if (!day) {
+      throw new Error('Dia de leitura não encontrado');
+    }
+    
+    // Marcar o dia como concluído
     await db.runAsync(
       'UPDATE reading_plan_days SET isCompleted = 1, completedDate = ? WHERE id = ?',
       [new Date().toISOString(), dayId]
     );
+    
+    // Incrementar o contador de dias completados no plano
+    await db.runAsync(
+      'UPDATE reading_plans SET completedDays = completedDays + 1 WHERE id = ?',
+      [day.planId]
+    );
+    
+    console.log(`✅ [ReadingPlanService] Dia ${dayId} (dia ${day.dayNumber}) marcado como concluído`);
+    
+    // Tentar sincronizar com backend (se estiver autenticado)
+    try {
+      const authService = (await import('./AuthService')).default;
+      const token = authService.getToken();
+      
+      if (token) {
+        console.log('☁️ Sincronizando conclusão de leitura com backend...');
+        const response = await authService.completeDay(day.dayNumber);
+        
+        if (response.success) {
+          console.log('✅ Leitura sincronizada com backend');
+        } else {
+          console.warn('⚠️ Falha ao sincronizar com backend:', response.message);
+        }
+      } else {
+        console.log('ℹ️ Usuário não autenticado - leitura mantida apenas localmente');
+      }
+    } catch (backendError) {
+      console.warn('⚠️ Erro ao sincronizar com backend (leitura mantida localmente):', backendError);
+    }
   }
 
   async deletePlan(planId: string): Promise<void> {
@@ -370,6 +561,135 @@ export class ReadingPlanService {
     return this.distributeReadings(startDate, totalDays, allBooks);
   }
 
+  private generateSequentialBibleReadings(startDate: Date, totalDays: number): ReadingPlanDay[] {
+    // Leitura sequencial de Genesis a Apocalipse
+    const allBooks = Array.from({ length: 66 }, (_, i) => i + 1);
+    return this.distributeReadings(startDate, totalDays, allBooks);
+  }
+
+  private generateInterleavedBibleReadings(startDate: Date, totalDays: number): ReadingPlanDay[] {
+    console.log('📚 Gerando leituras intercaladas - Início');
+    console.log('  Total de dias:', totalDays);
+    
+    const readings: ReadingPlanDay[] = [];
+    const bookChapters = this.getBookChapters();
+    
+    // Livros do Antigo Testamento (1-39)
+    const oldTestamentBooks = Array.from({ length: 39 }, (_, i) => i + 1);
+    // Livros do Novo Testamento (40-66)
+    const newTestamentBooks = Array.from({ length: 27 }, (_, i) => i + 40);
+    
+    // Calcular total de capítulos
+    const totalOTChapters = oldTestamentBooks.reduce((sum, bookId) => sum + (bookChapters[bookId] || 1), 0);
+    const totalNTChapters = newTestamentBooks.reduce((sum, bookId) => sum + (bookChapters[bookId] || 1), 0);
+    
+    console.log('  Total AT:', totalOTChapters, 'capítulos');
+    console.log('  Total NT:', totalNTChapters, 'capítulos');
+    
+    // Calcular capítulos por dia para cada testamento
+    // NT: garantir pelo menos 1 capítulo por dia
+    const ntChaptersPerDay = Math.max(1, Math.ceil(totalNTChapters / totalDays));
+    // AT: distribuir o restante
+    const otChaptersPerDay = Math.ceil(totalOTChapters / totalDays);
+    
+    console.log('  Capítulos/dia AT:', otChaptersPerDay);
+    console.log('  Capítulos/dia NT:', ntChaptersPerDay);
+    
+    let currentDate = new Date(startDate);
+    let otBookIndex = 0;
+    let otChapter = 1;
+    let ntBookIndex = 0;
+    let ntChapter = 1;
+    let dayNumber = 1;
+    
+    while (dayNumber <= totalDays) {
+      const dayReadings: Reading[] = [];
+      
+      // Adicionar leituras do Antigo Testamento
+      let otChaptersToday = 0;
+      while (otChaptersToday < otChaptersPerDay && otBookIndex < oldTestamentBooks.length) {
+        const bookId = oldTestamentBooks[otBookIndex];
+        const maxChapters = bookChapters[bookId] || 1;
+        
+        const chaptersToRead = Math.min(
+          otChaptersPerDay - otChaptersToday,
+          maxChapters - otChapter + 1
+        );
+        
+        dayReadings.push({
+          id: `${bookId}_${otChapter}_${otChapter + chaptersToRead - 1}`,
+          bookId,
+          startChapter: otChapter,
+          endChapter: otChapter + chaptersToRead - 1,
+          bookName: this.getBookName(bookId),
+        });
+        
+        otChapter += chaptersToRead;
+        otChaptersToday += chaptersToRead;
+        
+        if (otChapter > maxChapters) {
+          otBookIndex++;
+          otChapter = 1;
+        }
+      }
+      
+      // Adicionar leituras do Novo Testamento (pelo menos 1 capítulo)
+      if (ntBookIndex < newTestamentBooks.length) {
+        let ntChaptersToday = 0;
+        while (ntChaptersToday < ntChaptersPerDay && ntBookIndex < newTestamentBooks.length) {
+          const bookId = newTestamentBooks[ntBookIndex];
+          const maxChapters = bookChapters[bookId] || 1;
+          
+          const chaptersToRead = Math.min(
+            ntChaptersPerDay - ntChaptersToday,
+            maxChapters - ntChapter + 1
+          );
+          
+          dayReadings.push({
+            id: `${bookId}_${ntChapter}_${ntChapter + chaptersToRead - 1}`,
+            bookId,
+            startChapter: ntChapter,
+            endChapter: ntChapter + chaptersToRead - 1,
+            bookName: this.getBookName(bookId),
+          });
+          
+          ntChapter += chaptersToRead;
+          ntChaptersToday += chaptersToRead;
+          
+          if (ntChapter > maxChapters) {
+            ntBookIndex++;
+            ntChapter = 1;
+          }
+        }
+      }
+      
+      // Se não houver leituras para o dia, encerra
+      if (dayReadings.length === 0) {
+        break;
+      }
+      
+      readings.push({
+        id: `day_${dayNumber}`,
+        planId: '', // Will be set by caller
+        dayNumber,
+        date: currentDate.toISOString(),
+        readings: dayReadings,
+        isCompleted: false,
+      });
+      
+      currentDate.setDate(currentDate.getDate() + 1);
+      dayNumber++;
+    }
+    
+    console.log(`📚 Leituras intercaladas geradas: ${readings.length} dias`);
+    if (readings.length > 0) {
+      console.log('  Primeiro dia:', readings[0]);
+      console.log('  Último dia:', readings[readings.length - 1]);
+    }
+    
+    return readings;
+  }
+
   private generateCustomReadings(startDate: Date, totalDays: number, books: number[]): ReadingPlanDay[] {
     return this.distributeReadings(startDate, totalDays, books);
   }
@@ -434,21 +754,93 @@ export class ReadingPlanService {
   }
 
   private getBookChapters(): Record<number, number> {
-    // Simplified chapter counts for common Bible books
+    // Capítulos de todos os 66 livros da Bíblia
     return {
-      1: 50, 2: 40, 3: 27, 4: 36, 5: 34, // Genesis to Deuteronomy
-      19: 150, 20: 31, // Psalms, Proverbs
-      40: 28, 41: 16, 42: 24, 43: 21, 44: 28, 45: 16, 46: 16, 47: 13, 48: 6, 49: 4, // Matthew to Galatians
-      50: 6, 51: 4, 52: 5, 53: 4, 54: 6, 55: 4, 56: 4, 57: 1, 58: 1, 59: 3, // Ephesians to Philemon, Hebrews to Jude
-      60: 5, 61: 4, 62: 5, 63: 3, 64: 1, 65: 1, 66: 22, // 1 Peter to Revelation
-      // Add more as needed
+      // Antigo Testamento (1-39)
+      1: 50,   // Gênesis
+      2: 40,   // Êxodo
+      3: 27,   // Levítico
+      4: 36,   // Números
+      5: 34,   // Deuteronômio
+      6: 24,   // Josué
+      7: 21,   // Juízes
+      8: 4,    // Rute
+      9: 31,   // 1 Samuel
+      10: 24,  // 2 Samuel
+      11: 22,  // 1 Reis
+      12: 25,  // 2 Reis
+      13: 29,  // 1 Crônicas
+      14: 36,  // 2 Crônicas
+      15: 10,  // Esdras
+      16: 13,  // Neemias
+      17: 10,  // Ester
+      18: 42,  // Jó
+      19: 150, // Salmos
+      20: 31,  // Provérbios
+      21: 12,  // Eclesiastes
+      22: 8,   // Cantares
+      23: 66,  // Isaías
+      24: 52,  // Jeremias
+      25: 5,   // Lamentações
+      26: 48,  // Ezequiel
+      27: 12,  // Daniel
+      28: 14,  // Oséias
+      29: 3,   // Joel
+      30: 9,   // Amós
+      31: 1,   // Obadias
+      32: 4,   // Jonas
+      33: 7,   // Miqueias
+      34: 3,   // Naum
+      35: 3,   // Habacuque
+      36: 3,   // Sofonias
+      37: 2,   // Ageu
+      38: 14,  // Zacarias
+      39: 4,   // Malaquias
+      
+      // Novo Testamento (40-66)
+      40: 28,  // Mateus
+      41: 16,  // Marcos
+      42: 24,  // Lucas
+      43: 21,  // João
+      44: 28,  // Atos
+      45: 16,  // Romanos
+      46: 16,  // 1 Coríntios
+      47: 13,  // 2 Coríntios
+      48: 6,   // Gálatas
+      49: 6,   // Efésios
+      50: 4,   // Filipenses
+      51: 4,   // Colossenses
+      52: 5,   // 1 Tessalonicenses
+      53: 3,   // 2 Tessalonicenses
+      54: 6,   // 1 Timóteo
+      55: 4,   // 2 Timóteo
+      56: 3,   // Tito
+      57: 1,   // Filemom
+      58: 13,  // Hebreus
+      59: 5,   // Tiago
+      60: 5,   // 1 Pedro
+      61: 3,   // 2 Pedro
+      62: 5,   // 1 João
+      63: 1,   // 2 João
+      64: 1,   // 3 João
+      65: 1,   // Judas
+      66: 22,  // Apocalipse
     };
   }
 
   private getBookName(bookId: number): string {
     const bookNames: Record<number, string> = {
+      // Antigo Testamento
       1: 'Gênesis', 2: 'Êxodo', 3: 'Levítico', 4: 'Números', 5: 'Deuteronômio',
-      19: 'Salmos', 20: 'Provérbios',
+      6: 'Josué', 7: 'Juízes', 8: 'Rute',
+      9: '1 Samuel', 10: '2 Samuel', 11: '1 Reis', 12: '2 Reis',
+      13: '1 Crônicas', 14: '2 Crônicas', 15: 'Esdras', 16: 'Neemias', 17: 'Ester',
+      18: 'Jó', 19: 'Salmos', 20: 'Provérbios', 21: 'Eclesiastes', 22: 'Cantares',
+      23: 'Isaías', 24: 'Jeremias', 25: 'Lamentações', 26: 'Ezequiel', 27: 'Daniel',
+      28: 'Oséias', 29: 'Joel', 30: 'Amós', 31: 'Obadias', 32: 'Jonas', 33: 'Miqueias',
+      34: 'Naum', 35: 'Habacuque', 36: 'Sofonias', 37: 'Ageu', 38: 'Zacarias', 39: 'Malaquias',
+      
+      // Novo Testamento
       40: 'Mateus', 41: 'Marcos', 42: 'Lucas', 43: 'João', 44: 'Atos',
       45: 'Romanos', 46: '1 Coríntios', 47: '2 Coríntios', 48: 'Gálatas',
       49: 'Efésios', 50: 'Filipenses', 51: 'Colossenses', 52: '1 Tessalonicenses',

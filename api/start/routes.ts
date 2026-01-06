@@ -12,6 +12,7 @@ const AdminAuthController = () => import('#controllers/Admin/auth_controller')
 const AdminQuizController = () => import('#controllers/Admin/quiz_controller')
 const AdminReadingPlanTemplateController = () => import('#controllers/Admin/reading_plan_template_controller')
 const AdminReportController = () => import('#controllers/Admin/report_controller')
+const AdminPlayStoreReportsController = () => import('#controllers/Admin/play_store_reports_controller')
 const BibleCuriositiesController = () => import('#controllers/bible_curiosities_controller')
 const ImportController = () => import('#controllers/import_controller')
 const PasswordResetController = () => import('#controllers/password_reset_controller')
@@ -42,6 +43,7 @@ router.post('/password/reset', [PasswordResetController, 'resetPassword'])
 
 // Reading Plan routes (protected)
 router.post('/reading-plans', [ReadingPlanController, 'create']).use(middleware.auth())
+router.post('/reading-plans/custom', [ReadingPlanController, 'createCustom']).use(middleware.auth())
 router.get('/reading-plans/active', [ReadingPlanController, 'getActive']).use(middleware.auth())
 router
   .post('/reading-plans/complete', [ReadingPlanController, 'completeDay'])
@@ -129,5 +131,11 @@ router.group(() => {
 
     // Reports
     router.get('/reports/general-stats', [AdminReportController, 'getGeneralStats'])
+
+    // Play Store Reports
+    router.get('/reports/play-store/general', [AdminPlayStoreReportsController, 'generalStats'])
+    router.get('/reports/play-store/installs', [AdminPlayStoreReportsController, 'installMetrics'])
+    router.get('/reports/play-store/crashes', [AdminPlayStoreReportsController, 'crashMetrics'])
+    router.get('/reports/play-store/anrs', [AdminPlayStoreReportsController, 'anrMetrics'])
   }).use(middleware.auth({ guards: ['api'] }))
 }).prefix('/admin')

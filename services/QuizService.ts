@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3333';
+export const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:1999';
 
 interface Question {
   id: string;
