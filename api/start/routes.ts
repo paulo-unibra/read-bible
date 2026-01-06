@@ -10,9 +10,11 @@
 const AuthController = () => import('#controllers/auth_controller')
 const AdminAuthController = () => import('#controllers/Admin/auth_controller')
 const AdminQuizController = () => import('#controllers/Admin/quiz_controller')
-const AdminReadingPlanTemplateController = () => import('#controllers/Admin/reading_plan_template_controller')
+const AdminReadingPlanTemplateController = () =>
+  import('#controllers/Admin/reading_plan_template_controller')
 const AdminReportController = () => import('#controllers/Admin/report_controller')
-const AdminPlayStoreReportsController = () => import('#controllers/Admin/play_store_reports_controller')
+const AdminPlayStoreReportsController = () =>
+  import('#controllers/Admin/play_store_reports_controller')
 const BibleCuriositiesController = () => import('#controllers/bible_curiosities_controller')
 const ImportController = () => import('#controllers/import_controller')
 const PasswordResetController = () => import('#controllers/password_reset_controller')
@@ -97,45 +99,64 @@ router
   .use(middleware.auth())
 
 // Admin routes
-router.group(() => {
-  // Auth
-  router.post('/login', [AdminAuthController, 'login'])
-  router.post('/logout', [AdminAuthController, 'logout']).use(middleware.auth({ guards: ['api'] }))
-  router.get('/me', [AdminAuthController, 'me']).use(middleware.auth({ guards: ['api'] }))
+router
+  .group(() => {
+    // Auth
+    router.post('/login', [AdminAuthController, 'login'])
+    router
+      .post('/logout', [AdminAuthController, 'logout'])
+      .use(middleware.auth({ guards: ['api'] }))
+    router.get('/me', [AdminAuthController, 'me']).use(middleware.auth({ guards: ['api'] }))
 
-  // Protected admin routes (requerem autenticação)
-  router.group(() => {
-    router.get('/users', [AdminAuthController, 'listUsers'])
-    router.get('/permissions', [AdminAuthController, 'listPermissions'])
-    router.post('/permissions', [AdminAuthController, 'createPermission'])
-    router.get('/roles', [AdminAuthController, 'listRoles'])
-    router.post('/roles/:roleId/permissions', [AdminAuthController, 'addPermissionToRole'])
-    router.delete('/roles/:roleId/permissions', [AdminAuthController, 'removePermissionFromRole'])
+    // Protected admin routes (requerem autenticação)
+    router
+      .group(() => {
+        router.get('/users', [AdminAuthController, 'listUsers'])
+        router.get('/permissions', [AdminAuthController, 'listPermissions'])
+        router.post('/permissions', [AdminAuthController, 'createPermission'])
+        router.get('/roles', [AdminAuthController, 'listRoles'])
+        router.post('/roles/:roleId/permissions', [AdminAuthController, 'addPermissionToRole'])
+        router.delete('/roles/:roleId/permissions', [
+          AdminAuthController,
+          'removePermissionFromRole',
+        ])
 
-    // Quiz management
-    router.get('/quizzes', [AdminQuizController, 'index'])
-    router.get('/quizzes/stats', [AdminQuizController, 'stats'])
-    router.get('/quizzes/:id', [AdminQuizController, 'show'])
-    router.post('/quizzes', [AdminQuizController, 'store'])
-    router.put('/quizzes/:id', [AdminQuizController, 'update'])
-    router.delete('/quizzes/:id', [AdminQuizController, 'destroy'])
-    router.post('/quizzes/generate-ai', [AdminQuizController, 'generateWithAI'])
-    router.get('/quizzes/jobs/:jobId', [AdminQuizController, 'getJobStatus'])
+        // Quiz management
+        router.get('/quizzes', [AdminQuizController, 'index'])
+        router.get('/quizzes/stats', [AdminQuizController, 'stats'])
+        router.get('/quizzes/:id', [AdminQuizController, 'show'])
+        router.post('/quizzes', [AdminQuizController, 'store'])
+        router.put('/quizzes/:id', [AdminQuizController, 'update'])
+        router.delete('/quizzes/:id', [AdminQuizController, 'destroy'])
+        router.post('/quizzes/generate-ai', [AdminQuizController, 'generateWithAI'])
+        router.get('/quizzes/jobs/:jobId', [AdminQuizController, 'getJobStatus'])
 
-    // Reading Plan Templates management
-    router.get('/reading-plan-templates', [AdminReadingPlanTemplateController, 'index'])
-    router.get('/reading-plan-templates/:id', [AdminReadingPlanTemplateController, 'show'])
-    router.post('/reading-plan-templates', [AdminReadingPlanTemplateController, 'store'])
-    router.put('/reading-plan-templates/:id', [AdminReadingPlanTemplateController, 'update'])
-    router.delete('/reading-plan-templates/:id', [AdminReadingPlanTemplateController, 'destroy'])
+        // Reading Plan Templates management
+        router.get('/reading-plan-templates', [AdminReadingPlanTemplateController, 'index'])
+        router.get('/reading-plan-templates/:id', [AdminReadingPlanTemplateController, 'show'])
+        router.post('/reading-plan-templates', [AdminReadingPlanTemplateController, 'store'])
+        router.put('/reading-plan-templates/:id', [AdminReadingPlanTemplateController, 'update'])
+        router.delete('/reading-plan-templates/:id', [
+          AdminReadingPlanTemplateController,
+          'destroy',
+        ])
+        router.post('/reading-plan-templates/generate-with-ai', [
+          AdminReadingPlanTemplateController,
+          'generateWithAI',
+        ])
 
-    // Reports
-    router.get('/reports/general-stats', [AdminReportController, 'getGeneralStats'])
+        // Reports
+        router.get('/reports/general-stats', [AdminReportController, 'getGeneralStats'])
 
-    // Play Store Reports
-    router.get('/reports/play-store/general', [AdminPlayStoreReportsController, 'generalStats'])
-    router.get('/reports/play-store/installs', [AdminPlayStoreReportsController, 'installMetrics'])
-    router.get('/reports/play-store/crashes', [AdminPlayStoreReportsController, 'crashMetrics'])
-    router.get('/reports/play-store/anrs', [AdminPlayStoreReportsController, 'anrMetrics'])
-  }).use(middleware.auth({ guards: ['api'] }))
-}).prefix('/admin')
+        // Play Store Reports
+        router.get('/reports/play-store/general', [AdminPlayStoreReportsController, 'generalStats'])
+        router.get('/reports/play-store/installs', [
+          AdminPlayStoreReportsController,
+          'installMetrics',
+        ])
+        router.get('/reports/play-store/crashes', [AdminPlayStoreReportsController, 'crashMetrics'])
+        router.get('/reports/play-store/anrs', [AdminPlayStoreReportsController, 'anrMetrics'])
+      })
+      .use(middleware.auth({ guards: ['api'] }))
+  })
+  .prefix('/admin')

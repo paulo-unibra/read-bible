@@ -50,6 +50,12 @@ const ReadingPlanTemplates: React.FC = () => {
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [importSuccess, setImportSuccess] = useState('');
+  
+  // Estados para IA
+  const [showAIModal, setShowAIModal] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState('');
 
   const { hasPermission, logout } = useAuth();
   const navigate = useNavigate();
@@ -227,6 +233,68 @@ const ReadingPlanTemplates: React.FC = () => {
     navigate('/login');
   };
 
+  const handleGenerateWithAI = async () => {
+    if (!aiPrompt.trim()) {
+      setFormError('Digite uma instrução para a IA');
+      return;
+    }
+
+    setIsGenerating(true);
+    setFormError('');
+    setGenerationProgress('🤖 Enviando instrução para a IA...');
+
+    try {
+      setGenerationProgress('🧠 IA processando sua solicitação...');
+      
+      const response = await api.post('/admin/reading-plan-templates/generate-with-ai', {
+        prompt: aiPrompt
+      });
+
+      setGenerationProgress('✅ Plano gerado com sucesso!');
+      
+      const generatedPlan = response.data.plan;
+      
+      // Preencher formulário com dados gerados
+      setFormData({
+        name: generatedPlan.name || '',
+        description: generatedPlan.description || '',
+        type: generatedPlan.type || 'custom',
+        duration: generatedPlan.duration?.toString() || generatedPlan.readings.length.toString(),
+        testament: generatedPlan.testament || 'both',
+        isActive: generatedPlan.isActive !== undefined ? generatedPlan.isActive : true,
+        order: generatedPlan.order || 0,
+      });
+
+      // Preencher leituras
+      const generatedReadings: Reading[] = generatedPlan.readings.map((reading: any, index: number) => ({
+        day: reading.day || index + 1,
+        bookReadings: Array.isArray(reading.bookReadings) 
+          ? reading.bookReadings.map((br: any) => ({
+              book: br.book || '',
+              chapters: Array.isArray(br.chapters) ? br.chapters : []
+            }))
+          : [],
+        description: reading.description || ''
+      }));
+
+      setReadings(generatedReadings);
+      setImportSuccess(`🎉 Plano gerado pela IA! ${generatedReadings.length} dias de leitura criados.`);
+      setTimeout(() => setImportSuccess(''), 5000);
+      
+      // Fechar modal de IA e abrir modal de criação
+      setShowAIModal(false);
+      setShowModal(true);
+      setAiPrompt('');
+      
+    } catch (err) {
+      const error = err as { response?: { data?: { error?: string } } };
+      setFormError(error.response?.data?.error || 'Erro ao gerar plano com IA');
+      setGenerationProgress('');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const handleImportJson = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -312,6 +380,9 @@ const ReadingPlanTemplates: React.FC = () => {
           <h1>Planos de Leitura</h1>
         </div>
         <div className="header-actions">
+          <button onClick={() => setShowAIModal(true)} className="ai-button">
+            🤖 Pedir para IA
+          </button>
           <button onClick={() => handleOpenModal()} className="create-button">
             + Criar Plano
           </button>
@@ -379,6 +450,76 @@ const ReadingPlanTemplates: React.FC = () => {
         )}
       </div>
 
+      {/* Modal de IA */}
+      {showAIModal && (
+        <div className="modal-overlay" onClick={() => !isGenerating && setShowAIModal(false)}>
+          <div className="modal-content modal-ai" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>🤖 Gerar Plano com IA</h2>
+              {!isGenerating && (
+                <button className="close-button" onClick={() => setShowAIModal(false)}>×</button>
+              )}
+            </div>
+
+            <div className="ai-modal-body">
+              {formError && <div className="form-error">{formError}</div>}
+              
+              {!isGenerating ? (
+                <>
+                  <div className="ai-instructions">
+                    <p>💡 <strong>Dica:</strong> Seja específico sobre o que deseja. Exemplos:</p>
+                    <ul>
+                      <li>"Criar plano de 30 dias lendo os Salmos"</li>
+                      <li>"Plano de 90 dias lendo os Evangelhos e Atos"</li>
+                      <li>"Leitura do Novo Testamento em 100 dias"</li>
+                      <li>"Plano de 1 ano lendo toda a Bíblia sequencialmente"</li>
+                    </ul>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Descreva o plano que deseja criar:</label>
+                    <textarea
+                      value={aiPrompt}
+                      onChange={(e) => setAiPrompt(e.target.value)}
+                      placeholder="Ex: Criar um plano de 30 dias focado nos livros proféticos do Antigo Testamento, começando por Isaías e terminando em Malaquias..."
+                      rows={6}
+                      className="ai-textarea"
+                    />
+                  </div>
+
+                  <div className="modal-footer">
+                    <button 
+                      type="button" 
+                      onClick={() => setShowAIModal(false)} 
+                      className="cancel-button"
+                    >
+                      Cancelar
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={handleGenerateWithAI} 
+                      className="ai-generate-button"
+                      disabled={!aiPrompt.trim()}
+                    >
+                      ✨ Gerar Plano
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="ai-generating">
+                  <div className="ai-loader">
+                    <div className="ai-spinner"></div>
+                    <div className="ai-brain">🧠</div>
+                  </div>
+                  <p className="ai-progress-text">{generationProgress}</p>
+                  <p className="ai-wait-text">Isso pode levar alguns segundos...</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal de Criação/Edição */}
       {showModal && (
         <div className="modal-overlay" onClick={handleCloseModal}>
@@ -394,19 +535,61 @@ const ReadingPlanTemplates: React.FC = () => {
 
               {/* Botão de Importar JSON */}
               <div className="import-section">
-                <label htmlFor="json-import" className="import-button">
-                  📥 Importar JSON
-                  <input
-                    id="json-import"
-                    type="file"
-                    accept=".json"
-                    onChange={handleImportJson}
-                    style={{ display: 'none' }}
-                  />
-                </label>
-                <span className="import-hint">
-                  Importar plano de leitura a partir de arquivo JSON
-                </span>
+                <div>
+                  <label htmlFor="json-import" className="import-button">
+                    📥 Importar JSON
+                    <input
+                      id="json-import"
+                      type="file"
+                      accept=".json"
+                      onChange={handleImportJson}
+                      style={{ display: 'none' }}
+                    />
+                  </label>
+                  <span className="import-hint">
+                    Importar plano de leitura a partir de arquivo JSON
+                  </span>
+                </div>
+                <details className="json-example">
+                  <summary>Ver exemplo de estrutura JSON</summary>
+                  <pre className="json-code">
+{`{
+  "name": "Plano Exemplo",
+  "description": "Descrição do plano",
+  "type": "custom",
+  "duration": 7,
+  "testament": "both",
+  "isActive": true,
+  "order": 0,
+  "readings": [
+    {
+      "day": 1,
+      "bookReadings": [
+        {
+          "book": "Gênesis",
+          "chapters": [1, 2, 3]
+        }
+      ],
+      "description": "A criação"
+    },
+    {
+      "day": 2,
+      "bookReadings": [
+        {
+          "book": "Mateus",
+          "chapters": [1]
+        },
+        {
+          "book": "Salmos",
+          "chapters": [1]
+        }
+      ],
+      "description": "Múltiplas leituras"
+    }
+  ]
+}`}
+                  </pre>
+                </details>
               </div>
 
               <div className="form-row">

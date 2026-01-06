@@ -322,13 +322,19 @@
 
 .import-section {
   display: flex;
-  align-items: center;
-  gap: 16px;
+  flex-direction: column;
+  gap: 12px;
   margin-bottom: 24px;
   padding: 16px;
   background: #f8f9fa;
   border-radius: 8px;
   border: 2px dashed #dee2e6;
+}
+
+.import-section > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
 .import-button {
@@ -350,6 +356,66 @@
 .import-hint {
   color: #6c757d;
   font-size: 14px;
+}
+
+.json-example {
+  margin-top: 8px;
+  width: 100%;
+}
+
+.json-example summary {
+  cursor: pointer;
+  font-size: 14px;
+  color: #667eea;
+  font-weight: 600;
+  padding: 8px 12px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e0e6ed;
+  transition: all 0.2s;
+  user-select: none;
+}
+
+.json-example summary:hover {
+  background: #f8f9fa;
+  border-color: #667eea;
+}
+
+.json-example[open] summary {
+  margin-bottom: 12px;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.json-code {
+  background: #2d3748;
+  color: #e2e8f0;
+  padding: 16px;
+  border-radius: 6px;
+  overflow-x: auto;
+  font-size: 13px;
+  line-height: 1.6;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
+  margin: 0;
+  border: 1px solid #4a5568;
+}
+
+.json-code::-webkit-scrollbar {
+  height: 8px;
+}
+
+.json-code::-webkit-scrollbar-track {
+  background: #1a202c;
+  border-radius: 4px;
+}
+
+.json-code::-webkit-scrollbar-thumb {
+  background: #4a5568;
+  border-radius: 4px;
+}
+
+.json-code::-webkit-scrollbar-thumb:hover {
+  background: #718096;
 }
 
 .form-row {
@@ -639,6 +705,168 @@
 .cancel-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Botão de IA */
+.ai-button {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ai-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+/* Modal de IA */
+.modal-ai {
+  max-width: 700px;
+  width: 90%;
+}
+
+.ai-modal-body {
+  padding: 24px;
+}
+
+.ai-instructions {
+  background: #f0fdf4;
+  border-left: 4px solid #10b981;
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+}
+
+.ai-instructions p {
+  margin: 0 0 12px 0;
+  color: #065f46;
+  font-weight: 600;
+}
+
+.ai-instructions ul {
+  margin: 0;
+  padding-left: 20px;
+  color: #047857;
+}
+
+.ai-instructions li {
+  margin: 8px 0;
+  line-height: 1.6;
+}
+
+.ai-textarea {
+  width: 100%;
+  min-height: 150px;
+  padding: 12px;
+  border: 2px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+  transition: border-color 0.2s;
+}
+
+.ai-textarea:focus {
+  outline: none;
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+.ai-generate-button {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ai-generate-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.ai-generate-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Estado de geração */
+.ai-generating {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  min-height: 300px;
+}
+
+.ai-loader {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  margin-bottom: 32px;
+}
+
+.ai-spinner {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border: 4px solid #e5e7eb;
+  border-top-color: #10b981;
+  border-radius: 50%;
+  animation: ai-spin 1s linear infinite;
+}
+
+.ai-brain {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 48px;
+  animation: ai-pulse 2s ease-in-out infinite;
+}
+
+@keyframes ai-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes ai-pulse {
+  0%, 100% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.1);
+  }
+}
+
+.ai-progress-text {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 8px 0;
+  text-align: center;
+}
+
+.ai-wait-text {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 0;
+  text-align: center;
 }
 
 .submit-button {

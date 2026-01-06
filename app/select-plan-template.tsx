@@ -118,18 +118,30 @@ export default function SelectPlanTemplateScreen() {
     try {
       setLoading(true);
       
+      console.log('🎯 [select-plan-template] Criando plano - Template ID:', selectedTemplate.id, 'Nome:', customName);
+      
       // Se for o template sequencial (ID -1), usar função de criar plano anual
       if (selectedTemplate.id === -1) {
+        console.log('📘 [select-plan-template] Criando plano sequencial...');
         await readingPlanService.createDefaultAnnualPlan(customName);
       } 
       // Se for o template intercalado (ID -2), usar função de criar plano intercalado
       else if (selectedTemplate.id === -2) {
+        console.log('🔄 [select-plan-template] Criando plano intercalado...');
         await readingPlanService.createInterleavedPlan(customName);
-      } 
+      }
+      // Se for o template NT 100 dias (ID -3)
+      else if (selectedTemplate.id === -3) {
+        console.log('📖 [select-plan-template] Criando plano NT 100 dias...');
+        await readingPlanService.createNT100DaysPlan(customName);
+      }
       // Senão, usar template do banco de dados
       else {
+        console.log('📋 [select-plan-template] Criando plano a partir de template do backend...');
         await readingPlanService.createPlanFromTemplate(selectedTemplate.id, customName);
       }
+      
+      console.log('✅ [select-plan-template] Plano criado com sucesso!');
       
       Alert.alert(
         'Sucesso! 🎉',
@@ -142,7 +154,8 @@ export default function SelectPlanTemplateScreen() {
         ]
       );
     } catch (error: any) {
-      console.error('Error creating plan:', error);
+      console.error('❌ [select-plan-template] Erro ao criar plano:', error);
+      console.error('❌ [select-plan-template] Stack:', error?.stack);
       const errorMessage = error?.message || 'Falha ao criar plano de leitura';
       Alert.alert('Erro', errorMessage);
       setLoading(false);

@@ -168,30 +168,124 @@ export class ReadingPlanService {
 
   async createPlanFromTemplate(templateId: number, customName: string): Promise<ReadingPlan> {
     try {
+      console.log('📋 [createPlanFromTemplate] INÍCIO - Template ID:', templateId, 'Nome:', customName);
+      
+      // Verificar autenticação
+      const authService = (await import('./AuthService')).default;
+      const token = authService.getToken();
+      const user = authService.getUser();
+      
+      console.log('🔐 [createPlanFromTemplate] Token existe?', !!token);
+      console.log('👤 [createPlanFromTemplate] Usuário existe?', !!user);
+      
+      if (!token || !user) {
+        console.error('❌ [createPlanFromTemplate] Usuário não autenticado');
+        throw new Error('Usuário não autenticado. É necessário estar logado para criar um plano a partir de template.');
+      }
+      
+      console.log('👤 [createPlanFromTemplate] Usuário autenticado:', user.email);
+      
       // Fetch template details
+      console.log('📡 [createPlanFromTemplate] Buscando template do backend:', `${API_URL}/reading-plan-templates/${templateId}`);
       const response = await fetch(`${API_URL}/reading-plan-templates/${templateId}`);
+      console.log('📡 [createPlanFromTemplate] Response status:', response.status, response.statusText);
+      
       if (!response.ok) {
+        console.error('❌ [createPlanFromTemplate] Falha ao buscar template');
         throw new Error('Failed to fetch template');
       }
       const template = await response.json();
+      console.log('📋 [createPlanFromTemplate] Template recebido:', {
+        id: template.id,
+        name: template.name,
+        type: template.type,
+        readingsCount: template.readings?.length || 0
+      });
 
       const startDate = new Date();
       let endDate = new Date(startDate);
 
       // Calculate end date based on template type
       if (template.type === 'annual') {
-        // Annual plan goes until end of current year
         endDate = new Date(startDate.getFullYear(), 11, 31, 23, 59, 59);
       } else {
-        // Use template duration
         endDate.setDate(endDate.getDate() + template.duration);
       }
 
-      const planId = `template_${templateId}_${Date.now()}`;
       const totalDays = template.readings.length;
+      console.log('📅 [createPlanFromTemplate] Datas calculadas:', {
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        totalDays
+      });
 
+      // Convert template readings to the format expected by backend
+      console.log('🔄 [createPlanFromTemplate] Convertendo leituras do template...');
+      const readings: ReadingPlanDay[] = template.readings.map((reading: any, index: number) => {
+        const dayDate = new Date(startDate);
+        dayDate.setDate(dayDate.getDate() + index);
+
+        // Convert bookReadings to the Reading[] format
+        const dayReadings: Reading[] = reading.bookReadings.map((br: any) => {
+          // Determine book ID based on book name
+          const bookId = this.getBookIdByName(br.book);
+          
+          return {
+            id: `${br.book}_${br.chapters[0]}_${br.chapters[br.chapters.length - 1]}`,
+            bookId,
+            startChapter: br.chapters[0],
+            endChapter: br.chapters[br.chapters.length - 1],
+            bookName: br.book,
+          };
+        });
+
+        return {
+          id: `day_${index + 1}`,
+          planId: '', // Will be set by backend
+          dayNumber: reading.day,
+          date: dayDate.toISOString(),
+          readings: dayReadings,
+          isCompleted: false,
+        };
+      });
+      console.log('✅ [createPlanFromTemplate] Leituras convertidas:', readings.length, 'dias');
+
+      // Create plan in backend (NOT locally)
+      console.log('☁️ [createPlanFromTemplate] Enviando para backend via authService.createCustomReadingPlan...');
+      console.log('📦 [createPlanFromTemplate] Payload:', {
+        name: customName,
+        type: template.type,
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        totalDays,
+        readingsCount: readings.length
+      });
+      
+      const backendResponse = await authService.createCustomReadingPlan({
+        name: customName,
+        type: template.type,
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        totalDays,
+        readings,
+      });
+
+      console.log('📡 [createPlanFromTemplate] Resposta do backend:', {
+        success: backendResponse.success,
+        message: backendResponse.message,
+        planId: backendResponse.data?.plan?.id
+      });
+
+      if (!backendResponse.success) {
+        console.error('❌ [createPlanFromTemplate] Backend retornou erro:', backendResponse.message);
+        throw new Error(backendResponse.message || 'Falha ao criar plano no backend');
+      }
+
+      console.log('✅ [createPlanFromTemplate] Plano criado no backend com sucesso! ID:', backendResponse.data?.plan?.id);
+
+      // Return plan structure (but it's stored only in backend)
       const plan: ReadingPlan = {
-        id: planId,
+        id: backendResponse.data?.plan?.id || `template_${templateId}_${Date.now()}`,
         name: customName,
         type: template.type,
         startDate: startDate.toISOString(),
@@ -202,36 +296,35 @@ export class ReadingPlanService {
         completedDays: 0,
       };
 
-      await this.savePlan(plan);
-
-      // Convert template readings to plan days
-      const planDays: ReadingPlanDay[] = template.readings.map((reading: any, index: number) => {
-        const dayDate = new Date(startDate);
-        dayDate.setDate(dayDate.getDate() + index);
-
-        // Format readings from bookReadings array
-        const readingsText = reading.bookReadings
-          .map((br: any) => `${br.book} ${br.chapters.join(', ')}`)
-          .join(' | ');
-
-        return {
-          id: `${planId}_day_${index + 1}`,
-          planId,
-          dayNumber: reading.day,
-          date: dayDate.toISOString(),
-          readings: readingsText,
-          description: reading.description || '',
-          isCompleted: false,
-        };
-      });
-
-      await this.savePlanDays(planId, planDays);
-
+      console.log('✅ [createPlanFromTemplate] FIM - Retornando plano:', plan.id);
       return plan;
     } catch (error) {
-      console.error('Error creating plan from template:', error);
+      console.error('❌ [createPlanFromTemplate] ERRO:', error);
+      console.error('❌ [createPlanFromTemplate] Stack:', (error as Error).stack);
       throw error;
     }
+  }
+
+  private getBookIdByName(bookName: string): number {
+    // Map book names to IDs (1-66)
+    const bookMap: Record<string, number> = {
+      'Gênesis': 1, 'Êxodo': 2, 'Levítico': 3, 'Números': 4, 'Deuteronômio': 5,
+      'Josué': 6, 'Juízes': 7, 'Rute': 8, '1 Samuel': 9, '2 Samuel': 10,
+      '1 Reis': 11, '2 Reis': 12, '1 Crônicas': 13, '2 Crônicas': 14, 'Esdras': 15,
+      'Neemias': 16, 'Ester': 17, 'Jó': 18, 'Salmos': 19, 'Provérbios': 20,
+      'Eclesiastes': 21, 'Cantares': 22, 'Isaías': 23, 'Jeremias': 24, 'Lamentações': 25,
+      'Ezequiel': 26, 'Daniel': 27, 'Oséias': 28, 'Joel': 29, 'Amós': 30,
+      'Obadias': 31, 'Jonas': 32, 'Miquéias': 33, 'Naum': 34, 'Habacuque': 35,
+      'Sofonias': 36, 'Ageu': 37, 'Zacarias': 38, 'Malaquias': 39,
+      'Mateus': 40, 'Marcos': 41, 'Lucas': 42, 'João': 43, 'Atos': 44,
+      'Romanos': 45, '1 Coríntios': 46, '2 Coríntios': 47, 'Gálatas': 48, 'Efésios': 49,
+      'Filipenses': 50, 'Colossenses': 51, '1 Tessalonicenses': 52, '2 Tessalonicenses': 53, '1 Timóteo': 54,
+      '2 Timóteo': 55, 'Tito': 56, 'Filemom': 57, 'Hebreus': 58, 'Tiago': 59,
+      '1 Pedro': 60, '2 Pedro': 61, '1 João': 62, '2 João': 63, '3 João': 64,
+      'Judas': 65, 'Apocalipse': 66,
+    };
+    
+    return bookMap[bookName] || 1; // Default to Genesis if not found
   }
 
   async createMonthlyPlan(name: string, startDate: Date, type: 'new-testament' | 'psalms-proverbs'): Promise<ReadingPlan> {
