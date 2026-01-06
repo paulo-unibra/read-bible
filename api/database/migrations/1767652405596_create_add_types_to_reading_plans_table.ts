@@ -5,14 +5,14 @@ export default class extends BaseSchema {
 
   async up() {
     this.schema.raw(`
-      ALTER TABLE ${this.tableName} 
+      ALTER TABLE ${this.tableName}
       MODIFY COLUMN type ENUM('yearly', 'custom', 'sequential', 'interleaved') NOT NULL
     `)
   }
 
   async down() {
     this.schema.raw(`
-      ALTER TABLE ${this.tableName} 
+      ALTER TABLE ${this.tableName}
       MODIFY COLUMN type ENUM('yearly', 'custom') NOT NULL
     `)
   }

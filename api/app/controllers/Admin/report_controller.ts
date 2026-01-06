@@ -40,8 +40,8 @@ export default class ReportController {
             -- Dias esperados: proporção do plano que deveria estar completa
             -- Se 50% do tempo passou, deveria ter 50% dos dias completos
             CEIL(
-              rp.total_days * 
-              (DATEDIFF(CURDATE(), DATE(rp.start_date)) / 
+              rp.total_days *
+              (DATEDIFF(CURDATE(), DATE(rp.start_date)) /
                DATEDIFF(DATE(rp.end_date), DATE(rp.start_date)))
             ),
             rp.total_days

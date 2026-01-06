@@ -173,7 +173,7 @@ export default class ReadingPlanController {
       console.log('🔵 [API] createCustom - INÍCIO')
       const user = auth.user!
       console.log('👤 [API] Usuário autenticado:', { id: user.id, email: user.email })
-      
+
       const { name, type, startDate, endDate, totalDays, readings } = request.only([
         'name',
         'type',
@@ -208,7 +208,7 @@ export default class ReadingPlanController {
       }
 
       console.log('✅ [API] Nenhum plano ativo encontrado, criando novo...')
-      
+
       // Criar plano customizado
       const planData = {
         userId: user.id,
@@ -223,7 +223,7 @@ export default class ReadingPlanController {
         totalChapters: 0, // Será calculado depois
         completedChapters: 0,
       }
-      
+
       console.log('💾 [API] Salvando plano no banco:', planData)
       const plan = await ReadingPlan.create(planData)
       console.log('✅ [API] Plano salvo com ID:', plan.id)
@@ -233,7 +233,7 @@ export default class ReadingPlanController {
         console.log(`📚 [API] Salvando ${readings.length} dias de leitura...`)
         let totalChapters = 0
         let savedCount = 0
-        
+
         for (const reading of readings) {
           // Criar um registro separado para cada livro do dia (intercalado AT + NT)
           for (const bookReading of reading.readings) {
@@ -245,20 +245,20 @@ export default class ReadingPlanController {
               endChapter: bookReading.endChapter,
               isCompleted: false,
             })
-            
+
             savedCount++
-            
+
             // Contar capítulos deste livro
             totalChapters += (bookReading.endChapter - bookReading.startChapter + 1)
           }
-          
+
           if (reading.dayNumber % 50 === 0) {
             console.log(`   📖 [API] Processados ${reading.dayNumber}/${readings.length} dias (${savedCount} registros)...`)
           }
         }
-        
+
         console.log(`✅ [API] ${savedCount} registros de leitura salvos (${readings.length} dias). Total de capítulos: ${totalChapters}`)
-        
+
         // Atualizar totais
         plan.totalChapters = totalChapters
         plan.chaptersPerDay = Math.ceil(totalChapters / totalDays)
