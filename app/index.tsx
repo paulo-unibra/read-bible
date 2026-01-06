@@ -2,24 +2,24 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AdBanner from "../components/AdBanner";
 import BibleCuriosityCard from "../components/BibleCuriosityCard";
 import { Logo } from "../components/logo";
 import authService, {
-    ReadingPlan,
-    TodayReading,
+  ReadingPlan,
+  TodayReading,
 } from "../services/AuthService";
 import bibleCuriosityService, {
-    BibleCuriosity,
+  BibleCuriosity,
 } from "../services/BibleCuriosityService";
 import bibleReaderService from "../services/BibleReaderService";
 import DatabaseService from "../services/DatabaseService";
@@ -709,7 +709,7 @@ export default function HomeScreen() {
                 { color: colors.textPrimary, fontSize: applyFontScale(18) },
               ]}
             >
-              Todas as leituras do dia concluídas!
+              Plano de Leitura Concluído!
             </Text>
             <Text
               style={[
@@ -721,7 +721,7 @@ export default function HomeScreen() {
                 },
               ]}
             >
-              Volte amanhã para continuar sua jornada
+              Parabéns por concluir seu plano de leitura. Clique aqui para visualizar seu certificado de conclusão.
             </Text>
           </View>
         ) : !isAuthenticated ? (

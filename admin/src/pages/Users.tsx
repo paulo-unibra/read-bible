@@ -10,18 +10,29 @@ interface Role {
   slug: string;
 }
 
+interface ReadingStatus {
+  status: 'no_plan' | 'not_started' | 'late' | 'up_to_date';
+  currentDay: number;
+  totalDays: number;
+  completedDays: number;
+  daysLate: number;
+  planName: string | null;
+}
+
 interface User {
   id: number;
   email: string;
   fullName: string | null;
   roles: Role[];
   createdAt: string;
+  readingStatus: ReadingStatus;
 }
 
 const Users: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const { hasPermission, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -32,14 +43,15 @@ const Users: React.FC = () => {
     }
 
     loadUsers();
-  }, []);
+  }, [statusFilter]);
 
   const loadUsers = async () => {
     setLoading(true);
     setError('');
     
     try {
-      const response = await api.get('/admin/users');
+      const params = statusFilter !== 'all' ? { readingStatus: statusFilter } : {};
+      const response = await api.get('/admin/users', { params });
       setUsers(response.data);
     } catch (err: any) {
       setError('Erro ao carregar usuários');
@@ -90,6 +102,42 @@ const Users: React.FC = () => {
           </div>
         </div>
 
+        <div className="filter-section">
+          <label>Filtrar por status de leitura:</label>
+          <div className="filter-buttons">
+            <button 
+              className={statusFilter === 'all' ? 'filter-btn active' : 'filter-btn'}
+              onClick={() => setStatusFilter('all')}
+            >
+              📊 Todos
+            </button>
+            <button 
+              className={statusFilter === 'up_to_date' ? 'filter-btn active' : 'filter-btn'}
+              onClick={() => setStatusFilter('up_to_date')}
+            >
+              ✅ Em dia
+            </button>
+            <button 
+              className={statusFilter === 'late' ? 'filter-btn active' : 'filter-btn'}
+              onClick={() => setStatusFilter('late')}
+            >
+              ⚠️ Atrasados
+            </button>
+            <button 
+              className={statusFilter === 'not_started' ? 'filter-btn active' : 'filter-btn'}
+              onClick={() => setStatusFilter('not_started')}
+            >
+              ⏸️ Não iniciaram
+            </button>
+            <button 
+              className={statusFilter === 'no_plan' ? 'filter-btn active' : 'filter-btn'}
+              onClick={() => setStatusFilter('no_plan')}
+            >
+              📝 Sem plano
+            </button>
+          </div>
+        </div>
+
         {error && (
           <div className="error-message">
             {error}
@@ -109,6 +157,7 @@ const Users: React.FC = () => {
                   <th>Nome</th>
                   <th>E-mail</th>
                   <th>Roles</th>
+                  <th>Status de Leitura</th>
                   <th>Criado em</th>
                   <th>Ações</th>
                 </tr>
@@ -116,7 +165,7 @@ const Users: React.FC = () => {
               <tbody>
                 {users.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="no-data">
+                    <td colSpan={7} className="no-data">
                       Nenhum usuário encontrado
                     </td>
                   </tr>
@@ -133,6 +182,30 @@ const Users: React.FC = () => {
                               {role.name}
                             </span>
                           ))}
+                        </div>
+                      </td>
+                      <td>
+                        <div className="status-cell">
+                          {user.readingStatus.status === 'up_to_date' && (
+                            <span className="status-badge status-up-to-date">
+                              ✅ Em dia ({user.readingStatus.currentDay}/{user.readingStatus.totalDays})
+                            </span>
+                          )}
+                          {user.readingStatus.status === 'late' && (
+                            <span className="status-badge status-late">
+                              ⚠️ Atrasado ({user.readingStatus.daysLate} {user.readingStatus.daysLate === 1 ? 'dia' : 'dias'})
+                            </span>
+                          )}
+                          {user.readingStatus.status === 'not_started' && (
+                            <span className="status-badge status-not-started">
+                              ⏸️ Não iniciou
+                            </span>
+                          )}
+                          {user.readingStatus.status === 'no_plan' && (
+                            <span className="status-badge status-no-plan">
+                              📝 Sem plano
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td>{formatDate(user.createdAt)}</td>

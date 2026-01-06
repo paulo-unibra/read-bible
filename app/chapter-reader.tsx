@@ -26,6 +26,7 @@ import AudioService from "../services/AudioService";
 import bibleReaderService from "../services/BibleReaderService";
 import DatabaseService from "../services/DatabaseService";
 import googleDriveService from "../services/GoogleDriveService";
+import NotesService from "../services/NotesService";
 import {
   Bible,
   Book,
@@ -127,6 +128,15 @@ export default function ChapterReaderScreen() {
   // Book selector modal state
   const [bookSelectorVisible, setBookSelectorVisible] = useState(false);
   const [availableBooks, setAvailableBooks] = useState<Book[]>([]);
+
+  // Verse note modal state
+  const [noteModalVisible, setNoteModalVisible] = useState(false);
+  const [noteText, setNoteText] = useState("");
+  const [savingNote, setSavingNote] = useState(false);
+  const [isEditingExistingNote, setIsEditingExistingNote] = useState(false);
+
+  // Verse notes tracking
+  const [verseNotes, setVerseNotes] = useState<Map<string, string>>(new Map());
 
   // Notes modal state
   const [notesModalVisible, setNotesModalVisible] = useState(false);
@@ -267,6 +277,28 @@ export default function ChapterReaderScreen() {
     }
   }, [bibleId, currentBookId, currentChapter]);
 
+  // Load verse notes for current chapter
+  const loadVerseNotes = React.useCallback(async () => {
+    if (!currentBookId || currentChapter === null) return;
+
+    try {
+      const notes = await NotesService.getNotesByChapter(currentBookId, currentChapter);
+      const notesMap = new Map<string, string>();
+      
+      notes.forEach(note => {
+        // Armazenar apenas o primeiro versículo da nota
+        // Isso garante que o ícone apareça apenas uma vez
+        const firstVerse = Math.min(...note.verseNumbers);
+        const key = `${note.bookId}-${note.chapterNumber}-${firstVerse}`;
+        notesMap.set(key, note.id); // Armazena o ID da nota, não o texto
+      });
+      
+      setVerseNotes(notesMap);
+    } catch (error) {
+      console.error("Error loading verse notes:", error);
+    }
+  }, [currentBookId, currentChapter]);
+
   const checkAudioAvailability = React.useCallback(async () => {
     if (
       !currentBookId ||
@@ -365,6 +397,7 @@ export default function ChapterReaderScreen() {
       // Update navigation state and check audio availability
       await updateNavigationState();
       await checkAudioAvailability();
+      await loadVerseNotes();
 
       // Save reading position (non-blocking)
       DatabaseService.saveLastReading(
@@ -443,6 +476,7 @@ export default function ChapterReaderScreen() {
       try {
         await loadChapterVerses();
         await checkAudioAvailability();
+        await loadVerseNotes();
         setLastLoadedChapter(currentChapter);
         console.log("✅ Capítulo carregado com sucesso!");
 
@@ -1424,10 +1458,10 @@ export default function ChapterReaderScreen() {
 
     const shareText = `${versesText}
 
-  ${book?.name} ${verseRange}
+${book?.name} ${currentChapter}:${verseRange}
 
-  Aplicativo Bíblia em Foco
-  Link do app: https://readbible.app`;
+Aplicativo Bíblia em Foco
+Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
 
     const shareTitle =
       selectedVerses.size === 1
@@ -1450,6 +1484,181 @@ export default function ChapterReaderScreen() {
       console.error("Error sharing verses:", error);
       Alert.alert("Erro", "Não foi possível compartilhar os versículos");
     }
+  };
+
+  // Open note modal for selected verses
+  const openNoteModal = async () => {
+    if (selectedVerses.size === 0) return;
+
+    const selectedVersesData = verses.filter((verse) =>
+      selectedVerses.has(
+        `${verse.bookId}-${verse.chapterNumber}-${verse.verseNumber}`
+      )
+    );
+
+    const sortedVerses = selectedVersesData.sort(
+      (a, b) => a.verseNumber - b.verseNumber
+    );
+
+    const verseNumbers = sortedVerses.map((v) => v.verseNumber);
+
+    // Verificar se já existe uma anotação para esses versículos
+    const existingNote = await NotesService.getNoteByReference(
+      currentBookId,
+      currentChapter,
+      verseNumbers
+    );
+
+    if (existingNote) {
+      setNoteText(existingNote.note);
+      setIsEditingExistingNote(true);
+    } else {
+      setNoteText("");
+      setIsEditingExistingNote(false);
+    }
+
+    setNoteModalVisible(true);
+  };
+
+  // Save note for selected verses
+  const saveNote = async () => {
+    if (selectedVerses.size === 0 || !noteText.trim()) return;
+
+    setSavingNote(true);
+    try {
+      const selectedVersesData = verses.filter((verse) =>
+        selectedVerses.has(
+          `${verse.bookId}-${verse.chapterNumber}-${verse.verseNumber}`
+        )
+      );
+
+      const sortedVerses = selectedVersesData.sort(
+        (a, b) => a.verseNumber - b.verseNumber
+      );
+
+      const verseNumbers = sortedVerses.map((v) => v.verseNumber);
+
+      // Limpa símbolos especiais do texto dos versículos
+      const cleanVerseText = (text: string) => {
+        return text
+          .replace(/[✚ℕ]/g, "")
+          .replace(/\s{2,}/g, " ")
+          .replace(/\s+([.,;:!?])/g, "$1")
+          .trim();
+      };
+
+      const versesText = sortedVerses
+        .map((verse) => `${verse.verseNumber} - ${cleanVerseText(verse.text)}`)
+        .join(" ");
+
+      await NotesService.saveNote(
+        currentBookId,
+        book?.name || "",
+        currentChapter,
+        verseNumbers,
+        versesText,
+        noteText.trim()
+      );
+
+      // Atualizar o mapa de anotações localmente
+      await loadVerseNotes();
+
+      Alert.alert("Sucesso", "Anotação salva com sucesso!");
+      setNoteModalVisible(false);
+      setNoteText("");
+      setIsEditingExistingNote(false);
+      clearSelection();
+    } catch (error) {
+      console.error("Error saving note:", error);
+      Alert.alert("Erro", "Não foi possível salvar a anotação");
+    } finally {
+      setSavingNote(false);
+    }
+  };
+
+  // Open note for a specific verse (view/edit existing note)
+  const openVerseNote = async (verse: Verse) => {
+    try {
+      // Buscar todas as notas do capítulo
+      const notes = await NotesService.getNotesByChapter(verse.bookId, verse.chapterNumber);
+      
+      // Encontrar a nota que contém este versículo
+      const note = notes.find(n => n.verseNumbers.includes(verse.verseNumber));
+
+      if (!note) {
+        Alert.alert("Info", "Nenhuma anotação encontrada para este versículo");
+        return;
+      }
+
+      // Set up for editing
+      setNoteText(note.note);
+      setIsEditingExistingNote(true);
+      
+      // Store the verse selection internally but don't activate selection mode
+      const newSelection = new Set<string>();
+      note.verseNumbers.forEach(verseNum => {
+        newSelection.add(`${note.bookId}-${note.chapterNumber}-${verseNum}`);
+      });
+      setSelectedVerses(newSelection);
+      // Don't activate selection mode when viewing/editing notes
+      // setSelectionMode(true);
+      
+      setNoteModalVisible(true);
+    } catch (error) {
+      console.error("Error opening verse note:", error);
+      Alert.alert("Erro", "Não foi possível carregar a anotação");
+    }
+  };
+
+  // Delete note
+  const deleteNote = async () => {
+    if (selectedVerses.size === 0) return;
+
+    Alert.alert(
+      "Confirmar exclusão",
+      "Tem certeza que deseja excluir esta anotação?",
+      [
+        {
+          text: "Cancelar",
+          style: "cancel",
+        },
+        {
+          text: "Excluir",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const selectedVersesData = verses.filter((verse) =>
+                selectedVerses.has(
+                  `${verse.bookId}-${verse.chapterNumber}-${verse.verseNumber}`
+                )
+              );
+
+              const sortedVerses = selectedVersesData.sort(
+                (a, b) => a.verseNumber - b.verseNumber
+              );
+
+              const verseNumbers = sortedVerses.map((v) => v.verseNumber);
+              const verseRange = verseNumbers.length === 1 
+                ? verseNumbers[0].toString()
+                : `${Math.min(...verseNumbers)}-${Math.max(...verseNumbers)}`;
+              const noteId = `${currentBookId}-${currentChapter}-${verseRange}`;
+
+              await NotesService.deleteNote(noteId);
+              await loadVerseNotes();
+
+              Alert.alert("Sucesso", "Anotação excluída com sucesso!");
+              setNoteModalVisible(false);
+              setNoteText("");
+              setIsEditingExistingNote(false);
+              clearSelection();
+            } catch (error) {
+              console.error("Error deleting note:", error);
+              Alert.alert("Erro", "Não foi possível excluir a anotação");
+            }
+          },
+        },
+      ]
+    );
   };
 
   const renderVerseText = (text: string, verse: Verse) => {
@@ -1516,6 +1725,23 @@ export default function ChapterReaderScreen() {
         <Text key={`tail-${cursor}`}>{cleanedText.substring(cursor)}</Text>
       );
     }
+    
+    // Adicionar ícone de anotação no final do versículo, se houver
+    const favoriteKey = `${verse.bookId}-${verse.chapterNumber}-${verse.verseNumber}`;
+    const hasNote = verseNotes.has(favoriteKey);
+    if (hasNote && !selectionMode) {
+      parts.push(
+        <Text key="note-icon" onPress={() => openVerseNote(verse)}>
+          {" "}
+          <Ionicons 
+            name="document-text" 
+            size={16} 
+            color={isDark ? "#FFB74D" : "#FF9800"} 
+          />
+        </Text>
+      );
+    }
+    
     return <>{parts}</>;
   };
 
@@ -1555,6 +1781,8 @@ export default function ChapterReaderScreen() {
   const renderVerse = ({ item }: { item: Verse }) => {
     const favoriteKey = `${item.bookId}-${item.chapterNumber}-${item.verseNumber}`;
     const isSelected = selectedVerses.has(favoriteKey);
+    const hasNote = verseNotes.has(favoriteKey);
+    
     return (
       <View
         style={[
@@ -1632,7 +1860,7 @@ export default function ChapterReaderScreen() {
               {renderVerseText(item.text, item)}
             </Text>
             <View style={styles.verseButtonsRow}>
-              {/* vazio (refs/notas inline) */}
+              {/* Área onde aparecerão referências e notas inline */}
             </View>
           </View>
         </Pressable>
@@ -1728,6 +1956,12 @@ export default function ChapterReaderScreen() {
         <View style={styles.headerActions}>
           {selectionMode && selectedVerses.size > 0 && (
             <>
+              <TouchableOpacity
+                onPress={openNoteModal}
+                style={styles.headerButton}
+              >
+                <Ionicons name="create-outline" size={24} color={iconColor} />
+              </TouchableOpacity>
               <TouchableOpacity
                 onPress={shareSelectedVerses}
                 style={styles.headerButton}
@@ -3075,6 +3309,118 @@ export default function ChapterReaderScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Note Modal */}
+      <Modal
+        visible={noteModalVisible}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setNoteModalVisible(false)}
+      >
+        <View style={styles.settingsOverlay}>
+          <View
+            style={[
+              styles.noteModal,
+              { backgroundColor: isDark ? "#1f1f1f" : "#fff" },
+            ]}
+          >
+            <View style={styles.noteModalHeader}>
+              <Text
+                style={[
+                  styles.noteModalTitle,
+                  { color: isDark ? "#fafafa" : "#222" },
+                ]}
+              >
+                ✍️ Criar Anotação
+              </Text>
+              <TouchableOpacity
+                onPress={() => setNoteModalVisible(false)}
+                style={styles.noteModalCloseButton}
+              >
+                <Ionicons
+                  name="close"
+                  size={24}
+                  color={isDark ? "#fafafa" : "#222"}
+                />
+              </TouchableOpacity>
+            </View>
+
+            <Text
+              style={[
+                styles.noteModalSubtitle,
+                { color: isDark ? "#ccc" : "#666" },
+              ]}
+            >
+              {book?.name} {currentChapter}:{Array.from(selectedVerses).map(key => {
+                const parts = key.split('-');
+                return parts[2];
+              }).sort((a, b) => Number(a) - Number(b)).join(', ')}
+            </Text>
+
+            <TextInput
+              style={[
+                styles.noteInput,
+                {
+                  backgroundColor: isDark ? "#2a2a2a" : "#f5f5f5",
+                  color: isDark ? "#fafafa" : "#222",
+                  borderColor: isDark ? "#444" : "#ddd",
+                },
+              ]}
+              placeholder="Digite sua anotação aqui..."
+              placeholderTextColor={isDark ? "#888" : "#999"}
+              multiline
+              numberOfLines={8}
+              value={noteText}
+              onChangeText={setNoteText}
+              textAlignVertical="top"
+            />
+
+            <View style={styles.noteModalFooter}>
+              {/* <TouchableOpacity
+                onPress={() => {
+                  setNoteModalVisible(false);
+                  setNoteText("");
+                  setIsEditingExistingNote(false);
+                }}
+                style={[
+                  styles.noteModalButton,
+                  styles.noteModalCancelButton,
+                ]}
+              >
+                <Text style={styles.noteModalCancelText}>Cancelar</Text>
+              </TouchableOpacity> */}
+
+              {isEditingExistingNote && (
+                <TouchableOpacity
+                  onPress={deleteNote}
+                  style={[
+                    styles.noteModalButton,
+                    styles.noteModalDeleteButton,
+                  ]}
+                >
+                  <Text style={styles.noteModalDeleteText}>Excluir</Text>
+                </TouchableOpacity>
+              )}
+
+              <TouchableOpacity
+                onPress={saveNote}
+                disabled={!noteText.trim() || savingNote}
+                style={[
+                  styles.noteModalButton,
+                  styles.noteModalSaveButton,
+                  (!noteText.trim() || savingNote) && styles.noteModalButtonDisabled,
+                ]}
+              >
+                {savingNote ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.noteModalSaveText}>Salvar</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -3874,6 +4220,83 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 14,
     fontWeight: "600",
+  },
+
+  // Note Modal Styles
+  noteModal: {
+    width: "90%",
+    maxHeight: "80%",
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: "#000",
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
+  },
+  noteModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  noteModalTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+  },
+  noteModalCloseButton: {
+    padding: 4,
+  },
+  noteModalSubtitle: {
+    fontSize: 14,
+    marginBottom: 16,
+    fontWeight: "500",
+  },
+  noteInput: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 15,
+    minHeight: 150,
+    marginBottom: 20,
+  },
+  noteModalFooter: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 12,
+  },
+  noteModalButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  noteModalCancelButton: {
+    backgroundColor: "#e0e0e0",
+  },
+  noteModalCancelText: {
+    color: "#333",
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  noteModalSaveButton: {
+    backgroundColor: "#2196F3",
+  },
+  noteModalSaveText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  noteModalDeleteButton: {
+    backgroundColor: "#f44336",
+  },
+  noteModalDeleteText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  noteModalButtonDisabled: {
+    opacity: 0.5,
   },
 
   booksContainer: {

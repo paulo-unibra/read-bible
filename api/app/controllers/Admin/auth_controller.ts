@@ -113,29 +113,89 @@ export default class AuthController {
   }
 
   /**
-   * Lista todos os usuários do sistema
+   * Lista todos os usuários do sistema com status de leitura
    */
-  async listUsers({ response }: HttpContext) {
+  async listUsers({ request, response }: HttpContext) {
     try {
+      const { readingStatus } = request.qs()
+
       const users = await User.query().preload('roles').orderBy('id', 'asc')
 
-      return response.ok(
-        users.map(user => ({
-          id: user.id,
-          email: user.email,
-          fullName: user.fullName,
-          roles: user.roles.map(role => ({
-            id: role.id,
-            name: role.name,
-            slug: role.slug
-          })),
-          createdAt: user.createdAt.toISO()
-        }))
+      // Buscar planos de leitura e progresso para cada usuário
+      const usersWithStatus = await Promise.all(
+        users.map(async (user) => {
+          const readingPlan = await user
+            .related('readingPlans')
+            .query()
+            .where('is_active', true)
+            .first()
+
+          let status = 'no_plan' // Não criou plano
+          let currentDay = 0
+          let totalDays = 0
+          let completedDays = 0
+          let daysLate = 0
+
+          if (readingPlan) {
+            currentDay = readingPlan.currentDay || 0
+            totalDays = readingPlan.totalDays || 0
+            completedDays = readingPlan.completedChapters || 0
+
+            // Verificar se já iniciou
+            const hasProgress = completedDays > 0
+
+            if (!hasProgress) {
+              status = 'not_started' // Não iniciou o plano
+            } else {
+              // Calcular quantos dias se passaram desde o início
+              const startDate = readingPlan.startDate.toJSDate()
+              const today = new Date()
+              const daysPassed = Math.floor(
+                (today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
+              )
+              const expectedDay = Math.min(daysPassed + 1, totalDays)
+
+              if (currentDay < expectedDay) {
+                daysLate = expectedDay - currentDay
+                status = 'late' // Leitura atrasada
+              } else {
+                status = 'up_to_date' // Leitura em dia
+              }
+            }
+          }
+
+          return {
+            id: user.id,
+            email: user.email,
+            fullName: user.fullName,
+            roles: user.roles.map((role) => ({
+              id: role.id,
+              name: role.name,
+              slug: role.slug,
+            })),
+            createdAt: user.createdAt.toISO(),
+            readingStatus: {
+              status,
+              currentDay,
+              totalDays,
+              completedDays,
+              daysLate,
+              planName: readingPlan?.name || null,
+            },
+          }
+        })
       )
+
+      // Filtrar por status se especificado
+      const filteredUsers = readingStatus
+        ? usersWithStatus.filter((user) => user.readingStatus.status === readingStatus)
+        : usersWithStatus
+
+      return response.ok(filteredUsers)
     } catch (error) {
       console.error('Erro ao listar usuários:', error)
       return response.internalServerError({
-        error: 'Erro ao listar usuários'
+        error: 'Erro ao listar usuários',
       })
     }
   }
