@@ -2466,28 +2466,36 @@ export default function ChapterReaderScreen() {
                 <Text style={[styles.loadingText, { color: isDark ? "#e0e0e0" : "#333" }]}>Carregando referência...</Text>
               </View>
             ) : selectedReferenceVerse ? (
-              <View style={[
-                styles.referenceVerseCard,
-                isDark && { backgroundColor: "#2a2a2a" }
-              ]}>
-                <View style={styles.referenceVerseHeader}>
-                  <Text style={[styles.referenceVerseTitle, { color: isDark ? "#e0e0e0" : "#333" }]}>
-                    {`${selectedReferenceBookName} ${selectedReferenceVerse.chapterNumber}:${selectedReferenceVerse.verseNumber}`}
-                  </Text>
-                  <TouchableOpacity
-                    onPress={() =>
-                      openSingleReference(
-                        currentReferences[selectedReferenceIndex].reference
-                      )
-                    }
-                    style={styles.expandButton}
+              <View style={styles.referenceContentContainer}>
+                <View style={[
+                  styles.referenceVerseCard,
+                  isDark && { backgroundColor: "#2a2a2a" }
+                ]}>
+                  <View style={styles.referenceVerseHeader}>
+                    <Text style={[styles.referenceVerseTitle, { color: isDark ? "#e0e0e0" : "#333" }]}>
+                      {`${selectedReferenceBookName} ${selectedReferenceVerse.chapterNumber}:${selectedReferenceVerse.verseNumber}`}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() =>
+                        openSingleReference(
+                          currentReferences[selectedReferenceIndex].reference
+                        )
+                      }
+                      style={styles.expandButton}
+                    >
+                      <Ionicons name="expand-outline" size={16} color="#2196F3" />
+                    </TouchableOpacity>
+                  </View>
+                  <ScrollView 
+                    showsVerticalScrollIndicator={true}
+                    style={{ maxHeight: 400 }}
+                    contentContainerStyle={{ paddingBottom: 8 }}
                   >
-                    <Ionicons name="expand-outline" size={16} color="#2196F3" />
-                  </TouchableOpacity>
+                    <Text style={[styles.referenceVerseText, { color: isDark ? "#d4d4d4" : "#666" }]}>
+                      {selectedReferenceVerse.text}
+                    </Text>
+                  </ScrollView>
                 </View>
-                <Text style={[styles.referenceVerseText, { color: isDark ? "#d4d4d4" : "#666" }]}>
-                  {selectedReferenceVerse.text}
-                </Text>
               </View>
             ) : (
               <View style={styles.referenceErrorContainer}>
@@ -3483,7 +3491,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 12,
     margin: 16,
     width: "95%",
-    maxHeight: "75%",
+    maxHeight: "85%",
   },
   referenceLinksContainer: {
     maxHeight: 45,
@@ -3571,15 +3579,15 @@ const styles = StyleSheet.create({
     paddingVertical: 60,
     paddingHorizontal: 20,
   },
+  referenceContentContainer: {
+    flex: 1,
+  },
   referenceVerseCard: {
     backgroundColor: "#f8f9fa",
     padding: 16,
-    marginBottom: 12,
-    marginHorizontal: 4,
     borderRadius: 12,
     borderLeftWidth: 4,
     borderLeftColor: "#2196F3",
-    minHeight: 80,
     shadowColor: "#000",
     shadowOffset: {
       width: 0,

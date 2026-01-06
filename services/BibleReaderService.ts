@@ -637,51 +637,124 @@ export class BibleReaderService {
   }
 
   async getVerseByReference(bibleId: string, reference: string): Promise<Verse | null> {
-    // Parse reference like "Pv 8:23" or "Sl 33:6"
-    const refMatch = reference.match(/^([A-Za-z0-9\s]+)\s(\d+):(\d+)$/);
-    if (!refMatch) return null;
+    console.log('getVerseByReference called with:', reference);
+    
+    // Parse reference - supports multiple formats:
+    // "Pv 8:23" (single verse)
+    // "Ap 12:10-11" (range with hyphen)
+    // "Ap 12:10,11" (range with comma)
+    const singleVerseMatch = reference.match(/^([A-Za-zÀ-ÿ0-9\s]+)\s(\d+):(\d+)$/);
+    const verseRangeHyphenMatch = reference.match(/^([A-Za-zÀ-ÿ0-9\s]+)\s(\d+):(\d+)-(\d+)$/);
+    const verseRangeCommaMatch = reference.match(/^([A-Za-zÀ-ÿ0-9\s]+)\s(\d+):(\d+),(\d+)$/);
+    
+    let bookAbbr: string;
+    let chapterNumber: number;
+    let startVerse: number;
+    let endVerse: number;
+    
+    if (verseRangeHyphenMatch) {
+      // Range with hyphen: "Ap 12:10-11"
+      bookAbbr = verseRangeHyphenMatch[1].trim();
+      chapterNumber = parseInt(verseRangeHyphenMatch[2]);
+      startVerse = parseInt(verseRangeHyphenMatch[3]);
+      endVerse = parseInt(verseRangeHyphenMatch[4]);
+      console.log('Parsed verse range (hyphen):', { bookAbbr, chapterNumber, startVerse, endVerse });
+    } else if (verseRangeCommaMatch) {
+      // Range with comma: "Ap 12:10,11"
+      bookAbbr = verseRangeCommaMatch[1].trim();
+      chapterNumber = parseInt(verseRangeCommaMatch[2]);
+      startVerse = parseInt(verseRangeCommaMatch[3]);
+      endVerse = parseInt(verseRangeCommaMatch[4]);
+      console.log('Parsed verse range (comma):', { bookAbbr, chapterNumber, startVerse, endVerse });
+    } else if (singleVerseMatch) {
+      // Single verse: "Pv 8:23"
+      bookAbbr = singleVerseMatch[1].trim();
+      chapterNumber = parseInt(singleVerseMatch[2]);
+      startVerse = parseInt(singleVerseMatch[3]);
+      endVerse = startVerse;
+      console.log('Parsed single verse:', { bookAbbr, chapterNumber, verseNumber: startVerse });
+    } else {
+      console.warn('Reference format not matched:', reference);
+      return null;
+    }
 
-    const bookAbbr = refMatch[1].trim();
-    const chapterNumber = parseInt(refMatch[2]);
-    const verseNumber = parseInt(refMatch[3]);
-
-    // Simple book abbreviation mapping
+    // Complete book abbreviation mapping
     const bookMap: {[key: string]: number} = {
-      'Gn': 1, 'Ex': 2, 'Lv': 3, 'Nm': 4, 'Dt': 5,
-      'Pv': 20, 'Sl': 19, 'Is': 23, 'Jr': 24, 'Hb': 58,
-      'At': 44, 'Rm': 45, 'Cl': 51, 'Zc': 38
+      // Antigo Testamento
+      'Gn': 1, 'Êx': 2, 'Ex': 2, 'Lv': 3, 'Nm': 4, 'Dt': 5,
+      'Js': 6, 'Jz': 7, 'Rt': 8,
+      '1Sm': 9, '2Sm': 10, '1Rs': 11, '2Rs': 12,
+      '1Cr': 13, '2Cr': 14, 'Ed': 15, 'Ne': 16, 'Et': 17,
+      'Jó': 18, 'Sl': 19, 'Pv': 20, 'Ec': 21, 'Ct': 22,
+      'Is': 23, 'Jr': 24, 'Lm': 25, 'Ez': 26, 'Dn': 27,
+      'Os': 28, 'Jl': 29, 'Am': 30, 'Ob': 31, 'Jn': 32,
+      'Mq': 33, 'Na': 34, 'Hc': 35, 'Sf': 36, 'Ag': 37,
+      'Zc': 38, 'Ml': 39,
+      // Novo Testamento
+      'Mt': 40, 'Mc': 41, 'Lc': 42, 'Jo': 43, 'João': 43, 'At': 44,
+      'Rm': 45, '1Co': 46, '2Co': 47, 'Gl': 48, 'Ef': 49,
+      'Fp': 50, 'Cl': 51, '1Ts': 52, '2Ts': 53,
+      '1Tm': 54, '2Tm': 55, 'Tt': 56, 'Fm': 57,
+      'Hb': 58, 'Tg': 59, '1Pe': 60, '2Pe': 61,
+      '1Jo': 62, '2Jo': 63, '3Jo': 64, 'Jd': 65, 'Ap': 66, 'Apc': 66, 'Apocalipse': 66
     };
 
     const bookId = bookMap[bookAbbr];
-    if (!bookId) return null;
+    if (!bookId) {
+      console.warn(`Book abbreviation not found: ${bookAbbr}`);
+      return null;
+    }
 
     const db = this.getBibleConnection(bibleId);
     if (!db) return null;
 
     try {
+      // Fetch verses in the range
       const result = await db.getAllAsync(
-        'SELECT * FROM Bible WHERE Book = ? AND Chapter = ? AND Verse = ? LIMIT 1',
-        [bookId, chapterNumber, verseNumber]
+        'SELECT * FROM Bible WHERE Book = ? AND Chapter = ? AND Verse >= ? AND Verse <= ? ORDER BY Verse',
+        [bookId, chapterNumber, startVerse, endVerse]
       );
 
       if (result.length === 0) return null;
 
-      const row = result[0] as any;
-      const parsedContent = this.parseVerseContent(row.Scripture);
+      // Combine all verses in the range
+      let combinedText = '';
+      let allTitles: string[] = [];
+      let allNotes: string[] = [];
+      let allReferences: Array<{ text: string; reference: string; position: number }> = [];
+      let allCrossReferences: string[] = [];
+      
+      result.forEach((row: any, index) => {
+        const parsedContent = this.parseVerseContent(row.Scripture);
+        
+        // Add verse number prefix for multi-verse ranges
+        if (result.length > 1) {
+          combinedText += `${row.Verse}. ${parsedContent.text} `;
+        } else {
+          combinedText += parsedContent.text;
+        }
+        
+        // Collect all metadata
+        if (parsedContent.titles.length > 0) allTitles.push(...parsedContent.titles);
+        if (parsedContent.notes.length > 0) allNotes.push(...parsedContent.notes);
+        if (parsedContent.verseReferences.length > 0) allReferences.push(...parsedContent.verseReferences);
+        if (parsedContent.crossReferences.length > 0) allCrossReferences.push(...parsedContent.crossReferences);
+      });
 
+      const firstRow = result[0] as any;
       return {
-        id: parseInt(`${bookId}${chapterNumber.toString().padStart(3, '0')}${row.Verse.toString().padStart(3, '0')}`),
+        id: parseInt(`${bookId}${chapterNumber.toString().padStart(3, '0')}${firstRow.Verse.toString().padStart(3, '0')}`),
         bookId,
         chapterNumber,
-        verseNumber: row.Verse,
-        text: parsedContent.text,
-        titles: parsedContent.titles.length > 0 ? parsedContent.titles : undefined,
-        notes: parsedContent.notes.length > 0 ? parsedContent.notes : undefined,
-        verseReferences: parsedContent.verseReferences.length > 0 ? parsedContent.verseReferences : undefined,
-        crossReferences: parsedContent.crossReferences.length > 0 ? parsedContent.crossReferences : undefined,
-        strongNumbers: parsedContent.strongNumbers.length > 0 ? parsedContent.strongNumbers : undefined,
-        interlinear: parsedContent.interlinear.length > 0 ? parsedContent.interlinear : undefined,
-        formatting: parsedContent.formatting.length > 0 ? parsedContent.formatting : undefined,
+        verseNumber: startVerse, // Use the start verse as the main verse number
+        text: combinedText.trim(),
+        titles: allTitles.length > 0 ? allTitles : undefined,
+        notes: allNotes.length > 0 ? allNotes : undefined,
+        verseReferences: allReferences.length > 0 ? allReferences : undefined,
+        crossReferences: allCrossReferences.length > 0 ? allCrossReferences : undefined,
+        strongNumbers: undefined,
+        interlinear: undefined,
+        formatting: undefined,
       };
     } catch (error) {
       console.error('Error getting verse by reference:', error);
