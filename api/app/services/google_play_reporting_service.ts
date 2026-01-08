@@ -1,5 +1,6 @@
 import env from '#start/env'
 import { google } from 'googleapis'
+import axios from 'axios'
 
 /**
  * Service para integração com Google Play Developer Reporting API
@@ -76,12 +77,19 @@ class GooglePlayReportingService {
       }
 
       const parent = `apps/${packageName}`
+      
+      console.log('🔍 Buscando crash metrics...')
+      console.log('📦 Package:', packageName)
+      console.log('📅 Período:', startDate, 'até', endDate)
+      console.log('🔑 Auth configurado:', !!this.auth)
+      console.log('🔌 API inicializada:', !!this.playDeveloperReporting)
+      console.log('🎯 URL da requisição:', `apps/${packageName}/crashRateMetricSet:query`)
 
       const response = await this.playDeveloperReporting.vitals.crashrate.query({
         name: parent,
         requestBody: {
-          dimensions: ['DATE'],
-          metrics: ['CRASH_RATE', 'CRASH_RATE_PER_USER_PERCENT', 'DISTINCT_CRASHES'],
+          dimensions: [],  // Sem dimensões para pegar agregado total
+          metrics: ['crashRate', 'crashRate7dUserWeighted', 'crashRate28dUserWeighted', 'distinctUsers'],
           timelineSpec: {
             aggregationPeriod: 'DAILY',
             startTime: {
@@ -98,11 +106,22 @@ class GooglePlayReportingService {
         },
       })
 
+      console.log('✅ Crash metrics obtidos com sucesso')
       return this.formatCrashMetrics(response.data)
     } catch (error: any) {
-      if (error.status === 404) {
+      console.error('❌ Erro ao buscar crash metrics:')
+      console.error('   Status:', error.status || error.code)
+      console.error('   Mensagem:', error.message)
+      console.error('   Detalhes:', JSON.stringify(error.errors || error.response?.data || {}, null, 2))
+      
+      if (error.status === 404 || error.code === 404) {
         throw new Error(
-          `App "${packageName}" não encontrado no Google Play Console ou a Service Account não tem permissão. Verifique: 1) Se o app está publicado, 2) Se a Service Account tem acesso no Play Console`
+          `App "${packageName}" não encontrado no Google Play Console ou a Service Account não tem permissão. Verifique: 1) Se o app está publicado, 2) Se a Service Account tem acesso no Play Console, 3) Se já passaram 24-48h desde a configuração`
+        )
+      }
+      if (error.status === 403 || error.code === 403) {
+        throw new Error(
+          `Service Account não tem permissão para acessar "${packageName}". Vá no Play Console → Configurações → Acesso à API → Conceda acesso para play-store-reporting@nutotia.iam.gserviceaccount.com`
         )
       }
       throw error
@@ -127,8 +146,8 @@ class GooglePlayReportingService {
       const response = await this.playDeveloperReporting.vitals.anrrate.query({
         name: parent,
         requestBody: {
-          dimensions: ['DATE'],
-          metrics: ['ANR_RATE', 'ANR_RATE_PER_USER_PERCENT', 'DISTINCT_ANRS'],
+          dimensions: [],  // Sem dimensões para pegar agregado total
+          metrics: ['anrRate', 'anrRate7dUserWeighted', 'anrRate28dUserWeighted', 'distinctUsers'],
           timelineSpec: {
             aggregationPeriod: 'DAILY',
             startTime: {
@@ -198,7 +217,7 @@ class GooglePlayReportingService {
       // Se o erro for 404 (app não encontrado), retorna dados vazios ao invés de erro
       if (error.message?.includes('não encontrado')) {
         console.warn(
-          '⚠️  Google Play: App não configurado ainda. Retornando dados vazios. Configure as permissões no Play Console para ver as métricas.'
+          '⚠️  Google Play: App configurado mas sem dados ainda. Isso é normal para apps novos ou com poucos usuários. Aguarde 24-48h após o lançamento.'
         )
         return this.getEmptyStats(formatDate(startDate), formatDate(endDate), days)
       }
@@ -231,25 +250,27 @@ class GooglePlayReportingService {
       crashes: {
         averages: {
           crashRate: 0,
-          crashRatePerUserPercent: 0,
+          crashRate7dUserWeighted: 0,
+          crashRate28dUserWeighted: 0,
         },
         totals: {
-          distinctCrashes: 0,
+          distinctUsers: 0,
         },
         timeline: [],
       },
       anrs: {
         averages: {
           anrRate: 0,
-          anrRatePerUserPercent: 0,
+          anrRate7dUserWeighted: 0,
+          anrRate28dUserWeighted: 0,
         },
         totals: {
-          distinctAnrs: 0,
+          distinctUsers: 0,
         },
         timeline: [],
       },
+      _note: 'Dados ainda não disponíveis. A API do Google Play precisa de 24-48h após o lançamento e volume mínimo de usuários.',
       generatedAt: new Date().toISOString(),
-      _note: 'Dados vazios: App não encontrado ou sem permissão. Configure no Google Play Console.',
     }
   }
 
@@ -260,21 +281,23 @@ class GooglePlayReportingService {
     const rows = data.rows || []
 
     let totalCrashRate = 0
-    let totalCrashRatePerUser = 0
-    let totalDistinctCrashes = 0
+    let totalCrashRate7d = 0
+    let totalCrashRate28d = 0
+    let totalDistinctUsers = 0
 
     const timeline = rows.map((row: any) => {
       const metrics = row.metrics || {}
 
-      totalCrashRate += metrics.CRASH_RATE || 0
-      totalCrashRatePerUser += metrics.CRASH_RATE_PER_USER_PERCENT || 0
-      totalDistinctCrashes += metrics.DISTINCT_CRASHES || 0
+      totalCrashRate += metrics.crashRate || 0
+      totalCrashRate7d += metrics.crashRate7dUserWeighted || 0
+      totalCrashRate28d += metrics.crashRate28dUserWeighted || 0
+      totalDistinctUsers += metrics.distinctUsers || 0
 
       return {
-        date: row.dimensions?.DATE,
-        crashRate: metrics.CRASH_RATE || 0,
-        crashRatePerUserPercent: metrics.CRASH_RATE_PER_USER_PERCENT || 0,
-        distinctCrashes: metrics.DISTINCT_CRASHES || 0,
+        crashRate: metrics.crashRate || 0,
+        crashRate7dUserWeighted: metrics.crashRate7dUserWeighted || 0,
+        crashRate28dUserWeighted: metrics.crashRate28dUserWeighted || 0,
+        distinctUsers: metrics.distinctUsers || 0,
       }
     })
 
@@ -283,10 +306,11 @@ class GooglePlayReportingService {
     return {
       averages: {
         crashRate: totalCrashRate / count,
-        crashRatePerUserPercent: totalCrashRatePerUser / count,
+        crashRate7dUserWeighted: totalCrashRate7d / count,
+        crashRate28dUserWeighted: totalCrashRate28d / count,
       },
       totals: {
-        distinctCrashes: totalDistinctCrashes,
+        distinctUsers: totalDistinctUsers,
       },
       timeline,
     }
@@ -299,21 +323,23 @@ class GooglePlayReportingService {
     const rows = data.rows || []
 
     let totalAnrRate = 0
-    let totalAnrRatePerUser = 0
-    let totalDistinctAnrs = 0
+    let totalAnrRate7d = 0
+    let totalAnrRate28d = 0
+    let totalDistinctUsers = 0
 
     const timeline = rows.map((row: any) => {
       const metrics = row.metrics || {}
 
-      totalAnrRate += metrics.ANR_RATE || 0
-      totalAnrRatePerUser += metrics.ANR_RATE_PER_USER_PERCENT || 0
-      totalDistinctAnrs += metrics.DISTINCT_ANRS || 0
+      totalAnrRate += metrics.anrRate || 0
+      totalAnrRate7d += metrics.anrRate7dUserWeighted || 0
+      totalAnrRate28d += metrics.anrRate28dUserWeighted || 0
+      totalDistinctUsers += metrics.distinctUsers || 0
 
       return {
-        date: row.dimensions?.DATE,
-        anrRate: metrics.ANR_RATE || 0,
-        anrRatePerUserPercent: metrics.ANR_RATE_PER_USER_PERCENT || 0,
-        distinctAnrs: metrics.DISTINCT_ANRS || 0,
+        anrRate: metrics.anrRate || 0,
+        anrRate7dUserWeighted: metrics.anrRate7dUserWeighted || 0,
+        anrRate28dUserWeighted: metrics.anrRate28dUserWeighted || 0,
+        distinctUsers: metrics.distinctUsers || 0,
       }
     })
 
@@ -322,12 +348,161 @@ class GooglePlayReportingService {
     return {
       averages: {
         anrRate: totalAnrRate / count,
-        anrRatePerUserPercent: totalAnrRatePerUser / count,
+        anrRate7dUserWeighted: totalAnrRate7d / count,
+        anrRate28dUserWeighted: totalAnrRate28d / count,
       },
       totals: {
-        distinctAnrs: totalDistinctAnrs,
+        distinctUsers: totalDistinctUsers,
       },
       timeline,
+    }
+  }
+
+  /**
+   * MÉTODO ALTERNATIVO: Testa acesso direto à API usando axios
+   * Útil para debug e verificar se o problema é com googleapis ou com a API
+   */
+  async testDirectApiAccess(packageName: string) {
+    await this.ensureInitialized()
+
+    try {
+      if (!this.auth) {
+        throw new Error('Auth não inicializado')
+      }
+
+      console.log('🧪 Testando acesso direto à API com axios...')
+      console.log('📦 Package:', packageName)
+
+      // Obtém o access token do GoogleAuth
+      const client = await this.auth.getClient()
+      const accessToken = await client.getAccessToken()
+
+      if (!accessToken.token) {
+        throw new Error('Não foi possível obter access token')
+      }
+
+      console.log('🔑 Access token obtido:', accessToken.token.substring(0, 50) + '...')
+
+      // Tenta acessar diretamente a API
+      const url = `https://playdeveloperreporting.googleapis.com/v1beta1/apps/${packageName}/crashRateMetricSet`
+
+      console.log('🌐 URL:', url)
+
+      const response = await axios.get(url, {
+        headers: {
+          Authorization: `Bearer ${accessToken.token}`,
+          'Content-Type': 'application/json',
+        },
+        validateStatus: () => true, // Aceita qualquer status para vermos o erro
+      })
+
+      console.log('📨 Status:', response.status)
+      console.log('📨 Status Text:', response.statusText)
+      console.log('📦 Data:', JSON.stringify(response.data, null, 2))
+      console.log('📋 Headers:', JSON.stringify(response.headers, null, 2))
+
+      return {
+        success: response.status >= 200 && response.status < 300,
+        status: response.status,
+        statusText: response.statusText,
+        data: response.data,
+        headers: response.headers,
+      }
+    } catch (error: any) {
+      console.error('❌ Erro no teste direto:')
+      console.error('   Mensagem:', error.message)
+      console.error('   Response:', error.response?.data)
+      console.error('   Status:', error.response?.status)
+      console.error('   Headers:', error.response?.headers)
+
+      return {
+        success: false,
+        error: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        headers: error.response?.headers,
+      }
+    }
+  }
+
+  /**
+   * MÉTODO ALTERNATIVO 2: Query com axios (POST)
+   */
+  async testDirectQuery(packageName: string, startDate: string, endDate: string) {
+    await this.ensureInitialized()
+
+    try {
+      if (!this.auth) {
+        throw new Error('Auth não inicializado')
+      }
+
+      console.log('🧪 Testando query direto com axios...')
+      console.log('📦 Package:', packageName)
+      console.log('📅 Período:', startDate, 'até', endDate)
+
+      // Obtém o access token
+      const client = await this.auth.getClient()
+      const accessToken = await client.getAccessToken()
+
+      if (!accessToken.token) {
+        throw new Error('Não foi possível obter access token')
+      }
+
+      // URL para query
+      const url = `https://playdeveloperreporting.googleapis.com/v1beta1/apps/${packageName}/crashRateMetricSet:query`
+
+      console.log('🌐 URL:', url)
+
+      const requestBody = {
+        dimensions: [],  // Sem dimensões para pegar agregado total
+        metrics: ['crashRate', 'crashRate7dUserWeighted', 'crashRate28dUserWeighted', 'distinctUsers'],
+        timelineSpec: {
+          aggregationPeriod: 'DAILY',
+          startTime: {
+            year: Number.parseInt(startDate.split('-')[0]),
+            month: Number.parseInt(startDate.split('-')[1]),
+            day: Number.parseInt(startDate.split('-')[2]),
+          },
+          endTime: {
+            year: Number.parseInt(endDate.split('-')[0]),
+            month: Number.parseInt(endDate.split('-')[1]),
+            day: Number.parseInt(endDate.split('-')[2]),
+          },
+        },
+      }
+
+      console.log('📤 Request Body:', JSON.stringify(requestBody, null, 2))
+
+      const response = await axios.post(url, requestBody, {
+        headers: {
+          Authorization: `Bearer ${accessToken.token}`,
+          'Content-Type': 'application/json',
+        },
+        validateStatus: () => true,
+      })
+
+      console.log('📨 Status:', response.status)
+      console.log('📨 Status Text:', response.statusText)
+      console.log('📦 Data:', JSON.stringify(response.data, null, 2))
+
+      return {
+        success: response.status >= 200 && response.status < 300,
+        status: response.status,
+        statusText: response.statusText,
+        data: response.data,
+      }
+    } catch (error: any) {
+      console.error('❌ Erro no teste direto query:')
+      console.error('   Mensagem:', error.message)
+      console.error('   Response:', error.response?.data)
+      console.error('   Status:', error.response?.status)
+
+      return {
+        success: false,
+        error: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+      }
     }
   }
 }

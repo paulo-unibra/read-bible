@@ -156,6 +156,16 @@ router
         ])
         router.get('/reports/play-store/crashes', [AdminPlayStoreReportsController, 'crashMetrics'])
         router.get('/reports/play-store/anrs', [AdminPlayStoreReportsController, 'anrMetrics'])
+
+        // Play Store Reports - TESTES DIRETOS
+        router.get('/reports/play-store/test/direct-access', [
+          AdminPlayStoreReportsController,
+          'testDirectAccess',
+        ])
+        router.get('/reports/play-store/test/direct-query', [
+          AdminPlayStoreReportsController,
+          'testDirectQuery',
+        ])
       })
       .use(middleware.auth({ guards: ['api'] }))
   })

@@ -30,9 +30,15 @@ export default function AuthScreen() {
 
     setLoading(true);
     try {
+      console.log('🚀 Iniciando autenticação...');
+      console.log('📧 Email:', email);
+      console.log('🔐 Modo:', isLogin ? 'Login' : 'Registro');
+      
       const response = isLogin
         ? await authService.login(email, password)
         : await authService.register(name, email, password);
+
+      console.log('✅ Resposta recebida:', response);
 
       if (response.success) {
         Alert.alert('Sucesso', response.message, [
@@ -48,7 +54,12 @@ export default function AuthScreen() {
         Alert.alert('Erro', response.message);
       }
     } catch (error) {
-      Alert.alert('Erro', 'Ocorreu um erro. Tente novamente.');
+      console.error('❌ Erro no handleAuth:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      Alert.alert(
+        'Erro',
+        `Ocorreu um erro. Tente novamente.\n\nDetalhes: ${errorMessage}`
+      );
     } finally {
       setLoading(false);
     }

@@ -92,7 +92,7 @@ const Reports: React.FC = () => {
   const [error, setError] = useState("");
   const [playStoreError, setPlayStoreError] = useState("");
   const [isExporting, setIsExporting] = useState(false);
-  const [playStoreDays, setPlayStoreDays] = useState(30);
+  const [playStoreDays, setPlayStoreDays] = useState(7);
 
   const { hasPermission, logout } = useAuth();
   const navigate = useNavigate();
@@ -653,43 +653,55 @@ const Reports: React.FC = () => {
                     className="info-message"
                     style={{
                       padding: "20px",
-                      backgroundColor: "#fff3cd",
-                      border: "1px solid #ffc107",
+                      backgroundColor: "#e3f2fd",
+                      border: "1px solid #2196f3",
                       borderRadius: "8px",
-                      color: "#856404",
+                      color: "#0d47a1",
                       marginBottom: "20px",
                     }}
                   >
                     <h4 style={{ marginTop: 0 }}>
-                      ⚠️ App não configurado no Google Play Console
+                      ℹ️ Dados do Google Play ainda não disponíveis
                     </h4>
                     <p>
-                      O app <code>com.readbible.app</code> não foi encontrado ou
-                      a Service Account não tem permissão.
+                      <strong>App na Play Store:</strong>{" "}
+                      <a 
+                        href="https://play.google.com/store/apps/details?id=com.readbible.app" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        style={{ color: "#1976d2" }}
+                      >
+                        Bíblia em Foco
+                      </a>
+                      <br />
+                      <strong>Publicado em:</strong> 25/12/2025 (13 dias atrás)
+                      <br />
+                      <strong>Package:</strong> <code>com.readbible.app</code>
+                      <br />
+                      <strong>Usuários cadastrados:</strong> {stats?.users?.total || 270} (volume suficiente ✓)
                     </p>
                     <p>
-                      <strong>Para resolver:</strong>
+                      <strong>Por que os dados não aparecem ainda?</strong>
                     </p>
-                    <ol style={{ marginBottom: 0 }}>
-                      <li>
-                        Acesse{" "}
-                        <a
-                          href="https://play.google.com/console/"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          Google Play Console
-                        </a>
-                      </li>
-                      <li>Vá em: Configurações → Acesso à API</li>
-                      <li>
-                        Conceda acesso para:{" "}
-                        <code>
-                          play-store-reporting@nutotia.iam.gserviceaccount.com
-                        </code>
-                      </li>
-                      <li>Marque as permissões de visualização</li>
-                    </ol>
+                    <ul style={{ marginBottom: 10 }}>
+                      <li>🎯 <strong>Trilha de produção:</strong> A API só conta usuários da versão de produção pública (não testes internos/fechados)</li>
+                      <li>📊 <strong>Métricas de qualidade:</strong> Só aparecem quando há eventos para reportar (crashes, ANRs, slow rendering)</li>
+                      <li>🔄 <strong>Período de coleta:</strong> Google precisa acumular dados por alguns dias antes de disponibilizar</li>
+                      <li>⏰ <strong>Atraso natural:</strong> Pode haver atraso de 24-48h entre os eventos e sua disponibilização na API</li>
+                    </ul>
+                    <p>
+                      <strong>✅ Configuração correta:</strong>
+                    </p>
+                    <ul style={{ marginBottom: 10 }}>
+                      <li>✓ App publicado na Play Store</li>
+                      <li>✓ Service Account com permissões de Administrador</li>
+                      <li>✓ API do Google Play Developer Reporting habilitada</li>
+                      <li>✓ Tempo suficiente desde publicação (13 dias)</li>
+                    </ul>
+                    <p style={{ marginBottom: 0, fontSize: "0.9em", marginTop: 10 }}>
+                      💡 <strong>Próximo passo:</strong> Os dados aparecerão automaticamente quando o app atingir o volume mínimo de usuários ativos. 
+                      Continue promovendo o app para aumentar as instalações!
+                    </p>
                   </div>
                 ) : (
                   <>

@@ -64,6 +64,10 @@ class AuthService {
    */
   async register(name: string, email: string, password: string): Promise<AuthResponse> {
     try {
+      console.log('📝 Tentando registrar...');
+      console.log('📡 API_URL:', API_URL);
+      console.log('📧 Email:', email);
+      
       const response = await fetch(`${API_URL}/auth/register`, {
         method: 'POST',
         headers: {
@@ -72,7 +76,11 @@ class AuthService {
         body: JSON.stringify({ name, email, password }),
       });
 
+      console.log('📨 Response status:', response.status);
+      console.log('📨 Response ok:', response.ok);
+
       const data: AuthResponse = await response.json();
+      console.log('📦 Response data:', JSON.stringify(data, null, 2));
 
       if (data.success && data.data) {
         this.token = data.data.token;
@@ -84,10 +92,17 @@ class AuthService {
 
       return data;
     } catch (error) {
-      console.error('Erro ao registrar:', error);
+      console.error('❌ Erro ao registrar:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      const errorDetails = `URL: ${API_URL}\nErro: ${errorMessage}\nTipo: ${error instanceof TypeError ? 'Network/Connection' : 'Other'}`;
+      
+      const troubleshootMsg = error instanceof TypeError && errorMessage.includes('Network request failed')
+        ? '\n\n💡 Dicas:\n- Verifique sua conexão com internet\n- Tente conectar-se via WiFi\n- Redes móveis podem bloquear portas personalizadas'
+        : '';
+      
       return {
         success: false,
-        message: 'Erro ao conectar com o servidor',
+        message: `Erro ao conectar com o servidor\n\n${errorDetails}${troubleshootMsg}`,
         error,
       };
     }
@@ -98,6 +113,10 @@ class AuthService {
    */
   async login(email: string, password: string): Promise<AuthResponse> {
     try {
+      console.log('🔐 Tentando login...');
+      console.log('📡 API_URL:', API_URL);
+      console.log('📧 Email:', email);
+      
       const response = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: {
@@ -106,7 +125,11 @@ class AuthService {
         body: JSON.stringify({ email, password }),
       });
 
+      console.log('📨 Response status:', response.status);
+      console.log('📨 Response ok:', response.ok);
+
       const data: AuthResponse = await response.json();
+      console.log('📦 Response data:', JSON.stringify(data, null, 2));
 
       if (data.success && data.data) {
         this.token = data.data.token;
@@ -118,10 +141,17 @@ class AuthService {
 
       return data;
     } catch (error) {
-      console.error('Erro ao fazer login:', error);
+      console.error('❌ Erro ao fazer login:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      const errorDetails = `URL: ${API_URL}\nErro: ${errorMessage}\nTipo: ${error instanceof TypeError ? 'Network/Connection' : 'Other'}`;
+      
+      const troubleshootMsg = error instanceof TypeError && errorMessage.includes('Network request failed')
+        ? '\n\n💡 Dicas:\n- Verifique sua conexão com internet\n- Tente conectar-se via WiFi\n- Redes móveis podem bloquear portas personalizadas'
+        : '';
+      
       return {
         success: false,
-        message: 'Erro ao conectar com o servidor',
+        message: `Erro ao conectar com o servidor\n\n${errorDetails}${troubleshootMsg}`,
         error,
       };
     }

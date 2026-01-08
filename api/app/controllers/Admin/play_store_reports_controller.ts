@@ -142,4 +142,63 @@ export default class PlayStoreReportsController {
       })
     }
   }
+
+  /**
+   * TESTE: Acesso direto à API com axios (GET)
+   */
+  async testDirectAccess({ response }: HttpContext) {
+    try {
+      const packageName = env.get('GOOGLE_PLAY_PACKAGE_NAME', 'com.readbible.app')
+
+      const result = await googlePlayReportingService.testDirectApiAccess(packageName)
+
+      return response.ok({
+        success: result.success,
+        message: 'Teste de acesso direto à API',
+        result,
+      })
+    } catch (error) {
+      console.error('Erro ao testar acesso direto:', error)
+      return response.internalServerError({
+        success: false,
+        message: 'Erro ao testar acesso direto',
+        error: error.message,
+      })
+    }
+  }
+
+  /**
+   * TESTE: Query direto com axios (POST)
+   */
+  async testDirectQuery({ request, response }: HttpContext) {
+    try {
+      const { days = 7 } = request.qs()
+      const packageName = env.get('GOOGLE_PLAY_PACKAGE_NAME', 'com.readbible.app')
+
+      const endDate = new Date()
+      const startDate = new Date()
+      startDate.setDate(startDate.getDate() - Number.parseInt(days))
+
+      const formatDate = (date: Date) => date.toISOString().split('T')[0]
+
+      const result = await googlePlayReportingService.testDirectQuery(
+        packageName,
+        formatDate(startDate),
+        formatDate(endDate)
+      )
+
+      return response.ok({
+        success: result.success,
+        message: 'Teste de query direto à API',
+        result,
+      })
+    } catch (error) {
+      console.error('Erro ao testar query direto:', error)
+      return response.internalServerError({
+        success: false,
+        message: 'Erro ao testar query direto',
+        error: error.message,
+      })
+    }
+  }
 }
