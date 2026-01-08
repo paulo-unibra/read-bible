@@ -189,7 +189,7 @@ export default class ReadingPlanController {
         startDate,
         endDate,
         totalDays,
-        readingsCount: readings?.length || 0
+        readingsCount: readings?.length || 0,
       })
 
       // Verificar se já existe um plano ativo
@@ -212,7 +212,9 @@ export default class ReadingPlanController {
       // Criar plano customizado
       const planData = {
         userId: user.id,
-        name: name || `Plano ${type === 'sequential' ? 'Sequencial' : 'Intercalado'} ${DateTime.now().year}`,
+        name:
+          name ||
+          `Plano ${type === 'sequential' ? 'Sequencial' : 'Intercalado'} ${DateTime.now().year}`,
         type: type || 'custom',
         startDate: DateTime.fromISO(startDate),
         endDate: DateTime.fromISO(endDate),
@@ -249,15 +251,19 @@ export default class ReadingPlanController {
             savedCount++
 
             // Contar capítulos deste livro
-            totalChapters += (bookReading.endChapter - bookReading.startChapter + 1)
+            totalChapters += bookReading.endChapter - bookReading.startChapter + 1
           }
 
           if (reading.dayNumber % 50 === 0) {
-            console.log(`   📖 [API] Processados ${reading.dayNumber}/${readings.length} dias (${savedCount} registros)...`)
+            console.log(
+              `   📖 [API] Processados ${reading.dayNumber}/${readings.length} dias (${savedCount} registros)...`
+            )
           }
         }
 
-        console.log(`✅ [API] ${savedCount} registros de leitura salvos (${readings.length} dias). Total de capítulos: ${totalChapters}`)
+        console.log(
+          `✅ [API] ${savedCount} registros de leitura salvos (${readings.length} dias). Total de capítulos: ${totalChapters}`
+        )
 
         // Atualizar totais
         plan.totalChapters = totalChapters
@@ -300,14 +306,29 @@ export default class ReadingPlanController {
    */
   async getActive({ auth, response }: HttpContext) {
     try {
+      console.log('=== GET ACTIVE PLAN API START ===')
       const user = auth.user!
+      console.log('User ID:', user.id)
 
       const plan = await ReadingPlan.query()
         .where('user_id', user.id)
         .where('is_active', true)
         .first()
 
+      console.log('Plan found:', !!plan)
+      if (plan) {
+        console.log('Plan details:', {
+          id: plan.id,
+          name: plan.name,
+          currentDay: plan.currentDay,
+          totalDays: plan.totalDays,
+          isActive: plan.isActive,
+          startDate: plan.startDate?.toISO(),
+        })
+      }
+
       if (!plan) {
+        console.log('=== NO PLAN FOUND - RETURNING NULL ===')
         return response.ok({
           success: true,
           data: null,
@@ -320,7 +341,23 @@ export default class ReadingPlanController {
         .where('day', plan.currentDay)
         .where('is_completed', false)
 
-      return response.ok({
+      console.log('Today reading count:', todayReading.length)
+      console.log('Current day:', plan.currentDay)
+
+      // Contar quantos dias foram realmente concluídos
+      // Buscar dias distintos que foram concluídos
+      const completedDaysResult = await ReadingProgress.query()
+        .where('reading_plan_id', plan.id)
+        .where('is_completed', true)
+        .select('day')
+        .groupBy('day')
+
+      const completedDays = completedDaysResult.length
+
+      console.log('Completed days query result count:', completedDays)
+      console.log('Completed days:', completedDays)
+
+      const responseData = {
         success: true,
         data: {
           plan: {
@@ -331,6 +368,8 @@ export default class ReadingPlanController {
             chaptersPerDay: plan.chaptersPerDay,
             completedChapters: plan.completedChapters,
             totalChapters: plan.totalChapters,
+            completedDays: completedDays,
+            startDate: plan.startDate.toISO(),
             progress: Math.round((plan.completedChapters / plan.totalChapters) * 100),
           },
           todayReadings: todayReading.map((r) => ({
@@ -342,8 +381,17 @@ export default class ReadingPlanController {
             isCompleted: r.isCompleted,
           })),
         },
-      })
+      }
+
+      console.log('=== RESPONSE DATA ===')
+      console.log(JSON.stringify(responseData, null, 2))
+      console.log('=== GET ACTIVE PLAN API END ===')
+
+      return response.ok(responseData)
     } catch (error) {
+      console.error('=== ERROR IN GET ACTIVE PLAN ===')
+      console.error('Error details:', error)
+      console.error('Error stack:', error.stack)
       return response.badRequest({
         success: false,
         message: 'Erro ao buscar plano de leitura',
@@ -592,6 +640,8 @@ export default class ReadingPlanController {
           startChapter: r.startChapter,
           endChapter: r.endChapter,
           isCompleted: r.isCompleted,
+          completedAt: r.completedAt ? r.completedAt.toISO() : null,
+          updatedAt: r.updatedAt.toISO(),
         })),
       })
     } catch (error) {

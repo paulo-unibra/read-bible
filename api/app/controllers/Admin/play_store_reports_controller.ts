@@ -175,9 +175,12 @@ export default class PlayStoreReportsController {
       const { days = 7 } = request.qs()
       const packageName = env.get('GOOGLE_PLAY_PACKAGE_NAME', 'com.readbible.app')
 
+      // Google Play API só tem dados até ontem (D-1)
       const endDate = new Date()
+      endDate.setDate(endDate.getDate() - 1) // Ontem
+
       const startDate = new Date()
-      startDate.setDate(startDate.getDate() - Number.parseInt(days))
+      startDate.setDate(startDate.getDate() - Number.parseInt(days) - 1) // days + 1 dia atrás
 
       const formatDate = (date: Date) => date.toISOString().split('T')[0]
 

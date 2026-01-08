@@ -28,8 +28,23 @@ interface User {
   readingStatus: ReadingStatus;
 }
 
+interface UserStats {
+  all: number;
+  up_to_date: number;
+  late: number;
+  not_started: number;
+  no_plan: number;
+}
+
 const Users: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
+  const [stats, setStats] = useState<UserStats>({
+    all: 0,
+    up_to_date: 0,
+    late: 0,
+    not_started: 0,
+    no_plan: 0
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -43,6 +58,7 @@ const Users: React.FC = () => {
     }
 
     loadUsers();
+    loadStats();
   }, [statusFilter]);
 
   const loadUsers = async () => {
@@ -58,6 +74,15 @@ const Users: React.FC = () => {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadStats = async () => {
+    try {
+      const response = await api.get('/admin/users/stats');
+      setStats(response.data);
+    } catch (err: any) {
+      console.error('Erro ao carregar estatísticas:', err);
     }
   };
 
@@ -109,31 +134,31 @@ const Users: React.FC = () => {
               className={statusFilter === 'all' ? 'filter-btn active' : 'filter-btn'}
               onClick={() => setStatusFilter('all')}
             >
-              📊 Todos
+              📊 Todos ({stats.all})
             </button>
             <button 
               className={statusFilter === 'up_to_date' ? 'filter-btn active' : 'filter-btn'}
               onClick={() => setStatusFilter('up_to_date')}
             >
-              ✅ Em dia
+              ✅ Em dia ({stats.up_to_date})
             </button>
             <button 
               className={statusFilter === 'late' ? 'filter-btn active' : 'filter-btn'}
               onClick={() => setStatusFilter('late')}
             >
-              ⚠️ Atrasados
+              ⚠️ Atrasados ({stats.late})
             </button>
             <button 
               className={statusFilter === 'not_started' ? 'filter-btn active' : 'filter-btn'}
               onClick={() => setStatusFilter('not_started')}
             >
-              ⏸️ Não iniciaram
+              ⏸️ Não iniciaram ({stats.not_started})
             </button>
             <button 
               className={statusFilter === 'no_plan' ? 'filter-btn active' : 'filter-btn'}
               onClick={() => setStatusFilter('no_plan')}
             >
-              📝 Sem plano
+              📝 Sem plano ({stats.no_plan})
             </button>
           </div>
         </div>

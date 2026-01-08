@@ -112,6 +112,7 @@ router
     router
       .group(() => {
         router.get('/users', [AdminAuthController, 'listUsers'])
+        router.get('/users/stats', [AdminAuthController, 'usersStats'])
         router.get('/permissions', [AdminAuthController, 'listPermissions'])
         router.post('/permissions', [AdminAuthController, 'createPermission'])
         router.get('/roles', [AdminAuthController, 'listRoles'])

@@ -201,6 +201,71 @@ export default class AuthController {
   }
 
   /**
+   * Retorna estatísticas de status de leitura dos usuários
+   */
+  async usersStats({ response }: HttpContext) {
+    try {
+      const users = await User.query().preload('roles').orderBy('id', 'asc')
+
+      // Contadores para cada status
+      const stats = {
+        all: 0,
+        up_to_date: 0,
+        late: 0,
+        not_started: 0,
+        no_plan: 0
+      }
+
+      // Analisar status de cada usuário
+      await Promise.all(
+        users.map(async (user) => {
+          const readingPlan = await user
+            .related('readingPlans')
+            .query()
+            .where('is_active', true)
+            .first()
+
+          let status = 'no_plan'
+
+          if (readingPlan) {
+            const completedDays = readingPlan.completedChapters || 0
+            const hasProgress = completedDays > 0
+
+            if (!hasProgress) {
+              status = 'not_started'
+            } else {
+              const startDate = readingPlan.startDate.toJSDate()
+              const today = new Date()
+              const daysPassed = Math.floor(
+                (today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
+              )
+              const currentDay = readingPlan.currentDay || 0
+              const totalDays = readingPlan.totalDays || 0
+              const expectedDay = Math.min(daysPassed + 1, totalDays)
+
+              if (currentDay < expectedDay) {
+                status = 'late'
+              } else {
+                status = 'up_to_date'
+              }
+            }
+          }
+
+          stats.all++
+          stats[status as keyof typeof stats]++
+        })
+      )
+
+      return response.ok(stats)
+    } catch (error) {
+      console.error('Erro ao buscar estatísticas:', error)
+      return response.internalServerError({
+        error: 'Erro ao buscar estatísticas'
+      })
+    }
+  }
+
+  /**
    * Lista todas as permissões do sistema
    */
   async listPermissions({ response }: HttpContext) {

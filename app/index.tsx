@@ -2,24 +2,24 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AdBanner from "../components/AdBanner";
 import BibleCuriosityCard from "../components/BibleCuriosityCard";
 import { Logo } from "../components/logo";
 import authService, {
-    ReadingPlan,
-    TodayReading,
+  ReadingPlan,
+  TodayReading,
 } from "../services/AuthService";
 import bibleCuriosityService, {
-    BibleCuriosity,
+  BibleCuriosity,
 } from "../services/BibleCuriosityService";
 import bibleReaderService from "../services/BibleReaderService";
 import DatabaseService from "../services/DatabaseService";
@@ -122,20 +122,26 @@ export default function HomeScreen() {
 
   const loadReadingPlan = async () => {
     try {
+      console.log('=== LOAD READING PLAN START ===');
       // Primeiro busca planos locais (templates customizados tem prioridade)
       const localPlans = await readingPlanService.getActivePlans();
+      console.log('Local plans found:', localPlans.length);
       if (localPlans.length > 0) {
+        console.log('Using local plan:', localPlans[0]);
         setHasLocalPlan(true);
         // Pega o primeiro plano ativo local
         const plan = localPlans[0];
 
         // Busca o próximo dia não concluído do plano
         const planDays = await readingPlanService.getPlanDays(plan.id);
+        console.log('Plan days retrieved:', planDays.length);
 
         // Busca o primeiro dia que NÃO está concluído (ordenado por número do dia)
         const nextDay = planDays
           .sort((a, b) => a.dayNumber - b.dayNumber)
           .find((day) => !day.isCompleted);
+        
+        console.log('Next uncompleted day:', nextDay ? `Day ${nextDay.dayNumber}` : 'None found');
 
         // Calcular total de capítulos do plano
         const totalChapters = planDays.reduce((sum, day) => {
@@ -154,17 +160,30 @@ export default function HomeScreen() {
           }, 0);
 
         // Converte para o formato esperado pela tela
-        setReadingPlan({
+        const readingPlanData = {
           ...plan,
           currentDay: nextDay?.dayNumber || plan.totalDays,
           chaptersPerDay: 0,
           totalChapters,
           completedChapters,
           progress: Math.round((plan.completedDays / plan.totalDays) * 100),
+        };
+        
+        console.log('Reading plan data prepared:', {
+          currentDay: readingPlanData.currentDay,
+          totalDays: readingPlanData.totalDays,
+          totalChapters: readingPlanData.totalChapters,
+          completedChapters: readingPlanData.completedChapters,
+          progress: readingPlanData.progress,
+          hasStartDate: !!readingPlanData.startDate,
+          completedDays: readingPlanData.completedDays
         });
+        
+        setReadingPlan(readingPlanData);
 
         // Converte readings para o formato esperado
         if (nextDay) {
+          console.log('Setting today readings:', nextDay.readings);
           setTodayReadings(nextDay.readings);
           setTodayDayId(nextDay.id); // Guardar o ID do dia do plano
 
@@ -187,25 +206,36 @@ export default function HomeScreen() {
 
         } else {
           // Se não há mais dias não concluídos, limpa as leituras
+          console.log('No more uncompleted days - clearing readings');
           setTodayReadings([]);
           setTodayDayId(null);
         }
+        console.log('=== LOCAL PLAN LOADED SUCCESSFULLY ===');
         return;
       }
 
       // Se não encontrou planos locais, busca do backend (sistema antigo - apenas para retrocompatibilidade)
+      console.log('No local plans - trying backend API');
       const planResponse = await authService.getActivePlan();
+      console.log('Backend plan response:', planResponse);
+      
       if (planResponse.success && planResponse.data) {
+        console.log('Backend plan data:', planResponse.data.plan);
         setReadingPlan(planResponse.data.plan);
         setHasLocalPlan(false);
         
         // Buscar TODAS as leituras do plano para encontrar a próxima não concluída
         const allReadingsResponse = await authService.getAllPlanReadings();
+        console.log('All readings response:', allReadingsResponse);
+        
         if (allReadingsResponse.success && allReadingsResponse.data) {
+          console.log('Total readings from backend:', allReadingsResponse.data.length);
           // Encontra a primeira leitura não concluída
           const nextReadings = allReadingsResponse.data
             .filter(reading => !reading.isCompleted)
             .sort((a, b) => a.day - b.day);
+          
+          console.log('Uncompleted readings found:', nextReadings.length);
           
           if (nextReadings.length > 0) {
             // Agrupar leituras do mesmo dia
@@ -222,14 +252,18 @@ export default function HomeScreen() {
             setTodayReadings([]);
           }
         } else {
+          console.log('Failed to get all readings - using fallback');
           // Fallback para o comportamento antigo se falhar
           setTodayReadings(planResponse.data.todayReadings);
         }
         
         setTodayDayId(null); // Backend não usa IDs locais
+        console.log('=== BACKEND PLAN LOADED SUCCESSFULLY ===');
+      } else {
+        console.log('No backend plan found');
       }
     } catch (error) {
-      console.error("Erro ao carregar plano:", error);
+      console.error("=== ERROR LOADING PLAN ===", error);
     }
   };
 
@@ -591,15 +625,86 @@ export default function HomeScreen() {
               },
             ]}
           >
-            <Text
-              style={[
-                styles.todayTitle,
-                { color: colors.textPrimary, fontSize: applyFontScale(18) },
-              ]}
-            >
-              Leitura de Hoje - Dia {readingPlan.currentDay}/
-              {readingPlan.totalDays}
-            </Text>
+            <View style={styles.todayHeader}>
+              <Text
+                style={[
+                  styles.todayTitle,
+                  { color: colors.textPrimary, fontSize: applyFontScale(18) },
+                ]}
+              >
+                Leitura de Hoje - Dia {readingPlan.currentDay}/
+                {readingPlan.totalDays}
+              </Text>
+              {(() => {
+                // Calcular status baseado nas leituras realmente concluídas
+                const today = new Date();
+                const planStartDate = new Date(readingPlan.startDate);
+                
+                console.log('=== STATUS BADGE CALCULATION ===');
+                console.log('Today:', today.toISOString());
+                console.log('Plan start date:', readingPlan.startDate);
+                console.log('Plan start date parsed:', planStartDate.toISOString());
+                
+                // Calcular quantos dias se passaram desde o início do plano
+                const daysPassed = Math.floor(
+                  (today.getTime() - planStartDate.getTime()) / (1000 * 60 * 60 * 24)
+                );
+                
+                console.log('Days passed:', daysPassed);
+                
+                // Dias esperados = dias passados + 1 (incluindo hoje)
+                const expectedDays = Math.min(daysPassed + 1, readingPlan.totalDays);
+                
+                console.log('Expected days:', expectedDays);
+                console.log('Total days in plan:', readingPlan.totalDays);
+                
+                // Contar quantas leituras foram realmente concluídas
+                const completedDays = readingPlan.completedDays || 0;
+                
+                console.log('Completed days:', completedDays);
+                
+                // Verificar se ainda não leu hoje (leitura de hoje pendente)
+                const hasNotReadToday = completedDays === expectedDays - 1;
+                
+                // Verificar se está atrasado
+                const isLate = completedDays < expectedDays - 1;
+                const daysLate = expectedDays - completedDays - 1;
+                
+                console.log('Has not read today:', hasNotReadToday);
+                console.log('Is late:', isLate);
+                console.log('Days late:', daysLate);
+                console.log('=== END STATUS CALCULATION ===');
+                
+                if (isLate) {
+                  return (
+                    <View style={styles.statusBadge}>
+                      <Ionicons name="alert-circle" size={14} color="#FF9800" />
+                      <Text style={[styles.statusText, { color: '#FF9800' }]}>
+                        {daysLate} {daysLate === 1 ? 'dia atrasado' : 'dias atrasados'}
+                      </Text>
+                    </View>
+                  );
+                } else if (hasNotReadToday) {
+                  return (
+                    <View style={styles.statusBadge}>
+                      <Ionicons name="time-outline" size={14} color="#2196F3" />
+                      <Text style={[styles.statusText, { color: '#2196F3' }]}>
+                        Pendente hoje
+                      </Text>
+                    </View>
+                  );
+                } else {
+                  return (
+                    <View style={styles.statusBadge}>
+                      <Ionicons name="checkmark-circle" size={14} color="#4CAF50" />
+                      <Text style={[styles.statusText, { color: '#4CAF50' }]}>
+                        Em dia
+                      </Text>
+                    </View>
+                  );
+                }
+              })()}
+            </View>
             <View style={styles.readingInfo}>
               <Text
                 style={[
@@ -1125,11 +1230,30 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
+  todayHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 12,
+  },
   todayTitle: {
     fontSize: 18,
     fontWeight: "bold",
     color: "#333",
-    marginBottom: 12,
+    flex: 1,
+  },
+  statusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: "500",
   },
   readingInfo: { marginBottom: 16 },
   readingText: { fontSize: 16, color: "#666", marginBottom: 4 },

@@ -26,6 +26,8 @@ export interface ReadingPlan {
   chaptersPerDay: number;
   completedChapters: number;
   totalChapters: number;
+  completedDays: number;
+  startDate: string;
   progress: number;
 }
 
@@ -327,6 +329,11 @@ class AuthService {
    */
   async getActivePlan(): Promise<{ success: boolean; data: { plan: ReadingPlan; todayReadings: TodayReading[] } | null }> {
     try {
+      console.log('=== GET ACTIVE PLAN REQUEST ===');
+      console.log('API URL:', `${API_URL}/reading-plans/active`);
+      console.log('Token exists:', !!this.token);
+      console.log('Token preview:', this.token ? `${this.token.substring(0, 20)}...` : 'null');
+      
       const response = await fetch(`${API_URL}/reading-plans/active`, {
         method: 'GET',
         headers: {
@@ -334,8 +341,16 @@ class AuthService {
         },
       });
 
-      return await response.json();
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
+      
+      const data = await response.json();
+      console.log('Response data:', JSON.stringify(data, null, 2));
+      console.log('=== GET ACTIVE PLAN RESPONSE ===');
+
+      return data;
     } catch (error) {
+      console.error('=== ERROR IN GET ACTIVE PLAN ===');
       console.error('Erro ao buscar plano:', error);
       return {
         success: false,

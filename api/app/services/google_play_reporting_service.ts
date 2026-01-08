@@ -1,6 +1,6 @@
 import env from '#start/env'
-import { google } from 'googleapis'
 import axios from 'axios'
+import { google } from 'googleapis'
 
 /**
  * Service para integração com Google Play Developer Reporting API
@@ -77,7 +77,7 @@ class GooglePlayReportingService {
       }
 
       const parent = `apps/${packageName}`
-      
+
       console.log('🔍 Buscando crash metrics...')
       console.log('📦 Package:', packageName)
       console.log('📅 Período:', startDate, 'até', endDate)
@@ -88,8 +88,13 @@ class GooglePlayReportingService {
       const response = await this.playDeveloperReporting.vitals.crashrate.query({
         name: parent,
         requestBody: {
-          dimensions: [],  // Sem dimensões para pegar agregado total
-          metrics: ['crashRate', 'crashRate7dUserWeighted', 'crashRate28dUserWeighted', 'distinctUsers'],
+          dimensions: [], // Sem dimensões para pegar agregado total
+          metrics: [
+            'crashRate',
+            'crashRate7dUserWeighted',
+            'crashRate28dUserWeighted',
+            'distinctUsers',
+          ],
           timelineSpec: {
             aggregationPeriod: 'DAILY',
             startTime: {
@@ -112,8 +117,11 @@ class GooglePlayReportingService {
       console.error('❌ Erro ao buscar crash metrics:')
       console.error('   Status:', error.status || error.code)
       console.error('   Mensagem:', error.message)
-      console.error('   Detalhes:', JSON.stringify(error.errors || error.response?.data || {}, null, 2))
-      
+      console.error(
+        '   Detalhes:',
+        JSON.stringify(error.errors || error.response?.data || {}, null, 2)
+      )
+
       if (error.status === 404 || error.code === 404) {
         throw new Error(
           `App "${packageName}" não encontrado no Google Play Console ou a Service Account não tem permissão. Verifique: 1) Se o app está publicado, 2) Se a Service Account tem acesso no Play Console, 3) Se já passaram 24-48h desde a configuração`
@@ -146,7 +154,7 @@ class GooglePlayReportingService {
       const response = await this.playDeveloperReporting.vitals.anrrate.query({
         name: parent,
         requestBody: {
-          dimensions: [],  // Sem dimensões para pegar agregado total
+          dimensions: [], // Sem dimensões para pegar agregado total
           metrics: ['anrRate', 'anrRate7dUserWeighted', 'anrRate28dUserWeighted', 'distinctUsers'],
           timelineSpec: {
             aggregationPeriod: 'DAILY',
@@ -181,9 +189,12 @@ class GooglePlayReportingService {
    * Apenas métricas de qualidade (crashes, ANRs, erros)
    */
   async getGeneralStats(packageName: string, days: number = 30) {
+    // Google Play API só tem dados até ontem (D-1)
     const endDate = new Date()
+    endDate.setDate(endDate.getDate() - 1) // Ontem
+
     const startDate = new Date()
-    startDate.setDate(startDate.getDate() - days)
+    startDate.setDate(startDate.getDate() - days - 1) // days + 1 dia atrás
 
     const formatDate = (date: Date) => date.toISOString().split('T')[0]
 
@@ -269,7 +280,8 @@ class GooglePlayReportingService {
         },
         timeline: [],
       },
-      _note: 'Dados ainda não disponíveis. A API do Google Play precisa de 24-48h após o lançamento e volume mínimo de usuários.',
+      _note:
+        'Dados ainda não disponíveis. A API do Google Play precisa de 24-48h após o lançamento e volume mínimo de usuários.',
       generatedAt: new Date().toISOString(),
     }
   }
@@ -286,18 +298,24 @@ class GooglePlayReportingService {
     let totalDistinctUsers = 0
 
     const timeline = rows.map((row: any) => {
-      const metrics = row.metrics || {}
+      const metricsArray = row.metrics || []
 
-      totalCrashRate += metrics.crashRate || 0
-      totalCrashRate7d += metrics.crashRate7dUserWeighted || 0
-      totalCrashRate28d += metrics.crashRate28dUserWeighted || 0
-      totalDistinctUsers += metrics.distinctUsers || 0
+      // Converter array de métricas para objeto
+      const metricsObj: any = {}
+      metricsArray.forEach((m: any) => {
+        metricsObj[m.metric] = Number.parseFloat(m.decimalValue?.value || '0')
+      })
+
+      totalCrashRate += metricsObj.crashRate || 0
+      totalCrashRate7d += metricsObj.crashRate7dUserWeighted || 0
+      totalCrashRate28d += metricsObj.crashRate28dUserWeighted || 0
+      totalDistinctUsers += metricsObj.distinctUsers || 0
 
       return {
-        crashRate: metrics.crashRate || 0,
-        crashRate7dUserWeighted: metrics.crashRate7dUserWeighted || 0,
-        crashRate28dUserWeighted: metrics.crashRate28dUserWeighted || 0,
-        distinctUsers: metrics.distinctUsers || 0,
+        crashRate: metricsObj.crashRate || 0,
+        crashRate7dUserWeighted: metricsObj.crashRate7dUserWeighted || 0,
+        crashRate28dUserWeighted: metricsObj.crashRate28dUserWeighted || 0,
+        distinctUsers: metricsObj.distinctUsers || 0,
       }
     })
 
@@ -328,18 +346,24 @@ class GooglePlayReportingService {
     let totalDistinctUsers = 0
 
     const timeline = rows.map((row: any) => {
-      const metrics = row.metrics || {}
+      const metricsArray = row.metrics || []
 
-      totalAnrRate += metrics.anrRate || 0
-      totalAnrRate7d += metrics.anrRate7dUserWeighted || 0
-      totalAnrRate28d += metrics.anrRate28dUserWeighted || 0
-      totalDistinctUsers += metrics.distinctUsers || 0
+      // Converter array de métricas para objeto
+      const metricsObj: any = {}
+      metricsArray.forEach((m: any) => {
+        metricsObj[m.metric] = Number.parseFloat(m.decimalValue?.value || '0')
+      })
+
+      totalAnrRate += metricsObj.anrRate || 0
+      totalAnrRate7d += metricsObj.anrRate7dUserWeighted || 0
+      totalAnrRate28d += metricsObj.anrRate28dUserWeighted || 0
+      totalDistinctUsers += metricsObj.distinctUsers || 0
 
       return {
-        anrRate: metrics.anrRate || 0,
-        anrRate7dUserWeighted: metrics.anrRate7dUserWeighted || 0,
-        anrRate28dUserWeighted: metrics.anrRate28dUserWeighted || 0,
-        distinctUsers: metrics.distinctUsers || 0,
+        anrRate: metricsObj.anrRate || 0,
+        anrRate7dUserWeighted: metricsObj.anrRate7dUserWeighted || 0,
+        anrRate28dUserWeighted: metricsObj.anrRate28dUserWeighted || 0,
+        distinctUsers: metricsObj.distinctUsers || 0,
       }
     })
 
@@ -390,7 +414,7 @@ class GooglePlayReportingService {
 
       const response = await axios.get(url, {
         headers: {
-          Authorization: `Bearer ${accessToken.token}`,
+          'Authorization': `Bearer ${accessToken.token}`,
           'Content-Type': 'application/json',
         },
         validateStatus: () => true, // Aceita qualquer status para vermos o erro
@@ -454,8 +478,13 @@ class GooglePlayReportingService {
       console.log('🌐 URL:', url)
 
       const requestBody = {
-        dimensions: [],  // Sem dimensões para pegar agregado total
-        metrics: ['crashRate', 'crashRate7dUserWeighted', 'crashRate28dUserWeighted', 'distinctUsers'],
+        dimensions: [], // Sem dimensões para pegar agregado total
+        metrics: [
+          'crashRate',
+          'crashRate7dUserWeighted',
+          'crashRate28dUserWeighted',
+          'distinctUsers',
+        ],
         timelineSpec: {
           aggregationPeriod: 'DAILY',
           startTime: {
@@ -475,7 +504,7 @@ class GooglePlayReportingService {
 
       const response = await axios.post(url, requestBody, {
         headers: {
-          Authorization: `Bearer ${accessToken.token}`,
+          'Authorization': `Bearer ${accessToken.token}`,
           'Content-Type': 'application/json',
         },
         validateStatus: () => true,

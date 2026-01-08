@@ -64,12 +64,18 @@ export default function ReadingHistoryScreen() {
     });
     
     return Array.from(dayMap.entries())
-      .map(([day, readings]) => ({
-        day,
-        readings,
-        isCompleted: readings.every(r => r.isCompleted),
-        completedAt: readings[0]?.completedAt || null,
-      }))
+      .map(([day, readings]) => {
+        // Pegar a data de conclusão do primeiro item, ou usar updatedAt como fallback
+        const firstReading = readings[0];
+        let dateToUse = firstReading?.completedAt || firstReading?.updatedAt || null;
+        
+        return {
+          day,
+          readings,
+          isCompleted: readings.every(r => r.isCompleted),
+          completedAt: dateToUse,
+        };
+      })
       .sort((a, b) => a.day - b.day);
   };
 
@@ -83,29 +89,28 @@ export default function ReadingHistoryScreen() {
         setPlan(planResponse.data.plan);
       }
       
-      // Carregar TODAS as leituras do plano (não apenas histórico)
+      // Carregar TODAS as leituras do plano
       const response = await authService.getAllPlanReadings();
       
       if (response.success && response.data) {
         setHistory(response.data);
         
-        // Separar leituras concluídas e próximas
+        // Separar leituras concluídas e não concluídas
         const completed = response.data.filter(item => item.isCompleted);
-        
-        // Agrupar próximas leituras por dia
-        const upcomingByDay = groupByDay(
-          response.data
-            .filter(item => !item.isCompleted)
-            .sort((a, b) => a.day - b.day)
-        );
+        const notCompleted = response.data.filter(item => !item.isCompleted);
         
         console.log('Total de leituras do plano:', response.data.length);
         console.log('Leituras concluídas:', completed.length);
-        console.log('Próximas leituras (dias):', upcomingByDay.length);
+        console.log('Leituras não concluídas:', notCompleted.length);
+        
+        // Agrupar próximas leituras por dia
+        const upcomingByDay = groupByDay(notCompleted.sort((a, b) => a.day - b.day));
         
         // Pegar próximos 5 dias
         setUpcomingReadings(upcomingByDay.slice(0, 5));
-        groupByMonth(completed);
+        
+        // Agrupar leituras concluídas por mês (já ordena por data decrescente)
+        groupCompletedByMonth(completed);
       }
     } catch (error) {
       console.error('Erro ao carregar histórico:', error);
@@ -114,20 +119,36 @@ export default function ReadingHistoryScreen() {
     }
   };
 
-  const groupByMonth = (items: ReadingHistoryItem[]) => {
+  const groupCompletedByMonth = (completedItems: ReadingHistoryItem[]) => {
     const grouped: GroupedHistory = {};
     
     // Agrupar por dia primeiro
-    const dayReadings = groupByDay(items);
+    const dayReadings = groupByDay(completedItems);
     
-    // Ordenar por updatedAt desc
+    // Ordenar por data de conclusão (mais recente primeiro)
     const sortedDays = dayReadings
+      .filter(dayReading => {
+        // Verificar se tem data válida
+        if (!dayReading.completedAt) return false;
+        
+        try {
+          const date = new Date(dayReading.completedAt);
+          const timestamp = date.getTime();
+          return !isNaN(timestamp) && date.getFullYear() >= 2020;
+        } catch (error) {
+          return false;
+        }
+      })
       .sort((a, b) => {
-        const dateA = a.completedAt ? new Date(a.completedAt).getTime() : 0;
-        const dateB = b.completedAt ? new Date(b.completedAt).getTime() : 0;
+        // Ordenar do mais recente para o mais antigo
+        const dateA = new Date(a.completedAt!).getTime();
+        const dateB = new Date(b.completedAt!).getTime();
         return dateB - dateA;
       });
     
+    console.log('Total de dias com leituras concluídas válidas:', sortedDays.length);
+    
+    // Agrupar por mês/ano
     sortedDays.forEach(dayReading => {
       const date = new Date(dayReading.completedAt!);
       const monthYear = date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
@@ -408,60 +429,78 @@ export default function ReadingHistoryScreen() {
             </Text>
           </View>
         ) : (
-          Object.keys(groupedHistory).map(monthYear => (
+          Object.keys(groupedHistory).map((monthYear, monthIndex) => (
             <View key={monthYear} style={styles.monthSection}>
-              <Text style={[styles.monthTitle, { color: colors.accent, fontSize: applyFontScale(18) }]}>
+              <Text style={[styles.monthTitle, { color: colors.accent, fontSize: applyFontScale(16) }]}>
                 {monthYear.charAt(0).toUpperCase() + monthYear.slice(1)}
               </Text>
               
-              {groupedHistory[monthYear].slice(0, 5).map(dayReading => (
-                <View
-                  key={dayReading.day}
-                  style={[styles.historyCard, { backgroundColor: colors.card, borderLeftColor: colors.success }]}
-                >
-                  <View style={styles.historyInfo}>
-                    <View style={[styles.dayBadge, { backgroundColor: colors.success }]}>
-                      <Text style={[styles.dayNumber, { fontSize: applyFontScale(16) }]}>
-                        Dia {dayReading.day}
-                      </Text>
-                    </View>
-                    <View style={styles.readingDetails}>
-                      {dayReading.readings.map((reading, index) => (
-                        <Text 
-                          key={reading.id}
-                          style={[
-                            styles.bookName, 
-                            { 
-                              color: colors.textPrimary, 
-                              fontSize: applyFontScale(16),
-                              marginBottom: index < dayReading.readings.length - 1 ? 4 : 0
-                            }
-                          ]}
-                        >
-                          {reading.bookName} {reading.startChapter}
-                          {reading.endChapter !== reading.startChapter && `-${reading.endChapter}`}
-                        </Text>
-                      ))}
-                      <Text style={[styles.completedDate, { color: colors.textSecondary, fontSize: applyFontScale(12), marginTop: 4 }]}>
-                        {new Date(dayReading.completedAt!).toLocaleDateString('pt-BR', {
-                          day: '2-digit',
-                          month: '2-digit',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </Text>
-                    </View>
-                  </View>
-                  
-                  <TouchableOpacity
-                    style={[styles.unmarkButton, { backgroundColor: colors.danger }]}
-                    onPress={() => handleToggleReading(dayReading)}
+              {groupedHistory[monthYear].map((dayReading, dayIndex) => {
+                // A primeira leitura do primeiro mês é a mais recente (pode marcar/desmarcar)
+                const isLatestReading = monthIndex === 0 && dayIndex === 0;
+                
+                return (
+                  <View
+                    key={dayReading.day}
+                    style={[
+                      styles.historyCard, 
+                      { 
+                        backgroundColor: colors.card, 
+                        borderLeftColor: colors.success,
+                        opacity: isLatestReading ? 1 : 0.6
+                      }
+                    ]}
                   >
-                    <Ionicons name="close-circle" size={20} color="#fff" />
-                  </TouchableOpacity>
-                </View>
-              ))}
+                    <View style={styles.historyInfo}>
+                      <View style={[styles.dayBadge, { backgroundColor: colors.success }]}>
+                        <Text style={[styles.dayNumber, { fontSize: applyFontScale(16) }]}>
+                          Dia {dayReading.day}
+                        </Text>
+                      </View>
+                      <View style={styles.readingDetails}>
+                        {dayReading.readings.map((reading, index) => (
+                          <Text 
+                            key={reading.id}
+                            style={[
+                              styles.bookName, 
+                              { 
+                                color: colors.textPrimary, 
+                                fontSize: applyFontScale(16),
+                                marginBottom: index < dayReading.readings.length - 1 ? 4 : 0
+                              }
+                            ]}
+                          >
+                            {reading.bookName} {reading.startChapter}
+                            {reading.endChapter !== reading.startChapter && `-${reading.endChapter}`}
+                          </Text>
+                        ))}
+                        <Text style={[styles.completedDate, { color: colors.textSecondary, fontSize: applyFontScale(12), marginTop: 4 }]}>
+                          {new Date(dayReading.completedAt!).toLocaleDateString('pt-BR', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </Text>
+                      </View>
+                    </View>
+                    
+                    {isLatestReading ? (
+                      <TouchableOpacity
+                        style={[styles.unmarkButton, { backgroundColor: colors.danger }]}
+                        onPress={() => handleToggleReading(dayReading)}
+                      >
+                        <Ionicons name="close-circle" size={20} color="#fff" />
+                      </TouchableOpacity>
+                    ) : (
+                      <View style={[styles.unmarkButton, { backgroundColor: colors.textSecondary, opacity: 0.3 }]}>
+                        <Ionicons name="lock-closed" size={16} color="#fff" />
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
             </View>
           ))
         )}

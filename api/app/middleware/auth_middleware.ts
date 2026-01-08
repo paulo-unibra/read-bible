@@ -1,6 +1,6 @@
+import type { Authenticators } from '@adonisjs/auth/types'
 import type { HttpContext } from '@adonisjs/core/http'
 import type { NextFn } from '@adonisjs/core/types/http'
-import type { Authenticators } from '@adonisjs/auth/types'
 
 /**
  * Auth middleware is used authenticate HTTP requests and deny
@@ -19,7 +19,19 @@ export default class AuthMiddleware {
       guards?: (keyof Authenticators)[]
     } = {}
   ) {
-    await ctx.auth.authenticateUsing(options.guards, { loginRoute: this.redirectTo })
+    console.log('=== AUTH MIDDLEWARE ===')
+    console.log('Request URL:', ctx.request.url())
+    console.log('Request method:', ctx.request.method())
+    console.log('Has Authorization header:', !!ctx.request.header('authorization'))
+
+    try {
+      await ctx.auth.authenticateUsing(options.guards, { loginRoute: this.redirectTo })
+      console.log('Auth successful, user ID:', ctx.auth.user?.id)
+    } catch (error) {
+      console.error('Auth failed:', error.message)
+      throw error
+    }
+
     return next()
   }
 }
