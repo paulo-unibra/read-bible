@@ -49,11 +49,11 @@ async function testPlayConsole() {
 
       const parent = `apps/${packageName}`
 
-      const response = await playdeveloperreporting.vitals.installsreport.query({
+      const response = await playdeveloperreporting.vitals.crashrate.query({
         name: parent,
         requestBody: {
-          dimensions: ['DATE'],
-          metrics: ['INSTALLS'],
+          dimensions: [],
+          metrics: ['crashRate', 'distinctUsers'],
           timelineSpec: {
             aggregationPeriod: 'DAILY',
             startTime: {

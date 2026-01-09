@@ -1,5 +1,4 @@
 import env from '#start/env'
-import axios from 'axios'
 import { google } from 'googleapis'
 
 /**
@@ -412,32 +411,30 @@ class GooglePlayReportingService {
 
       console.log('🌐 URL:', url)
 
-      const response = await axios.get(url, {
+      const response = await fetch(url, {
+        method: 'GET',
         headers: {
           'Authorization': `Bearer ${accessToken.token}`,
           'Content-Type': 'application/json',
         },
-        validateStatus: () => true, // Aceita qualquer status para vermos o erro
       })
+
+      const data = await response.json().catch(() => ({}))
 
       console.log('📨 Status:', response.status)
       console.log('📨 Status Text:', response.statusText)
-      console.log('📦 Data:', JSON.stringify(response.data, null, 2))
-      console.log('📋 Headers:', JSON.stringify(response.headers, null, 2))
+      console.log('📦 Data:', JSON.stringify(data, null, 2))
 
       return {
         success: response.status >= 200 && response.status < 300,
         status: response.status,
         statusText: response.statusText,
-        data: response.data,
-        headers: response.headers,
+        data: data,
       }
     } catch (error: any) {
       console.error('❌ Erro no teste direto:')
       console.error('   Mensagem:', error.message)
-      console.error('   Response:', error.response?.data)
-      console.error('   Status:', error.response?.status)
-      console.error('   Headers:', error.response?.headers)
+      console.error('   Stack:', error.stack)
 
       return {
         success: false,
@@ -502,23 +499,26 @@ class GooglePlayReportingService {
 
       console.log('📤 Request Body:', JSON.stringify(requestBody, null, 2))
 
-      const response = await axios.post(url, requestBody, {
+      const response = await fetch(url, {
+        method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken.token}`,
           'Content-Type': 'application/json',
         },
-        validateStatus: () => true,
+        body: JSON.stringify(requestBody),
       })
+
+      const data = await response.json().catch(() => ({}))
 
       console.log('📨 Status:', response.status)
       console.log('📨 Status Text:', response.statusText)
-      console.log('📦 Data:', JSON.stringify(response.data, null, 2))
+      console.log('📦 Data:', JSON.stringify(data, null, 2))
 
       return {
         success: response.status >= 200 && response.status < 300,
         status: response.status,
         statusText: response.statusText,
-        data: response.data,
+        data: data,
       }
     } catch (error: any) {
       console.error('❌ Erro no teste direto query:')

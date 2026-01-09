@@ -56,10 +56,9 @@ export default class PlayStoreReportsController {
         })
       }
 
-      const metrics = await googlePlayReportingService.getInstallMetrics(
+      const metrics = await googlePlayReportingService.getGeneralStats(
         packageName,
-        startDate,
-        endDate
+        30 // últimos 30 dias
       )
 
       return response.ok({
