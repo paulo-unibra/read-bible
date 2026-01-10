@@ -1,6 +1,6 @@
+import ReadingPlanConverterService from '#services/reading_plan_converter_service'
 import { BaseCommand, args } from '@adonisjs/core/ace'
 import type { CommandOptions } from '@adonisjs/core/types/ace'
-import ReadingPlanConverterService from '#services/reading_plan_converter_service'
 
 export default class ConvertPlanTo365 extends BaseCommand {
   static commandName = 'plan:convert-to-365'
@@ -18,7 +18,7 @@ export default class ConvertPlanTo365 extends BaseCommand {
 
     this.logger.info('🔄 Iniciando conversão do plano para 365 dias...')
 
-    const planIdNum = parseInt(this.planId, 10)
+    const planIdNum = Number.parseInt(this.planId, 10)
 
     if (isNaN(planIdNum)) {
       this.logger.error('❌ ID do plano inválido. Deve ser um número.')

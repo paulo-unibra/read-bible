@@ -88,10 +88,11 @@ export default class ReadingPlanConverterService {
       }
 
       // Calcular novo currentDay baseado no progresso
-      const maxCompletedDay = Array.from(newDayGroups.entries())
-        .filter(([_, readings]) => readings.some((r) => r.isCompleted))
-        .map(([day, _]) => day)
-        .sort((a, b) => b - a)[0] || 1
+      const maxCompletedDay =
+        Array.from(newDayGroups.entries())
+          .filter(([_, readings]) => readings.some((r) => r.isCompleted))
+          .map(([day, _]) => day)
+          .sort((a, b) => b - a)[0] || 1
 
       // Atualizar o plano
       // Ajustar startDate para o primeiro dia do ANO ATUAL (não do ano do plano)

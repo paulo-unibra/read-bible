@@ -1,6 +1,5 @@
 import ReadingPlan from '#models/reading_plan'
 import ReadingProgress from '#models/reading_progress'
-import { DateTime } from 'luxon'
 
 /**
  * Estrutura da Bíblia com número de capítulos por livro
@@ -140,9 +139,7 @@ export default class ReadingPlanRecalculatorService {
         const wasCompleted = oldCompletedReadings.length > 0
 
         // Se o dia estava completado, marca a nova leitura como completada
-        const completedAt = wasCompleted
-          ? oldCompletedReadings[0].completedAt
-          : null
+        const completedAt = wasCompleted ? oldCompletedReadings[0].completedAt : null
 
         await ReadingProgress.create({
           readingPlanId: planId,

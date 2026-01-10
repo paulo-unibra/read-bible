@@ -1,6 +1,6 @@
+import ReadingPlanRecalculatorService from '#services/reading_plan_recalculator_service'
 import { BaseCommand, args } from '@adonisjs/core/ace'
 import type { CommandOptions } from '@adonisjs/core/types/ace'
-import ReadingPlanRecalculatorService from '#services/reading_plan_recalculator_service'
 
 export default class RecalculatePlanBooks extends BaseCommand {
   static commandName = 'plan:recalculate-books'
@@ -18,7 +18,7 @@ export default class RecalculatePlanBooks extends BaseCommand {
 
     this.logger.info('📚 Iniciando recálculo dos livros do plano...')
 
-    const planIdNum = parseInt(this.planId, 10)
+    const planIdNum = Number.parseInt(this.planId, 10)
 
     if (isNaN(planIdNum)) {
       this.logger.error('❌ ID do plano inválido. Deve ser um número.')
@@ -45,7 +45,7 @@ export default class RecalculatePlanBooks extends BaseCommand {
       )
     } else {
       this.logger.info('✅ Nenhuma duplicata encontrada neste plano.')
-      
+
       const shouldContinue = await this.prompt.confirm(
         'O plano parece estar correto. Deseja recalcular mesmo assim?'
       )
