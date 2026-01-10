@@ -113,6 +113,10 @@ router
       .group(() => {
         router.get('/users', [AdminAuthController, 'listUsers'])
         router.get('/users/stats', [AdminAuthController, 'usersStats'])
+        router.get('/users/:userId/convertible-plans', [AdminAuthController, 'getUserConvertiblePlans'])
+        router.post('/users/:userId/convert-plan', [AdminAuthController, 'convertUserPlanTo365Days'])
+        router.post('/users/:userId/recalculate-plan', [AdminAuthController, 'recalculateUserPlanBooks'])
+        router.get('/users/:userId/plan/:planId/check-duplicates', [AdminAuthController, 'checkUserPlanForDuplicates'])
         router.get('/permissions', [AdminAuthController, 'listPermissions'])
         router.post('/permissions', [AdminAuthController, 'createPermission'])
         router.get('/roles', [AdminAuthController, 'listRoles'])

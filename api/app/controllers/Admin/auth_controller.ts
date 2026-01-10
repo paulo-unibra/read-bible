@@ -1,6 +1,8 @@
 import Permission from '#models/permission'
 import Role from '#models/role'
 import User from '#models/user'
+import ReadingPlanConverterService from '#services/reading_plan_converter_service'
+import ReadingPlanRecalculatorService from '#services/reading_plan_recalculator_service'
 import type { HttpContext } from '@adonisjs/core/http'
 import hash from '@adonisjs/core/services/hash'
 
@@ -149,7 +151,9 @@ export default class AuthController {
             } else {
               // Calcular quantos dias se passaram desde o início
               const startDate = readingPlan.startDate.toJSDate()
+              startDate.setHours(0, 0, 0, 0)
               const today = new Date()
+              today.setHours(0, 0, 0, 0)
               const daysPassed = Math.floor(
                 (today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
               )
@@ -235,7 +239,9 @@ export default class AuthController {
               status = 'not_started'
             } else {
               const startDate = readingPlan.startDate.toJSDate()
+              startDate.setHours(0, 0, 0, 0)
               const today = new Date()
+              today.setHours(0, 0, 0, 0)
               const daysPassed = Math.floor(
                 (today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
               )
@@ -431,6 +437,153 @@ export default class AuthController {
       console.error('Erro ao remover permissão da role:', error)
       return response.internalServerError({
         error: 'Erro ao remover permissão da role'
+      })
+    }
+  }
+
+  /**
+   * Converte um plano de leitura de um usuário para 365 dias
+   */
+  async convertUserPlanTo365Days({ request, response, params }: HttpContext) {
+    try {
+      const { userId } = params
+      const { planId } = request.only(['planId'])
+
+      if (!planId) {
+        return response.badRequest({
+          error: 'ID do plano é obrigatório'
+        })
+      }
+
+      console.log(`🔄 [Admin] Convertendo plano ${planId} do usuário ${userId} para 365 dias...`)
+
+      const converterService = new ReadingPlanConverterService()
+      const result = await converterService.convertTo365Days(planId)
+
+      if (result.success) {
+        console.log(`✅ [Admin] Plano ${planId} convertido com sucesso!`)
+        return response.ok(result)
+      } else {
+        console.log(`❌ [Admin] Falha ao converter plano ${planId}:`, result.message)
+        return response.badRequest(result)
+      }
+    } catch (error) {
+      console.error('❌ [Admin] Erro ao converter plano:', error)
+      return response.internalServerError({
+        error: 'Erro ao converter plano para 365 dias',
+        message: error.message
+      })
+    }
+  }
+
+  /**
+   * Lista planos de um usuário que podem ser convertidos (> 365 dias)
+   */
+  async getUserConvertiblePlans({ response, params }: HttpContext) {
+    try {
+      const { userId } = params
+
+      const user = await User.find(userId)
+      if (!user) {
+        return response.notFound({
+          error: 'Usuário não encontrado'
+        })
+      }
+
+      await user.load('readingPlans', (query) => {
+        query.where('total_days', '>', 365).orderBy('total_days', 'desc')
+      })
+
+      const plans = user.readingPlans.map((plan) => ({
+        id: plan.id,
+        name: plan.name,
+        type: plan.type,
+        totalDays: plan.totalDays,
+        currentDay: plan.currentDay,
+        startDate: plan.startDate,
+        endDate: plan.endDate,
+        isActive: plan.isActive,
+        completedChapters: plan.completedChapters,
+      }))
+
+      return response.ok({
+        userId: user.id,
+        userEmail: user.email,
+        convertiblePlans: plans,
+      })
+    } catch (error) {
+      console.error('❌ [Admin] Erro ao listar planos convertíveis:', error)
+      return response.internalServerError({
+        error: 'Erro ao listar planos convertíveis',
+      })
+    }
+  }
+
+  /**
+   * Recalcula os livros de um plano de leitura corrigindo erros
+   */
+  async recalculateUserPlanBooks({ request, response, params }: HttpContext) {
+    try {
+      const { userId } = params
+      const { planId } = request.only(['planId'])
+
+      let targetPlanId = planId
+
+      // Se não foi fornecido planId, buscar o plano ativo do usuário
+      if (!targetPlanId) {
+        const { default: ReadingPlan } = await import('#models/reading_plan')
+        const activePlan = await ReadingPlan.query()
+          .where('user_id', userId)
+          .where('is_active', true)
+          .first()
+
+        if (!activePlan) {
+          return response.badRequest({
+            error: 'Usuário não possui plano ativo',
+          })
+        }
+
+        targetPlanId = activePlan.id
+      }
+
+      console.log(
+        `🔄 [Admin] Recalculando livros do plano ${targetPlanId} do usuário ${userId}...`
+      )
+
+      const recalculatorService = new ReadingPlanRecalculatorService()
+      const result = await recalculatorService.recalculatePlanBooks(targetPlanId)
+
+      if (result.success) {
+        console.log(`✅ [Admin] Plano ${targetPlanId} recalculado com sucesso!`)
+        return response.ok(result)
+      } else {
+        console.log(`❌ [Admin] Falha ao recalcular plano ${targetPlanId}:`, result.message)
+        return response.badRequest(result)
+      }
+    } catch (error) {
+      console.error('❌ [Admin] Erro ao recalcular plano:', error)
+      return response.internalServerError({
+        error: 'Erro ao recalcular livros do plano',
+        message: error.message,
+      })
+    }
+  }
+
+  /**
+   * Verifica se um plano tem problemas de livros duplicados
+   */
+  async checkUserPlanForDuplicates({ response, params }: HttpContext) {
+    try {
+      const { userId, planId } = params
+
+      const recalculatorService = new ReadingPlanRecalculatorService()
+      const result = await recalculatorService.checkPlanForDuplicateBooks(parseInt(planId))
+
+      return response.ok(result)
+    } catch (error) {
+      console.error('❌ [Admin] Erro ao verificar duplicatas:', error)
+      return response.internalServerError({
+        error: 'Erro ao verificar duplicatas no plano',
       })
     }
   }

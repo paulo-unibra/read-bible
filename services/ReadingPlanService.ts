@@ -9,6 +9,7 @@ export class ReadingPlanService {
     try {
       // Criar plano anual local (não usa backend, apenas SQLite local como os templates)
       const startDate = new Date();
+      startDate.setHours(0, 0, 0, 0);
       const endDate = new Date(startDate.getFullYear(), 11, 31, 23, 59, 59);
       const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
       
@@ -96,6 +97,7 @@ export class ReadingPlanService {
       console.log('👤 Usuário autenticado:', user.email);
       
       const startDate = new Date();
+      startDate.setHours(0, 0, 0, 0);
       const endDate = new Date(startDate.getFullYear(), 11, 31, 23, 59, 59);
       const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
       
@@ -203,6 +205,7 @@ export class ReadingPlanService {
       });
 
       const startDate = new Date();
+      startDate.setHours(0, 0, 0, 0);
       let endDate = new Date(startDate);
 
       // Calculate end date based on template type
@@ -608,14 +611,16 @@ export class ReadingPlanService {
   }
 
   async getTodayReading(planId: string): Promise<ReadingPlanDay | null> {
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayStr = today.toISOString().split('T')[0];
     
     await DatabaseService.init();
     const db = (DatabaseService as any).db;
     
     const result = await db.getFirstAsync(
       'SELECT * FROM reading_plan_days WHERE planId = ? AND date LIKE ?',
-      [planId, `${today}%`]
+      [planId, `${todayStr}%`]
     ) as any;
     
     if (!result) return null;

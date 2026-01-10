@@ -122,19 +122,23 @@ export default function ReadingPlansScreen() {
     });
     
     // Mark today
-    const today = new Date().toISOString().split('T')[0];
-    if (marked[today]) {
-      marked[today].selected = true;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayStr = today.toISOString().split('T')[0];
+    if (marked[todayStr]) {
+      marked[todayStr].selected = true;
     } else {
-      marked[today] = { selected: true, selectedColor: '#FF9800' };
+      marked[todayStr] = { selected: true, selectedColor: '#FF9800' };
     }
     
     return marked;
   };
 
   const getTodayReading = () => {
-    const today = new Date().toISOString().split('T')[0];
-    return planDays.find(day => day.date.startsWith(today));
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayStr = today.toISOString().split('T')[0];
+    return planDays.find(day => day.date.startsWith(todayStr));
   };
 
   const renderPlan = ({ item }: { item: ReadingPlan }) => (

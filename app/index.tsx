@@ -638,7 +638,13 @@ export default function HomeScreen() {
               {(() => {
                 // Calcular status baseado nas leituras realmente concluídas
                 const today = new Date();
-                const planStartDate = new Date(readingPlan.startDate);
+                today.setHours(0, 0, 0, 0);
+                
+                // Extrair apenas a parte da data (YYYY-MM-DD) para evitar problemas de timezone
+                const startDateStr = readingPlan.startDate.split('T')[0]; // "2026-01-01"
+                const [year, month, day] = startDateStr.split('-').map(Number);
+                const planStartDate = new Date(year, month - 1, day); // Mês é 0-indexed
+                planStartDate.setHours(0, 0, 0, 0);
                 
                 console.log('=== STATUS BADGE CALCULATION ===');
                 console.log('Today:', today.toISOString());
@@ -652,27 +658,32 @@ export default function HomeScreen() {
                 
                 console.log('Days passed:', daysPassed);
                 
-                // Dias esperados = dias passados + 1 (incluindo hoje)
-                const expectedDays = Math.min(daysPassed + 1, readingPlan.totalDays);
-                
-                console.log('Expected days:', expectedDays);
-                console.log('Total days in plan:', readingPlan.totalDays);
-                
                 // Contar quantas leituras foram realmente concluídas
                 const completedDays = readingPlan.completedDays || 0;
                 
                 console.log('Completed days:', completedDays);
+                console.log('Current day (next uncompleted):', readingPlan.currentDay);
                 
-                // Verificar se ainda não leu hoje (leitura de hoje pendente)
-                const hasNotReadToday = completedDays === expectedDays - 1;
+                // Dia que DEVERIA estar baseado na data (quantos dias já se passaram)
+                // Se começou dia 1/1 e hoje é 10/1, já se passaram 9 dias, então hoje é o dia 10
+                const expectedDayByDate = Math.min(daysPassed + 1, readingPlan.totalDays);
                 
-                // Verificar se está atrasado
-                const isLate = completedDays < expectedDays - 1;
-                const daysLate = expectedDays - completedDays - 1;
+                console.log('Expected day by date:', expectedDayByDate);
+                console.log('Total days in plan:', readingPlan.totalDays);
                 
-                console.log('Has not read today:', hasNotReadToday);
+                // Calcular status:
+                // - Se completou MENOS que o dia esperado - 1, está atrasado
+                // - Se completou EXATAMENTE o dia esperado - 1, está pendente hoje
+                // - Se completou IGUAL OU MAIS que o dia esperado, está em dia
+                
+                const isLate = completedDays < (expectedDayByDate - 1);
+                const hasNotReadToday = completedDays === (expectedDayByDate - 1);
+                const daysLate = isLate ? (expectedDayByDate - 1 - completedDays) : 0;
+                
                 console.log('Is late:', isLate);
+                console.log('Has not read today:', hasNotReadToday);
                 console.log('Days late:', daysLate);
+                console.log('Calculation: completedDays =', completedDays, ', expectedDayByDate - 1 =', expectedDayByDate - 1);
                 console.log('=== END STATUS CALCULATION ===');
                 
                 if (isLate) {
