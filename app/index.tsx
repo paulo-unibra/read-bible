@@ -716,23 +716,44 @@ export default function HomeScreen() {
                 }
               })()}
             </View>
-            <View style={styles.readingInfo}>
-              <Text
-                style={[
-                  styles.readingText,
-                  { color: colors.textSecondary, fontSize: applyFontScale(16) },
-                ]}
-              >
-                {todayReadings.map((reading, index) => (
-                  <Text key={reading.id}>
-                    {reading.bookName} {reading.startChapter}
-                    {reading.endChapter !== reading.startChapter
-                      ? `-${reading.endChapter}`
-                      : ""}
-                    {index < todayReadings.length - 1 ? ", " : ""}
-                  </Text>
-                ))}
-              </Text>
+            <TouchableOpacity 
+              style={styles.readingInfo}
+              onPress={() => {
+                router.push({
+                  pathname: '/daily-reading',
+                  params: {
+                    readings: JSON.stringify(todayReadings),
+                    hasLocalPlan: hasLocalPlan.toString(),
+                    todayDayId: todayDayId || undefined,
+                    dayNumber: todayReadings[0]?.day?.toString() || undefined,
+                  },
+                });
+              }}
+            >
+              <View style={styles.readingTextContainer}>
+                <Text
+                  style={[
+                    styles.readingText,
+                    { color: colors.textSecondary, fontSize: applyFontScale(16) },
+                  ]}
+                >
+                  {todayReadings.map((reading, index) => (
+                    <Text key={reading.id}>
+                      {reading.bookName} {reading.startChapter}
+                      {reading.endChapter !== reading.startChapter
+                        ? `-${reading.endChapter}`
+                        : ""}
+                      {index < todayReadings.length - 1 ? ", " : ""}
+                    </Text>
+                  ))}
+                </Text>
+                <Ionicons 
+                  name="arrow-forward" 
+                  size={20} 
+                  color={colors.accent} 
+                  style={styles.readingArrow}
+                />
+              </View>
               <Text
                 style={[
                   styles.readingProgress,
@@ -763,7 +784,7 @@ export default function HomeScreen() {
                   ]}
                 />
               </View>
-            </View>
+            </TouchableOpacity>
             {!todayReadings[0].isCompleted ? (
               <TouchableOpacity
                 style={[
@@ -1386,4 +1407,12 @@ const styles = StyleSheet.create({
   disabledButtonText: { color: "#eee" },
   disabledText: { opacity: 0.7 },
   readingProgress: { fontSize: 14, color: "#666", marginTop: 8 },
+  readingTextContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  readingArrow: {
+    marginLeft: 8,
+  },
 });

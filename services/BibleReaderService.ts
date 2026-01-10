@@ -948,6 +948,92 @@ export class BibleReaderService {
     
     return [...new Set(variations)]; // Remove duplicatas
   }
+
+  /**
+   * Busca a referência cruzada para um versículo específico
+   */
+  async getCrossReference(bibleId: string, bookName: string, chapterNumber: number, verseNumber: number): Promise<string | null> {
+    try {
+      const db = this.bibleConnections.get(bibleId);
+      if (!db) {
+        throw new Error(`Bíblia ${bibleId} não está aberta`);
+      }
+
+      // Buscar o livro pelo nome
+      const books = await this.getBooks(bibleId);
+      const book = books.find(b => b.name.toLowerCase() === bookName.toLowerCase());
+      
+      if (!book) {
+        console.warn(`Livro não encontrado: ${bookName}`);
+        return null;
+      }
+
+      // Buscar o versículo completo
+      const result = await db.getAllAsync<{content: string}>(
+        'SELECT content FROM verses WHERE book_id = ? AND chapter = ? AND verse = ?',
+        [book.id, chapterNumber, verseNumber]
+      );
+
+      if (result.length === 0) {
+        return null;
+      }
+
+      // Parse do conteúdo para extrair referências cruzadas
+      const parsed = this.parseVerseContent(result[0].content);
+      
+      if (parsed.crossReferences && parsed.crossReferences.length > 0) {
+        return parsed.crossReferences.join('\n\n');
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Erro ao buscar referência cruzada:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Busca a nota de rodapé para um versículo específico
+   */
+  async getFootnote(bibleId: string, bookName: string, chapterNumber: number, verseNumber: number): Promise<string | null> {
+    try {
+      const db = this.bibleConnections.get(bibleId);
+      if (!db) {
+        throw new Error(`Bíblia ${bibleId} não está aberta`);
+      }
+
+      // Buscar o livro pelo nome
+      const books = await this.getBooks(bibleId);
+      const book = books.find(b => b.name.toLowerCase() === bookName.toLowerCase());
+      
+      if (!book) {
+        console.warn(`Livro não encontrado: ${bookName}`);
+        return null;
+      }
+
+      // Buscar o versículo completo
+      const result = await db.getAllAsync<{content: string}>(
+        'SELECT content FROM verses WHERE book_id = ? AND chapter = ? AND verse = ?',
+        [book.id, chapterNumber, verseNumber]
+      );
+
+      if (result.length === 0) {
+        return null;
+      }
+
+      // Parse do conteúdo para extrair notas
+      const parsed = this.parseVerseContent(result[0].content);
+      
+      if (parsed.notes && parsed.notes.length > 0) {
+        return parsed.notes.join('\n\n');
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Erro ao buscar nota de rodapé:', error);
+      return null;
+    }
+  }
 }
 
 export default new BibleReaderService();
