@@ -1,6 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
+import Slider from '@react-native-community/slider';
+import { Audio } from 'expo-av';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     ScrollView,
@@ -12,8 +14,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AdBanner from '../components/AdBanner';
+import HymnAudioMixer from '../components/HymnAudioMixer';
 import DatabaseService from '../services/DatabaseService';
 import harpaService, { Hymn, HymnVerse } from '../services/HarpaService';
+import hymnAudioService, { HymnAudioTrack } from '../services/HymnAudioService';
+
 export default function HymnViewerScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -25,9 +30,32 @@ export default function HymnViewerScreen() {
   const [fontSizePref, setFontSizePref] = useState<'small' | 'medium' | 'large'>('medium');
   const [hymnFontSize, setHymnFontSize] = useState<'small' | 'medium' | 'large'>('medium');
 
+  // Estados do player de áudio
+  const [audioTracks, setAudioTracks] = useState<HymnAudioTrack[]>([]);
+  const [isLoadingAudio, setIsLoadingAudio] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [position, setPosition] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [showMixer, setShowMixer] = useState(false);
+  const playbackInterval = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
     loadSettings();
     loadHymn();
+    loadAudio();
+    
+    // Configurar modo de áudio
+    Audio.setAudioModeAsync({
+      allowsRecordingIOS: false,
+      playsInSilentModeIOS: true,
+      staysActiveInBackground: true,
+      shouldDuckAndroid: true,
+    });
+
+    // Cleanup ao desmontar
+    return () => {
+      cleanupAudio();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -64,6 +92,147 @@ export default function HymnViewerScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadAudio = async () => {
+    try {
+      setIsLoadingAudio(true);
+      console.log(`🎵 Buscando áudios do hino ${hymnNumber}...`);
+      
+      const tracks = await hymnAudioService.searchHymnAudios(hymnNumber);
+      
+      if (tracks.length > 0) {
+        console.log(`✅ ${tracks.length} áudios encontrados, carregando...`);
+        const loadedTracks = await hymnAudioService.loadAllTracks(tracks);
+        setAudioTracks(loadedTracks);
+        
+        // Obter duração do primeiro áudio
+        const firstDuration = await hymnAudioService.getDuration(loadedTracks);
+        setDuration(firstDuration);
+        
+        console.log(`✅ Áudios carregados com sucesso!`);
+      } else {
+        console.log(`ℹ️ Nenhum áudio disponível para o hino ${hymnNumber}`);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar áudios:', error);
+    } finally {
+      setIsLoadingAudio(false);
+    }
+  };
+
+  const cleanupAudio = async () => {
+    if (playbackInterval.current) {
+      clearInterval(playbackInterval.current);
+    }
+    
+    if (audioTracks.length > 0) {
+      await hymnAudioService.stopAll(audioTracks);
+      await hymnAudioService.unloadAll(audioTracks);
+    }
+  };
+
+  const startPlaybackInterval = () => {
+    if (playbackInterval.current) {
+      clearInterval(playbackInterval.current);
+    }
+    
+    playbackInterval.current = setInterval(async () => {
+      const currentPosition = await hymnAudioService.getPosition(audioTracks);
+      setPosition(currentPosition);
+      
+      // Se chegou ao fim, parar
+      if (currentPosition >= duration - 100) {
+        await handleStop();
+      }
+    }, 100);
+  };
+
+  const handlePlayPause = async () => {
+    try {
+      if (audioTracks.length === 0) {
+        console.log('ℹ️ Nenhum áudio disponível');
+        return;
+      }
+
+      if (isPlaying) {
+        await hymnAudioService.pauseAll(audioTracks);
+        setIsPlaying(false);
+        if (playbackInterval.current) {
+          clearInterval(playbackInterval.current);
+        }
+      } else {
+        await hymnAudioService.playAll(audioTracks);
+        setIsPlaying(true);
+        startPlaybackInterval();
+      }
+    } catch (error) {
+      console.error('Erro ao tocar/pausar:', error);
+    }
+  };
+
+  const handleStop = async () => {
+    try {
+      await hymnAudioService.stopAll(audioTracks);
+      setIsPlaying(false);
+      setPosition(0);
+      if (playbackInterval.current) {
+        clearInterval(playbackInterval.current);
+      }
+    } catch (error) {
+      console.error('Erro ao parar:', error);
+    }
+  };
+
+  const handleSeek = async (value: number) => {
+    try {
+      await hymnAudioService.seekAll(audioTracks, value);
+      setPosition(value);
+    } catch (error) {
+      console.error('Erro ao buscar posição:', error);
+    }
+  };
+
+  const handleVolumeChange = async (trackIndex: number, volume: number) => {
+    try {
+      const updatedTracks = [...audioTracks];
+      updatedTracks[trackIndex].volume = volume;
+      
+      if (!updatedTracks[trackIndex].isMuted) {
+        await hymnAudioService.setTrackVolume(updatedTracks[trackIndex], volume);
+      }
+      
+      setAudioTracks(updatedTracks);
+    } catch (error) {
+      console.error('Erro ao ajustar volume:', error);
+    }
+  };
+
+  const handleMuteToggle = async (trackIndex: number) => {
+    try {
+      const updatedTracks = [...audioTracks];
+      const track = updatedTracks[trackIndex];
+      
+      // Inverter o estado de mute
+      track.isMuted = !track.isMuted;
+      
+      // Aplicar o novo volume baseado no novo estado
+      if (track.sound && track.isLoaded) {
+        const newVolume = track.isMuted ? 0 : track.volume;
+        await track.sound.setVolumeAsync(newVolume);
+      }
+      
+      setAudioTracks(updatedTracks);
+    } catch (error) {
+      console.error('Erro ao mutar/desmutar:', error);
+    }
+  };
+
+  const formatTime = (millis: number) => {
+    const totalSeconds = Math.floor(millis / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
   const applyFontScale = (base: number) => {
@@ -281,6 +450,86 @@ export default function HymnViewerScreen() {
           )}
         </View>
 
+        {/* Player de Áudio */}
+        {audioTracks.length > 0 && (
+          <View style={[styles.audioPlayer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.playerHeader}>
+              <Ionicons name="musical-notes" size={24} color={colors.accent} />
+              <Text style={[styles.playerTitle, { color: colors.textPrimary }]}>
+                Áudio do Hino
+              </Text>
+              {isLoadingAudio && <ActivityIndicator size="small" color={colors.accent} />}
+            </View>
+
+            {/* Controles principais */}
+            <View style={styles.playerControls}>
+              <TouchableOpacity 
+                onPress={handleStop}
+                style={styles.controlButton}
+                disabled={!isPlaying && position === 0}
+              >
+                <Ionicons 
+                  name="stop" 
+                  size={32} 
+                  color={(!isPlaying && position === 0) ? colors.textSecondary : colors.accent} 
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                onPress={handlePlayPause}
+                style={[styles.playButton, { backgroundColor: colors.accent }]}
+              >
+                <Ionicons 
+                  name={isPlaying ? 'pause' : 'play'} 
+                  size={36} 
+                  color="#fff" 
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                onPress={() => setShowMixer(!showMixer)}
+                style={styles.controlButton}
+              >
+                <Ionicons 
+                  name={showMixer ? 'options' : 'options-outline'} 
+                  size={32} 
+                  color={colors.accent} 
+                />
+              </TouchableOpacity>
+            </View>
+
+            {/* Barra de progresso */}
+            <View style={styles.progressContainer}>
+              <Text style={[styles.timeText, { color: colors.textSecondary }]}>
+                {formatTime(position)}
+              </Text>
+              <Slider
+                style={styles.progressSlider}
+                minimumValue={0}
+                maximumValue={duration}
+                value={position}
+                onSlidingComplete={handleSeek}
+                minimumTrackTintColor={colors.accent}
+                maximumTrackTintColor={colors.border}
+                thumbTintColor={colors.accent}
+              />
+              <Text style={[styles.timeText, { color: colors.textSecondary }]}>
+                {formatTime(duration)}
+              </Text>
+            </View>
+
+            {/* Mixer de áudio */}
+            {showMixer && (
+              <HymnAudioMixer
+                tracks={audioTracks}
+                onVolumeChange={handleVolumeChange}
+                onMuteToggle={handleMuteToggle}
+                isDark={isDark}
+              />
+            )}
+          </View>
+        )}
+
         {/* Verses */}
         <View style={styles.versesContent}>
           {hymn.verses.map((verse, index) => renderVerse(verse, index))}
@@ -414,6 +663,64 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 14,
+    textAlign: 'center',
+  },
+  audioPlayer: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 3,
+  },
+  playerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 16,
+  },
+  playerTitle: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  playerControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 24,
+    marginBottom: 16,
+  },
+  controlButton: {
+    padding: 8,
+  },
+  playButton: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  progressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  progressSlider: {
+    flex: 1,
+    height: 40,
+  },
+  timeText: {
+    fontSize: 12,
+    minWidth: 40,
     textAlign: 'center',
   },
 });

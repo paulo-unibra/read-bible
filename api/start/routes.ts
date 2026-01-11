@@ -23,6 +23,7 @@ const QuizController = () => import('#controllers/quiz_controller')
 const QuizResultController = () => import('#controllers/quiz_result_controller')
 const ReadingPlanController = () => import('#controllers/reading_plan_controller')
 const ReadingPlanTemplateController = () => import('#controllers/reading_plan_template_controller')
+const HymnAudiosController = () => import('#controllers/hymn_audios_controller')
 import router from '@adonisjs/core/services/router'
 import { middleware } from './kernel.js'
 
@@ -100,6 +101,11 @@ router
   .get('/curiosities/favorites', [BibleCuriositiesController, 'getFavorites'])
   .use(middleware.auth())
 
+// Hymn Audio routes (public para o app, admin para gerenciamento)
+// IMPORTANTE: Rota específica ANTES da rota com parâmetro
+router.get('/hymn-audios/stream/:fileId', [HymnAudiosController, 'streamAudio'])
+router.get('/hymn-audios/:hymnNumber', [HymnAudiosController, 'getByHymnNumber'])
+
 // Admin routes
 router
   .group(() => {
@@ -173,6 +179,13 @@ router
           AdminPlayStoreReportsController,
           'testDirectQuery',
         ])
+
+        // Hymn Audio Sync management
+        router.get('/hymn-audios/list', [HymnAudiosController, 'listHymnsWithAudio'])
+        router.get('/hymn-audios/search/:hymnNumber', [HymnAudiosController, 'searchInDrive'])
+        router.post('/hymn-audios', [HymnAudiosController, 'upsert'])
+        router.patch('/hymn-audios/:id/offset', [HymnAudiosController, 'updateOffset'])
+        router.delete('/hymn-audios/:id', [HymnAudiosController, 'delete'])
       })
       .use(middleware.auth({ guards: ['api'] }))
   })

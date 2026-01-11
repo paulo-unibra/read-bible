@@ -2,6 +2,8 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import ProtectedRoute from './components/ProtectedRoute'
 import { AuthProvider } from './contexts/AuthContext'
 import Dashboard from './pages/Dashboard'
+import HymnAudioList from './pages/HymnAudioList/HymnAudioList'
+import HymnAudioManager from './pages/HymnAudioManager/HymnAudioManager'
 import Login from './pages/Login'
 import Permissions from './pages/Permissions'
 import Quizzes from './pages/Quizzes'
@@ -60,6 +62,22 @@ function App() {
             element={
               <ProtectedRoute permission="visualizar_relatorios">
                 <Reports />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/hymn-audios"
+            element={
+              <ProtectedRoute permission="gerenciar_conteudo">
+                <HymnAudioList />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/hymn-audios/:hymnNumber"
+            element={
+              <ProtectedRoute permission="gerenciar_conteudo">
+                <HymnAudioManager />
               </ProtectedRoute>
             }
           />

@@ -114,6 +114,18 @@ const Dashboard: React.FC = () => {
               {hasPermission('gerenciar_roles') ? 'Acessar' : 'Sem permissão'}
             </button>
           </div>
+
+          <div className="dashboard-card">
+            <h3>🎵 Áudios de Hinos</h3>
+            <p>Gerenciar sincronização de áudios</p>
+            <button 
+              className="card-button" 
+              onClick={() => navigate('/admin/hymn-audios')}
+              disabled={!hasPermission('gerenciar_conteudo')}
+            >
+              {hasPermission('gerenciar_conteudo') ? 'Acessar' : 'Sem permissão'}
+            </button>
+          </div>
         </div>
       </main>
     </div>
