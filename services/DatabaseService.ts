@@ -741,6 +741,27 @@ class DatabaseService {
     };
   }
 
+  async getQuizStats(): Promise<{ completed: number; total: number } | null> {
+    return this.safeDbOperation(async () => {
+      await this.ensureInitialized();
+      if (!this.db) throw new Error("Database not initialized");
+
+      // Buscar estatísticas de questionários completados
+      const result = await this.db.getFirstAsync<{ completed: number }>(
+        "SELECT COUNT(*) as completed FROM quiz_results WHERE score >= 7"
+      );
+
+      const totalResult = await this.db.getFirstAsync<{ total: number }>(
+        "SELECT COUNT(*) as total FROM quiz_results"
+      );
+
+      return {
+        completed: result?.completed || 0,
+        total: totalResult?.total || 0,
+      };
+    }, 'getQuizStats');
+  }
+
   async clearAllData(): Promise<void> {
     return this.safeDbOperation(async () => {
       await this.ensureInitialized();

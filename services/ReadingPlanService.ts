@@ -524,8 +524,12 @@ export class ReadingPlanService {
   }
 
   async markDayAsCompleted(dayId: string): Promise<void> {
+    console.log(`📝 [markDayAsCompleted] Iniciando marcação do dia ${dayId}`);
+    
     await DatabaseService.init();
     const db = (DatabaseService as any).db;
+    
+    console.log('🔍 [markDayAsCompleted] Buscando informações do dia...');
     
     // Pegar o planId e o dayNumber do dia
     const day = await db.getFirstAsync(
@@ -533,9 +537,14 @@ export class ReadingPlanService {
       [dayId]
     );
     
+    console.log('📊 [markDayAsCompleted] Dia encontrado:', day);
+    
     if (!day) {
+      console.error('❌ [markDayAsCompleted] Dia de leitura não encontrado para ID:', dayId);
       throw new Error('Dia de leitura não encontrado');
     }
+    
+    console.log('💾 [markDayAsCompleted] Marcando dia como concluído no banco...');
     
     // Marcar o dia como concluído
     await db.runAsync(
@@ -543,33 +552,37 @@ export class ReadingPlanService {
       [new Date().toISOString(), dayId]
     );
     
+    console.log('📈 [markDayAsCompleted] Incrementando contador de dias completados...');
+    
     // Incrementar o contador de dias completados no plano
     await db.runAsync(
       'UPDATE reading_plans SET completedDays = completedDays + 1 WHERE id = ?',
       [day.planId]
     );
     
-    console.log(`✅ [ReadingPlanService] Dia ${dayId} (dia ${day.dayNumber}) marcado como concluído`);
+    console.log(`✅ [markDayAsCompleted] Dia ${dayId} (dia ${day.dayNumber}) marcado como concluído`);
     
     // Tentar sincronizar com backend (se estiver autenticado)
     try {
+      console.log('🔄 [markDayAsCompleted] Verificando autenticação para sincronização...');
       const authService = (await import('./AuthService')).default;
       const token = authService.getToken();
       
       if (token) {
-        console.log('☁️ Sincronizando conclusão de leitura com backend...');
+        console.log('☁️ [markDayAsCompleted] Sincronizando conclusão com backend...');
         const response = await authService.completeDay(day.dayNumber);
+        console.log('📥 [markDayAsCompleted] Resposta do backend:', response);
         
         if (response.success) {
-          console.log('✅ Leitura sincronizada com backend');
+          console.log('✅ [markDayAsCompleted] Leitura sincronizada com backend');
         } else {
-          console.warn('⚠️ Falha ao sincronizar com backend:', response.message);
+          console.warn('⚠️ [markDayAsCompleted] Falha ao sincronizar com backend:', response.message);
         }
       } else {
-        console.log('ℹ️ Usuário não autenticado - leitura mantida apenas localmente');
+        console.log('ℹ️ [markDayAsCompleted] Usuário não autenticado - leitura mantida apenas localmente');
       }
     } catch (backendError) {
-      console.warn('⚠️ Erro ao sincronizar com backend (leitura mantida localmente):', backendError);
+      console.warn('⚠️ [markDayAsCompleted] Erro ao sincronizar com backend (leitura mantida localmente):', backendError);
     }
   }
 
@@ -680,69 +693,105 @@ export class ReadingPlanService {
     // Calcular total de capítulos
     const totalOTChapters = oldTestamentBooks.reduce((sum, bookId) => sum + (bookChapters[bookId] || 1), 0);
     const totalNTChapters = newTestamentBooks.reduce((sum, bookId) => sum + (bookChapters[bookId] || 1), 0);
+    const totalChapters = totalOTChapters + totalNTChapters;
     
     console.log('  Total AT:', totalOTChapters, 'capítulos');
     console.log('  Total NT:', totalNTChapters, 'capítulos');
+    console.log('  Total geral:', totalChapters, 'capítulos');
     
-    // Calcular capítulos por dia para cada testamento
-    // NT: garantir pelo menos 1 capítulo por dia
-    const ntChaptersPerDay = Math.max(1, Math.ceil(totalNTChapters / totalDays));
-    // AT: distribuir o restante
-    const otChaptersPerDay = Math.ceil(totalOTChapters / totalDays);
+    // Calcular distribuição balanceada
+    const baseChaptersPerDay = Math.floor(totalChapters / totalDays);
+    const extraChapterDays = totalChapters % totalDays;
     
-    console.log('  Capítulos/dia AT:', otChaptersPerDay);
-    console.log('  Capítulos/dia NT:', ntChaptersPerDay);
+    // Calcular base para cada testamento
+    const baseOTPerDay = Math.floor(totalOTChapters / totalDays);
+    const baseNTPerDay = Math.floor(totalNTChapters / totalDays);
+    const extraOTDays = totalOTChapters % totalDays;
+    const extraNTDays = totalNTChapters % totalDays;
+    
+    console.log('  Base capítulos/dia:', baseChaptersPerDay);
+    console.log('  Dias com capítulo extra:', extraChapterDays);
+    console.log('  Base AT/dia:', baseOTPerDay, '+ extras:', extraOTDays);
+    console.log('  Base NT/dia:', baseNTPerDay, '+ extras:', extraNTDays);
     
     let currentDate = new Date(startDate);
     let otBookIndex = 0;
     let otChapter = 1;
     let ntBookIndex = 0;
     let ntChapter = 1;
-    let dayNumber = 1;
+    let otChaptersDistributed = 0;
+    let ntChaptersDistributed = 0;
     
-    while (dayNumber <= totalDays) {
+    for (let dayNumber = 1; dayNumber <= totalDays; dayNumber++) {
       const dayReadings: Reading[] = [];
       
+      // Calcular quantos capítulos de cada testamento ler hoje
+      // baseado na distribuição balanceada
+      let otChaptersToday = baseOTPerDay + (dayNumber <= extraOTDays ? 1 : 0);
+      let ntChaptersToday = baseNTPerDay + (dayNumber <= extraNTDays ? 1 : 0);
+      
+      // Se um testamento acabou, ajustar para garantir que continuamos lendo até o fim
+      if (otBookIndex >= oldTestamentBooks.length) {
+        // AT acabou, mas precisamos continuar distribuindo dias até totalDays
+        otChaptersToday = 0;
+        // Recalcular NT para usar os dias restantes
+        const ntChaptersRemaining = totalNTChapters - ntChaptersDistributed;
+        const daysRemaining = totalDays - dayNumber + 1;
+        ntChaptersToday = Math.ceil(ntChaptersRemaining / daysRemaining);
+      } else if (ntBookIndex >= newTestamentBooks.length) {
+        // NT acabou, mas precisamos continuar distribuindo dias até totalDays
+        ntChaptersToday = 0;
+        // Recalcular AT para usar os dias restantes
+        const otChaptersRemaining = totalOTChapters - otChaptersDistributed;
+        const daysRemaining = totalDays - dayNumber + 1;
+        otChaptersToday = Math.ceil(otChaptersRemaining / daysRemaining);
+      }
+      
       // Adicionar leituras do Antigo Testamento
-      let otChaptersToday = 0;
-      while (otChaptersToday < otChaptersPerDay && otBookIndex < oldTestamentBooks.length) {
+      let otChaptersRead = 0;
+      while (otChaptersRead < otChaptersToday && otBookIndex < oldTestamentBooks.length) {
         const bookId = oldTestamentBooks[otBookIndex];
         const maxChapters = bookChapters[bookId] || 1;
         
         const chaptersToRead = Math.min(
-          otChaptersPerDay - otChaptersToday,
+          otChaptersToday - otChaptersRead,
           maxChapters - otChapter + 1
         );
         
-        dayReadings.push({
-          id: `${bookId}_${otChapter}_${otChapter + chaptersToRead - 1}`,
-          bookId,
-          startChapter: otChapter,
-          endChapter: otChapter + chaptersToRead - 1,
-          bookName: this.getBookName(bookId),
-        });
-        
-        otChapter += chaptersToRead;
-        otChaptersToday += chaptersToRead;
-        
-        if (otChapter > maxChapters) {
-          otBookIndex++;
-          otChapter = 1;
+        if (chaptersToRead > 0) {
+          dayReadings.push({
+            id: `${bookId}_${otChapter}_${otChapter + chaptersToRead - 1}`,
+            bookId,
+            startChapter: otChapter,
+            endChapter: otChapter + chaptersToRead - 1,
+            bookName: this.getBookName(bookId),
+          });
+          
+          otChapter += chaptersToRead;
+          otChaptersRead += chaptersToRead;
+          otChaptersDistributed += chaptersToRead;
+          
+          if (otChapter > maxChapters) {
+            otBookIndex++;
+            otChapter = 1;
+          }
+        } else {
+          break;
         }
       }
       
-      // Adicionar leituras do Novo Testamento (pelo menos 1 capítulo)
-      if (ntBookIndex < newTestamentBooks.length) {
-        let ntChaptersToday = 0;
-        while (ntChaptersToday < ntChaptersPerDay && ntBookIndex < newTestamentBooks.length) {
-          const bookId = newTestamentBooks[ntBookIndex];
-          const maxChapters = bookChapters[bookId] || 1;
-          
-          const chaptersToRead = Math.min(
-            ntChaptersPerDay - ntChaptersToday,
-            maxChapters - ntChapter + 1
-          );
-          
+      // Adicionar leituras do Novo Testamento
+      let ntChaptersRead = 0;
+      while (ntChaptersRead < ntChaptersToday && ntBookIndex < newTestamentBooks.length) {
+        const bookId = newTestamentBooks[ntBookIndex];
+        const maxChapters = bookChapters[bookId] || 1;
+        
+        const chaptersToRead = Math.min(
+          ntChaptersToday - ntChaptersRead,
+          maxChapters - ntChapter + 1
+        );
+        
+        if (chaptersToRead > 0) {
           dayReadings.push({
             id: `${bookId}_${ntChapter}_${ntChapter + chaptersToRead - 1}`,
             bookId,
@@ -752,18 +801,16 @@ export class ReadingPlanService {
           });
           
           ntChapter += chaptersToRead;
-          ntChaptersToday += chaptersToRead;
+          ntChaptersRead += chaptersToRead;
+          ntChaptersDistributed += chaptersToRead;
           
           if (ntChapter > maxChapters) {
             ntBookIndex++;
             ntChapter = 1;
           }
+        } else {
+          break;
         }
-      }
-      
-      // Se não houver leituras para o dia, encerra
-      if (dayReadings.length === 0) {
-        break;
       }
       
       readings.push({
@@ -776,13 +823,17 @@ export class ReadingPlanService {
       });
       
       currentDate.setDate(currentDate.getDate() + 1);
-      dayNumber++;
     }
     
     console.log(`📚 Leituras intercaladas geradas: ${readings.length} dias`);
+    console.log(`  AT: ${otChaptersDistributed}/${totalOTChapters} capítulos distribuídos`);
+    console.log(`  NT: ${ntChaptersDistributed}/${totalNTChapters} capítulos distribuídos`);
+    console.log(`  Total: ${otChaptersDistributed + ntChaptersDistributed}/${totalChapters} capítulos`);
     if (readings.length > 0) {
-      console.log('  Primeiro dia:', readings[0]);
-      console.log('  Último dia:', readings[readings.length - 1]);
+      const firstDayChapters = readings[0].readings.reduce((sum, r) => sum + (r.endChapter - r.startChapter + 1), 0);
+      const lastDayChapters = readings[readings.length - 1].readings.reduce((sum, r) => sum + (r.endChapter - r.startChapter + 1), 0);
+      console.log('  Primeiro dia:', firstDayChapters, 'capítulos');
+      console.log('  Último dia:', lastDayChapters, 'capítulos');
     }
     
     return readings;
@@ -798,23 +849,38 @@ export class ReadingPlanService {
     
     // Calculate total chapters to read
     const totalChapters = books.reduce((sum, bookId) => sum + (bookChapters[bookId] || 1), 0);
-    const chaptersPerDay = Math.ceil(totalChapters / totalDays);
+    
+    console.log(`📖 Distribuindo ${totalChapters} capítulos em ${totalDays} dias`);
+    
+    // Calcular capítulos base por dia e quantos dias precisam de um capítulo extra
+    const baseChaptersPerDay = Math.floor(totalChapters / totalDays);
+    const extraChapterDays = totalChapters % totalDays;
+    
+    console.log(`  Base: ${baseChaptersPerDay} capítulos/dia`);
+    console.log(`  Dias com capítulo extra: ${extraChapterDays}`);
     
     let currentDate = new Date(startDate);
     let currentBookIndex = 0;
     let currentChapter = 1;
     let dayNumber = 1;
+    let chaptersDistributed = 0;
     
     while (dayNumber <= totalDays && currentBookIndex < books.length) {
-      const dayReadings: Reading[] = [];
-      let chaptersForToday = 0;
+      // Determinar quantos capítulos ler hoje
+      // Os primeiros dias recebem um capítulo extra se necessário
+      const chaptersForToday = dayNumber <= extraChapterDays 
+        ? baseChaptersPerDay + 1 
+        : baseChaptersPerDay;
       
-      while (chaptersForToday < chaptersPerDay && currentBookIndex < books.length) {
+      const dayReadings: Reading[] = [];
+      let chaptersReadToday = 0;
+      
+      while (chaptersReadToday < chaptersForToday && currentBookIndex < books.length) {
         const bookId = books[currentBookIndex];
         const maxChapters = bookChapters[bookId] || 1;
         
         const chaptersToRead = Math.min(
-          chaptersPerDay - chaptersForToday,
+          chaptersForToday - chaptersReadToday,
           maxChapters - currentChapter + 1
         );
         
@@ -827,7 +893,8 @@ export class ReadingPlanService {
         });
         
         currentChapter += chaptersToRead;
-        chaptersForToday += chaptersToRead;
+        chaptersReadToday += chaptersToRead;
+        chaptersDistributed += chaptersToRead;
         
         if (currentChapter > maxChapters) {
           currentBookIndex++;
@@ -847,6 +914,10 @@ export class ReadingPlanService {
       currentDate.setDate(currentDate.getDate() + 1);
       dayNumber++;
     }
+    
+    console.log(`✅ Distribuídos ${chaptersDistributed} capítulos em ${readings.length} dias`);
+    console.log(`  Primeiro dia: ${readings[0]?.readings.reduce((sum, r) => sum + (r.endChapter - r.startChapter + 1), 0)} capítulos`);
+    console.log(`  Último dia: ${readings[readings.length - 1]?.readings.reduce((sum, r) => sum + (r.endChapter - r.startChapter + 1), 0)} capítulos`);
     
     return readings;
   }

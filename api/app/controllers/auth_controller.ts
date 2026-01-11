@@ -1,6 +1,6 @@
-import type { HttpContext } from '@adonisjs/core/http'
 import User from '#models/user'
 import { loginValidator, registerValidator } from '#validators/auth'
+import type { HttpContext } from '@adonisjs/core/http'
 
 export default class AuthController {
   /**
@@ -122,6 +122,197 @@ export default class AuthController {
       return response.unauthorized({
         success: false,
         message: 'Não autenticado'
+      })
+    }
+  }
+
+  /**
+   * Obter estatísticas do usuário
+   */
+  async stats({ auth, response }: HttpContext) {
+    try {
+      const user = auth.user!
+
+      // Carregar planos de leitura do usuário
+      await user.load('readingPlans')
+
+      // Buscar plano ativo
+      const activePlan = user.readingPlans.find(plan => plan.isActive)
+
+      let stats = {
+        totalChaptersRead: 0,
+        totalQuizzesCompleted: 0,
+        currentStreak: 0,
+        longestStreak: 0,
+        readingStatus: 'sem-plano' as 'em-dia' | 'atrasado' | 'sem-plano',
+        daysLate: 0,
+        completedDays: 0,
+        totalDays: 0,
+        planProgress: 0,
+      }
+
+      if (activePlan) {
+        // Buscar todas as leituras do plano
+        const { default: db } = await import('@adonisjs/lucid/services/db')
+
+        const planReadings = await db
+          .from('reading_progress')
+          .where('reading_plan_id', activePlan.id)
+          .orderBy('day')
+
+        // Contar leituras completadas
+        const completedReadings = planReadings.filter((r: any) => r.is_completed)
+
+        // Calcular capítulos lidos
+        const totalChaptersRead = completedReadings.reduce((sum: number, reading: any) => {
+          return sum + (reading.end_chapter - reading.start_chapter + 1)
+        }, 0)
+
+        // Calcular total de capítulos do plano
+        const totalChapters = planReadings.reduce((sum: number, reading: any) => {
+          return sum + (reading.end_chapter - reading.start_chapter + 1)
+        }, 0)
+
+        // Calcular dias únicos completados
+        const completedDaysSet = new Set(completedReadings.map((r: any) => r.day))
+        const completedDays = completedDaysSet.size
+
+        // Calcular total de dias do plano
+        const totalDaysSet = new Set(planReadings.map((r: any) => r.day))
+        const totalDays = totalDaysSet.size
+
+        // Calcular streaks (sequência de dias consecutivos)
+        const { currentStreak, longestStreak } = this.calculateStreaks(planReadings)
+
+        // Calcular status de leitura
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+
+        const planStartDate = new Date(activePlan.startDate.toJSDate())
+        planStartDate.setHours(0, 0, 0, 0)
+
+        const daysPassed = Math.floor(
+          (today.getTime() - planStartDate.getTime()) / (1000 * 60 * 60 * 24)
+        )
+
+        const expectedDayByDate = Math.min(daysPassed + 1, totalDays)
+        const isLate = completedDays < (expectedDayByDate - 1)
+        const daysLate = isLate ? (expectedDayByDate - 1 - completedDays) : 0
+
+        stats = {
+          totalChaptersRead,
+          currentStreak,
+          longestStreak,
+          readingStatus: isLate ? 'atrasado' : 'em-dia',
+          daysLate,
+          completedDays,
+          totalDays,
+          planProgress: totalDays > 0 ? Math.round((completedDays / totalDays) * 100) : 0,
+          totalQuizzesCompleted: 0, // Será calculado abaixo
+        }
+      }
+
+      // Buscar questionários completados (score >= 7)
+      const { default: db } = await import('@adonisjs/lucid/services/db')
+      const quizResults = await db
+        .from('quiz_results')
+        .where('user_id', user.id)
+        .where('score', '>=', 7)
+        .count('* as total')
+
+      stats.totalQuizzesCompleted = quizResults[0]?.total || 0
+
+      return response.ok({
+        success: true,
+        data: stats
+      })
+    } catch (error) {
+      console.error('Erro ao buscar estatísticas:', error)
+      return response.badRequest({
+        success: false,
+        message: 'Erro ao buscar estatísticas do usuário'
+      })
+    }
+  }
+
+  /**
+   * Calcular sequências de dias consecutivos
+   */
+  private calculateStreaks(planReadings: any[]) {
+    // Agrupar por dia e verificar se está completo
+    const dayMap = new Map<number, boolean>()
+
+    for (const reading of planReadings) {
+      const day = reading.day
+      if (!dayMap.has(day)) {
+        dayMap.set(day, true)
+      }
+      // Se alguma leitura do dia não está completa, o dia não está completo
+      if (!reading.is_completed) {
+        dayMap.set(day, false)
+      }
+    }
+
+    // Converter para array ordenado
+    const days = Array.from(dayMap.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([day, isCompleted]) => ({ day, isCompleted }))
+
+    let currentStreak = 0
+    let longestStreak = 0
+    let tempStreak = 0
+
+    for (let i = 0; i < days.length; i++) {
+      if (days[i].isCompleted) {
+        tempStreak++
+        if (tempStreak > longestStreak) {
+          longestStreak = tempStreak
+        }
+      } else {
+        // Se chegou em um dia não completado, resetar streak temporário
+        if (i === 0 || !days[i - 1].isCompleted) {
+          tempStreak = 0
+        } else {
+          currentStreak = tempStreak
+          tempStreak = 0
+        }
+      }
+    }
+
+    // Se terminou com uma sequência, ela é a atual
+    if (tempStreak > 0) {
+      currentStreak = tempStreak
+    }
+
+    return { currentStreak, longestStreak }
+  }
+
+  /**
+   * Atualizar perfil do usuário
+   */
+  async updateProfile({ auth, request, response }: HttpContext) {
+    try {
+      const user = auth.user!
+      const { name } = request.only(['name'])
+
+      if (name) {
+        user.fullName = name
+        await user.save()
+      }
+
+      return response.ok({
+        success: true,
+        message: 'Perfil atualizado com sucesso',
+        data: {
+          id: user.id,
+          name: user.fullName,
+          email: user.email
+        }
+      })
+    } catch (error) {
+      return response.badRequest({
+        success: false,
+        message: 'Erro ao atualizar perfil'
       })
     }
   }

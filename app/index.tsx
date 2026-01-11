@@ -350,18 +350,7 @@ export default function HomeScreen() {
         await loadReadingPlan();
         
         // Alerta de parabéns após atualizar
-        setTimeout(() => {
-          Alert.alert(
-            "🎉 Parabéns!",
-            "Leitura marcada como concluída!\n\nContinue firme em sua jornada de leitura bíblica.",
-            [
-              {
-                text: "Continuar",
-                style: "default"
-              }
-            ]
-          );
-        }, 300);
+2
         return;
       }
 
@@ -371,18 +360,18 @@ export default function HomeScreen() {
         await loadReadingPlan();
         
         // Alerta de parabéns após atualizar
-        setTimeout(() => {
-          Alert.alert(
-            "🎉 Parabéns!",
-            "Leitura marcada como concluída!\n\nContinue firme em sua jornada de leitura bíblica.",
-            [
-              {
-                text: "Continuar",
-                style: "default"
-              }
-            ]
-          );
-        }, 300);
+        // setTimeout(() => {
+        //   Alert.alert(
+        //     "🎉 Parabéns!",
+        //     "Leitura marcada como concluída!\n\nContinue firme em sua jornada de leitura bíblica.",
+        //     [
+        //       {
+        //         text: "Continuar",
+        //         style: "default"
+        //       }
+        //     ]
+        //   );
+        // }, 300);
       } else {
         Alert.alert("Erro", response.message);
       }
@@ -545,7 +534,10 @@ export default function HomeScreen() {
 
         {/* User greeting or login button */}
         {isAuthenticated ? (
-          <View style={styles.userGreeting}>
+          <TouchableOpacity 
+            style={styles.userGreeting}
+            onPress={() => router.push('/profile')}
+          >
             <Ionicons
               name="person-circle-outline"
               size={20}
@@ -555,17 +547,13 @@ export default function HomeScreen() {
             <Text style={[styles.greetingText, { color: colors.textPrimary }]}>
               Olá, {userName}
             </Text>
-            <TouchableOpacity
-              onPress={handleLogout}
-              style={styles.logoutButton}
-            >
-              <Ionicons
-                name="log-out-outline"
-                size={20}
-                color={colors.iconMuted}
-              />
-            </TouchableOpacity>
-          </View>
+            <Ionicons
+              name="chevron-forward"
+              size={16}
+              color={colors.iconMuted}
+              style={{ marginLeft: 4 }}
+            />
+          </TouchableOpacity>
         ) : (
           <TouchableOpacity
             style={[styles.loginButton, { backgroundColor: colors.primary }]}

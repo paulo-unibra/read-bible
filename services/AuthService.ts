@@ -183,6 +183,40 @@ class AuthService {
   }
 
   /**
+   * Atualizar nome do usuário
+   */
+  async updateUserName(name: string): Promise<void> {
+    try {
+      if (!this.user) {
+        throw new Error('Usuário não autenticado');
+      }
+
+      // Atualizar localmente
+      this.user.name = name;
+      await AsyncStorage.setItem('@auth_user', JSON.stringify(this.user));
+
+      // Tentar atualizar no backend (se disponível)
+      if (this.token) {
+        try {
+          await fetch(`${API_URL}/auth/profile`, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${this.token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ name }),
+          });
+        } catch (error) {
+          console.log('Backend não disponível, nome atualizado apenas localmente');
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar nome:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Verificar se está autenticado
    */
   isAuthenticated(): boolean {
@@ -493,6 +527,34 @@ class AuthService {
       return {
         success: false,
         message: 'Erro ao conectar com o servidor',
+      };
+    }
+  }
+
+  /**
+   * Buscar estatísticas do usuário
+   */
+  async getStats(): Promise<any> {
+    try {
+      const response = await fetch(`${API_URL}/auth/stats`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${this.token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Falha ao buscar estatísticas');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Erro ao buscar estatísticas:', error);
+      return {
+        success: false,
+        message: 'Erro ao conectar com o servidor',
+        data: null,
       };
     }
   }

@@ -2,14 +2,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import authService, { TodayReading } from "../services/AuthService";
@@ -246,37 +246,71 @@ export default function DailyReadingScreen() {
   };
 
   const handleMarkComplete = async () => {
-    if (markingComplete) return;
+    if (markingComplete) {
+      console.log('⚠️ [handleMarkComplete] Já está marcando, ignorando...');
+      return;
+    }
 
     try {
+      console.log('✅ [handleMarkComplete] Iniciando marcação de leitura como concluída');
+      console.log('  hasLocalPlan:', hasLocalPlan);
+      console.log('  todayDayId:', todayDayId);
+      console.log('  dayNumber:', dayNumber);
+      
       setMarkingComplete(true);
 
       if (hasLocalPlan && todayDayId) {
         // Plano local
+        console.log('📱 [handleMarkComplete] Marcando plano local, dayId:', todayDayId);
         await readingPlanService.markDayAsCompleted(todayDayId);
+        console.log('✅ [handleMarkComplete] Plano local marcado com sucesso');
       } else if (dayNumber) {
         // Plano do backend
+        console.log('☁️ [handleMarkComplete] Marcando plano backend, day:', dayNumber);
         const response = await authService.completeDay(dayNumber);
+        console.log('📥 [handleMarkComplete] Resposta do backend:', response);
+        
         if (!response.success) {
+          console.error('❌ [handleMarkComplete] Erro do backend:', response.message);
           Alert.alert("Erro", response.message);
           setMarkingComplete(false);
           return;
         }
+        console.log('✅ [handleMarkComplete] Plano backend marcado com sucesso');
+      } else {
+        console.error('❌ [handleMarkComplete] Nenhum ID de dia ou número de dia disponível');
+        Alert.alert("Erro", "ID do dia não encontrado");
+        setMarkingComplete(false);
+        return;
       }
 
-      Alert.alert(
-        "🎉 Parabéns!",
-        "Leitura marcada como concluída!\n\nContinue firme em sua jornada de leitura bíblica.",
-        [
-          {
-            text: "Voltar",
-            style: "default",
-            onPress: () => router.back(),
-          },
-        ]
-      );
+      console.log('🎉 [handleMarkComplete] Leitura marcada com sucesso, voltando...');
+      
+      // Resetar estado antes de voltar
+      setMarkingComplete(false);
+      
+      // Voltar para a tela anterior
+      console.log('🔙 [handleMarkComplete] Chamando router.back()...');
+      
+      // Usar setTimeout para garantir que o estado seja atualizado
+      setTimeout(() => {
+        router.back();
+        console.log('✅ [handleMarkComplete] router.back() executado');
+      }, 100);
+      
+      // Alert.alert(
+      //   "🎉 Parabéns!",
+      //   "Leitura marcada como concluída!\n\nContinue firme em sua jornada de leitura bíblica.",
+      //   [
+      //     {
+      //       text: "Voltar",
+      //       style: "default",
+      //       onPress: () => router.back(),
+      //     },
+      //   ]
+      // );
     } catch (error) {
-      console.error("Erro ao marcar leitura:", error);
+      console.error("❌ [handleMarkComplete] Erro ao marcar leitura:", error);
       Alert.alert("Erro", "Não foi possível marcar a leitura como concluída");
       setMarkingComplete(false);
     }

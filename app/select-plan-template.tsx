@@ -199,12 +199,13 @@ export default function SelectPlanTemplateScreen() {
       <TouchableOpacity
         style={[
           styles.templateCard,
+          { backgroundColor: colors.card, borderColor: colors.border },
           isSelected && { ...styles.selectedCard, borderColor: typeColor }
         ]}
         onPress={() => handleSelectTemplate(item)}
       >
         <View style={styles.cardHeader}>
-          <Text style={styles.templateName}>{item.name}</Text>
+          <Text style={[styles.templateName, { color: colors.text }]}>{item.name}</Text>
           {isSelected && <Ionicons name="checkmark-circle" size={24} color={typeColor} />}
         </View>
 
@@ -214,21 +215,21 @@ export default function SelectPlanTemplateScreen() {
               {getTypeLabel(item.type)}
             </Text>
           </View>
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{getTestamentLabel(item.testament)}</Text>
+          <View style={[styles.badge, { backgroundColor: isDark ? '#404040' : '#f0f0f0' }]}>
+            <Text style={[styles.badgeText, { color: colors.textSecondary }]}>{getTestamentLabel(item.testament)}</Text>
           </View>
         </View>
 
-        <Text style={styles.description}>{item.description}</Text>
+        <Text style={[styles.description, { color: colors.textSecondary }]}>{item.description}</Text>
 
         <View style={styles.stats}>
           <View style={styles.stat}>
-            <Ionicons name="calendar-outline" size={16} color="#666" />
-            <Text style={styles.statText}>{item.duration} dias</Text>
+            <Ionicons name="calendar-outline" size={16} color={colors.textSecondary} />
+            <Text style={[styles.statText, { color: colors.textSecondary }]}>{item.duration} dias</Text>
           </View>
           <View style={styles.stat}>
-            <Ionicons name="book-outline" size={16} color="#666" />
-            <Text style={styles.statText}>{item.readingsCount} leituras</Text>
+            <Ionicons name="book-outline" size={16} color={colors.textSecondary} />
+            <Text style={[styles.statText, { color: colors.textSecondary }]}>{item.readingsCount} leituras</Text>
           </View>
         </View>
       </TouchableOpacity>
@@ -257,12 +258,12 @@ export default function SelectPlanTemplateScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
+      <View style={[styles.header, { backgroundColor: colors.headerBg, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Escolher Plano de Leitura</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Escolher Plano de Leitura</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -273,22 +274,22 @@ export default function SelectPlanTemplateScreen() {
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Ionicons name="document-text-outline" size={64} color="#ccc" />
-            <Text style={styles.emptyText}>Nenhum template disponível</Text>
+            <Ionicons name="document-text-outline" size={64} color={colors.border} />
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Nenhum template disponível</Text>
           </View>
         }
       />
 
       {selectedTemplate && (
-        <View style={styles.footer}>
+        <View style={[styles.footer, { backgroundColor: colors.headerBg, borderTopColor: colors.border }]}>
           <View style={styles.nameInputContainer}>
-            <Text style={styles.nameLabel}>Nome do seu plano:</Text>
+            <Text style={[styles.nameLabel, { color: colors.text }]}>Nome do seu plano:</Text>
             <TextInput
-              style={styles.nameInput}
+              style={[styles.nameInput, { backgroundColor: colors.bg, borderColor: colors.border, color: colors.text }]}
               value={customName}
               onChangeText={setCustomName}
               placeholder="Digite um nome personalizado"
-              placeholderTextColor="#999"
+              placeholderTextColor={colors.textSecondary}
             />
           </View>
           <TouchableOpacity
