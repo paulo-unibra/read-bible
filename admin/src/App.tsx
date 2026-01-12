@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import ProtectedRoute from './components/ProtectedRoute'
 import { AuthProvider } from './contexts/AuthContext'
+import BibleCuriosities from './pages/BibleCuriosities/BibleCuriosities'
 import Dashboard from './pages/Dashboard'
 import HymnAudioList from './pages/HymnAudioList/HymnAudioList'
 import HymnAudioManager from './pages/HymnAudioManager/HymnAudioManager'
@@ -87,6 +88,14 @@ function App() {
             element={
               <ProtectedRoute permission="gerenciar_conteudo">
                 <IncorrectPlans />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/bible-curiosities"
+            element={
+              <ProtectedRoute permission="gerenciar_conteudo">
+                <BibleCuriosities />
               </ProtectedRoute>
             }
           />

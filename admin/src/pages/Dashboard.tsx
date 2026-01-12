@@ -138,6 +138,18 @@ const Dashboard: React.FC = () => {
               {hasPermission('gerenciar_conteudo') ? 'Acessar' : 'Sem permissão'}
             </button>
           </div>
+
+          <div className="dashboard-card">
+            <h3>📖 Curiosidades Bíblicas</h3>
+            <p>Gerenciar curiosidades geradas por IA</p>
+            <button 
+              className="card-button" 
+              onClick={() => navigate('/bible-curiosities')}
+              disabled={!hasPermission('gerenciar_conteudo')}
+            >
+              {hasPermission('gerenciar_conteudo') ? 'Acessar' : 'Sem permissão'}
+            </button>
+          </div>
         </div>
       </main>
     </div>

@@ -101,11 +101,11 @@ export default class BibleCuriositiesController {
       }
       const curiosityContent = data.choices[0].message.content.trim()
 
-      // Salvar no banco
+      // Salvar no banco (inativa por padrão para revisão)
       const curiosity = await BibleCuriosity.create({
         content: curiosityContent,
         date: DateTime.fromFormat(today, 'yyyy-MM-dd'),
-        isActive: true,
+        isActive: false,
       })
 
       return response.created({
@@ -235,6 +235,157 @@ export default class BibleCuriositiesController {
       return response.badRequest({
         success: false,
         message: 'Erro ao buscar favoritos',
+      })
+    }
+  }
+
+  /**
+   * ========================================
+   * MÉTODOS ADMIN
+   * ========================================
+   */
+
+  /**
+   * Listar todas as curiosidades (admin)
+   */
+  async listAll({ request, response }: HttpContext) {
+    try {
+      const page = request.input('page', 1)
+      const limit = request.input('limit', 20)
+      const isActive = request.input('isActive') // 'true', 'false', ou undefined (todos)
+
+      const query = BibleCuriosity.query().orderBy('date', 'desc')
+
+      if (isActive !== undefined) {
+        query.where('isActive', isActive === 'true')
+      }
+
+      const curiosities = await query.paginate(page, limit)
+
+      return response.ok({
+        success: true,
+        data: {
+          data: curiosities.all().map((c) => ({
+            id: c.id,
+            content: c.content,
+            theme: c.theme,
+            date: c.date.toFormat('yyyy-MM-dd'),
+            isActive: c.isActive,
+            createdAt: c.createdAt.toISO(),
+          })),
+          meta: curiosities.getMeta(),
+        },
+      })
+    } catch (error) {
+      console.error('Erro ao listar curiosidades:', error)
+      return response.badRequest({
+        success: false,
+        message: 'Erro ao listar curiosidades',
+      })
+    }
+  }
+
+  /**
+   * Atualizar curiosidade (admin)
+   */
+  async update({ params, request, response }: HttpContext) {
+    try {
+      const curiosity = await BibleCuriosity.find(params.id)
+
+      if (!curiosity) {
+        return response.notFound({
+          success: false,
+          message: 'Curiosidade não encontrada',
+        })
+      }
+
+      const { content, theme, date } = request.only(['content', 'theme', 'date'])
+
+      if (content) curiosity.content = content
+      if (theme) curiosity.theme = theme
+      if (date) curiosity.date = DateTime.fromFormat(date, 'yyyy-MM-dd')
+
+      await curiosity.save()
+
+      return response.ok({
+        success: true,
+        message: 'Curiosidade atualizada com sucesso',
+        data: {
+          id: curiosity.id,
+          content: curiosity.content,
+          theme: curiosity.theme,
+          date: curiosity.date.toFormat('yyyy-MM-dd'),
+          isActive: curiosity.isActive,
+        },
+      })
+    } catch (error) {
+      console.error('Erro ao atualizar curiosidade:', error)
+      return response.badRequest({
+        success: false,
+        message: 'Erro ao atualizar curiosidade',
+      })
+    }
+  }
+
+  /**
+   * Alternar status ativo/inativo (admin)
+   */
+  async toggleActive({ params, response }: HttpContext) {
+    try {
+      const curiosity = await BibleCuriosity.find(params.id)
+
+      if (!curiosity) {
+        return response.notFound({
+          success: false,
+          message: 'Curiosidade não encontrada',
+        })
+      }
+
+      curiosity.isActive = !curiosity.isActive
+      await curiosity.save()
+
+      return response.ok({
+        success: true,
+        message: `Curiosidade ${curiosity.isActive ? 'ativada' : 'desativada'} com sucesso`,
+        data: {
+          id: curiosity.id,
+          isActive: curiosity.isActive,
+        },
+      })
+    } catch (error) {
+      console.error('Erro ao alternar status:', error)
+      return response.badRequest({
+        success: false,
+        message: 'Erro ao alternar status',
+      })
+    }
+  }
+
+  /**
+   * Deletar curiosidade (admin)
+   */
+  async delete({ params, response }: HttpContext) {
+    try {
+      const curiosity = await BibleCuriosity.find(params.id)
+
+      if (!curiosity) {
+        return response.notFound({
+          success: false,
+          message: 'Curiosidade não encontrada',
+        })
+      }
+
+      await curiosity.delete()
+
+      return response.ok({
+        success: true,
+        message: 'Curiosidade deletada com sucesso',
+      })
+    } catch (error) {
+      console.error('Erro ao deletar curiosidade:', error)
+      return response.badRequest({
+        success: false,
+        message: 'Erro ao deletar curiosidade',
       })
     }
   }

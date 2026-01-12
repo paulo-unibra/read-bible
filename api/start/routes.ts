@@ -190,6 +190,12 @@ router
         // Reading Plans management
         router.get('/reading-plans/incorrect', [ReadingPlanController, 'listIncorrectPlans'])
         router.post('/reading-plans/:planId/recalculate', [ReadingPlanController, 'recalculatePlan'])
+
+        // Bible Curiosities management
+        router.get('/curiosities', [BibleCuriositiesController, 'listAll'])
+        router.put('/curiosities/:id', [BibleCuriositiesController, 'update'])
+        router.patch('/curiosities/:id/toggle', [BibleCuriositiesController, 'toggleActive'])
+        router.delete('/curiosities/:id', [BibleCuriositiesController, 'delete'])
       })
       .use(middleware.auth({ guards: ['api'] }))
   })
