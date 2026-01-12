@@ -1224,10 +1224,10 @@ export default class ReadingPlanController {
       for (const plan of plans) {
         const startDate = plan.startDate
         const endDate = plan.endDate
-        
+
         // Calcular quantos dias DEVERIAM existir entre start_date e end_date
         const expectedDays = Math.ceil(endDate.diff(startDate, 'days').days)
-        
+
         // Contar quantos dias REALMENTE existem no reading_progress
         const daysInProgress = new Set(plan.progress.map(p => p.day))
         const maxDayInProgress = Math.max(...Array.from(daysInProgress), 0)
@@ -1317,12 +1317,12 @@ export default class ReadingPlanController {
       // Buscar progresso completado
       const completedProgress = plan.progress.filter(p => p.isCompleted)
       const completedDays = new Set(completedProgress.map(p => p.day))
-      
+
       console.log(`[RecalculatePlan] Progresso atual: ${completedProgress.length} registros completados em ${completedDays.size} dias`)
 
       // Mapear o que já foi lido (livro + capítulos)
       const completedChaptersMap = new Map<string, Set<number>>()
-      
+
       for (const progress of completedProgress) {
         if (!completedChaptersMap.has(progress.bookName)) {
           completedChaptersMap.set(progress.bookName, new Set())
@@ -1345,16 +1345,16 @@ export default class ReadingPlanController {
       const originalStartDate = plan.startDate
       const originalEndDate = plan.endDate
       const originalTotalDays = Math.ceil(originalEndDate.diff(originalStartDate, 'days').days)
-      
+
       console.log(`[RecalculatePlan] Mantendo período original: ${originalTotalDays} dias (${originalStartDate.toISO()} até ${originalEndDate.toISO()})`)
 
       const totalChapters = BIBLE_STRUCTURE.reduce((sum, book) => sum + book.chapters, 0)
       const remainingChapters = totalChapters - totalCompletedChapters
-      
+
       // Calcular quantos dias faltam criar
       const maxDayCompleted = Math.max(...completedDays, 0)
       const daysToCreate = originalTotalDays - maxDayCompleted
-      
+
       console.log(`[RecalculatePlan] Último dia completado: ${maxDayCompleted}, dias totais: ${originalTotalDays}, faltam criar: ${daysToCreate}`)
 
       // Usar 4 capítulos por dia como padrão, ajustando os últimos dias se necessário
@@ -1381,7 +1381,7 @@ export default class ReadingPlanController {
       for (let i = 0; i < BIBLE_STRUCTURE.length; i++) {
         const book = BIBLE_STRUCTURE[i]
         const completedInBook = completedChaptersMap.get(book.name) || new Set()
-        
+
         if (completedInBook.size === 0) {
           // Livro não iniciado
           bookIndex = i
@@ -1406,12 +1406,12 @@ export default class ReadingPlanController {
       // Gerar novos registros de progresso com distribuição inteligente
       let newRecordsCount = 0
       let chaptersDistributed = 0
-      
+
       while (bookIndex < BIBLE_STRUCTURE.length && currentDay <= originalTotalDays) {
         // Calcular quantos capítulos colocar neste dia
         const chaptersRemaining = remainingChapters - chaptersDistributed
         const daysRemaining = originalTotalDays - currentDay + 1
-        
+
         // Usar 4 cap/dia, mas ajustar nos últimos dias se necessário
         let chaptersForToday: number
         if (daysRemaining === 1) {
@@ -1430,7 +1430,7 @@ export default class ReadingPlanController {
         while (chaptersAddedToday < chaptersForToday && bookIndex < BIBLE_STRUCTURE.length) {
           const book = BIBLE_STRUCTURE[bookIndex]
           const completedInBook = completedChaptersMap.get(book.name) || new Set()
-          
+
           // Pular capítulos já lidos
           while (currentChapter <= book.chapters && completedInBook.has(currentChapter)) {
             currentChapter++
