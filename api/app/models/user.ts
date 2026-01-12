@@ -29,6 +29,8 @@ export default class User extends compose(BaseModel, AuthFinder) {
 
   @manyToMany(() => BibleCuriosity, {
     pivotTable: 'bible_curiosity_favorites',
+    pivotForeignKey: 'user_id',
+    pivotRelatedForeignKey: 'curiosity_id',
   })
   declare favoriteCuriosities: ManyToMany<typeof BibleCuriosity>
 

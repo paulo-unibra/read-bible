@@ -21,6 +21,8 @@ export default class BibleCuriosity extends BaseModel {
 
   @manyToMany(() => User, {
     pivotTable: 'bible_curiosity_favorites',
+    pivotForeignKey: 'curiosity_id',
+    pivotRelatedForeignKey: 'user_id',
   })
   declare favoritedBy: ManyToMany<typeof User>
 
