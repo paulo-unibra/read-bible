@@ -1,6 +1,6 @@
 import HymnAudioSync from '#models/hymn_audio_sync'
 import type { HttpContext } from '@adonisjs/core/http'
-import { searchHymnAudiosInDrive, listAllHymnsWithAudioInDrive } from '../services/google_drive_service.js'
+import { listAllHymnsWithAudioInDrive, searchHymnAudiosInDrive } from '../services/google_drive_service.js'
 
 export default class HymnAudiosController {
   /**

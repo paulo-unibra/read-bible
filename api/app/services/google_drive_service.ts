@@ -213,7 +213,7 @@ export async function listAllHymnsWithAudioInDrive(): Promise<number[]> {
 
   // Extrair números únicos dos nomes dos arquivos (padrão: hino-123-instrumento.mp3)
   const hymnNumbers = new Set<number>()
-  
+
   for (const file of data.files) {
     const match = file.name.match(/^hino-(\d+)-.*\.mp3$/i)
     if (match) {
@@ -222,7 +222,7 @@ export async function listAllHymnsWithAudioInDrive(): Promise<number[]> {
   }
 
   const sortedNumbers = Array.from(hymnNumbers).sort((a, b) => a - b)
-  
+
   console.log(`[GoogleDrive] Encontrados ${sortedNumbers.length} hinos com áudios no Drive`)
 
   return sortedNumbers
