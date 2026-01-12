@@ -43,14 +43,14 @@ const Dashboard: React.FC = () => {
               ))}
             </ul>
 
-            <h3>Suas Permissões:</h3>
+            {/* <h3>Suas Permissões:</h3>
             <div className="permissions-grid">
               {user?.permissions.map(permission => (
                 <span key={permission} className="permission-badge">
                   {permission.replace(/_/g, ' ')}
                 </span>
               ))}
-            </div>
+            </div> */}
           </div>
         </div>
 
@@ -121,6 +121,18 @@ const Dashboard: React.FC = () => {
             <button 
               className="card-button" 
               onClick={() => navigate('/admin/hymn-audios')}
+              disabled={!hasPermission('gerenciar_conteudo')}
+            >
+              {hasPermission('gerenciar_conteudo') ? 'Acessar' : 'Sem permissão'}
+            </button>
+          </div>
+
+          <div className="dashboard-card">
+            <h3>⚠️ Planos Incorretos</h3>
+            <p>Corrigir planos com cálculo incorreto</p>
+            <button 
+              className="card-button" 
+              onClick={() => navigate('/incorrect-plans')}
               disabled={!hasPermission('gerenciar_conteudo')}
             >
               {hasPermission('gerenciar_conteudo') ? 'Acessar' : 'Sem permissão'}

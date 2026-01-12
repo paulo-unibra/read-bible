@@ -1205,4 +1205,313 @@ export default class ReadingPlanController {
       return response.status(500).send('<h1>Erro ao carregar ranking</h1>')
     }
   }
+
+  /**
+   * Listar usuários com planos de leitura incorretos (com menos dias do que deveriam)
+   * GET /api/admin/reading-plans/incorrect
+   */
+  async listIncorrectPlans({ response }: HttpContext) {
+    try {
+      // Buscar todos os planos ativos
+      const plans = await ReadingPlan.query()
+        .where('is_active', true)
+        .preload('user')
+        .preload('progress')
+
+      const totalChapters = BIBLE_STRUCTURE.reduce((sum, book) => sum + book.chapters, 0)
+      const incorrectPlans: any[] = []
+
+      for (const plan of plans) {
+        const startDate = plan.startDate
+        const endDate = plan.endDate
+        
+        // Calcular quantos dias DEVERIAM existir entre start_date e end_date
+        const expectedDays = Math.ceil(endDate.diff(startDate, 'days').days)
+        
+        // Contar quantos dias REALMENTE existem no reading_progress
+        const daysInProgress = new Set(plan.progress.map(p => p.day))
+        const maxDayInProgress = Math.max(...Array.from(daysInProgress), 0)
+        const actualProgressDays = daysInProgress.size
+
+        // Verificar se está incorreto:
+        // 1. Se o número de dias no progress é menor que o esperado
+        // 2. Se o max day é menor que expected days (faltam dias no final)
+        const missingDays = expectedDays - maxDayInProgress
+        const isIncorrect = missingDays > 5 || actualProgressDays < (expectedDays * 0.95)
+
+        if (isIncorrect) {
+          // Contar quantos dias já foram lidos
+          const completedDays = new Set(
+            plan.progress.filter(p => p.isCompleted).map(p => p.day)
+          ).size
+
+          // Contar capítulos completados
+          const completedChapters = plan.progress
+            .filter(p => p.isCompleted)
+            .reduce((sum, p) => sum + (p.endChapter - p.startChapter + 1), 0)
+
+          let issue = ''
+          if (missingDays > 5) {
+            issue = `Faltam ${missingDays} dias no plano (deveria ter ${expectedDays} dias, mas tem apenas ${maxDayInProgress})`
+          } else {
+            const missingProgressDays = expectedDays - actualProgressDays
+            issue = `Faltam ${missingProgressDays} registros de dias (esperado: ${expectedDays}, encontrado: ${actualProgressDays})`
+          }
+
+          incorrectPlans.push({
+            planId: plan.id,
+            userId: plan.userId,
+            userName: plan.user.fullName,
+            userEmail: plan.user.email,
+            planName: plan.name,
+            startDate: plan.startDate.toISO(),
+            endDate: plan.endDate.toISO(),
+            totalDays: plan.totalDays,
+            expectedDays: expectedDays,
+            actualDays: maxDayInProgress,
+            progressRecords: actualProgressDays,
+            missingDays: missingDays,
+            chaptersPerDay: plan.chaptersPerDay,
+            totalChapters: plan.totalChapters,
+            completedDays: completedDays,
+            completedChapters: completedChapters,
+            progressPercentage: Math.round((completedChapters / totalChapters) * 100),
+            issue: issue,
+          })
+        }
+      }
+
+      return response.ok({
+        success: true,
+        data: {
+          total: incorrectPlans.length,
+          plans: incorrectPlans.sort((a, b) => b.missingDays - a.missingDays),
+        },
+      })
+    } catch (error) {
+      console.error('Erro ao listar planos incorretos:', error)
+      return response.internalServerError({
+        success: false,
+        message: 'Erro ao listar planos incorretos',
+        error: error.message,
+      })
+    }
+  }
+
+  /**
+   * Recalcular plano de leitura mantendo o progresso já realizado
+   * POST /api/admin/reading-plans/:planId/recalculate
+   */
+  async recalculatePlan({ params, response }: HttpContext) {
+    try {
+      const { planId } = params
+
+      // Buscar plano
+      const plan = await ReadingPlan.query()
+        .where('id', planId)
+        .preload('progress')
+        .firstOrFail()
+
+      console.log(`[RecalculatePlan] Recalculando plano ${planId}...`)
+
+      // Buscar progresso completado
+      const completedProgress = plan.progress.filter(p => p.isCompleted)
+      const completedDays = new Set(completedProgress.map(p => p.day))
+      
+      console.log(`[RecalculatePlan] Progresso atual: ${completedProgress.length} registros completados em ${completedDays.size} dias`)
+
+      // Mapear o que já foi lido (livro + capítulos)
+      const completedChaptersMap = new Map<string, Set<number>>()
+      
+      for (const progress of completedProgress) {
+        if (!completedChaptersMap.has(progress.bookName)) {
+          completedChaptersMap.set(progress.bookName, new Set())
+        }
+        const chaptersSet = completedChaptersMap.get(progress.bookName)!
+        for (let ch = progress.startChapter; ch <= progress.endChapter; ch++) {
+          chaptersSet.add(ch)
+        }
+      }
+
+      // Calcular total de capítulos completados
+      let totalCompletedChapters = 0
+      for (const chapters of completedChaptersMap.values()) {
+        totalCompletedChapters += chapters.size
+      }
+
+      console.log(`[RecalculatePlan] Total de capítulos já lidos: ${totalCompletedChapters}`)
+
+      // MANTER o período original do plano (não recalcular até fim do ano)
+      const originalStartDate = plan.startDate
+      const originalEndDate = plan.endDate
+      const originalTotalDays = Math.ceil(originalEndDate.diff(originalStartDate, 'days').days)
+      
+      console.log(`[RecalculatePlan] Mantendo período original: ${originalTotalDays} dias (${originalStartDate.toISO()} até ${originalEndDate.toISO()})`)
+
+      const totalChapters = BIBLE_STRUCTURE.reduce((sum, book) => sum + book.chapters, 0)
+      const remainingChapters = totalChapters - totalCompletedChapters
+      
+      // Calcular quantos dias faltam criar
+      const maxDayCompleted = Math.max(...completedDays, 0)
+      const daysToCreate = originalTotalDays - maxDayCompleted
+      
+      console.log(`[RecalculatePlan] Último dia completado: ${maxDayCompleted}, dias totais: ${originalTotalDays}, faltam criar: ${daysToCreate}`)
+
+      // Usar 4 capítulos por dia como padrão, ajustando os últimos dias se necessário
+      const baseChaptersPerDay = 4
+      const daysWithBaseChapters = Math.floor(remainingChapters / baseChaptersPerDay)
+      const remainingChaptersInLastDay = remainingChapters % baseChaptersPerDay
+
+      console.log(`[RecalculatePlan] Distribuição: ${daysWithBaseChapters} dias com ${baseChaptersPerDay} cap/dia + último dia com ${remainingChaptersInLastDay} capítulos`)
+
+      // Deletar APENAS os registros NÃO completados
+      const deletedCount = await ReadingProgress.query()
+        .where('reading_plan_id', planId)
+        .where('is_completed', false)
+        .delete()
+
+      console.log(`[RecalculatePlan] ${deletedCount} registros não completados deletados`)
+
+      // Gerar nova distribuição começando de onde parou
+      let currentDay = Math.max(...completedDays, 0) + 1
+      let bookIndex = 0
+      let currentChapter = 1
+
+      // Pular livros/capítulos já completados
+      for (let i = 0; i < BIBLE_STRUCTURE.length; i++) {
+        const book = BIBLE_STRUCTURE[i]
+        const completedInBook = completedChaptersMap.get(book.name) || new Set()
+        
+        if (completedInBook.size === 0) {
+          // Livro não iniciado
+          bookIndex = i
+          currentChapter = 1
+          break
+        } else if (completedInBook.size < book.chapters) {
+          // Livro parcialmente lido - encontrar próximo capítulo não lido
+          bookIndex = i
+          for (let ch = 1; ch <= book.chapters; ch++) {
+            if (!completedInBook.has(ch)) {
+              currentChapter = ch
+              break
+            }
+          }
+          break
+        }
+        // Livro completamente lido, continuar para o próximo
+      }
+
+      console.log(`[RecalculatePlan] Reiniciando de: ${BIBLE_STRUCTURE[bookIndex]?.name} cap ${currentChapter}, dia ${currentDay}`)
+
+      // Gerar novos registros de progresso com distribuição inteligente
+      let newRecordsCount = 0
+      let chaptersDistributed = 0
+      
+      while (bookIndex < BIBLE_STRUCTURE.length && currentDay <= originalTotalDays) {
+        // Calcular quantos capítulos colocar neste dia
+        const chaptersRemaining = remainingChapters - chaptersDistributed
+        const daysRemaining = originalTotalDays - currentDay + 1
+        
+        // Usar 4 cap/dia, mas ajustar nos últimos dias se necessário
+        let chaptersForToday: number
+        if (daysRemaining === 1) {
+          // Último dia: colocar todos os capítulos restantes
+          chaptersForToday = chaptersRemaining
+        } else if (chaptersRemaining <= daysRemaining * baseChaptersPerDay) {
+          // Estamos próximos do fim, distribuir uniformemente
+          chaptersForToday = Math.ceil(chaptersRemaining / daysRemaining)
+        } else {
+          // Ainda longe do fim, usar base de 4 cap/dia
+          chaptersForToday = baseChaptersPerDay
+        }
+
+        let chaptersAddedToday = 0
+
+        while (chaptersAddedToday < chaptersForToday && bookIndex < BIBLE_STRUCTURE.length) {
+          const book = BIBLE_STRUCTURE[bookIndex]
+          const completedInBook = completedChaptersMap.get(book.name) || new Set()
+          
+          // Pular capítulos já lidos
+          while (currentChapter <= book.chapters && completedInBook.has(currentChapter)) {
+            currentChapter++
+          }
+
+          if (currentChapter > book.chapters) {
+            bookIndex++
+            currentChapter = 1
+            continue
+          }
+
+          const chaptersRemainingInBook = book.chapters - currentChapter + 1
+          const chaptersNeeded = chaptersForToday - chaptersAddedToday
+          const chaptersToAdd = Math.min(chaptersRemainingInBook, chaptersNeeded)
+
+          const startChapter = currentChapter
+          const endChapter = currentChapter + chaptersToAdd - 1
+
+          await ReadingProgress.create({
+            readingPlanId: planId,
+            day: currentDay,
+            bookName: book.name,
+            startChapter: startChapter,
+            endChapter: endChapter,
+            isCompleted: false,
+          })
+
+          newRecordsCount++
+          chaptersAddedToday += chaptersToAdd
+          chaptersDistributed += chaptersToAdd
+          currentChapter += chaptersToAdd
+
+          if (currentChapter > book.chapters) {
+            bookIndex++
+            currentChapter = 1
+          }
+        }
+
+        currentDay++
+      }
+
+      console.log(`[RecalculatePlan] ${newRecordsCount} novos registros criados, ${chaptersDistributed} capítulos distribuídos`)
+
+      // Atualizar plano (mantendo datas originais)
+      plan.totalDays = originalTotalDays
+      plan.chaptersPerDay = baseChaptersPerDay
+      plan.totalChapters = totalChapters
+      plan.completedChapters = totalCompletedChapters
+      await plan.save()
+
+      console.log(`[RecalculatePlan] Plano atualizado com sucesso!`)
+
+      return response.ok({
+        success: true,
+        message: 'Plano recalculado com sucesso mantendo o progresso',
+        data: {
+          plan: {
+            id: plan.id,
+            name: plan.name,
+            startDate: plan.startDate.toISO(),
+            endDate: plan.endDate.toISO(),
+            totalDays: plan.totalDays,
+            chaptersPerDay: plan.chaptersPerDay,
+            completedChapters: totalCompletedChapters,
+            remainingChapters: remainingChapters,
+          },
+          changes: {
+            deletedRecords: deletedCount,
+            newRecords: newRecordsCount,
+            keptCompletedRecords: completedProgress.length,
+            chaptersDistributed: chaptersDistributed,
+          },
+        },
+      })
+    } catch (error) {
+      console.error('Erro ao recalcular plano:', error)
+      return response.internalServerError({
+        success: false,
+        message: 'Erro ao recalcular plano de leitura',
+        error: error.message,
+      })
+    }
+  }
 }

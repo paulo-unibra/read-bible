@@ -4,6 +4,7 @@ import { AuthProvider } from './contexts/AuthContext'
 import Dashboard from './pages/Dashboard'
 import HymnAudioList from './pages/HymnAudioList/HymnAudioList'
 import HymnAudioManager from './pages/HymnAudioManager/HymnAudioManager'
+import IncorrectPlans from './pages/IncorrectPlans/IncorrectPlans'
 import Login from './pages/Login'
 import Permissions from './pages/Permissions'
 import Quizzes from './pages/Quizzes'
@@ -78,6 +79,14 @@ function App() {
             element={
               <ProtectedRoute permission="gerenciar_conteudo">
                 <HymnAudioManager />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/incorrect-plans"
+            element={
+              <ProtectedRoute permission="gerenciar_conteudo">
+                <IncorrectPlans />
               </ProtectedRoute>
             }
           />

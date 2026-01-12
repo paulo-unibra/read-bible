@@ -186,6 +186,10 @@ router
         router.post('/hymn-audios', [HymnAudiosController, 'upsert'])
         router.patch('/hymn-audios/:id/offset', [HymnAudiosController, 'updateOffset'])
         router.delete('/hymn-audios/:id', [HymnAudiosController, 'delete'])
+
+        // Reading Plans management
+        router.get('/reading-plans/incorrect', [ReadingPlanController, 'listIncorrectPlans'])
+        router.post('/reading-plans/:planId/recalculate', [ReadingPlanController, 'recalculatePlan'])
       })
       .use(middleware.auth({ guards: ['api'] }))
   })

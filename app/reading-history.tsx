@@ -362,7 +362,7 @@ export default function ReadingHistoryScreen() {
                     { backgroundColor: index === 0 ? colors.accent : colors.textSecondary }
                   ]}>
                     <Text style={[styles.dayNumber, { fontSize: applyFontScale(14) }]}>
-                      Dia {dayReading.day}
+                     {dayReading.day}º Dia 
                     </Text>
                   </View>
                   <View style={styles.readingDetails}>
@@ -454,7 +454,7 @@ export default function ReadingHistoryScreen() {
                     <View style={styles.historyInfo}>
                       <View style={[styles.dayBadge, { backgroundColor: colors.success }]}>
                         <Text style={[styles.dayNumber, { fontSize: applyFontScale(16) }]}>
-                          Dia {dayReading.day}
+                          {dayReading.day}º Dia
                         </Text>
                       </View>
                       <View style={styles.readingDetails}>
