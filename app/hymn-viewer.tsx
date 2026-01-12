@@ -16,8 +16,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import AdBanner from '../components/AdBanner';
 import HymnAudioMixer from '../components/HymnAudioMixer';
 import DatabaseService from '../services/DatabaseService';
-import harpaService, { Hymn, HymnVerse } from '../services/HarpaService';
+import harpaOfflineService, { HymnData } from '../services/HarpaOfflineService';
 import hymnAudioService, { HymnAudioTrack } from '../services/HymnAudioService';
+
+interface HymnVerse {
+  name: string;
+  type: 'verse' | 'chorus';
+  lines: string[];
+}
+
+interface Hymn extends HymnData {}
 
 export default function HymnViewerScreen() {
   const router = useRouter();
@@ -26,7 +34,7 @@ export default function HymnViewerScreen() {
 
   const [hymn, setHymn] = useState<Hymn | null>(null);
   const [loading, setLoading] = useState(true);
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [theme, setTheme] = useState<'light' | 'dark' | null>(null);
   const [fontSizePref, setFontSizePref] = useState<'small' | 'medium' | 'large'>('medium');
   const [hymnFontSize, setHymnFontSize] = useState<'small' | 'medium' | 'large'>('medium');
 
@@ -39,34 +47,85 @@ export default function HymnViewerScreen() {
   const [showMixer, setShowMixer] = useState(false);
   const playbackInterval = useRef<NodeJS.Timeout | null>(null);
 
+  // Carregar tema ANTES de qualquer renderização
   useEffect(() => {
-    loadSettings();
-    loadHymn();
-    loadAudio();
-    
-    // Configurar modo de áudio
-    Audio.setAudioModeAsync({
-      allowsRecordingIOS: false,
-      playsInSilentModeIOS: true,
-      staysActiveInBackground: true,
-      shouldDuckAndroid: true,
-    });
+    const initTheme = async () => {
+      try {
+        const settings = await DatabaseService.getMultipleSettings(['theme']);
+        const userTheme = settings.theme as 'light' | 'dark' | null;
+        setTheme(userTheme || 'light');
+      } catch (error) {
+        console.error('Erro ao carregar tema:', error);
+        setTheme('light');
+      }
+    };
+    initTheme();
+  }, []);
+
+  useEffect(() => {
+    // Só carregar conteúdo depois que o tema foi definido
+    if (theme !== null) {
+      loadSettings();
+      loadHymn();
+      loadAudio();
+      
+      // Configurar modo de áudio
+      Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: true,
+        shouldDuckAndroid: true,
+      });
+    }
 
     // Cleanup ao desmontar
     return () => {
-      cleanupAudio();
+      if (theme !== null) {
+        cleanupAudio();
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [theme]);
+
+  // Gerenciar intervalo de atualização de posição
+  useEffect(() => {
+    if (isPlaying && audioTracks.length > 0 && audioTracks[0].isLoaded) {
+      console.log(`🔄 [HymnViewer] Iniciando intervalo de atualização (isPlaying=true)`);
+      
+      const interval = setInterval(async () => {
+        const currentPosition = await hymnAudioService.getPosition(audioTracks);
+        console.log(`🕐 [HymnViewer] Posição: ${currentPosition}ms, duração: ${duration}ms`);
+        setPosition(currentPosition);
+        
+        // Só verificar fim se duração estiver definida e for válida
+        if (duration > 0 && currentPosition >= duration - 100) {
+          console.log(`⏹️ [HymnViewer] Fim do áudio, parando...`);
+          handleStop();
+        }
+      }, 100);
+      
+      playbackInterval.current = interval;
+      
+      return () => {
+        console.log(`🛑 [HymnViewer] Limpando intervalo`);
+        clearInterval(interval);
+      };
+    } else {
+      // Limpar intervalo quando não está tocando
+      if (playbackInterval.current) {
+        console.log(`🛑 [HymnViewer] Pausado, limpando intervalo`);
+        clearInterval(playbackInterval.current);
+        playbackInterval.current = null;
+      }
+    }
+  }, [isPlaying, audioTracks, duration]);
 
   const loadSettings = async () => {
     try {
-      const settings = await DatabaseService.getMultipleSettings(['fontSize', 'theme', 'hymnFontSize']);
+      const settings = await DatabaseService.getMultipleSettings(['fontSize', 'hymnFontSize']);
       const userFont = settings.fontSize as 'small' | 'medium' | 'large' | null;
-      const userTheme = settings.theme as 'light' | 'dark' | null;
       const userHymnFont = settings.hymnFontSize as 'small' | 'medium' | 'large' | null;
       if (userFont) setFontSizePref(userFont);
-      if (userTheme) setTheme(userTheme);
       if (userHymnFont) setHymnFontSize(userHymnFont);
     } catch (error) {
       console.error('Erro ao carregar configurações:', error);
@@ -85,10 +144,17 @@ export default function HymnViewerScreen() {
   const loadHymn = async () => {
     try {
       setLoading(true);
-      const loadedHymn = await harpaService.getHymnByNumber(hymnNumber);
+      console.log(`📖 [HymnViewer] Carregando hino ${hymnNumber}...`);
+      const loadedHymn = await harpaOfflineService.getHymnByNumber(hymnNumber);
+      console.log(`📖 [HymnViewer] Hino carregado:`, {
+        number: loadedHymn.number,
+        title: loadedHymn.title,
+        versesCount: loadedHymn.verses.length,
+        verses: loadedHymn.verses.map(v => ({ name: v.name, type: v.type, linesCount: v.lines.length }))
+      });
       setHymn(loadedHymn);
     } catch (error) {
-      console.error('Erro ao carregar hino:', error);
+      console.error('❌ [HymnViewer] Erro ao carregar hino:', error);
     } finally {
       setLoading(false);
     }
@@ -96,28 +162,19 @@ export default function HymnViewerScreen() {
 
   const loadAudio = async () => {
     try {
-      setIsLoadingAudio(true);
-      console.log(`🎵 Buscando áudios do hino ${hymnNumber}...`);
+      console.log(`🎵 [HymnViewer] Buscando áudios do hino ${hymnNumber}...`);
       
       const tracks = await hymnAudioService.searchHymnAudios(hymnNumber);
       
       if (tracks.length > 0) {
-        console.log(`✅ ${tracks.length} áudios encontrados, carregando...`);
-        const loadedTracks = await hymnAudioService.loadAllTracks(tracks);
-        setAudioTracks(loadedTracks);
-        
-        // Obter duração do primeiro áudio
-        const firstDuration = await hymnAudioService.getDuration(loadedTracks);
-        setDuration(firstDuration);
-        
-        console.log(`✅ Áudios carregados com sucesso!`);
+        console.log(`✅ [HymnViewer] ${tracks.length} áudios encontrados`);
+        // Apenas armazenar metadados - NÃO carregar áudio ainda
+        setAudioTracks(tracks);
       } else {
-        console.log(`ℹ️ Nenhum áudio disponível para o hino ${hymnNumber}`);
+        console.log(`ℹ️ [HymnViewer] Nenhum áudio disponível para o hino ${hymnNumber}`);
       }
     } catch (error) {
-      console.error('Erro ao carregar áudios:', error);
-    } finally {
-      setIsLoadingAudio(false);
+      console.error('❌ [HymnViewer] Erro ao buscar áudios:', error);
     }
   };
 
@@ -132,42 +189,79 @@ export default function HymnViewerScreen() {
     }
   };
 
-  const startPlaybackInterval = () => {
-    if (playbackInterval.current) {
-      clearInterval(playbackInterval.current);
-    }
-    
-    playbackInterval.current = setInterval(async () => {
-      const currentPosition = await hymnAudioService.getPosition(audioTracks);
-      setPosition(currentPosition);
-      
-      // Se chegou ao fim, parar
-      if (currentPosition >= duration - 100) {
-        await handleStop();
-      }
-    }, 100);
-  };
-
   const handlePlayPause = async () => {
+    const startTime = Date.now();
+    console.log(`⏱️ [TIMER] Início do handlePlayPause: ${startTime}`);
+    
     try {
       if (audioTracks.length === 0) {
-        console.log('ℹ️ Nenhum áudio disponível');
+        alert('Nenhum áudio disponível para este hino');
         return;
       }
 
+      // Verificar se precisa carregar os áudios
+      const needsLoading = !audioTracks[0].isLoaded;
+      
+      if (needsLoading) {
+        console.log(`⏱️ [TIMER] Detectado que precisa carregar áudios`);
+        const loadStartTime = Date.now();
+        console.log('📥 Carregando áudios com streaming...');
+        setIsLoadingAudio(true);
+        
+        try {
+          // Carregar com streaming
+          console.log(`⏱️ [TIMER] Iniciando loadAllTracks...`);
+          const loadedTracks = await hymnAudioService.loadAllTracks(audioTracks);
+          const loadEndTime = Date.now();
+          console.log(`⏱️ [TIMER] loadAllTracks concluído em ${loadEndTime - loadStartTime}ms`);
+          
+          if (loadedTracks.length === 0) {
+            throw new Error('Não foi possível carregar os áudios');
+          }
+          
+          setAudioTracks(loadedTracks);
+          
+          // Obter duração
+          console.log(`⏱️ [TIMER] Obtendo duração...`);
+          const durationStartTime = Date.now();
+          const firstDuration = await hymnAudioService.getDuration(loadedTracks);
+          console.log(`⏱️ [TIMER] Duração obtida em ${Date.now() - durationStartTime}ms`);
+          setDuration(firstDuration);
+          
+          // Tocar imediatamente
+          console.log(`⏱️ [TIMER] Iniciando playback...`);
+          const playStartTime = Date.now();
+          await hymnAudioService.playAll(loadedTracks);
+          console.log(`⏱️ [TIMER] Playback iniciado em ${Date.now() - playStartTime}ms`);
+          
+          setIsPlaying(true);
+          
+          const totalTime = Date.now() - startTime;
+          console.log(`⏱️ [TIMER] ✅ TOTAL desde clique até tocar: ${totalTime}ms (${(totalTime/1000).toFixed(1)}s)`);
+        } finally {
+          setIsLoadingAudio(false);
+        }
+        return;
+      }
+
+      // Já está carregado - tocar/pausar
+      console.log(`⏱️ [TIMER] Áudio já carregado, apenas tocando/pausando`);
       if (isPlaying) {
         await hymnAudioService.pauseAll(audioTracks);
         setIsPlaying(false);
-        if (playbackInterval.current) {
-          clearInterval(playbackInterval.current);
-        }
       } else {
         await hymnAudioService.playAll(audioTracks);
         setIsPlaying(true);
-        startPlaybackInterval();
       }
-    } catch (error) {
-      console.error('Erro ao tocar/pausar:', error);
+      
+      const totalTime = Date.now() - startTime;
+      console.log(`⏱️ [TIMER] ✅ TOTAL play/pause: ${totalTime}ms`);
+    } catch (error: any) {
+      const totalTime = Date.now() - startTime;
+      console.error(`⏱️ [TIMER] ❌ ERRO após ${totalTime}ms:`, error);
+      alert(error?.message || 'Erro ao reproduzir áudio');
+      setIsPlaying(false);
+      setIsLoadingAudio(false);
     }
   };
 
@@ -176,9 +270,6 @@ export default function HymnViewerScreen() {
       await hymnAudioService.stopAll(audioTracks);
       setIsPlaying(false);
       setPosition(0);
-      if (playbackInterval.current) {
-        clearInterval(playbackInterval.current);
-      }
     } catch (error) {
       console.error('Erro ao parar:', error);
     }
@@ -268,6 +359,11 @@ export default function HymnViewerScreen() {
     accent: isDark ? '#81c784' : '#4CAF50',
     chorusBg: isDark ? '#2b3d2b' : '#e8f5e9',
   };
+
+  // Não renderizar nada até o tema estar carregado
+  if (theme === null) {
+    return null;
+  }
 
   const renderVerse = (verse: HymnVerse, index: number) => {
     const isChorus = verse.type === 'chorus';

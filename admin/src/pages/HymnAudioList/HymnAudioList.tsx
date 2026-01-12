@@ -35,74 +35,85 @@ export default function HymnAudioList() {
 
   return (
     <div className="hymn-audio-list">
-      <div className="header">
-        <h1>Gerenciar Áudios de Hinos</h1>
-        <p className="subtitle">
-          Configure a sincronização de áudios para os hinos da Harpa Cristã
-        </p>
-      </div>
-
-      <div className="search-section">
-        <form onSubmit={handleSearchSubmit} className="search-form">
-          <input
-            type="number"
-            placeholder="Digite o número do hino (1-640)"
-            value={searchHymnNumber}
-            onChange={(e) => setSearchHymnNumber(e.target.value)}
-            min={1}
-            max={640}
-            className="search-input"
-          />
-          <button type="submit" className="search-button">
-            Buscar Hino
-          </button>
-        </form>
-      </div>
-
-      {loading && (
-        <div className="loading">Carregando hinos com áudio...</div>
-      )}
-
-      {!loading && (
-        <div className="stats-section">
-          <div className="stat-card">
-            <h3>{hymnsWithAudio.length}</h3>
-            <p>Hinos com Áudio Sincronizado</p>
-          </div>
-          <div className="stat-card">
-            <h3>{640 - hymnsWithAudio.length}</h3>
-            <p>Hinos Sem Áudio</p>
-          </div>
+      <header className="hymn-audio-list-header">
+        <div className="header-content">
+          <h1>🎵 Gerenciar Áudios de Hinos</h1>
+          <p className="subtitle">
+            Configure a sincronização de áudios para os hinos da Harpa Cristã
+          </p>
         </div>
-      )}
+      </header>
 
-      {!loading && hymnsWithAudio.length > 0 && (
-        <div className="hymns-list-section">
-          <h2>Hinos com Áudio Configurado</h2>
-          <div className="hymns-grid">
-            {hymnsWithAudio.map((hymnNumber) => (
-              <div
-                key={hymnNumber}
-                className="hymn-card"
-                onClick={() => navigate(`/admin/hymn-audios/${hymnNumber}`)}
-              >
-                <div className="hymn-number">#{hymnNumber}</div>
-                <div className="hymn-title">Hino {hymnNumber}</div>
-                <div className="hymn-action">
-                  <span>Editar Sincronização →</span>
+      <div className="content">
+        <div className="search-card">
+          <h2 className="card-title">Buscar Hino</h2>
+          <form onSubmit={handleSearchSubmit} className="search-form">
+            <input
+              type="number"
+              placeholder="Digite o número do hino (1-640)"
+              value={searchHymnNumber}
+              onChange={(e) => setSearchHymnNumber(e.target.value)}
+              min={1}
+              max={640}
+              className="search-input"
+            />
+            <button type="submit" className="search-button">
+              🔍 Buscar
+            </button>
+          </form>
+        </div>
+
+        {loading && (
+          <div className="loading-card">
+            <div className="loading-spinner"></div>
+            <p>Carregando hinos com áudio...</p>
+          </div>
+        )}
+
+        {!loading && (
+          <div className="stats-grid">
+            <div className="stat-card stat-primary">
+              <div className="stat-icon">🎵</div>
+              <h3 className="stat-value">{hymnsWithAudio.length}</h3>
+              <p className="stat-label">Hinos com Áudio Sincronizado</p>
+            </div>
+            <div className="stat-card stat-secondary">
+              <div className="stat-icon">⏳</div>
+              <h3 className="stat-value">{640 - hymnsWithAudio.length}</h3>
+              <p className="stat-label">Hinos Sem Áudio</p>
+            </div>
+          </div>
+        )}
+
+        {!loading && hymnsWithAudio.length > 0 && (
+          <div className="hymns-card">
+            <h2 className="card-title">Hinos com Áudio Configurado</h2>
+            <div className="hymns-grid">
+              {hymnsWithAudio.map((hymnNumber) => (
+                <div
+                  key={hymnNumber}
+                  className="hymn-item"
+                  onClick={() => navigate(`/admin/hymn-audios/${hymnNumber}`)}
+                >
+                  <div className="hymn-number">#{hymnNumber}</div>
+                  <div className="hymn-title">Hino {hymnNumber}</div>
+                  <div className="hymn-action">
+                    <span>Editar →</span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {!loading && hymnsWithAudio.length === 0 && (
-        <div className="empty-state">
-          <h3>Nenhum hino com áudio configurado</h3>
-          <p>Use o campo de busca acima para adicionar áudios a um hino</p>
-        </div>
-      )}
+        {!loading && hymnsWithAudio.length === 0 && (
+          <div className="empty-card">
+            <div className="empty-icon">🎼</div>
+            <h3>Nenhum hino com áudio configurado</h3>
+            <p>Use o campo de busca acima para adicionar áudios a um hino</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

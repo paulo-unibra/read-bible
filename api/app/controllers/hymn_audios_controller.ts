@@ -1,6 +1,6 @@
 import HymnAudioSync from '#models/hymn_audio_sync'
 import type { HttpContext } from '@adonisjs/core/http'
-import { searchHymnAudiosInDrive } from '../services/google_drive_service.js'
+import { searchHymnAudiosInDrive, listAllHymnsWithAudioInDrive } from '../services/google_drive_service.js'
 
 export default class HymnAudiosController {
   /**
@@ -213,17 +213,12 @@ export default class HymnAudiosController {
    */
   async listHymnsWithAudio({ response }: HttpContext) {
     try {
-      const hymns = await HymnAudioSync.query()
-        .where('is_active', true)
-        .select('hymn_number')
-        .groupBy('hymn_number')
-        .orderBy('hymn_number', 'asc')
-
-      const hymnNumbers = hymns.map(h => h.hymnNumber)
+      // Buscar hinos que têm áudios no Drive
+      const hymnsInDrive = await listAllHymnsWithAudioInDrive()
 
       return response.ok({
         success: true,
-        data: hymnNumbers,
+        data: hymnsInDrive,
       })
     } catch (error) {
       console.error('[HymnAudiosController] Erro ao listar hinos:', error)

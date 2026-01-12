@@ -177,3 +177,53 @@ export async function searchHymnAudiosInDrive(hymnNumber: number) {
 
   return audios
 }
+
+/**
+ * Lista todos os números de hinos que têm áudios no Google Drive
+ */
+export async function listAllHymnsWithAudioInDrive(): Promise<number[]> {
+  const AUDIO_FOLDER_ID = '1kpVk7VeWDts852XfWk9fZRIgjwa8OYoN'
+  const API_KEY = env.get('GOOGLE_API_KEY')
+
+  if (!API_KEY) {
+    throw new Error('GOOGLE_API_KEY não configurada no .env')
+  }
+
+  // Buscar todos os arquivos MP3 na pasta de áudios
+  const listUrl = `https://www.googleapis.com/drive/v3/files?q='${AUDIO_FOLDER_ID}'+in+parents+and+mimeType='audio/mpeg'&key=${API_KEY}&fields=files(name)&pageSize=1000`
+
+  const response = await fetch(listUrl)
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    console.error(`Erro HTTP ${response.status} ao listar hinos:`, errorText)
+    throw new Error(`Erro ao listar hinos no Drive: ${response.status}`)
+  }
+
+  const data = await response.json()
+
+  if (data.error) {
+    console.error('Erro API Drive:', data.error)
+    throw new Error(`Erro API Drive: ${data.error.message}`)
+  }
+
+  if (!data.files || data.files.length === 0) {
+    return []
+  }
+
+  // Extrair números únicos dos nomes dos arquivos (padrão: hino-123-instrumento.mp3)
+  const hymnNumbers = new Set<number>()
+  
+  for (const file of data.files) {
+    const match = file.name.match(/^hino-(\d+)-.*\.mp3$/i)
+    if (match) {
+      hymnNumbers.add(parseInt(match[1]))
+    }
+  }
+
+  const sortedNumbers = Array.from(hymnNumbers).sort((a, b) => a - b)
+  
+  console.log(`[GoogleDrive] Encontrados ${sortedNumbers.length} hinos com áudios no Drive`)
+
+  return sortedNumbers
+}

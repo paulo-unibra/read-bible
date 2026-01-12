@@ -9,9 +9,14 @@ export default function HymnAudioManager() {
   const navigate = useNavigate();
   
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [driveAudios, setDriveAudios] = useState<DriveAudioFile[]>([]);
   const [syncedAudios, setSyncedAudios] = useState<HymnAudioSync[]>([]);
   const [selectedTrack, setSelectedTrack] = useState<string | null>(null);
+  
+  // Estados de alterações pendentes
+  const [pendingChanges, setPendingChanges] = useState<Map<string, Partial<HymnAudioSync>>>(new Map());
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   
   // Estados do player
   const [isPlaying, setIsPlaying] = useState(false);
@@ -139,8 +144,7 @@ export default function HymnAudioManager() {
           error: audio.error,
         });
         
-        const sync = syncedAudios.find(s => s.instrument === instrument);
-        const offsetMs = sync?.offsetMs || 0;
+        const offsetMs = getCurrentValue(instrument, 'offsetMs');
         
         console.log(`[HymnAudioManager] ${instrument} - offset: ${offsetMs}ms`);
         
@@ -201,44 +205,57 @@ export default function HymnAudioManager() {
     setCurrentTime(newTime);
   };
 
-  const handleOffsetChange = async (instrument: string, offsetMs: number) => {
-    try {
-      const existing = syncedAudios.find(s => s.instrument === instrument);
-      const driveAudio = driveAudios.find(a => a.instrument === instrument);
-      
-      if (!driveAudio) return;
-      
-      if (existing) {
-        // Atualizar offset existente
-        await hymnAudioService.updateOffset(existing.id, offsetMs);
-      } else {
-        // Criar nova sincronização
-        await hymnAudioService.upsert({
-          hymnNumber: parseInt(hymnNumber!),
-          instrument,
-          fileId: driveAudio.fileId,
-          fileName: driveAudio.fileName,
-          offsetMs,
-          defaultVolume: 1.0,
-          defaultMuted: false,
-          displayOrder: 0,
-        });
-      }
-      
-      // Recarregar dados
-      await loadAudios();
-      
-    } catch (error) {
-      console.error('Erro ao atualizar offset:', error);
-      alert('Erro ao salvar sincronização');
-    }
+  const handleOffsetChange = (instrument: string, offsetMs: number) => {
+    const newPendingChanges = new Map(pendingChanges);
+    const currentChanges = newPendingChanges.get(instrument) || {};
+    
+    newPendingChanges.set(instrument, {
+      ...currentChanges,
+      offsetMs,
+    });
+    
+    setPendingChanges(newPendingChanges);
+    setHasUnsavedChanges(true);
   };
 
   const handleVolumeChange = (instrument: string, volume: number) => {
+    // Atualizar volume no player imediatamente
     const audio = audioRefs.current.get(instrument);
     if (audio) {
       audio.volume = volume;
     }
+
+    // Adicionar às alterações pendentes
+    const newPendingChanges = new Map(pendingChanges);
+    const currentChanges = newPendingChanges.get(instrument) || {};
+    
+    newPendingChanges.set(instrument, {
+      ...currentChanges,
+      defaultVolume: volume,
+    });
+    
+    setPendingChanges(newPendingChanges);
+    setHasUnsavedChanges(true);
+  };
+
+  const handleMuteToggle = (instrument: string, muted: boolean) => {
+    // Atualizar mute no player imediatamente
+    const audio = audioRefs.current.get(instrument);
+    if (audio) {
+      audio.muted = muted;
+    }
+
+    // Adicionar às alterações pendentes
+    const newPendingChanges = new Map(pendingChanges);
+    const currentChanges = newPendingChanges.get(instrument) || {};
+    
+    newPendingChanges.set(instrument, {
+      ...currentChanges,
+      defaultMuted: muted,
+    });
+    
+    setPendingChanges(newPendingChanges);
+    setHasUnsavedChanges(true);
   };
 
   const formatTime = (seconds: number) => {
@@ -251,142 +268,321 @@ export default function HymnAudioManager() {
     return syncedAudios.find(s => s.instrument === instrument);
   };
 
+  const getCurrentValue = (instrument: string, field: keyof HymnAudioSync): any => {
+    // Verificar se há alteração pendente
+    const pending = pendingChanges.get(instrument);
+    if (pending && field in pending) {
+      return pending[field];
+    }
+    
+    // Senão, retornar valor salvo
+    const sync = getSyncForInstrument(instrument);
+    if (sync && field in sync) {
+      return sync[field];
+    }
+    
+    // Valores padrão
+    const defaults: Record<string, any> = {
+      offsetMs: 0,
+      defaultVolume: 1.0,
+      defaultMuted: false,
+    };
+    
+    return defaults[field] ?? null;
+  };
+
+  const handleSaveChanges = async () => {
+    try {
+      setSaving(true);
+      
+      // Salvar cada alteração pendente
+      for (const [instrument, changes] of pendingChanges.entries()) {
+        const existing = syncedAudios.find(s => s.instrument === instrument);
+        const driveAudio = driveAudios.find(a => a.instrument === instrument);
+        
+        if (!driveAudio) continue;
+        
+        if (existing) {
+          // Atualizar existente
+          await hymnAudioService.upsert({
+            ...existing,
+            ...changes,
+          });
+        } else {
+          // Criar novo
+          await hymnAudioService.upsert({
+            hymnNumber: parseInt(hymnNumber!),
+            instrument,
+            fileId: driveAudio.fileId,
+            fileName: driveAudio.fileName,
+            offsetMs: 0,
+            defaultVolume: 1.0,
+            defaultMuted: false,
+            displayOrder: 0,
+            ...changes,
+          });
+        }
+      }
+      
+      // Recarregar dados
+      await loadAudios();
+      
+      // Limpar alterações pendentes
+      setPendingChanges(new Map());
+      setHasUnsavedChanges(false);
+      
+      alert('Alterações salvas com sucesso!');
+      
+    } catch (error) {
+      console.error('Erro ao salvar alterações:', error);
+      alert('Erro ao salvar alterações');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDiscardChanges = () => {
+    if (window.confirm('Descartar todas as alterações não salvas?')) {
+      // Reverter volumes e mutes no player
+      pendingChanges.forEach((changes, instrument) => {
+        const audio = audioRefs.current.get(instrument);
+        const sync = getSyncForInstrument(instrument);
+        
+        if (audio) {
+          if ('defaultVolume' in changes && sync) {
+            audio.volume = sync.defaultVolume;
+          }
+          if ('defaultMuted' in changes && sync) {
+            audio.muted = sync.defaultMuted;
+          }
+        }
+      });
+      
+      setPendingChanges(new Map());
+      setHasUnsavedChanges(false);
+    }
+  };
+
   return (
-    <div className="hymn-audio-manager">
-      <div className="header">
-        <button onClick={() => navigate('/admin/hymn-audios')} className="back-button">
-          ← Voltar
-        </button>
-        <h1>Gerenciar Áudios - Hino {hymnNumber}</h1>
-      </div>
-
-      {loading && <div className="loading">Carregando áudios...</div>}
-
-      {!loading && driveAudios.length === 0 && (
-        <div className="no-audios">
-          <p>Nenhum áudio encontrado para este hino no Google Drive.</p>
-          <p>Faça upload dos áudios no formato: hino-{hymnNumber}-[instrumento].mp3</p>
+    <div className="hymn-audio-manager-page">
+      <header className="hymn-audio-header">
+        <div className="header-content">
+          <button onClick={() => navigate('/admin/hymn-audios')} className="back-button">
+            ← Voltar
+          </button>
+          <h1>Gerenciar Áudios - Hino {hymnNumber}</h1>
         </div>
-      )}
-
-      {!loading && driveAudios.length > 0 && (
-        <>
-          {/* Player Global */}
-          <div className="global-player">
-            <div className="player-controls">
-              <button onClick={handleStop} disabled={!isPlaying && currentTime === 0}>
-                ⏹ Stop
-              </button>
-              <button onClick={handlePlayPause}>
-                {isPlaying ? '⏸ Pause' : '▶ Play'}
-              </button>
-            </div>
-
-            <div className="player-progress">
-              <span>{formatTime(currentTime)}</span>
-              <input
-                type="range"
-                min={0}
-                max={duration}
-                step={0.1}
-                value={currentTime}
-                onChange={handleSeek}
-                className="seek-bar"
-              />
-              <span>{formatTime(duration)}</span>
-            </div>
-
-            <div className="player-info">
-              <p>🎵 Tocando {audioRefs.current.size} faixas simultaneamente</p>
-              <p>💡 Use os controles abaixo para ajustar a sincronização de cada faixa</p>
-            </div>
+        {hasUnsavedChanges && (
+          <div className="header-actions">
+            <button onClick={handleDiscardChanges} className="discard-button" disabled={saving}>
+              Descartar
+            </button>
+            <button onClick={handleSaveChanges} className="save-button" disabled={saving}>
+              {saving ? 'Salvando...' : '💾 Salvar Alterações'}
+            </button>
           </div>
+        )}
+      </header>
 
-          {/* Lista de Faixas */}
-          <div className="tracks-list">
-            <h2>Faixas de Áudio</h2>
-            
-            {driveAudios.map((audio) => {
-              const sync = getSyncForInstrument(audio.instrument);
-              const offsetMs = sync?.offsetMs || 0;
+      <main className="hymn-audio-content">
+        {loading && (
+          <div className="loading-state">
+            <div className="spinner"></div>
+            <p>Carregando áudios...</p>
+          </div>
+        )}
+
+        {!loading && driveAudios.length === 0 && (
+          <div className="empty-state">
+            <div className="empty-icon">🎵</div>
+            <h2>Nenhum áudio encontrado</h2>
+            <p>Nenhum áudio foi encontrado para este hino no Google Drive.</p>
+            <p className="empty-hint">
+              Faça upload dos áudios no formato: <strong>hino-{hymnNumber}-[instrumento].mp3</strong>
+            </p>
+          </div>
+        )}
+
+        {!loading && driveAudios.length > 0 && (
+          <>
+            {/* Player Global */}
+            <div className="global-player-card">
+              <h2 className="player-title">Controles de Reprodução</h2>
               
-              return (
-                <div 
-                  key={audio.instrument} 
-                  className={`track-item ${selectedTrack === audio.instrument ? 'selected' : ''}`}
-                  onClick={() => setSelectedTrack(audio.instrument)}
+              <div className="player-controls">
+                <button 
+                  onClick={handleStop} 
+                  disabled={!isPlaying && currentTime === 0}
+                  className="player-btn stop-btn"
                 >
-                  <div className="track-header">
-                    <h3>{audio.instrument}</h3>
-                    <span className="track-status">
-                      {sync ? '✓ Sincronizado' : '○ Não sincronizado'}
-                    </span>
-                  </div>
+                  ⏹ Parar
+                </button>
+                <button onClick={handlePlayPause} className="player-btn play-btn">
+                  {isPlaying ? '⏸ Pausar' : '▶ Reproduzir'}
+                </button>
+              </div>
 
-                  <div className="track-info">
-                    <p><strong>Arquivo:</strong> {audio.fileName}</p>
-                    {audio.size && <p><strong>Tamanho:</strong> {(audio.size / 1024 / 1024).toFixed(2)} MB</p>}
-                  </div>
+              <div className="player-progress">
+                <span className="time-label">{formatTime(currentTime)}</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={duration}
+                  step={0.1}
+                  value={currentTime}
+                  onChange={handleSeek}
+                  className="seek-bar"
+                />
+                <span className="time-label">{formatTime(duration)}</span>
+              </div>
 
-                  <div className="track-controls">
-                    <div className="control-group">
-                      <label>Volume:</label>
-                      <input
-                        type="range"
-                        min={0}
-                        max={1}
-                        step={0.1}
-                        defaultValue={sync?.defaultVolume || 1.0}
-                        onChange={(e) => handleVolumeChange(audio.instrument, parseFloat(e.target.value))}
-                      />
-                    </div>
+              <div className="player-info">
+                <div className="info-item">
+                  <span className="info-icon">🎵</span>
+                  <span>Tocando {audioRefs.current.size} faixas simultaneamente</span>
+                </div>
+                <div className="info-item">
+                  <span className="info-icon">💡</span>
+                  <span>Use os controles abaixo para ajustar a sincronização de cada faixa</span>
+                </div>
+              </div>
+            </div>
 
-                    <div className="control-group">
-                      <label>
-                        Offset de Sincronização (ms):
-                        <span className="offset-help">
-                          Positivo = atrasa | Negativo = adianta
-                        </span>
-                      </label>
-                      <div className="offset-controls">
-                        <button onClick={() => handleOffsetChange(audio.instrument, offsetMs - 100)}>
-                          -100ms
-                        </button>
-                        <button onClick={() => handleOffsetChange(audio.instrument, offsetMs - 10)}>
-                          -10ms
-                        </button>
-                        <input
-                          type="number"
-                          value={offsetMs}
-                          onChange={(e) => handleOffsetChange(audio.instrument, parseInt(e.target.value) || 0)}
-                          className="offset-input"
-                        />
-                        <button onClick={() => handleOffsetChange(audio.instrument, offsetMs + 10)}>
-                          +10ms
-                        </button>
-                        <button onClick={() => handleOffsetChange(audio.instrument, offsetMs + 100)}>
-                          +100ms
-                        </button>
-                        {offsetMs !== 0 && (
-                          <button onClick={() => handleOffsetChange(audio.instrument, 0)} className="reset-button">
-                            Reset
-                          </button>
+            {/* Lista de Faixas */}
+            <div className="tracks-section">
+              <h2 className="section-title">Faixas de Áudio ({driveAudios.length})</h2>
+              
+              <div className="tracks-grid">
+                {driveAudios.map((audio) => {
+                  const sync = getSyncForInstrument(audio.instrument);
+                  const offsetMs = getCurrentValue(audio.instrument, 'offsetMs');
+                  const defaultVolume = getCurrentValue(audio.instrument, 'defaultVolume');
+                  const defaultMuted = getCurrentValue(audio.instrument, 'defaultMuted');
+                  const hasPendingChanges = pendingChanges.has(audio.instrument);
+                  
+                  return (
+                    <div 
+                      key={audio.instrument} 
+                      className="track-card"
+                    >
+                      <div className="track-header">
+                        <div className="track-title-section">
+                          <h3 className="track-name">
+                            {audio.instrument}
+                            {hasPendingChanges && <span className="pending-indicator">●</span>}
+                          </h3>
+                          <span className={`sync-status ${sync ? 'synced' : 'not-synced'}`}>
+                            {sync ? '✓ Sincronizado' : '○ Não sincronizado'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="track-info-section">
+                        <div className="info-row">
+                          <strong>Arquivo:</strong> 
+                          <span className="file-name">{audio.fileName}</span>
+                        </div>
+                        {audio.size && (
+                          <div className="info-row">
+                            <strong>Tamanho:</strong> 
+                            <span className="file-size">{(audio.size / 1024 / 1024).toFixed(2)} MB</span>
+                          </div>
                         )}
                       </div>
-                    </div>
-                  </div>
 
-                  {sync && sync.notes && (
-                    <div className="track-notes">
-                      <p><strong>Notas:</strong> {sync.notes}</p>
+                      <div className="track-controls-section">
+                        <div className="control-group">
+                          <label>
+                            <strong>Volume Padrão:</strong>
+                            <span className="volume-value">{Math.round(defaultVolume * 100)}%</span>
+                          </label>
+                          <div className="volume-controls">
+                            <input
+                              type="range"
+                              min={0}
+                              max={1}
+                              step={0.05}
+                              value={defaultVolume}
+                              onChange={(e) => handleVolumeChange(audio.instrument, parseFloat(e.target.value))}
+                              className="volume-slider"
+                            />
+                            <label className="mute-control">
+                              <input
+                                type="checkbox"
+                                checked={defaultMuted}
+                                onChange={(e) => handleMuteToggle(audio.instrument, e.target.checked)}
+                              />
+                              <span>🔇 Mutado por padrão</span>
+                            </label>
+                          </div>
+                          <p className="control-help">
+                            Este volume será aplicado automaticamente no app
+                          </p>
+                        </div>
+
+                        <div className="control-group">
+                          <label>
+                            <strong>Offset de Sincronização (ms):</strong>
+                            <span className="offset-help">
+                              Positivo = atrasa | Negativo = adianta
+                            </span>
+                          </label>
+                          <div className="offset-controls">
+                            <button 
+                              onClick={() => handleOffsetChange(audio.instrument, offsetMs - 100)}
+                              className="offset-btn decrease-btn"
+                            >
+                              -100ms
+                            </button>
+                            <button 
+                              onClick={() => handleOffsetChange(audio.instrument, offsetMs - 10)}
+                              className="offset-btn decrease-btn"
+                            >
+                              -10ms
+                            </button>
+                            <input
+                              type="number"
+                              value={offsetMs}
+                              onChange={(e) => handleOffsetChange(audio.instrument, parseInt(e.target.value) || 0)}
+                              className="offset-input"
+                            />
+                            <button 
+                              onClick={() => handleOffsetChange(audio.instrument, offsetMs + 10)}
+                              className="offset-btn increase-btn"
+                            >
+                              +10ms
+                            </button>
+                            <button 
+                              onClick={() => handleOffsetChange(audio.instrument, offsetMs + 100)}
+                              className="offset-btn increase-btn"
+                            >
+                              +100ms
+                            </button>
+                            {offsetMs !== 0 && (
+                              <button 
+                                onClick={() => handleOffsetChange(audio.instrument, 0)} 
+                                className="offset-btn reset-btn"
+                              >
+                                Resetar
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {sync && sync.notes && (
+                        <div className="track-notes">
+                          <strong>Notas:</strong> {sync.notes}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </>
-      )}
+                  );
+                })}
+              </div>
+            </div>
+          </>
+        )}
+      </main>
     </div>
   );
 }

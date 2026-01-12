@@ -2,29 +2,59 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    FlatList,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  FlatList,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DatabaseService from '../services/DatabaseService';
-import harpaService, { HymnListItem } from '../services/HarpaService';
+import harpaOfflineService from '../services/HarpaOfflineService';
+
+interface HymnListItem {
+  number: number;
+  title: string;
+}
 
 export default function HarpaScreen() {
   const [hymns, setHymns] = useState<HymnListItem[]>([]);
   const [filteredHymns, setFilteredHymns] = useState<HymnListItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [theme, setTheme] = useState<'light' | 'dark' | null>(null);
   const [fontSizePref, setFontSizePref] = useState<'small' | 'medium' | 'large'>('medium');
+  
+  // Estados de download
+  const [isDownloaded, setIsDownloaded] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+
+  // Carregar tema ANTES de qualquer renderização
+  useEffect(() => {
+    const initTheme = async () => {
+      try {
+        const settings = await DatabaseService.getMultipleSettings(['theme']);
+        const userTheme = settings.theme as 'light' | 'dark' | null;
+        setTheme(userTheme || 'light');
+      } catch (error) {
+        console.error('Erro ao carregar tema:', error);
+        setTheme('light');
+      }
+    };
+    initTheme();
+  }, []);
 
   useEffect(() => {
-    loadSettings();
-    loadHymnsList();
-  }, []);
+    // Só carregar conteúdo depois que o tema foi definido
+    if (theme !== null) {
+      loadSettings();
+      checkHarpaStatus();
+    }
+  }, [theme]);
 
   useEffect(() => {
     filterHymns();
@@ -33,24 +63,78 @@ export default function HarpaScreen() {
 
   const loadSettings = async () => {
     try {
-      const settings = await DatabaseService.getMultipleSettings(['fontSize', 'theme']);
+      const settings = await DatabaseService.getMultipleSettings(['fontSize']);
       const userFont = settings.fontSize as 'small' | 'medium' | 'large' | null;
-      const userTheme = settings.theme as 'light' | 'dark' | null;
       if (userFont) setFontSizePref(userFont);
-      if (userTheme) setTheme(userTheme);
     } catch (error) {
       console.error('Erro ao carregar configurações:', error);
     }
   };
 
-  const loadHymnsList = () => {
+  const checkHarpaStatus = async () => {
     try {
-      // Carrega lista completa instantaneamente (sem chamadas de API)
-      const list = harpaService.getAllHymnsList();
-      setHymns(list);
-      setFilteredHymns(list);
+      const downloaded = await harpaOfflineService.isHarpaDownloaded();
+      setIsDownloaded(downloaded);
+      
+      if (downloaded) {
+        await loadHymnsList();
+      } else {
+        // Extrair automaticamente na primeira vez
+        setIsDownloading(true);
+        const result = await harpaOfflineService.downloadHarpa((progress) => {
+          setDownloadProgress(progress);
+        });
+
+        if (result.success) {
+          setIsDownloaded(true);
+          await loadHymnsList();
+        } else {
+          setDownloadError(result.error || 'Erro ao preparar a Harpa');
+        }
+        setIsDownloading(false);
+      }
+    } catch (error) {
+      console.error('Erro ao verificar status da Harpa:', error);
+      setIsDownloading(false);
+    }
+  };
+
+  const loadHymnsList = async () => {
+    try {
+      const list = await harpaOfflineService.getHymnsList();
+      const formattedList: HymnListItem[] = list.map(hymn => ({
+        number: hymn.number,
+        title: hymn.title,
+      }));
+      
+      setHymns(formattedList);
+      setFilteredHymns(formattedList);
     } catch (error) {
       console.error('Erro ao carregar lista de hinos:', error);
+    }
+  };
+
+  const handleDownloadHarpa = async () => {
+    try {
+      setIsDownloading(true);
+      setDownloadError(null);
+      setDownloadProgress(0);
+
+      const result = await harpaOfflineService.downloadHarpa((progress) => {
+        setDownloadProgress(progress);
+      });
+
+      if (result.success) {
+        setIsDownloaded(true);
+        await loadHymnsList();
+      } else {
+        setDownloadError(result.error || 'Erro ao baixar a Harpa');
+      }
+    } catch (error) {
+      console.error('Erro no download:', error);
+      setDownloadError('Erro inesperado ao baixar a Harpa');
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -92,35 +176,111 @@ export default function HarpaScreen() {
     searchBg: isDark ? '#2b2b2b' : '#f0f0f0',
   };
 
+  // Não renderizar nada até o tema estar carregado
+  if (theme === null) {
+    return null;
+  }
+
+  const renderDownloadScreen = () => (
+    <View style={[styles.downloadContainer, { backgroundColor: colors.bg }]}>
+      <Ionicons name="musical-notes" size={80} color={colors.accent} />
+      <Text style={[styles.downloadTitle, { color: colors.textPrimary, fontSize: applyFontScale(24) }]}>
+        Harpa Cristã
+      </Text>
+      <Text style={[styles.downloadSubtitle, { color: colors.textSecondary, fontSize: applyFontScale(16) }]}>
+        640 hinos disponíveis
+      </Text>
+
+      {isDownloading && (
+        <View style={styles.progressContainer}>
+          <ActivityIndicator size="large" color={colors.accent} />
+          <Text style={[styles.progressText, { color: colors.textPrimary, fontSize: applyFontScale(16) }]}>
+            Preparando hinos... {downloadProgress}%
+          </Text>
+          <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
+            <View
+              style={[
+                styles.progressFill,
+                { backgroundColor: colors.accent, width: `${downloadProgress}%` },
+              ]}
+            />
+          </View>
+          <Text style={[styles.downloadInfo, { color: colors.textSecondary, fontSize: applyFontScale(14) }]}>
+            Isso será feito apenas uma vez
+          </Text>
+        </View>
+      )}
+
+      {downloadError && (
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle" size={48} color="#f44336" />
+          <Text style={[styles.errorText, { color: '#f44336', fontSize: applyFontScale(14) }]}>
+            {downloadError}
+          </Text>
+          <TouchableOpacity
+            style={[styles.retryButton, { backgroundColor: colors.accent }]}
+            onPress={handleDownloadHarpa}
+          >
+            <Text style={[styles.retryButtonText, { fontSize: applyFontScale(14) }]}>
+              Tentar novamente
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+
   const renderHymnItem = ({ item }: { item: HymnListItem }) => (
     <TouchableOpacity
       style={[styles.hymnCard, { backgroundColor: colors.card }]}
-      onPress={() =>
+      onPress={() => {
+        if (!isDownloaded) {
+          // Se não baixou, mostrar mensagem
+          return;
+        }
         router.push({
           pathname: '/hymn-viewer',
           params: { hymnNumber: item.number },
-        })
-      }
+        });
+      }}
+      disabled={!isDownloaded}
     >
-      <View style={[styles.hymnNumber, { backgroundColor: colors.accent }]}>
-        <Text style={[styles.hymnNumberText, { fontSize: applyFontScale(18) }]}>
-          {item.number}
-        </Text>
-      </View>
       <View style={styles.hymnInfo}>
         <Text
           style={[
             styles.hymnTitle,
-            { color: colors.textPrimary, fontSize: applyFontScale(16) },
+            { color: isDownloaded ? colors.textPrimary : colors.textSecondary, fontSize: applyFontScale(16) },
           ]}
           numberOfLines={2}
         >
-          {item.title}
+          {String(item.number).padStart(3, '0')} - {item.title}
         </Text>
       </View>
-      <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+      {isDownloaded && <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />}
     </TouchableOpacity>
   );
+
+  // Se não baixou ainda, mostrar tela de download
+  if (!isDownloaded) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
+        <StatusBar
+          barStyle={isDark ? 'light-content' : 'dark-content'}
+          backgroundColor={colors.headerBg}
+        />
+        <View style={[styles.header, { backgroundColor: colors.headerBg, borderBottomColor: colors.border }]}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: colors.textPrimary, fontSize: applyFontScale(20) }]}>
+            Harpa Cristã
+          </Text>
+          <View style={{ width: 40 }} />
+        </View>
+        {renderDownloadScreen()}
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
@@ -328,5 +488,65 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 14,
     textAlign: 'center',
+  },
+  downloadContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  downloadTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginTop: 24,
+    marginBottom: 8,
+  },
+  downloadSubtitle: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  downloadInfo: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 32,
+  },
+  downloadButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 12,
+  },
+  downloadButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  progressContainer: {
+    width: '100%',
+    alignItems: 'center',
+    gap: 16,
+  },
+  progressText: {
+    fontSize: 16,
+    marginTop: 16,
+  },
+  progressBar: {
+    width: '100%',
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  errorContainer: {
+    alignItems: 'center',
+    gap: 16,
+    marginTop: 24,
   },
 });

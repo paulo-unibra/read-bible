@@ -137,23 +137,49 @@ class HymnAudioService {
   }
 
   /**
-   * Carrega um áudio específico
+   * Carrega um áudio específico usando streaming do backend
    */
   async loadTrack(track: HymnAudioTrack): Promise<Audio.Sound | null> {
     try {
-      console.log(`📥 [HymnAudioService] Carregando áudio: ${track.instrument}`);
+      console.log(`📥 [HymnAudioService] Carregando: ${track.instrument}...`);
       
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: track.downloadUrl },
-        { shouldPlay: false, volume: track.volume },
-        null
-      );
+      // Usar endpoint de streaming do backend (com Range support)
+      const streamUrl = `${API_URL}/hymn-audios/stream/${track.fileId}`;
       
-      console.log(`✅ [HymnAudioService] Áudio carregado: ${track.instrument}`);
-      
-      return sound;
+      console.log(`🌊 [HymnAudioService] Tentando streaming via backend: ${streamUrl}`);
+
+      try {
+        const { sound } = await Audio.Sound.createAsync(
+          { uri: streamUrl },
+          { 
+            shouldPlay: false,
+            volume: track.volume,
+            progressUpdateIntervalMillis: 100,
+          }
+        );
+        
+        console.log(`✅ [HymnAudioService] ${track.instrument} carregado via streaming`);
+        return sound;
+      } catch (streamError) {
+        // Fallback: Tentar URL direta do Google Drive
+        console.log(`⚠️ [HymnAudioService] Streaming falhou, tentando download direto...`);
+        
+        const downloadUrl = `https://drive.google.com/uc?export=download&id=${track.fileId}`;
+        
+        const { sound } = await Audio.Sound.createAsync(
+          { uri: downloadUrl },
+          { 
+            shouldPlay: false,
+            volume: track.volume,
+            progressUpdateIntervalMillis: 100,
+          }
+        );
+        
+        console.log(`✅ [HymnAudioService] ${track.instrument} carregado via download direto`);
+        return sound;
+      }
     } catch (error) {
-      console.error(`[HymnAudioService] Erro ao carregar áudio ${track.instrument}:`, error);
+      console.error(`❌ [HymnAudioService] Erro ao carregar ${track.instrument}:`, error);
       return null;
     }
   }
@@ -162,22 +188,39 @@ class HymnAudioService {
    * Carrega todos os áudios
    */
   async loadAllTracks(tracks: HymnAudioTrack[]): Promise<HymnAudioTrack[]> {
-    console.log(`📥 [HymnAudioService] Carregando ${tracks.length} áudios...`);
+    const startTime = Date.now();
+    console.log(`⏱️ [TIMER] loadAllTracks iniciado para ${tracks.length} áudios`);
     
     const loadedTracks = await Promise.all(
       tracks.map(async (track) => {
-        const sound = await this.loadTrack(track);
-        return {
-          ...track,
-          sound: sound || undefined,
-          isLoaded: sound !== null,
-        };
+        const trackStartTime = Date.now();
+        try {
+          const sound = await this.loadTrack(track);
+          const trackEndTime = Date.now();
+          console.log(`⏱️ [TIMER] Track ${track.instrument} carregado em ${trackEndTime - trackStartTime}ms`);
+          return {
+            ...track,
+            sound: sound || undefined,
+            isLoaded: sound !== null,
+          };
+        } catch (error) {
+          console.error(`❌ [HymnAudioService] Erro ao carregar track ${track.instrument}:`, error);
+          // Retornar track sem áudio carregado em caso de erro
+          return {
+            ...track,
+            sound: undefined,
+            isLoaded: false,
+          };
+        }
       })
     );
     
-    console.log(`✅ [HymnAudioService] Áudios carregados`);
+    const successCount = loadedTracks.filter(t => t.isLoaded).length;
+    const totalTime = Date.now() - startTime;
+    console.log(`⏱️ [TIMER] loadAllTracks concluído: ${successCount}/${tracks.length} áudios em ${totalTime}ms`);
     
-    return loadedTracks;
+    // Retornar apenas os tracks que carregaram com sucesso
+    return loadedTracks.filter(t => t.isLoaded);
   }
 
   /**
@@ -186,8 +229,18 @@ class HymnAudioService {
   async playAll(tracks: HymnAudioTrack[]): Promise<void> {
     console.log(`▶️ [HymnAudioService] Tocando todos os áudios...`);
     
+    // Filtrar apenas tracks carregados
+    const loadedTracks = tracks.filter(t => t.sound && t.isLoaded);
+    
+    if (loadedTracks.length === 0) {
+      console.error(`❌ [HymnAudioService] Nenhum áudio carregado para tocar`);
+      throw new Error('Nenhum áudio disponível para reprodução');
+    }
+    
+    console.log(`▶️ [HymnAudioService] ${loadedTracks.length}/${tracks.length} áudios prontos para tocar`);
+    
     // Verificar se os áudios já estão em alguma posição (retomando de pausa)
-    const firstTrack = tracks.find(t => t.sound && t.isLoaded);
+    const firstTrack = loadedTracks[0];
     let currentPosition = 0;
     
     if (firstTrack && firstTrack.sound) {
@@ -202,7 +255,7 @@ class HymnAudioService {
     if (isResumingFromPause) {
       // Apenas retomar todos os áudios sem aplicar delays
       console.log(`▶️ [HymnAudioService] Retomando de pausa na posição ${currentPosition}ms`);
-      const resumePromises = tracks
+      const resumePromises = loadedTracks
         .filter(t => t.sound && t.isLoaded && !t.isMuted)
         .map(async (track) => {
           try {
@@ -220,10 +273,10 @@ class HymnAudioService {
     console.log(`▶️ [HymnAudioService] Iniciando do começo com offsets`);
     
     // Encontrar o offset mais negativo (o que começa mais cedo)
-    const minOffset = Math.min(...tracks.map(t => t.offsetMs || 0));
+    const minOffset = Math.min(...loadedTracks.map(t => t.offsetMs || 0));
     console.log(`⏱️ [HymnAudioService] Offset de referência (mais negativo): ${minOffset}ms`);
     
-    const playPromises = tracks
+    const playPromises = loadedTracks
       .filter(t => t.sound && t.isLoaded && !t.isMuted)
       .map(async (track) => {
         try {
