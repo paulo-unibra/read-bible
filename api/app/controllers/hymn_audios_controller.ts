@@ -20,7 +20,7 @@ export default class HymnAudiosController {
       const port = request.protocol() === 'https' ? '' : ':1999'
       const apiUrl = `${baseUrl}${port}`
 
-      const audiosWithProxy = audios.map(audio => ({
+      const audiosWithProxy = audios.map((audio: any) => ({
         ...audio,
         downloadUrl: `${apiUrl}/hymn-audios/stream/${audio.fileId}`,
       }))

@@ -142,7 +142,7 @@ export async function searchHymnAudiosInDrive(hymnNumber: number) {
     throw new Error(`Erro ao buscar áudios no Drive: ${response.status}`)
   }
 
-  const data = await response.json()
+  const data = (await response.json()) as any
 
   if (data.error) {
     console.error('Erro API Drive:', data.error)
@@ -200,7 +200,7 @@ export async function listAllHymnsWithAudioInDrive(): Promise<number[]> {
     throw new Error(`Erro ao listar hinos no Drive: ${response.status}`)
   }
 
-  const data = await response.json()
+  const data = (await response.json()) as any
 
   if (data.error) {
     console.error('Erro API Drive:', data.error)

@@ -168,11 +168,6 @@ export default class AuthController {
           return sum + (reading.end_chapter - reading.start_chapter + 1)
         }, 0)
 
-        // Calcular total de capítulos do plano
-        const totalChapters = planReadings.reduce((sum: number, reading: any) => {
-          return sum + (reading.end_chapter - reading.start_chapter + 1)
-        }, 0)
-
         // Calcular dias únicos completados
         const completedDaysSet = new Set(completedReadings.map((r: any) => r.day))
         const completedDays = completedDaysSet.size

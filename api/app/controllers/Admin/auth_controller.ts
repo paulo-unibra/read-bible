@@ -574,7 +574,7 @@ export default class AuthController {
    */
   async checkUserPlanForDuplicates({ response, params }: HttpContext) {
     try {
-      const { userId, planId } = params
+      const { planId } = params
 
       const recalculatorService = new ReadingPlanRecalculatorService()
       const result = await recalculatorService.checkPlanForDuplicateBooks(parseInt(planId))
