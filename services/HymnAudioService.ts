@@ -1,6 +1,7 @@
 import { Audio } from 'expo-av';
+import Constants from 'expo-constants';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3333';
+const API_URL = process.env.EXPO_PUBLIC_API_URL || Constants.expoConfig?.extra?.apiUrl || 'http://localhost:3333';
 
 export interface HymnAudioTrack {
   instrument: string; // 'voz', 'teclado', etc.
@@ -224,7 +225,8 @@ class HymnAudioService {
   }
 
   /**
-   * Toca todos os áudios sincronizados (aplicando offset)
+   * Toca todos os áudios sincronizados
+   * SIMPLES: Todos começam na mesma posição, sem ajustes durante reprodução
    */
   async playAll(tracks: HymnAudioTrack[]): Promise<void> {
     console.log(`▶️ [HymnAudioService] Tocando todos os áudios...`);
@@ -239,70 +241,19 @@ class HymnAudioService {
     
     console.log(`▶️ [HymnAudioService] ${loadedTracks.length}/${tracks.length} áudios prontos para tocar`);
     
-    // Verificar se os áudios já estão em alguma posição (retomando de pausa)
-    const firstTrack = loadedTracks[0];
-    let currentPosition = 0;
+    // Ajustar volume antes de tocar
+    await Promise.all(
+      loadedTracks.map(track => 
+        track.sound!.setVolumeAsync(track.isMuted ? 0 : track.volume)
+      )
+    );
     
-    if (firstTrack && firstTrack.sound) {
-      const status = await firstTrack.sound.getStatusAsync();
-      if (status.isLoaded) {
-        currentPosition = status.positionMillis || 0;
-      }
-    }
+    // Tocar todos SIMULTANEAMENTE
+    await Promise.all(
+      loadedTracks.map(track => track.sound!.playAsync())
+    );
     
-    const isResumingFromPause = currentPosition > 100; // Mais de 100ms = está retomando
-    
-    if (isResumingFromPause) {
-      // Apenas retomar todos os áudios sem aplicar delays
-      console.log(`▶️ [HymnAudioService] Retomando de pausa na posição ${currentPosition}ms`);
-      const resumePromises = loadedTracks
-        .filter(t => t.sound && t.isLoaded && !t.isMuted)
-        .map(async (track) => {
-          try {
-            await track.sound!.setVolumeAsync(track.volume);
-            await track.sound!.playAsync();
-          } catch (error) {
-            console.error(`[HymnAudioService] Erro ao retomar ${track.instrument}:`, error);
-          }
-        });
-      await Promise.all(resumePromises);
-      return;
-    }
-    
-    // Começando do início: aplicar offsets
-    console.log(`▶️ [HymnAudioService] Iniciando do começo com offsets`);
-    
-    // Encontrar o offset mais negativo (o que começa mais cedo)
-    const minOffset = Math.min(...loadedTracks.map(t => t.offsetMs || 0));
-    console.log(`⏱️ [HymnAudioService] Offset de referência (mais negativo): ${minOffset}ms`);
-    
-    const playPromises = loadedTracks
-      .filter(t => t.sound && t.isLoaded && !t.isMuted)
-      .map(async (track) => {
-        try {
-          await track.sound!.setVolumeAsync(track.volume);
-          
-          // Calcular delay relativo ao offset mais negativo
-          const trackOffset = track.offsetMs || 0;
-          const relativeDelay = trackOffset - minOffset;
-          
-          console.log(`⏱️ [HymnAudioService] ${track.instrument}: offset=${trackOffset}ms, delay=${relativeDelay}ms`);
-          
-          if (relativeDelay > 0) {
-            // Atrasar o início deste áudio
-            setTimeout(async () => {
-              await track.sound!.playAsync();
-            }, relativeDelay);
-          } else {
-            // Tocar imediatamente (é o áudio de referência)
-            await track.sound!.playAsync();
-          }
-        } catch (error) {
-          console.error(`[HymnAudioService] Erro ao tocar ${track.instrument}:`, error);
-        }
-      });
-    
-    await Promise.all(playPromises);
+    console.log(`✅ [HymnAudioService] Todos os áudios iniciados simultaneamente`);
   }
 
   /**
@@ -311,43 +262,25 @@ class HymnAudioService {
   async pauseAll(tracks: HymnAudioTrack[]): Promise<void> {
     console.log(`⏸️ [HymnAudioService] Pausando todos os áudios...`);
     
-    const pausePromises = tracks
-      .filter(t => t.sound && t.isLoaded)
-      .map(async (track) => {
-        try {
-          await track.sound!.pauseAsync();
-        } catch (error) {
-          console.error(`[HymnAudioService] Erro ao pausar ${track.instrument}:`, error);
-        }
-      });
+    const loadedTracks = tracks.filter(t => t.sound && t.isLoaded);
     
-    await Promise.all(pausePromises);
+    await Promise.all(
+      loadedTracks.map(track => track.sound!.pauseAsync())
+    );
   }
 
   /**
-   * Para todos os áudios e volta ao início (respeitando offsets)
+   * Para todos os áudios e volta ao início
    */
   async stopAll(tracks: HymnAudioTrack[]): Promise<void> {
     console.log(`⏹️ [HymnAudioService] Parando todos os áudios...`);
-    
-    // Encontrar o offset mais negativo (referência)
-    const minOffset = Math.min(...tracks.map(t => t.offsetMs || 0));
     
     const stopPromises = tracks
       .filter(t => t.sound && t.isLoaded)
       .map(async (track) => {
         try {
           await track.sound!.stopAsync();
-          
-          // Calcular posição inicial considerando offset
-          // Se voz tem offset -110 (referência) e teclado -10:
-          // - voz: posição 0
-          // - teclado: posição -100 (mas como não pode ser negativo, será 0 e o delay será aplicado no play)
-          const trackOffset = track.offsetMs || 0;
-          const relativeDelay = trackOffset - minOffset;
-          const initialPosition = Math.max(0, -relativeDelay);
-          
-          await track.sound!.setPositionAsync(initialPosition);
+          await track.sound!.setPositionAsync(0);
         } catch (error) {
           console.error(`[HymnAudioService] Erro ao parar ${track.instrument}:`, error);
         }
@@ -404,32 +337,42 @@ class HymnAudioService {
   }
 
   /**
-   * Define a posição de reprodução para todos os áudios (mantendo offsets)
+   * Define a posição de reprodução para todos os áudios
    */
   async seekAll(tracks: HymnAudioTrack[], positionMillis: number): Promise<void> {
-    // Encontrar o offset mais negativo (referência)
-    const minOffset = Math.min(...tracks.map(t => t.offsetMs || 0));
+    console.log(`⏩ [HymnAudioService] Buscando posição ${positionMillis}ms...`);
     
-    const seekPromises = tracks
-      .filter(t => t.sound && t.isLoaded)
-      .map(async (track) => {
-        try {
-          // Calcular posição ajustada para este áudio
-          // Se voz tem offset -110 (referência) e teclado -10:
-          // Na posição 5000ms:
-          // - voz: 5000ms
-          // - teclado: 5000 - 100 = 4900ms (está 100ms atrás)
-          const trackOffset = track.offsetMs || 0;
-          const relativeDelay = trackOffset - minOffset;
-          const adjustedPosition = Math.max(0, positionMillis - relativeDelay);
-          
-          await track.sound!.setPositionAsync(adjustedPosition);
-        } catch (error) {
-          console.error(`[HymnAudioService] Erro ao buscar posição ${track.instrument}:`, error);
-        }
-      });
+    const loadedTracks = tracks.filter(t => t.sound && t.isLoaded);
     
-    await Promise.all(seekPromises);
+    // Verificar se estava tocando
+    const wasPlaying = await Promise.all(
+      loadedTracks.map(async (track) => {
+        const status = await track.sound!.getStatusAsync();
+        return status.isLoaded ? status.isPlaying : false;
+      })
+    );
+    const shouldResume = wasPlaying.some(playing => playing);
+    
+    // PAUSAR TODOS primeiro
+    if (shouldResume) {
+      await Promise.all(
+        loadedTracks.map(track => track.sound!.pauseAsync().catch(() => {}))
+      );
+    }
+    
+    // POSICIONAR TODOS na mesma posição
+    await Promise.all(
+      loadedTracks.map(track => track.sound!.setPositionAsync(positionMillis))
+    );
+    
+    // RETOMAR se estava tocando
+    if (shouldResume) {
+      await Promise.all(
+        loadedTracks
+          .filter(track => !track.isMuted)
+          .map(track => track.sound!.playAsync())
+      );
+    }
   }
 
   /**

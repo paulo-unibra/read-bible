@@ -97,7 +97,7 @@ export default function HymnViewerScreen() {
         console.log(`🕐 [HymnViewer] Posição: ${currentPosition}ms, duração: ${duration}ms`);
         setPosition(currentPosition);
         
-        // Só verificar fim se duração estiver definida e for válida
+        // Verificar fim do áudio
         if (duration > 0 && currentPosition >= duration - 100) {
           console.log(`⏹️ [HymnViewer] Fim do áudio, parando...`);
           handleStop();

@@ -43,13 +43,21 @@ class BibleCuriosityService {
    */
   async toggleFavorite(curiosityId: number): Promise<{ success: boolean; data?: { isFavorited: boolean } }> {
     try {
+      console.log('🔄 [BibleCuriosityService] toggleFavorite iniciado');
+      console.log('📋 [BibleCuriosityService] curiosityId:', curiosityId);
+      
       const token = await authService.getToken();
+      console.log('🔑 [BibleCuriosityService] Token obtido:', token ? `${token.substring(0, 20)}...` : 'null');
       
       if (!token) {
+        console.error('❌ [BibleCuriosityService] Token não encontrado');
         return { success: false };
       }
 
-      const response = await fetch(`${API_URL}/curiosities/${curiosityId}/favorite`, {
+      const url = `${API_URL}/curiosities/${curiosityId}/favorite`;
+      console.log('🌐 [BibleCuriosityService] URL da requisição:', url);
+
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -57,9 +65,37 @@ class BibleCuriosityService {
         },
       });
 
-      return await response.json();
+      console.log('📡 [BibleCuriosityService] Status da resposta:', response.status);
+      console.log('📡 [BibleCuriosityService] Status text:', response.statusText);
+      console.log('📡 [BibleCuriosityService] Response ok:', response.ok);
+
+      // Verificar se a resposta tem conteúdo
+      const contentType = response.headers.get('content-type');
+      console.log('📄 [BibleCuriosityService] Content-Type:', contentType);
+
+      if (!response.ok) {
+        console.error('❌ [BibleCuriosityService] Resposta não OK:', response.status);
+        const errorText = await response.text();
+        console.error('❌ [BibleCuriosityService] Erro texto:', errorText);
+        return { success: false };
+      }
+
+      // Tentar ler o corpo da resposta
+      const responseText = await response.text();
+      console.log('📥 [BibleCuriosityService] Resposta texto bruto:', responseText);
+
+      if (!responseText) {
+        console.error('❌ [BibleCuriosityService] Resposta vazia');
+        return { success: false };
+      }
+
+      const responseData = JSON.parse(responseText);
+      console.log('📥 [BibleCuriosityService] Dados da resposta:', JSON.stringify(responseData, null, 2));
+
+      return responseData;
     } catch (error) {
-      console.error('Erro ao favoritar curiosidade:', error);
+      console.error('❌ [BibleCuriosityService] Erro ao favoritar curiosidade:', error);
+      console.error('❌ [BibleCuriosityService] Stack trace:', error instanceof Error ? error.stack : 'N/A');
       return { success: false };
     }
   }

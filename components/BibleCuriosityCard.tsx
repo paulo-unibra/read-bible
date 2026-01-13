@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
 import React, { useRef, useState } from "react";
 import {
@@ -11,6 +12,7 @@ import {
 } from "react-native";
 import QRCode from "react-native-qrcode-svg";
 import ViewShot from "react-native-view-shot";
+import authService from "../services/AuthService";
 import type { BibleCuriosity } from "../services/BibleCuriosityService";
 import bibleCuriosityService from "../services/BibleCuriosityService";
 
@@ -41,6 +43,10 @@ export default function BibleCuriosityCard({
   const [isLoading, setIsLoading] = useState(false);
   const [showFooter, setShowFooter] = useState(false);
   const viewShotRef = useRef<ViewShot>(null);
+  const router = useRouter();
+
+  // Verificar se o usuário está autenticado
+  const isAuthenticated = authService.isAuthenticated();
 
   // Gera cor aleatória baseada no ID da curiosidade (consistente)
   const paletteIndex = curiosity.id % COLOR_PALETTES.length;
@@ -89,21 +95,50 @@ export default function BibleCuriosityCard({
   };
 
   const handleFavorite = async () => {
+    // Verificar se o usuário está autenticado
+    if (!isAuthenticated) {
+      Alert.alert(
+        "Login necessário", 
+        "Você precisa estar logado para favoritar curiosidades. Deseja fazer login agora?",
+        [
+          { text: "Cancelar", style: "cancel" },
+          { text: "Fazer Login", onPress: () => {
+            router.push("/auth");
+          }}
+        ]
+      );
+      return;
+    }
+
     try {
+      console.log('🔄 [BibleCuriosityCard] Iniciando favoritar...');
+      console.log('📋 [BibleCuriosityCard] Curiosity ID:', curiosity.id);
+      console.log('📋 [BibleCuriosityCard] isFavorited atual:', isFavorited);
+      
       setIsLoading(true);
       const response = await bibleCuriosityService.toggleFavorite(curiosity.id);
 
+      console.log('📥 [BibleCuriosityCard] Resposta do serviço:', JSON.stringify(response, null, 2));
+
       if (response.success && response.data) {
+        console.log('✅ [BibleCuriosityCard] Favorito alterado com sucesso:', response.data.isFavorited);
         setIsFavorited(response.data.isFavorited);
         if (onFavoriteChange) {
           onFavoriteChange();
         }
       } else {
-        Alert.alert("Erro", "Não foi possível favoritar a curiosidade");
+        console.error('❌ [BibleCuriosityCard] Falha ao favoritar - success:', response.success, 'data:', response.data);
+        Alert.alert(
+          "Login necessário", 
+          "Você precisa estar logado para favoritar curiosidades."
+        );
       }
     } catch (error) {
-      console.error("Erro ao favoritar:", error);
-      Alert.alert("Erro", "Ocorreu um erro ao favoritar");
+      console.error("❌ [BibleCuriosityCard] Erro ao favoritar:", error);
+      Alert.alert(
+        "Login necessário", 
+        "Você precisa estar logado para favoritar curiosidades."
+      );
     } finally {
       setIsLoading(false);
     }

@@ -173,41 +173,62 @@ export default class BibleCuriositiesController {
    */
   async toggleFavorite({ auth, params, response }: HttpContext) {
     try {
+      console.log('🔄 [BibleCuriositiesController] toggleFavorite iniciado')
+      
       const user = auth.user!
+      console.log('👤 [BibleCuriositiesController] User ID:', user.id)
+      console.log('👤 [BibleCuriositiesController] User email:', user.email)
+      
       const curiosityId = params.id
+      console.log('📋 [BibleCuriositiesController] Curiosity ID:', curiosityId)
 
       const curiosity = await BibleCuriosity.find(curiosityId)
+      console.log('🔍 [BibleCuriositiesController] Curiosidade encontrada:', curiosity ? 'SIM' : 'NÃO')
 
       if (!curiosity) {
+        console.error('❌ [BibleCuriositiesController] Curiosidade não encontrada')
         return response.notFound({
           success: false,
           message: 'Curiosidade não encontrada',
         })
       }
 
+      console.log('📥 [BibleCuriositiesController] Carregando favoritos...')
       await curiosity.load('favoritedBy')
+      console.log('📊 [BibleCuriositiesController] Favoritos carregados:', curiosity.favoritedBy.length)
+      
       const isFavorited = curiosity.favoritedBy.some((u) => u.id === user.id)
+      console.log('⭐ [BibleCuriositiesController] Já está favoritado?', isFavorited)
 
       if (isFavorited) {
+        console.log('➖ [BibleCuriositiesController] Removendo dos favoritos...')
         await curiosity.related('favoritedBy').detach([user.id])
       } else {
+        console.log('➕ [BibleCuriositiesController] Adicionando aos favoritos...')
         await curiosity.related('favoritedBy').attach([user.id])
       }
 
+      const resultMessage = isFavorited
+        ? 'Curiosidade removida dos favoritos'
+        : 'Curiosidade adicionada aos favoritos'
+      
+      console.log('✅ [BibleCuriositiesController]', resultMessage)
+      console.log('📤 [BibleCuriositiesController] isFavorited final:', !isFavorited)
+
       return response.ok({
         success: true,
-        message: isFavorited
-          ? 'Curiosidade removida dos favoritos'
-          : 'Curiosidade adicionada aos favoritos',
+        message: resultMessage,
         data: {
           isFavorited: !isFavorited,
         },
       })
     } catch (error) {
-      console.error('Erro ao favoritar curiosidade:', error)
+      console.error('❌ [BibleCuriositiesController] Erro ao favoritar curiosidade:', error)
+      console.error('❌ [BibleCuriositiesController] Stack trace:', error instanceof Error ? error.stack : 'N/A')
       return response.badRequest({
         success: false,
         message: 'Erro ao favoritar curiosidade',
+        error: error instanceof Error ? error.message : 'Erro desconhecido',
       })
     }
   }

@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 
-export const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:1999';
+export const API_URL = process.env.EXPO_PUBLIC_API_URL || Constants.expoConfig?.extra?.apiUrl || 'http://localhost:1999';
 
 export interface User {
   id: number;

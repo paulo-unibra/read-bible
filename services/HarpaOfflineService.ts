@@ -2,6 +2,7 @@ import { Asset } from 'expo-asset';
 import { Directory, File, Paths } from 'expo-file-system';
 import { XMLParser } from 'fast-xml-parser';
 import JSZip from 'jszip';
+import { Alert } from 'react-native';
 
 const HARPA_DIR = new Directory(Paths.document, 'harpa');
 const EXTRACTED_DIR = new Directory(HARPA_DIR, 'extracted');
@@ -42,14 +43,34 @@ class HarpaOfflineService {
    */
   async isHarpaDownloaded(): Promise<boolean> {
     try {
-      if (!EXTRACTED_DIR.exists) return false;
-      if (!HYMN_NAMES_FILE.exists) return false;
+      const dirExists = EXTRACTED_DIR.exists;
+      const fileExists = HYMN_NAMES_FILE.exists;
+      
+      console.log(`[isHarpaDownloaded] EXTRACTED_DIR.exists: ${dirExists}`);
+      console.log(`[isHarpaDownloaded] HYMN_NAMES_FILE.exists: ${fileExists}`);
+      
+      if (!dirExists) {
+        console.log('[isHarpaDownloaded] Diretório não existe');
+        return false;
+      }
+      
+      if (!fileExists) {
+        console.log('[isHarpaDownloaded] Arquivo de nomes não existe');
+        return false;
+      }
 
       // Verificar se tem arquivos XML
       const files = EXTRACTED_DIR.list();
-      return files.length >= 640;
+      console.log(`[isHarpaDownloaded] Arquivos encontrados: ${files.length}`);
+      
+      // Aceitar se tiver pelo menos 630 arquivos (98% dos hinos)
+      // Isso permite alguma margem para arquivos faltando ou duplicados
+      const hasEnoughFiles = files.length >= 630;
+      console.log(`[isHarpaDownloaded] Tem arquivos suficientes (>=630): ${hasEnoughFiles}`);
+      
+      return hasEnoughFiles;
     } catch (error) {
-      console.error('[HarpaOffline] Erro ao verificar download:', error);
+      console.error('[isHarpaDownloaded] Erro ao verificar download:', error);
       return false;
     }
   }
@@ -244,17 +265,80 @@ class HarpaOfflineService {
 
     // Verificar se a Harpa foi baixada
     const isDownloaded = await this.isHarpaDownloaded();
+    console.log(`📦 [HarpaOffline] Harpa baixada: ${isDownloaded}`);
+    
     if (!isDownloaded) {
-      console.error('❌ [HarpaOffline] Harpa não foi baixada ainda');
+      // Mostrar detalhes do diagnóstico
+      const dirExists = EXTRACTED_DIR.exists;
+      const fileExists = HYMN_NAMES_FILE.exists;
+      let fileCount = 0;
+      
+      if (dirExists) {
+        try {
+          const files = EXTRACTED_DIR.list();
+          fileCount = files.length;
+        } catch (e) {
+          console.error('Erro ao listar arquivos:', e);
+        }
+      }
+      
+      // Obter caminho de forma segura
+      let dirPath = 'N/A';
+      try {
+        dirPath = EXTRACTED_DIR.path || EXTRACTED_DIR.uri || 'undefined';
+      } catch (e) {
+        dirPath = 'erro ao obter path';
+      }
+      
+      Alert.alert(
+        'Harpa não baixada',
+        `A Harpa Cristã ainda não foi baixada.\n\n` +
+        `Diagnóstico:\n` +
+        `• Diretório existe: ${dirExists ? 'Sim' : 'Não'}\n` +
+        `• Caminho: ${dirPath}\n` +
+        `• Arquivo de nomes: ${fileExists ? 'Sim' : 'Não'}\n` +
+        `• Arquivos XML: ${fileCount}\n` +
+        `• Necessário: 630+ arquivos\n\n` +
+        `Por favor, faça o download primeiro na tela da Harpa.`
+      );
       return null;
     }
 
     try {
-      const xmlFile = new File(EXTRACTED_DIR, `${hymnNumber}.xml`);
-      console.log(`📁 [HarpaOffline] Verificando arquivo: ${xmlFile.path}`);
+      // Debug: listar todos os arquivos no diretório
+      const dirPath = EXTRACTED_DIR.path;
+      const dirExists = EXTRACTED_DIR.exists;
+      
+      console.log(`📂 [HarpaOffline] EXTRACTED_DIR.path: ${dirPath}`);
+      console.log(`📂 [HarpaOffline] EXTRACTED_DIR.exists: ${dirExists}`);
+      
+      let filesInfo = '';
+      if (dirExists) {
+        const files = EXTRACTED_DIR.list();
+        filesInfo = `Total de arquivos: ${files.length}`;
+        
+        if (files.length > 0 && files.length <= 10) {
+          filesInfo += `\n\nPrimeiros arquivos:\n${files.slice(0, 10).join('\n')}`;
+        }
+      } else {
+        filesInfo = 'Diretório não existe!';
+      }
 
-      if (!xmlFile.exists) {
-        console.warn(`⚠️ [HarpaOffline] Hino ${hymnNumber} não encontrado localmente`);
+      const xmlFile = new File(EXTRACTED_DIR, `${hymnNumber}.xml`);
+      const filePath = xmlFile.path;
+      const fileExists = xmlFile.exists;
+      
+      console.log(`📁 [HarpaOffline] Verificando arquivo: ${filePath}`);
+      console.log(`📁 [HarpaOffline] Arquivo existe: ${fileExists}`);
+
+      if (!fileExists) {
+        Alert.alert(
+          `Debug - Hino ${hymnNumber}`,
+          `Arquivo não encontrado!\n\n` +
+          `Caminho: ${filePath}\n\n` +
+          `Diretório existe: ${dirExists}\n` +
+          `${filesInfo}`
+        );
         return null;
       }
 
@@ -275,11 +359,19 @@ class HarpaOfflineService {
         this.hymnsCache.set(hymnNumber, hymnData);
         console.log(`✅ [HarpaOffline] Hino ${hymnNumber} carregado e armazenado no cache`);
       } else {
-        console.error(`❌ [HarpaOffline] Falha ao parsear hino ${hymnNumber}`);
+        Alert.alert(
+          'Erro ao parsear',
+          `Falha ao processar o XML do hino ${hymnNumber}`
+        );
       }
 
       return hymnData;
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      Alert.alert(
+        `Erro - Hino ${hymnNumber}`,
+        `Erro ao ler hino:\n\n${errorMessage}\n\nDiretório: ${EXTRACTED_DIR.path}\n\nVerifique se a Harpa foi baixada corretamente.`
+      );
       console.error(`❌ [HarpaOffline] Erro ao ler hino ${hymnNumber}:`, error);
       return null;
     }
