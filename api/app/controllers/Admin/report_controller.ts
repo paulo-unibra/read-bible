@@ -1,3 +1,4 @@
+import AppSetting from '#models/app_setting'
 import QuizResult from '#models/quiz_result'
 import ReadingPlan from '#models/reading_plan'
 import ReadingProgress from '#models/reading_progress'
@@ -154,6 +155,62 @@ export default class ReportController {
       console.error('Erro ao gerar relatório:', error)
       return response.internalServerError({
         error: 'Erro ao gerar relatório de estatísticas',
+      })
+    }
+  }
+
+  /**
+   * Atualiza o número de downloads do aplicativo
+   */
+  async updateAppDownloads({ request, response }: HttpContext) {
+    try {
+      const { downloads } = request.only(['downloads'])
+
+      if (typeof downloads !== 'number' || downloads < 0) {
+        return response.badRequest({
+          error: 'Número de downloads inválido',
+        })
+      }
+
+      const setting = await AppSetting.firstOrNew(
+        { key: 'app_downloads' },
+        {
+          key: 'app_downloads',
+          value: String(downloads),
+          description: 'Número total de downloads do aplicativo'
+        }
+      )
+
+      setting.value = String(downloads)
+      await setting.save()
+
+      return response.ok({
+        message: 'Downloads atualizados com sucesso',
+        downloads: downloads,
+      })
+    } catch (error) {
+      console.error('Erro ao atualizar downloads:', error)
+      return response.internalServerError({
+        error: 'Erro ao atualizar número de downloads',
+      })
+    }
+  }
+
+  /**
+   * Retorna o número de downloads do aplicativo
+   */
+  async getAppDownloads({ response }: HttpContext) {
+    try {
+      const setting = await AppSetting.findBy('key', 'app_downloads')
+      const downloads = setting ? Number(setting.value) : 0
+
+      return response.ok({
+        downloads: downloads,
+      })
+    } catch (error) {
+      console.error('Erro ao buscar downloads:', error)
+      return response.internalServerError({
+        error: 'Erro ao buscar número de downloads',
       })
     }
   }

@@ -93,9 +93,55 @@ const Reports: React.FC = () => {
   const [playStoreError, setPlayStoreError] = useState("");
   const [isExporting, setIsExporting] = useState(false);
   const [playStoreDays, setPlayStoreDays] = useState(7);
+  const [appDownloads, setAppDownloads] = useState(0);
+  
+  // Estado para controlar quais seções incluir no relatório
+  const [reportSections, setReportSections] = useState(() => {
+    const saved = localStorage.getItem('reportSections');
+    return saved ? JSON.parse(saved) : {
+      users: true,
+      readingPlans: true,
+      quizzes: true,
+      playStore: true,
+    };
+  });
+
+  // Estado para controlar quais cards individuais incluir
+  const [selectedCards, setSelectedCards] = useState(() => {
+    const saved = localStorage.getItem('selectedCards');
+    return saved ? JSON.parse(saved) : {
+      // Usuários
+      totalUsers: true,
+      withActivePlan: true,
+      upToDate: true,
+      withCompletedPlan: true,
+      withQuizResults: true,
+      newUsers: true,
+      activeUsers: true,
+      notStarted: true,
+      downloads: true,
+      // Planos
+      totalPlans: true,
+      completedDays: true,
+      plansByType: true,
+      // Quizzes
+      totalQuizResults: true,
+      averageScore: true,
+    };
+  });
 
   const { hasPermission, logout } = useAuth();
   const navigate = useNavigate();
+
+  // Salvar reportSections no localStorage quando mudar
+  useEffect(() => {
+    localStorage.setItem('reportSections', JSON.stringify(reportSections));
+  }, [reportSections]);
+
+  // Salvar selectedCards no localStorage quando mudar
+  useEffect(() => {
+    localStorage.setItem('selectedCards', JSON.stringify(selectedCards));
+  }, [selectedCards]);
 
   useEffect(() => {
     if (!hasPermission("visualizar_relatorios")) {
@@ -105,7 +151,25 @@ const Reports: React.FC = () => {
 
     loadStats();
     loadPlayStoreStats();
+    loadAppDownloads();
   }, []);
+
+  const loadAppDownloads = async () => {
+    try {
+      const response = await api.get('/admin/reports/app-downloads');
+      setAppDownloads(response.data.downloads || 0);
+    } catch (err) {
+      console.error('Erro ao carregar downloads:', err);
+    }
+  };
+
+  const saveAppDownloads = async (value: number) => {
+    try {
+      await api.put('/admin/reports/app-downloads', { downloads: value });
+    } catch (err: any) {
+      alert('Erro ao salvar downloads: ' + (err.response?.data?.error || err.message));
+    }
+  };
 
   const loadStats = async () => {
     setLoading(true);
@@ -302,81 +366,138 @@ const Reports: React.FC = () => {
       };
 
       // Estatísticas de Usuários
-      drawStatsBlock("Estatísticas de Usuários", "👥", [
-        {
-          label: "Total de usuários cadastrados",
-          value: stats.users.total,
-          highlight: true,
-        },
-        {
-          label: "Usuários com plano ativo",
-          value: stats.users.withActivePlan,
-        },
-        { label: "Usuários com leitura em dia", value: stats.users.upToDate },
-        {
-          label: "Usuários que completaram planos",
-          value: stats.users.withCompletedPlan,
-        },
-        {
-          label: "Usuários com questionários respondidos",
-          value: stats.users.withQuizResults,
-        },
-        {
-          label: "Novos usuários (30 dias)",
-          value: stats.users.newInLast30Days,
-          highlight: true,
-        },
-        {
-          label: "Usuários ativos (7 dias)",
-          value: stats.users.activeInLast7Days,
-          highlight: true,
-        },
-        {
-          label: "Ainda não iniciaram a leitura",
-          value: stats.users.notStartedReading,
-        },
-      ]);
+      if (reportSections.users) {
+        const userItems: Array<{ label: string; value: string | number; highlight?: boolean }> = [];
+        
+        if (selectedCards.downloads && appDownloads > 0) {
+          userItems.push({
+            label: "Downloads do aplicativo",
+            value: appDownloads,
+            highlight: true,
+          });
+        }
+        
+        if (selectedCards.totalUsers) {
+          userItems.push({
+            label: "Total de usuários cadastrados",
+            value: stats.users.total,
+            highlight: true,
+          });
+        }
+        
+        if (selectedCards.withActivePlan) {
+          userItems.push({
+            label: "Usuários com plano ativo",
+            value: stats.users.withActivePlan,
+          });
+        }
+        
+        if (selectedCards.upToDate) {
+          userItems.push({ label: "Usuários com leitura em dia", value: stats.users.upToDate });
+        }
+        
+        if (selectedCards.withCompletedPlan) {
+          userItems.push({
+            label: "Usuários que completaram planos",
+            value: stats.users.withCompletedPlan,
+          });
+        }
+        
+        if (selectedCards.withQuizResults) {
+          userItems.push({
+            label: "Usuários com questionários respondidos",
+            value: stats.users.withQuizResults,
+          });
+        }
+        
+        if (selectedCards.newUsers) {
+          userItems.push({
+            label: "Novos usuários (30 dias)",
+            value: stats.users.newInLast30Days,
+            highlight: true,
+          });
+        }
+        
+        if (selectedCards.activeUsers) {
+          userItems.push({
+            label: "Usuários ativos (7 dias)",
+            value: stats.users.activeInLast7Days,
+            highlight: true,
+          });
+        }
+        
+        if (selectedCards.notStarted) {
+          userItems.push({
+            label: "Ainda não iniciaram a leitura",
+            value: stats.users.notStartedReading,
+          });
+        }
+        
+        if (userItems.length > 0) {
+          drawStatsBlock("Estatísticas de Usuários", "👥", userItems);
+        }
+      }
 
       // Estatísticas de Planos de Leitura
+      if (reportSections.readingPlans) {
       const planItems: Array<{
         label: string;
         value: string | number;
         highlight?: boolean;
-      }> = [
-        {
+      }> = [];
+      
+      if (selectedCards.totalPlans) {
+        planItems.push({
           label: "Total de planos criados",
           value: stats.readingPlans.total,
           highlight: true,
-        },
-        {
+        });
+      }
+      
+      if (selectedCards.completedDays) {
+        planItems.push({
           label: "Total de dias completados",
           value: stats.readingPlans.totalCompletedDays,
-        },
-      ];
+        });
+      }
 
       // Adicionar planos por tipo
-      if (Object.keys(stats.readingPlans.byType).length > 0) {
+      if (selectedCards.plansByType && Object.keys(stats.readingPlans.byType).length > 0) {
         Object.entries(stats.readingPlans.byType).forEach(([type, count]) => {
           const typeName = type === "yearly" ? "Plano de Leitura Anual" : type;
           planItems.push({ label: `  ${typeName}`, value: count });
         });
       }
-
-      drawStatsBlock("Planos de Leitura", "📖", planItems);
+      
+      if (planItems.length > 0) {
+        drawStatsBlock("Planos de Leitura", "📖", planItems);
+      }
+    }
 
       // Estatísticas de Questionários
-      drawStatsBlock("Questionários", "📝", [
-        {
-          label: "Total de questionários respondidos",
-          value: stats.quizzes.totalResults,
-          highlight: true,
-        },
-        {
-          label: "Média de acertos",
-          value: `${stats.quizzes.averageScore.toFixed(2)}%`,
-          highlight: true,
-        },
-      ]);
+      if (reportSections.quizzes) {
+        const quizItems: Array<{ label: string; value: string | number; highlight?: boolean }> = [];
+        
+        if (selectedCards.totalQuizResults) {
+          quizItems.push({
+            label: "Total de questionários respondidos",
+            value: stats.quizzes.totalResults,
+            highlight: true,
+          });
+        }
+        
+        if (selectedCards.averageScore) {
+          quizItems.push({
+            label: "Média de acertos",
+            value: `${stats.quizzes.averageScore.toFixed(2)}%`,
+            highlight: true,
+          });
+        }
+        
+        if (quizItems.length > 0) {
+          drawStatsBlock("Questionários", "📝", quizItems);
+        }
+      }
 
       // Rodapé
       doc.setDrawColor(...primaryColor);
@@ -432,6 +553,41 @@ const Reports: React.FC = () => {
           <h1>Relatórios</h1>
         </div>
         <div className="header-actions">
+          {/* Checkboxes para selecionar seções do relatório */}
+          <div className="report-sections-selector">
+            <label className="section-checkbox">
+              <input
+                type="checkbox"
+                checked={reportSections.users}
+                onChange={(e) => setReportSections({ ...reportSections, users: e.target.checked })}
+              />
+              <span>Usuários</span>
+            </label>
+            <label className="section-checkbox">
+              <input
+                type="checkbox"
+                checked={reportSections.readingPlans}
+                onChange={(e) => setReportSections({ ...reportSections, readingPlans: e.target.checked })}
+              />
+              <span>Planos</span>
+            </label>
+            <label className="section-checkbox">
+              <input
+                type="checkbox"
+                checked={reportSections.quizzes}
+                onChange={(e) => setReportSections({ ...reportSections, quizzes: e.target.checked })}
+              />
+              <span>Quizzes</span>
+            </label>
+            <label className="section-checkbox">
+              <input
+                type="checkbox"
+                checked={reportSections.playStore}
+                onChange={(e) => setReportSections({ ...reportSections, playStore: e.target.checked })}
+              />
+              <span>Play Store</span>
+            </label>
+          </div>
           <button
             onClick={exportToPDF}
             className="export-button"
@@ -457,11 +613,25 @@ const Reports: React.FC = () => {
               <h2>📊 Estatísticas de Usuários</h2>
               <div className="stats-grid">
                 <div className="stat-card primary">
+                  <label className="card-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={selectedCards.totalUsers}
+                      onChange={(e) => setSelectedCards({ ...selectedCards, totalUsers: e.target.checked })}
+                    />
+                  </label>
                   <div className="stat-value">{stats.users.total}</div>
                   <div className="stat-label">Total de Usuários</div>
                 </div>
 
                 <div className="stat-card success">
+                  <label className="card-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={selectedCards.withActivePlan}
+                      onChange={(e) => setSelectedCards({ ...selectedCards, withActivePlan: e.target.checked })}
+                    />
+                  </label>
                   <div className="stat-value">{stats.users.withActivePlan}</div>
                   <div className="stat-label">Com Plano Ativo</div>
                   <div className="stat-percentage">
@@ -474,6 +644,13 @@ const Reports: React.FC = () => {
                 </div>
 
                 <div className="stat-card info">
+                  <label className="card-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={selectedCards.upToDate}
+                      onChange={(e) => setSelectedCards({ ...selectedCards, upToDate: e.target.checked })}
+                    />
+                  </label>
                   <div className="stat-value">{stats.users.upToDate}</div>
                   <div className="stat-label">Leitura em Dia</div>
                   <div className="stat-percentage">
@@ -486,6 +663,13 @@ const Reports: React.FC = () => {
                 </div>
 
                 <div className="stat-card warning">
+                  <label className="card-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={selectedCards.withCompletedPlan}
+                      onChange={(e) => setSelectedCards({ ...selectedCards, withCompletedPlan: e.target.checked })}
+                    />
+                  </label>
                   <div className="stat-value">
                     {stats.users.withCompletedPlan}
                   </div>
@@ -500,6 +684,13 @@ const Reports: React.FC = () => {
                 </div>
 
                 <div className="stat-card accent">
+                  <label className="card-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={selectedCards.withQuizResults}
+                      onChange={(e) => setSelectedCards({ ...selectedCards, withQuizResults: e.target.checked })}
+                    />
+                  </label>
                   <div className="stat-value">
                     {stats.users.withQuizResults}
                   </div>
@@ -514,6 +705,13 @@ const Reports: React.FC = () => {
                 </div>
 
                 <div className="stat-card new">
+                  <label className="card-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={selectedCards.newUsers}
+                      onChange={(e) => setSelectedCards({ ...selectedCards, newUsers: e.target.checked })}
+                    />
+                  </label>
                   <div className="stat-value">
                     {stats.users.newInLast30Days}
                   </div>
@@ -521,6 +719,13 @@ const Reports: React.FC = () => {
                 </div>
 
                 <div className="stat-card active">
+                  <label className="card-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={selectedCards.activeUsers}
+                      onChange={(e) => setSelectedCards({ ...selectedCards, activeUsers: e.target.checked })}
+                    />
+                  </label>
                   <div className="stat-value">
                     {stats.users.activeInLast7Days}
                   </div>
@@ -531,6 +736,13 @@ const Reports: React.FC = () => {
                   className="stat-card"
                   style={{ backgroundColor: "#f8d7da", borderColor: "#f5c6cb" }}
                 >
+                  <label className="card-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={selectedCards.notStarted}
+                      onChange={(e) => setSelectedCards({ ...selectedCards, notStarted: e.target.checked })}
+                    />
+                  </label>
                   <div className="stat-value">
                     {stats.users.notStartedReading}
                   </div>
@@ -545,6 +757,38 @@ const Reports: React.FC = () => {
                     % dos planos ativos
                   </div>
                 </div>
+
+                <div className="stat-card" style={{ backgroundColor: "#e3f2fd", borderColor: "#90caf9" }}>
+                  <label className="card-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={selectedCards.downloads}
+                      onChange={(e) => setSelectedCards({ ...selectedCards, downloads: e.target.checked })}
+                    />
+                  </label>
+                  <div className="stat-value" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <input
+                      type="number"
+                      value={appDownloads}
+                      onChange={(e) => setAppDownloads(Number(e.target.value))}
+                      onBlur={(e) => saveAppDownloads(Number(e.target.value))}
+                      className="downloads-input"
+                      min="0"
+                      placeholder="0"
+                      style={{
+                        fontSize: "2rem",
+                        fontWeight: "600",
+                        border: "2px solid #90caf9",
+                        borderRadius: "8px",
+                        padding: "8px 12px",
+                        width: "150px",
+                        textAlign: "center"
+                      }}
+                    />
+                  </div>
+                  <div className="stat-label">📥 Downloads do App</div>
+                  <div className="stat-note" style={{ fontSize: "0.75rem", color: "#666", marginTop: "4px" }}>Editável manualmente</div>
+                </div>
               </div>
             </div>
 
@@ -553,11 +797,25 @@ const Reports: React.FC = () => {
               <h2>📖 Estatísticas de Planos de Leitura</h2>
               <div className="stats-grid">
                 <div className="stat-card primary">
+                  <label className="card-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={selectedCards.totalPlans}
+                      onChange={(e) => setSelectedCards({ ...selectedCards, totalPlans: e.target.checked })}
+                    />
+                  </label>
                   <div className="stat-value">{stats.readingPlans.total}</div>
                   <div className="stat-label">Total de Planos Criados</div>
                 </div>
 
                 <div className="stat-card success">
+                  <label className="card-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={selectedCards.completedDays}
+                      onChange={(e) => setSelectedCards({ ...selectedCards, completedDays: e.target.checked })}
+                    />
+                  </label>
                   <div className="stat-value">
                     {stats.readingPlans.totalCompletedDays}
                   </div>
@@ -567,7 +825,16 @@ const Reports: React.FC = () => {
 
               {Object.keys(stats.readingPlans.byType).length > 0 && (
                 <div className="subsection">
-                  <h3>Planos por Tipo</h3>
+                  <h3>
+                    <label className="section-title-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={selectedCards.plansByType}
+                        onChange={(e) => setSelectedCards({ ...selectedCards, plansByType: e.target.checked })}
+                      />
+                      <span>Planos por Tipo</span>
+                    </label>
+                  </h3>
                   <div className="stats-grid">
                     {Object.entries(stats.readingPlans.byType).map(
                       ([type, count]) => {
@@ -591,11 +858,25 @@ const Reports: React.FC = () => {
               <h2>📝 Estatísticas de Questionários</h2>
               <div className="stats-grid">
                 <div className="stat-card primary">
+                  <label className="card-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={selectedCards.totalQuizResults}
+                      onChange={(e) => setSelectedCards({ ...selectedCards, totalQuizResults: e.target.checked })}
+                    />
+                  </label>
                   <div className="stat-value">{stats.quizzes.totalResults}</div>
                   <div className="stat-label">Questionários Respondidos</div>
                 </div>
 
                 <div className="stat-card success">
+                  <label className="card-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={selectedCards.averageScore}
+                      onChange={(e) => setSelectedCards({ ...selectedCards, averageScore: e.target.checked })}
+                    />
+                  </label>
                   <div className="stat-value">
                     {stats.quizzes.averageScore.toFixed(2)}%
                   </div>

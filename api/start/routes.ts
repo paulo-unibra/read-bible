@@ -160,6 +160,8 @@ router
 
         // Reports
         router.get('/reports/general-stats', [AdminReportController, 'getGeneralStats'])
+        router.get('/reports/app-downloads', [AdminReportController, 'getAppDownloads'])
+        router.put('/reports/app-downloads', [AdminReportController, 'updateAppDownloads'])
 
         // Play Store Reports
         router.get('/reports/play-store/general', [AdminPlayStoreReportsController, 'generalStats'])
