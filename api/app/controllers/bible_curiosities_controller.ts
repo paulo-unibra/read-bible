@@ -174,11 +174,11 @@ export default class BibleCuriositiesController {
   async toggleFavorite({ auth, params, response }: HttpContext) {
     try {
       console.log('🔄 [BibleCuriositiesController] toggleFavorite iniciado')
-      
+
       const user = auth.user!
       console.log('👤 [BibleCuriositiesController] User ID:', user.id)
       console.log('👤 [BibleCuriositiesController] User email:', user.email)
-      
+
       const curiosityId = params.id
       console.log('📋 [BibleCuriositiesController] Curiosity ID:', curiosityId)
 
@@ -196,7 +196,7 @@ export default class BibleCuriositiesController {
       console.log('📥 [BibleCuriositiesController] Carregando favoritos...')
       await curiosity.load('favoritedBy')
       console.log('📊 [BibleCuriositiesController] Favoritos carregados:', curiosity.favoritedBy.length)
-      
+
       const isFavorited = curiosity.favoritedBy.some((u) => u.id === user.id)
       console.log('⭐ [BibleCuriositiesController] Já está favoritado?', isFavorited)
 
@@ -211,7 +211,7 @@ export default class BibleCuriositiesController {
       const resultMessage = isFavorited
         ? 'Curiosidade removida dos favoritos'
         : 'Curiosidade adicionada aos favoritos'
-      
+
       console.log('✅ [BibleCuriositiesController]', resultMessage)
       console.log('📤 [BibleCuriositiesController] isFavorited final:', !isFavorited)
 
