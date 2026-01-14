@@ -128,6 +128,9 @@ export default class BibleCuriositiesController {
    */
   async getToday({ auth, response }: HttpContext) {
     try {
+      console.log('🔄 [BibleCuriositiesController.getToday] Iniciado')
+      console.log('👤 [BibleCuriositiesController.getToday] auth.user:', auth.user ? `ID ${auth.user.id}` : 'null')
+      
       const today = DateTime.now().toFormat('yyyy-MM-dd')
 
       const curiosity = await BibleCuriosity.query()
@@ -142,22 +145,36 @@ export default class BibleCuriositiesController {
         })
       }
 
+      console.log('📋 [BibleCuriositiesController.getToday] Curiosity ID:', curiosity.id)
+      console.log('📋 [BibleCuriositiesController.getToday] likesCount:', curiosity.likesCount)
+
       // Verificar se o usuário favoritou
       let isFavorited = false
       if (auth.user) {
+        console.log('🔍 [BibleCuriositiesController.getToday] Carregando favoritedBy...')
         await curiosity.load('favoritedBy')
+        console.log('📊 [BibleCuriositiesController.getToday] Total de favoritedBy:', curiosity.favoritedBy.length)
+        console.log('📊 [BibleCuriositiesController.getToday] IDs dos usuários que favoritaram:', curiosity.favoritedBy.map(u => u.id))
+        
         isFavorited = curiosity.favoritedBy.some((user) => user.id === auth.user!.id)
+        console.log('⭐ [BibleCuriositiesController.getToday] isFavorited:', isFavorited)
       }
+
+      const result = {
+        id: curiosity.id,
+        content: curiosity.content,
+        theme: curiosity.theme,
+        date: curiosity.date.toFormat('yyyy-MM-dd'),
+        isFavorited,
+        likesCount: curiosity.likesCount || 0,
+        sharesCount: curiosity.sharesCount || 0,
+      }
+
+      console.log('📤 [BibleCuriositiesController.getToday] Resposta:', JSON.stringify(result, null, 2))
 
       return response.ok({
         success: true,
-        data: {
-          id: curiosity.id,
-          content: curiosity.content,
-          theme: curiosity.theme,
-          date: curiosity.date.toFormat('yyyy-MM-dd'),
-          isFavorited,
-        },
+        data: result,
       })
     } catch (error) {
       console.error('Erro ao buscar curiosidade:', error)
@@ -203,9 +220,13 @@ export default class BibleCuriositiesController {
       if (isFavorited) {
         console.log('➖ [BibleCuriositiesController] Removendo dos favoritos...')
         await curiosity.related('favoritedBy').detach([user.id])
+        curiosity.likesCount = Math.max(0, (curiosity.likesCount || 0) - 1)
+        await curiosity.save()
       } else {
         console.log('➕ [BibleCuriositiesController] Adicionando aos favoritos...')
         await curiosity.related('favoritedBy').attach([user.id])
+        curiosity.likesCount = (curiosity.likesCount || 0) + 1
+        await curiosity.save()
       }
 
       const resultMessage = isFavorited
@@ -220,6 +241,8 @@ export default class BibleCuriositiesController {
         message: resultMessage,
         data: {
           isFavorited: !isFavorited,
+          likesCount: curiosity.likesCount || 0,
+          sharesCount: curiosity.sharesCount || 0,
         },
       })
     } catch (error) {
@@ -256,6 +279,40 @@ export default class BibleCuriositiesController {
       return response.badRequest({
         success: false,
         message: 'Erro ao buscar favoritos',
+      })
+    }
+  }
+
+  /**
+   * Registrar compartilhamento
+   */
+  async registerShare({ params, response }: HttpContext) {
+    try {
+      const curiosityId = params.id
+      const curiosity = await BibleCuriosity.find(curiosityId)
+
+      if (!curiosity) {
+        return response.notFound({
+          success: false,
+          message: 'Curiosidade não encontrada',
+        })
+      }
+
+      curiosity.sharesCount = (curiosity.sharesCount || 0) + 1
+      await curiosity.save()
+
+      return response.ok({
+        success: true,
+        message: 'Compartilhamento registrado',
+        data: {
+          sharesCount: curiosity.sharesCount,
+        },
+      })
+    } catch (error) {
+      console.error('Erro ao registrar compartilhamento:', error)
+      return response.badRequest({
+        success: false,
+        message: 'Erro ao registrar compartilhamento',
       })
     }
   }

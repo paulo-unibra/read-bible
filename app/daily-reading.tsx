@@ -24,6 +24,7 @@ interface ChapterContent {
   verses: { 
     number: number; 
     text: string;
+    titles?: {level: number; text: string}[];
     verseReferences?: {text: string; reference: string; position: number}[];
     notes?: string[];
   }[];
@@ -203,6 +204,7 @@ export default function DailyReadingScreen() {
             verses: verses.map((v) => ({
               number: v.number,
               text: v.text,
+              titles: v.titles,
               verseReferences: v.verseReferences,
               notes: v.notes,
             })),

@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
     Alert,
     StyleSheet,
@@ -40,6 +40,8 @@ export default function BibleCuriosityCard({
   onFavoriteChange,
 }: BibleCuriosityCardProps) {
   const [isFavorited, setIsFavorited] = useState(curiosity.isFavorited);
+  const [likesCount, setLikesCount] = useState(curiosity.likesCount || 0);
+  const [sharesCount, setSharesCount] = useState(curiosity.sharesCount || 0);
   const [isLoading, setIsLoading] = useState(false);
   const [showFooter, setShowFooter] = useState(false);
   const viewShotRef = useRef<ViewShot>(null);
@@ -48,13 +50,39 @@ export default function BibleCuriosityCard({
   // Verificar se o usuário está autenticado
   const isAuthenticated = authService.isAuthenticated();
 
+  // Sincronizar estados quando a prop curiosity mudar (ex: após recarregar do servidor)
+  // Usa useEffect com key do curiosity.id e timestamp implícito
+  useEffect(() => {
+    console.log('🔄 [BibleCuriosityCard] useEffect disparado');
+    console.log('📋 [BibleCuriosityCard] curiosity.isFavorited:', curiosity.isFavorited);
+    console.log('📋 [BibleCuriosityCard] curiosity.likesCount:', curiosity.likesCount);
+    console.log('📋 [BibleCuriosityCard] estado local isFavorited antes:', isFavorited);
+    
+    // Sempre sincroniza com os valores da prop quando ela mudar
+    setIsFavorited(curiosity.isFavorited);
+    setLikesCount(curiosity.likesCount || 0);
+    setSharesCount(curiosity.sharesCount || 0);
+    
+    console.log('✅ [BibleCuriosityCard] Estados atualizados - isFavorited:', curiosity.isFavorited);
+  }, [curiosity.id, curiosity.isFavorited, curiosity.likesCount, curiosity.sharesCount]);
+
   // Gera cor aleatória baseada no ID da curiosidade (consistente)
   const paletteIndex = curiosity.id % COLOR_PALETTES.length;
   const palette = COLOR_PALETTES[paletteIndex];
 
+  console.log('🎨 [BibleCuriosityCard] RENDER');
+  console.log('📋 [BibleCuriosityCard] curiosity.isFavorited (prop):', curiosity.isFavorited);
+  console.log('💚 [BibleCuriosityCard] isFavorited (estado local):', isFavorited);
+  console.log('🔢 [BibleCuriosityCard] likesCount (estado local):', likesCount);
+  console.log('❓ [BibleCuriosityCard] Deve mostrar coração preenchido?', isFavorited ? 'SIM' : 'NÃO');
+  console.log('🎯 [BibleCuriosityCard] Nome do ícone:', isFavorited ? "heart" : "heart-outline");
+
   const handleShare = async () => {
     try {
       setIsLoading(true);
+
+      // Update otimista - incrementa imediatamente
+      setSharesCount(prev => prev + 1);
 
       // Mostra o footer antes de capturar
       setShowFooter(true);
@@ -66,6 +94,8 @@ export default function BibleCuriosityCard({
       if (!viewShotRef.current) {
         Alert.alert("Erro", "Componente não está pronto");
         setShowFooter(false);
+        // Reverte o contador em caso de erro
+        setSharesCount(prev => prev - 1);
         return;
       }
 
@@ -78,6 +108,7 @@ export default function BibleCuriosityCard({
       const canShare = await Sharing.isAvailableAsync();
       if (!canShare) {
         Alert.alert("Erro", "Compartilhamento não disponível");
+        setSharesCount(prev => prev - 1);
         return;
       }
 
@@ -85,10 +116,18 @@ export default function BibleCuriosityCard({
         mimeType: "image/jpeg",
         dialogTitle: "Compartilhar Curiosidade Bíblica",
       });
+
+      // Registrar compartilhamento no backend (em background)
+      bibleCuriosityService.registerShare(curiosity.id).catch(error => {
+        console.error('Erro ao registrar compartilhamento:', error);
+        // Não reverter o contador mesmo em erro pois o usuário já compartilhou
+      });
     } catch (error: any) {
       console.error("Erro ao compartilhar:", error);
       Alert.alert("Erro", "Não foi possível compartilhar");
       setShowFooter(false);
+      // Reverte o contador em caso de erro
+      setSharesCount(prev => prev - 1);
     } finally {
       setIsLoading(false);
     }
@@ -115,6 +154,14 @@ export default function BibleCuriosityCard({
       console.log('📋 [BibleCuriosityCard] Curiosity ID:', curiosity.id);
       console.log('📋 [BibleCuriosityCard] isFavorited atual:', isFavorited);
       
+      // Update otimista - atualiza UI imediatamente
+      const newFavoritedState = !isFavorited;
+      const newLikesCount = newFavoritedState ? likesCount + 1 : Math.max(0, likesCount - 1);
+      
+      setIsFavorited(newFavoritedState);
+      setLikesCount(newLikesCount);
+      
+      // Chama API em background
       setIsLoading(true);
       const response = await bibleCuriosityService.toggleFavorite(curiosity.id);
 
@@ -122,12 +169,17 @@ export default function BibleCuriosityCard({
 
       if (response.success && response.data) {
         console.log('✅ [BibleCuriosityCard] Favorito alterado com sucesso:', response.data.isFavorited);
+        // Sincronizar com resposta do servidor (caso haja diferença)
         setIsFavorited(response.data.isFavorited);
-        if (onFavoriteChange) {
-          onFavoriteChange();
+        if (response.data.likesCount !== undefined) {
+          setLikesCount(response.data.likesCount);
         }
+        // NÃO chamar onFavoriteChange() para evitar reload que sobrescreve o estado
       } else {
         console.error('❌ [BibleCuriosityCard] Falha ao favoritar - success:', response.success, 'data:', response.data);
+        // Reverter UI em caso de erro
+        setIsFavorited(!newFavoritedState);
+        setLikesCount(likesCount);
         Alert.alert(
           "Login necessário", 
           "Você precisa estar logado para favoritar curiosidades."
@@ -135,6 +187,9 @@ export default function BibleCuriosityCard({
       }
     } catch (error) {
       console.error("❌ [BibleCuriosityCard] Erro ao favoritar:", error);
+      // Reverter UI em caso de erro
+      setIsFavorited(isFavorited);
+      setLikesCount(likesCount);
       Alert.alert(
         "Login necessário", 
         "Você precisa estar logado para favoritar curiosidades."
@@ -199,12 +254,22 @@ export default function BibleCuriosityCard({
           onPress={handleFavorite}
           disabled={isLoading}
         >
-          <Ionicons
-            name={isFavorited ? "heart" : "heart-outline"}
-            size={24}
-            color="#667eea"
-          />
-          <Text style={styles.actionText}>Favoritar</Text>
+          {(() => {
+            const iconName = isFavorited ? "heart" : "heart-outline";
+            console.log('💗 [BibleCuriosityCard] Renderizando ícone:', iconName);
+            return (
+              <Ionicons
+                name={iconName}
+                size={24}
+                color="#667eea"
+              />
+            );
+          })()}
+          <View style={styles.actionTextContainer}>
+            <Text style={styles.actionText}>
+              Curtir{likesCount > 0 ? ` • ${likesCount}` : ''}
+            </Text>
+          </View>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -213,7 +278,11 @@ export default function BibleCuriosityCard({
           disabled={isLoading}
         >
           <Ionicons name="share-social" size={24} color="#667eea" />
-          <Text style={styles.actionText}>Compartilhar</Text>
+          <View style={styles.actionTextContainer}>
+            <Text style={styles.actionText}>
+              Compartilhar{sharesCount > 0 ? ` • ${sharesCount}` : ''}
+            </Text>
+          </View>
         </TouchableOpacity>
       </View>
     </View>
@@ -293,15 +362,18 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   actionButton: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 6,
     paddingVertical: 4,
     paddingHorizontal: 12,
   },
+  actionTextContainer: {
+    justifyContent: 'center',
+  },
   actionText: {
-    color: "#667eea",
+    color: '#667eea',
     fontSize: 13,
-    fontWeight: "600",
+    fontWeight: '600',
   },
 });

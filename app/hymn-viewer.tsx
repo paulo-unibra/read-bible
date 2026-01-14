@@ -55,6 +55,7 @@ export default function HymnViewerScreen() {
   const [cacheStatuses, setCacheStatuses] = useState<Map<string, CacheStatus>>(new Map());
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
+  const [showPlayer, setShowPlayer] = useState(false); // Controla expansão do player
 
   // Carregar tema ANTES de qualquer renderização
   useEffect(() => {
@@ -701,7 +702,7 @@ export default function HymnViewerScreen() {
           )}
         </View>
 
-        {/* Player de Áudio */}
+        {/* Player de Áudio Compacto/Expansível */}
         {audioTracks.length > 0 && (
           <>
             {/* Verificar se todos os áudios estão em cache */}
@@ -709,21 +710,60 @@ export default function HymnViewerScreen() {
               const allCached = Array.from(cacheStatuses.values()).every(s => s.isCached);
               
               return (
-                <>
-                  {/* Sempre mostrar botão de download se houver áudios */}
-                  <HymnDownloadButton
-                    hymnNumber={hymnNumber}
-                    cacheStatuses={cacheStatuses}
-                    isDownloading={isDownloading}
-                    downloadProgress={downloadProgress}
-                    onDownload={handleDownloadTracks}
-                    onRemove={handleRemoveDownloads}
-                    isDark={isDark}
-                  />
+                <View style={[styles.audioPlayer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  {/* Botão compacto - sempre visível */}
+                  <TouchableOpacity 
+                    style={styles.compactPlayerButton}
+                    onPress={() => setShowPlayer(!showPlayer)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.compactPlayerLeft}>
+                      <Ionicons 
+                        name={showPlayer ? "chevron-up" : "musical-notes"} 
+                        size={24} 
+                        color={colors.accent} 
+                      />
+                      <View style={styles.compactPlayerInfo}>
+                        <Text style={[styles.compactPlayerTitle, { color: colors.textPrimary }]}>
+                          {allCached ? 'Áudio do Hino' : 'Download Áudio'}
+                        </Text>
+                        <Text style={[styles.compactPlayerStatus, { color: colors.textSecondary }]}>
+                          {allCached 
+                            ? (isPlaying ? '▶ Tocando...' : 'Toque para abrir player')
+                            : `${Array.from(cacheStatuses.values()).filter(s => s.isCached).length}/${audioTracks.length} faixas baixadas`
+                          }
+                        </Text>
+                      </View>
+                    </View>
+                    <Ionicons 
+                      name={showPlayer ? "chevron-up" : "chevron-down"} 
+                      size={20} 
+                      color={colors.textSecondary} 
+                    />
+                  </TouchableOpacity>
 
-                  {/* Só mostrar player se TODOS os áudios estiverem em cache */}
-                  {allCached && (
-                    <View style={[styles.audioPlayer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  {/* Conteúdo expandido */}
+                  {showPlayer && (
+                    <View style={styles.expandedPlayerContent}>
+                      {/* Botão de download integrado */}
+                      {!allCached && (
+                        <View style={styles.downloadSection}>
+                          <HymnDownloadButton
+                            hymnNumber={hymnNumber}
+                            cacheStatuses={cacheStatuses}
+                            isDownloading={isDownloading}
+                            downloadProgress={downloadProgress}
+                            onDownload={handleDownloadTracks}
+                            onRemove={handleRemoveDownloads}
+                            isDark={isDark}
+                            compact={true}
+                          />
+                        </View>
+                      )}
+
+                      {/* Player completo - só se todos estiverem baixados */}
+                      {allCached && (
+                        <>
                       <View style={styles.playerHeader}>
                         <Ionicons name="musical-notes" size={24} color={colors.accent} />
                         <Text style={[styles.playerTitle, { color: colors.textPrimary }]}>
@@ -789,18 +829,20 @@ export default function HymnViewerScreen() {
                         </Text>
                       </View>
 
-                      {/* Mixer de áudio */}
-                      {showMixer && (
-                        <HymnAudioMixer
-                          tracks={audioTracks}
-                          onVolumeChange={handleVolumeChange}
-                          onMuteToggle={handleMuteToggle}
-                          isDark={isDark}
-                        />
+                          {/* Mixer de áudio */}
+                          {showMixer && (
+                            <HymnAudioMixer
+                              tracks={audioTracks}
+                              onVolumeChange={handleVolumeChange}
+                              onMuteToggle={handleMuteToggle}
+                              isDark={isDark}
+                            />
+                          )}
+                        </>
                       )}
                     </View>
                   )}
-                </>
+                </View>
               );
             })()}
           </>
@@ -944,19 +986,52 @@ const styles = StyleSheet.create({
   audioPlayer: {
     borderRadius: 12,
     borderWidth: 1,
-    padding: 16,
     marginBottom: 20,
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3.84,
     elevation: 3,
   },
+  compactPlayerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+  },
+  compactPlayerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  compactPlayerInfo: {
+    flex: 1,
+  },
+  compactPlayerTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  compactPlayerStatus: {
+    fontSize: 13,
+  },
+  expandedPlayerContent: {
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.1)',
+  },
+  downloadSection: {
+    padding: 16,
+    paddingTop: 12,
+  },
   playerHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     marginBottom: 16,
+    paddingHorizontal: 16,
+    paddingTop: 16,
   },
   playerTitle: {
     flex: 1,
@@ -969,6 +1044,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 24,
     marginBottom: 16,
+    paddingHorizontal: 16,
   },
   controlButton: {
     padding: 8,
@@ -989,6 +1065,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
   },
   progressSlider: {
     flex: 1,

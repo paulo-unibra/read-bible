@@ -11,6 +11,7 @@ interface HymnDownloadButtonProps {
   onDownload: () => void;
   onRemove?: () => void;
   isDark: boolean;
+  compact?: boolean; // Modo compacto para integração com player
 }
 
 export default function HymnDownloadButton({
@@ -21,6 +22,7 @@ export default function HymnDownloadButton({
   onDownload,
   onRemove,
   isDark,
+  compact = false,
 }: HymnDownloadButtonProps) {
   const colors = {
     bg: isDark ? '#1e1e1e' : '#fff',
@@ -54,6 +56,90 @@ export default function HymnDownloadButton({
   if (totalTracks === 0) {
     return null; // Não mostrar se não há faixas
   }
+
+  // Modo compacto - apenas botão de ação principal
+  if (compact) {
+    return (
+      <View style={styles.compactContainer}>
+        {/* Barra de progresso durante download */}
+        {isDownloading && (
+          <View style={styles.progressContainer}>
+            <View style={styles.progressBar}>
+              <View 
+                style={[
+                  styles.progressFill, 
+                  { 
+                    width: `${downloadProgress * 100}%`,
+                    backgroundColor: colors.accent 
+                  }
+                ]} 
+              />
+            </View>
+            <Text style={[styles.progressText, { color: colors.textSecondary }]}>
+              Baixando... {Math.round(downloadProgress * 100)}%
+            </Text>
+          </View>
+        )}
+
+        {/* Botão de ação */}
+        <View style={styles.actions}>
+          {!isFullyCached && (
+            <TouchableOpacity
+              style={[
+                styles.button,
+                styles.downloadButton,
+                { 
+                  backgroundColor: colors.accent,
+                  opacity: isDownloading ? 0.6 : 1,
+                }
+              ]}
+              onPress={onDownload}
+              disabled={isDownloading}
+            >
+              {isDownloading ? (
+                <>
+                  <ActivityIndicator size="small" color="#fff" />
+                  <Text style={styles.buttonText}>Baixando...</Text>
+                </>
+              ) : (
+                <>
+                  <Ionicons name="download-outline" size={20} color="#fff" />
+                  <Text style={styles.buttonText}>
+                    Baixar {totalTracks} {totalTracks === 1 ? 'faixa' : 'faixas'} ({cachedTracks}/{totalTracks})
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+
+          {isFullyCached && onRemove && (
+            <TouchableOpacity
+              style={[
+                styles.button,
+                styles.removeButton,
+                { borderColor: colors.danger }
+              ]}
+              onPress={onRemove}
+            >
+              <Ionicons name="trash-outline" size={20} color={colors.danger} />
+              <Text style={[styles.buttonText, { color: colors.danger }]}>
+                Remover Downloads
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Info compacta */}
+        {!isFullyCached && !isDownloading && (
+          <Text style={[styles.compactInfo, { color: colors.textSecondary }]}>
+            {totalTracks} {totalTracks === 1 ? 'faixa disponível' : 'faixas disponíveis'} para download
+          </Text>
+        )}
+      </View>
+    );
+  }
+
+  // Modo normal (original)
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg, borderColor: colors.border }]}>
@@ -204,6 +290,14 @@ export default function HymnDownloadButton({
 }
 
 const styles = StyleSheet.create({
+  compactContainer: {
+    gap: 8,
+  },
+  compactInfo: {
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 4,
+  },
   container: {
     borderRadius: 12,
     borderWidth: 1,

@@ -6,6 +6,8 @@ export interface BibleCuriosity {
   theme: string | null;
   date: string;
   isFavorited: boolean;
+  likesCount: number;
+  sharesCount: number;
 }
 
 class BibleCuriosityService {
@@ -14,23 +16,44 @@ class BibleCuriosityService {
    */
   async getTodayCuriosity(): Promise<{ success: boolean; data: BibleCuriosity | null }> {
     try {
+      console.log('🔄 [BibleCuriosityService] getTodayCuriosity iniciado');
+      
       const token = await authService.getToken();
+      console.log('🔑 [BibleCuriosityService] Token:', token ? `${token.substring(0, 20)}...` : 'ausente');
+      console.log('🔑 [BibleCuriosityService] Token completo presente:', !!token);
+      
       const headers: HeadersInit = {
         'Content-Type': 'application/json',
       };
       
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
+        console.log('✅ [BibleCuriosityService] Header Authorization adicionado');
+      } else {
+        console.log('❌ [BibleCuriosityService] SEM TOKEN - requisição será anônima');
       }
+
+      console.log('🌐 [BibleCuriosityService] URL:', `${API_URL}/curiosities/today`);
 
       const response = await fetch(`${API_URL}/curiosities/today`, {
         method: 'GET',
         headers,
       });
 
-      return await response.json();
+      console.log('📡 [BibleCuriosityService] Status:', response.status);
+      console.log('📡 [BibleCuriosityService] OK:', response.ok);
+
+      const result = await response.json();
+      console.log('📥 [BibleCuriosityService] Resposta completa:', JSON.stringify(result, null, 2));
+      
+      if (result.data) {
+        console.log('📊 [BibleCuriosityService] isFavorited da API:', result.data.isFavorited);
+        console.log('📊 [BibleCuriosityService] likesCount da API:', result.data.likesCount);
+      }
+      
+      return result;
     } catch (error) {
-      console.error('Erro ao buscar curiosidade:', error);
+      console.error('❌ [BibleCuriosityService] Erro ao buscar curiosidade:', error);
       return {
         success: false,
         data: null,
@@ -123,6 +146,28 @@ class BibleCuriosityService {
     } catch (error) {
       console.error('Erro ao buscar favoritos:', error);
       return { success: false, data: [] };
+    }
+  }
+  /**
+   * Registrar compartilhamento
+   */
+  async registerShare(curiosityId: number): Promise<{ success: boolean; data?: { sharesCount: number } }> {
+    try {
+      const response = await fetch(`${API_URL}/curiosities/${curiosityId}/share`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        return { success: false };
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Erro ao registrar compartilhamento:', error);
+      return { success: false };
     }
   }
 }

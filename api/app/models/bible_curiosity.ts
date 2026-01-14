@@ -19,6 +19,12 @@ export default class BibleCuriosity extends BaseModel {
   @column()
   declare isActive: boolean
 
+  @column()
+  declare likesCount: number
+
+  @column()
+  declare sharesCount: number
+
   @manyToMany(() => User, {
     pivotTable: 'bible_curiosity_favorites',
     pivotForeignKey: 'curiosity_id',
