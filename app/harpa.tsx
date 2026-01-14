@@ -2,14 +2,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  FlatList,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    FlatList,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DatabaseService from '../services/DatabaseService';
@@ -230,35 +230,35 @@ export default function HarpaScreen() {
     </View>
   );
 
-  const renderHymnItem = ({ item }: { item: HymnListItem }) => (
-    <TouchableOpacity
-      style={[styles.hymnCard, { backgroundColor: colors.card }]}
-      onPress={() => {
-        if (!isDownloaded) {
-          // Se não baixou, mostrar mensagem
-          return;
-        }
-        router.push({
-          pathname: '/hymn-viewer',
-          params: { hymnNumber: item.number },
-        });
-      }}
-      disabled={!isDownloaded}
-    >
-      <View style={styles.hymnInfo}>
-        <Text
-          style={[
-            styles.hymnTitle,
-            { color: isDownloaded ? colors.textPrimary : colors.textSecondary, fontSize: applyFontScale(16) },
-          ]}
-          numberOfLines={2}
-        >
-          {String(item.number).padStart(3, '0')} - {item.title}
-        </Text>
-      </View>
-      {isDownloaded && <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />}
-    </TouchableOpacity>
-  );
+  const renderHymnItem = ({ item }: { item: HymnListItem }) => {
+    return (
+      <TouchableOpacity
+        style={[
+          styles.hymnCard,
+          { backgroundColor: colors.card },
+        ]}
+        onPress={() => {
+          router.push({
+            pathname: '/hymn-viewer',
+            params: { hymnNumber: item.number },
+          });
+        }}
+      >
+        <View style={styles.hymnInfo}>
+          <Text
+            style={[
+              styles.hymnTitle,
+              { color: colors.textPrimary, fontSize: applyFontScale(16) },
+            ]}
+            numberOfLines={2}
+          >
+            {String(item.number).padStart(3, '0')} - {item.title}
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+      </TouchableOpacity>
+    );
+  };
 
   // Se não baixou ainda, mostrar tela de download
   if (!isDownloaded) {
@@ -422,6 +422,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 4,
+  },
+  audioStatus: {
+    marginTop: 4,
+  },
+  cachedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  notCachedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  badgeText: {
+    fontSize: 12,
+    fontWeight: '500',
   },
   hymnAuthor: {
     fontSize: 12,

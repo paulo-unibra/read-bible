@@ -15,9 +15,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AdBanner from '../components/AdBanner';
 import HymnAudioMixer from '../components/HymnAudioMixer';
+import HymnDownloadButton from '../components/HymnDownloadButton';
 import DatabaseService from '../services/DatabaseService';
 import harpaOfflineService, { HymnData } from '../services/HarpaOfflineService';
 import hymnAudioService, { HymnAudioTrack } from '../services/HymnAudioService';
+import hymnCacheService, { CacheStatus } from '../services/HymnCacheService';
 
 interface HymnVerse {
   name: string;
@@ -46,6 +48,13 @@ export default function HymnViewerScreen() {
   const [duration, setDuration] = useState(0);
   const [showMixer, setShowMixer] = useState(false);
   const playbackInterval = useRef<NodeJS.Timeout | null>(null);
+  const masterTimerStart = useRef<number>(0); // Timer mestre para sincronização
+  const lastSyncTime = useRef<number>(0); // Última vez que sincronizou
+
+  // Estados de cache e download
+  const [cacheStatuses, setCacheStatuses] = useState<Map<string, CacheStatus>>(new Map());
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
 
   // Carregar tema ANTES de qualquer renderização
   useEffect(() => {
@@ -87,18 +96,31 @@ export default function HymnViewerScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [theme]);
 
-  // Gerenciar intervalo de atualização de posição
+  // Verificar cache quando audioTracks mudar
+  useEffect(() => {
+    if (audioTracks.length > 0) {
+      checkCacheStatus();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [audioTracks]);
+
+  // Gerenciar intervalo de atualização de posição com TIMER MESTRE
   useEffect(() => {
     if (isPlaying && audioTracks.length > 0 && audioTracks[0].isLoaded) {
-      console.log(`🔄 [HymnViewer] Iniciando intervalo de atualização (isPlaying=true)`);
+      console.log(`🔄 [HymnViewer] Iniciando timer mestre`);
       
-      const interval = setInterval(async () => {
-        const currentPosition = await hymnAudioService.getPosition(audioTracks);
-        console.log(`🕐 [HymnViewer] Posição: ${currentPosition}ms, duração: ${duration}ms`);
-        setPosition(currentPosition);
+      // Inicializar timer mestre
+      if (masterTimerStart.current === 0) {
+        masterTimerStart.current = Date.now() - position;
+      }
+      
+      const interval = setInterval(() => {
+        // Calcular posição baseado no timer mestre
+        const elapsed = Date.now() - masterTimerStart.current;
+        setPosition(elapsed);
         
         // Verificar fim do áudio
-        if (duration > 0 && currentPosition >= duration - 100) {
+        if (duration > 0 && elapsed >= duration - 100) {
           console.log(`⏹️ [HymnViewer] Fim do áudio, parando...`);
           handleStop();
         }
@@ -107,7 +129,7 @@ export default function HymnViewerScreen() {
       playbackInterval.current = interval;
       
       return () => {
-        console.log(`🛑 [HymnViewer] Limpando intervalo`);
+        console.log(`🛑 [HymnViewer] Limpando timer mestre`);
         clearInterval(interval);
       };
     } else {
@@ -178,6 +200,124 @@ export default function HymnViewerScreen() {
     }
   };
 
+  const checkCacheStatus = async () => {
+    try {
+      if (audioTracks.length === 0) return;
+      
+      console.log(`💾 [HymnViewer] Verificando cache dos áudios...`);
+      
+      const instruments = audioTracks.map(t => t.instrument);
+      const statuses = await hymnCacheService.checkMultipleTracks(hymnNumber, instruments);
+      
+      setCacheStatuses(statuses);
+      
+      const cachedCount = Array.from(statuses.values()).filter(s => s.isCached).length;
+      console.log(`✅ [HymnViewer] ${cachedCount}/${instruments.length} áudios em cache`);
+    } catch (error) {
+      console.error('❌ [HymnViewer] Erro ao verificar cache:', error);
+    }
+  };
+
+  const handleDownloadTracks = async () => {
+    try {
+      if (audioTracks.length === 0) {
+        alert('Nenhum áudio disponível para download');
+        return;
+      }
+
+      setIsDownloading(true);
+      setDownloadProgress(0);
+
+      console.log(`📥 [HymnViewer] Iniciando download de ${audioTracks.length} faixas...`);
+
+      // Filtrar apenas as que não estão em cache
+      const tracksToDownload = audioTracks.filter(track => {
+        const status = cacheStatuses.get(track.instrument);
+        return !status?.isCached;
+      });
+
+      if (tracksToDownload.length === 0) {
+        alert('Todas as faixas já estão baixadas!');
+        setIsDownloading(false);
+        return;
+      }
+
+      const downloadData = tracksToDownload.map(track => ({
+        instrument: track.instrument,
+        fileId: track.fileId,
+      }));
+
+      await hymnCacheService.downloadAllTracks(
+        hymnNumber,
+        downloadData,
+        (overall, trackProgress) => {
+          setDownloadProgress(overall);
+          console.log(`📊 [HymnViewer] Progresso: ${Math.round(overall * 100)}% - ${trackProgress.instrument}`);
+        }
+      );
+
+      console.log(`✅ [HymnViewer] Download concluído!`);
+      
+      // SEMPRE descarregar áudios após download para forçar reload limpo do cache
+      console.log(`🔄 [HymnViewer] Descarregando áudios para forçar reload do cache...`);
+      
+      // Parar e descarregar qualquer áudio que possa estar carregado
+      if (audioTracks.length > 0) {
+        // Verificar se algum tem sound object
+        const hasLoadedSounds = audioTracks.some(t => t.sound);
+        
+        if (hasLoadedSounds) {
+          await hymnAudioService.stopAll(audioTracks);
+          await hymnAudioService.unloadAll(audioTracks);
+        }
+        
+        // Resetar estado completamente para forçar novo carregamento
+        setAudioTracks(audioTracks.map(t => ({ 
+          ...t, 
+          sound: undefined,
+          isLoaded: false 
+        })));
+        setIsPlaying(false);
+        setPosition(0);
+        setDuration(0);
+      }
+      
+      // Atualizar status do cache
+      await checkCacheStatus();
+      
+      alert('Áudios baixados com sucesso! Agora você pode ouvi-los offline.');
+    } catch (error: any) {
+      console.error('❌ [HymnViewer] Erro ao baixar:', error);
+      alert(`Erro ao baixar áudios: ${error?.message || 'Erro desconhecido'}`);
+    } finally {
+      setIsDownloading(false);
+      setDownloadProgress(0);
+    }
+  };
+
+  const handleRemoveDownloads = async () => {
+    try {
+      // Parar e descarregar áudios se estiverem tocando
+      if (audioTracks.length > 0 && audioTracks[0].isLoaded) {
+        console.log(`⏹️ [HymnViewer] Parando áudios antes de remover downloads...`);
+        await hymnAudioService.stopAll(audioTracks);
+        await hymnAudioService.unloadAll(audioTracks);
+        // Atualizar estado
+        setAudioTracks(audioTracks.map(t => ({ ...t, isLoaded: false })));
+        setIsPlaying(false);
+        setPosition(0);
+      }
+      
+      // Remover arquivos do cache
+      await hymnCacheService.removeHymnFromCache(hymnNumber);
+      await checkCacheStatus();
+      alert('Downloads removidos com sucesso!');
+    } catch (error: any) {
+      console.error('❌ [HymnViewer] Erro ao remover downloads:', error);
+      alert(`Erro ao remover downloads: ${error?.message || 'Erro desconhecido'}`);
+    }
+  };
+
   const cleanupAudio = async () => {
     if (playbackInterval.current) {
       clearInterval(playbackInterval.current);
@@ -228,10 +368,10 @@ export default function HymnViewerScreen() {
           console.log(`⏱️ [TIMER] Duração obtida em ${Date.now() - durationStartTime}ms`);
           setDuration(firstDuration);
           
-          // Tocar imediatamente
+          // Tocar imediatamente DO INÍCIO (fromStart=true)
           console.log(`⏱️ [TIMER] Iniciando playback...`);
           const playStartTime = Date.now();
-          await hymnAudioService.playAll(loadedTracks);
+          await hymnAudioService.playAll(loadedTracks, true);
           console.log(`⏱️ [TIMER] Playback iniciado em ${Date.now() - playStartTime}ms`);
           
           setIsPlaying(true);
@@ -249,8 +389,14 @@ export default function HymnViewerScreen() {
       if (isPlaying) {
         await hymnAudioService.pauseAll(audioTracks);
         setIsPlaying(false);
+        // Resetar timer mestre ao pausar (será reiniciado ao retomar)
+        masterTimerStart.current = 0;
+        lastSyncTime.current = 0;
       } else {
-        await hymnAudioService.playAll(audioTracks);
+        // Retomar da posição atual - inicializar timer mestre
+        masterTimerStart.current = Date.now() - position;
+        lastSyncTime.current = Date.now();
+        await hymnAudioService.playAll(audioTracks, false);
         setIsPlaying(true);
       }
       
@@ -270,6 +416,9 @@ export default function HymnViewerScreen() {
       await hymnAudioService.stopAll(audioTracks);
       setIsPlaying(false);
       setPosition(0);
+      // Resetar timer mestre
+      masterTimerStart.current = 0;
+      lastSyncTime.current = 0;
     } catch (error) {
       console.error('Erro ao parar:', error);
     }
@@ -277,8 +426,14 @@ export default function HymnViewerScreen() {
 
   const handleSeek = async (value: number) => {
     try {
-      await hymnAudioService.seekAll(audioTracks, value);
+      // Sincronizar todos os áudios para a nova posição
+      await hymnAudioService.syncAllToPosition(audioTracks, value);
       setPosition(value);
+      // Atualizar timer mestre para a nova posição
+      if (isPlaying) {
+        masterTimerStart.current = Date.now() - value;
+        lastSyncTime.current = Date.now();
+      }
     } catch (error) {
       console.error('Erro ao buscar posição:', error);
     }
@@ -548,82 +703,107 @@ export default function HymnViewerScreen() {
 
         {/* Player de Áudio */}
         {audioTracks.length > 0 && (
-          <View style={[styles.audioPlayer, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={styles.playerHeader}>
-              <Ionicons name="musical-notes" size={24} color={colors.accent} />
-              <Text style={[styles.playerTitle, { color: colors.textPrimary }]}>
-                Áudio do Hino
-              </Text>
-              {isLoadingAudio && <ActivityIndicator size="small" color={colors.accent} />}
-            </View>
+          <>
+            {/* Verificar se todos os áudios estão em cache */}
+            {(() => {
+              const allCached = Array.from(cacheStatuses.values()).every(s => s.isCached);
+              
+              return (
+                <>
+                  {/* Sempre mostrar botão de download se houver áudios */}
+                  <HymnDownloadButton
+                    hymnNumber={hymnNumber}
+                    cacheStatuses={cacheStatuses}
+                    isDownloading={isDownloading}
+                    downloadProgress={downloadProgress}
+                    onDownload={handleDownloadTracks}
+                    onRemove={handleRemoveDownloads}
+                    isDark={isDark}
+                  />
 
-            {/* Controles principais */}
-            <View style={styles.playerControls}>
-              <TouchableOpacity 
-                onPress={handleStop}
-                style={styles.controlButton}
-                disabled={!isPlaying && position === 0}
-              >
-                <Ionicons 
-                  name="stop" 
-                  size={32} 
-                  color={(!isPlaying && position === 0) ? colors.textSecondary : colors.accent} 
-                />
-              </TouchableOpacity>
+                  {/* Só mostrar player se TODOS os áudios estiverem em cache */}
+                  {allCached && (
+                    <View style={[styles.audioPlayer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                      <View style={styles.playerHeader}>
+                        <Ionicons name="musical-notes" size={24} color={colors.accent} />
+                        <Text style={[styles.playerTitle, { color: colors.textPrimary }]}>
+                          Áudio do Hino
+                        </Text>
+                        {isLoadingAudio && <ActivityIndicator size="small" color={colors.accent} />}
+                      </View>
 
-              <TouchableOpacity 
-                onPress={handlePlayPause}
-                style={[styles.playButton, { backgroundColor: colors.accent }]}
-              >
-                <Ionicons 
-                  name={isPlaying ? 'pause' : 'play'} 
-                  size={36} 
-                  color="#fff" 
-                />
-              </TouchableOpacity>
+                      {/* Controles principais */}
+                      <View style={styles.playerControls}>
+                        <TouchableOpacity 
+                          onPress={handleStop}
+                          style={styles.controlButton}
+                          disabled={!isPlaying && position === 0}
+                        >
+                          <Ionicons 
+                            name="stop" 
+                            size={32} 
+                            color={(!isPlaying && position === 0) ? colors.textSecondary : colors.accent} 
+                          />
+                        </TouchableOpacity>
 
-              <TouchableOpacity 
-                onPress={() => setShowMixer(!showMixer)}
-                style={styles.controlButton}
-              >
-                <Ionicons 
-                  name={showMixer ? 'options' : 'options-outline'} 
-                  size={32} 
-                  color={colors.accent} 
-                />
-              </TouchableOpacity>
-            </View>
+                        <TouchableOpacity 
+                          onPress={handlePlayPause}
+                          style={[styles.playButton, { backgroundColor: colors.accent }]}
+                        >
+                          <Ionicons 
+                            name={isPlaying ? 'pause' : 'play'} 
+                            size={36} 
+                            color="#fff" 
+                          />
+                        </TouchableOpacity>
 
-            {/* Barra de progresso */}
-            <View style={styles.progressContainer}>
-              <Text style={[styles.timeText, { color: colors.textSecondary }]}>
-                {formatTime(position)}
-              </Text>
-              <Slider
-                style={styles.progressSlider}
-                minimumValue={0}
-                maximumValue={duration}
-                value={position}
-                onSlidingComplete={handleSeek}
-                minimumTrackTintColor={colors.accent}
-                maximumTrackTintColor={colors.border}
-                thumbTintColor={colors.accent}
-              />
-              <Text style={[styles.timeText, { color: colors.textSecondary }]}>
-                {formatTime(duration)}
-              </Text>
-            </View>
+                        <TouchableOpacity 
+                          onPress={() => setShowMixer(!showMixer)}
+                          style={styles.controlButton}
+                        >
+                          <Ionicons 
+                            name={showMixer ? 'options' : 'options-outline'} 
+                            size={32} 
+                            color={colors.accent} 
+                          />
+                        </TouchableOpacity>
+                      </View>
 
-            {/* Mixer de áudio */}
-            {showMixer && (
-              <HymnAudioMixer
-                tracks={audioTracks}
-                onVolumeChange={handleVolumeChange}
-                onMuteToggle={handleMuteToggle}
-                isDark={isDark}
-              />
-            )}
-          </View>
+                      {/* Barra de progresso */}
+                      <View style={styles.progressContainer}>
+                        <Text style={[styles.timeText, { color: colors.textSecondary }]}>
+                          {formatTime(position)}
+                        </Text>
+                        <Slider
+                          style={styles.progressSlider}
+                          minimumValue={0}
+                          maximumValue={duration}
+                          value={position}
+                          onSlidingComplete={handleSeek}
+                          minimumTrackTintColor={colors.accent}
+                          maximumTrackTintColor={colors.border}
+                          thumbTintColor={colors.accent}
+                        />
+                        <Text style={[styles.timeText, { color: colors.textSecondary }]}>
+                          {formatTime(duration)}
+                        </Text>
+                      </View>
+
+                      {/* Mixer de áudio */}
+                      {showMixer && (
+                        <HymnAudioMixer
+                          tracks={audioTracks}
+                          onVolumeChange={handleVolumeChange}
+                          onMuteToggle={handleMuteToggle}
+                          isDark={isDark}
+                        />
+                      )}
+                    </View>
+                  )}
+                </>
+              );
+            })()}
+          </>
         )}
 
         {/* Verses */}
