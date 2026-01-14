@@ -12,6 +12,7 @@ import {
   View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { IntroductionRenderer } from "../components/IntroductionRenderer";
 import authService, { TodayReading } from "../services/AuthService";
 import bibleReaderService from "../services/BibleReaderService";
 import DatabaseService from "../services/DatabaseService";
@@ -404,9 +405,9 @@ export default function DailyReadingScreen() {
       // Adicionar texto antes do símbolo
       if (match.index > cursor) {
         parts.push(
-          <Text key={`text-${cursor}`}>
+          <React.Fragment key={`text-${cursor}`}>
             {text.substring(cursor, match.index)}
-          </Text>
+          </React.Fragment>
         );
       }
       
@@ -445,15 +446,13 @@ export default function DailyReadingScreen() {
     // Adicionar texto restante
     if (cursor < text.length) {
       parts.push(
-        <Text key={`tail-${cursor}`}>{text.substring(cursor)}</Text>
+        <React.Fragment key={`tail-${cursor}`}>
+          {text.substring(cursor)}
+        </React.Fragment>
       );
     }
     
-    return (
-      <Text style={[styles.verseText, { color: colors.textPrimary, fontSize: applyFontScale(16) }]}>
-        {parts}
-      </Text>
-    );
+    return <>{parts}</>;
   };
 
   const applyFontScale = useCallback(
@@ -562,26 +561,74 @@ export default function DailyReadingScreen() {
                   { color: colors.accent, fontSize: applyFontScale(20) },
                 ]}
               >
-                {chapter.bookName} {chapter.chapterNumber}
+                {chapter.bookName} {chapter.chapterNumber === 0 ? ' - Introdução' : ` ${chapter.chapterNumber}`}
               </Text>
             </View>
 
-            {/* Verses */}
+            {/* Introdução ou Verses */}
+            {chapter.chapterNumber === 0 && chapter.verses.length > 0 && chapter.verses[0].text ? (
+              <View style={styles.introductionContainer}>
+                <IntroductionRenderer
+                  htmlContent={chapter.verses[0].text}
+                  isDark={theme === 'dark'}
+                  fontSize={applyFontScale(16)}
+                />
+              </View>
+            ) : (
             <View style={styles.versesContainer}>
-              {chapter.verses.map((verse) => (
-                <View key={verse.number} style={styles.verseRow}>
-                  <Text
-                    style={[
-                      styles.verseNumber,
-                      { color: colors.verseNumber, fontSize: applyFontScale(12) },
-                    ]}
-                  >
-                    {verse.number}
-                  </Text>
-                  {renderVerseText(verse, chapter.bookName, chapter.chapterNumber)}
+              {chapter.verses.map((verse, index) => (
+                <View key={verse.number || index} style={styles.verseContainer}>
+                  {/* Titles (if any) */}
+                  {verse.titles && verse.titles.length > 0 && (
+                    <View style={{ marginBottom: 6, marginLeft: 32 }}>
+                      {verse.titles.map((title, titleIndex) => {
+                        const cleanedTitle = title.text.includes("|") 
+                          ? title.text.substring(title.text.lastIndexOf("|") + 1).trim()
+                          : title.text;
+                        
+                        const levelSizes: Record<number, number> = { 1: 16, 2: 15, 3: 14 };
+                        const fontSize = levelSizes[title.level] || 16;
+
+                        return (
+                          <View key={titleIndex} style={styles.verseTitleContainer}>
+                            <Text
+                              style={[
+                                styles.verseTitle,
+                                {
+                                  color: colors.accent,
+                                  fontSize: applyFontScale(fontSize),
+                                  fontWeight: "700",
+                                },
+                              ]}
+                            >
+                              {cleanedTitle}
+                            </Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  )}
+
+                  {/* Verse number and text */}
+                  <View style={styles.verseRow}>
+                    <Text
+                      style={[
+                        styles.verseNumber,
+                        { color: colors.verseNumber, fontSize: applyFontScale(12) },
+                      ]}
+                    >
+                      {verse.number || index + 1}
+                    </Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.verseText, { color: colors.textPrimary, fontSize: applyFontScale(16) }]}>
+                        {renderVerseText(verse, chapter.bookName, chapter.chapterNumber)}
+                      </Text>
+                    </View>
+                  </View>
                 </View>
               ))}
             </View>
+            )}
 
             {/* Divider between chapters */}
             {index < chapters.length - 1 && (
@@ -941,6 +988,15 @@ const styles = StyleSheet.create({
   versesContainer: {
     gap: 12,
   },
+  verseContainer: {
+    marginBottom: 4,
+  },
+  verseTitleContainer: {
+    marginBottom: 5,
+  },
+  verseTitle: {
+    fontWeight: "bold",
+  },
   verseRow: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -974,6 +1030,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#e0e0e0",
     marginVertical: 24,
   },
+  introductionContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
   completeButtonContainer: {
     marginTop: 32,
     alignItems: "center",
@@ -1000,7 +1060,7 @@ const styles = StyleSheet.create({
   },
   progressIndicator: {
     position: "absolute",
-    bottom: 20,
+    bottom: 50,
     right: 20,
     backgroundColor: "rgba(33, 150, 243, 0.9)",
     paddingHorizontal: 16,

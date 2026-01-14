@@ -258,14 +258,11 @@ export const IntroductionRenderer: React.FC<IntroductionRendererProps> = ({
     
     // NÃO remover tags <a> - elas serão processadas pelo renderTextWithReferences
     
-    // Remover tags órfãs de fechamento </p> e <p> sem conteúdo
-    html = html.replace(/<\/p>\s*<p>/gi, ' ');
+    // Remover apenas tags órfãs de fechamento no início
     html = html.replace(/^<\/p>/gi, '');
-    html = html.replace(/<\/p>(?=<h2)/gi, '');
     
     // Adicionar quebra antes de h2 que está dentro de parágrafo
     html = html.replace(/<p>\s*<h2>/gi, '<h2>');
-    html = html.replace(/<\/p>\s*<p>\s*<h2>/gi, '<h2>');
     
     let position = 0;
     
