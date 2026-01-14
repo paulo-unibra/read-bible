@@ -130,7 +130,7 @@ export default class BibleCuriositiesController {
     try {
       console.log('🔄 [BibleCuriositiesController.getToday] Iniciado')
       console.log('👤 [BibleCuriositiesController.getToday] auth.user:', auth.user ? `ID ${auth.user.id}` : 'null')
-      
+
       const today = DateTime.now().toFormat('yyyy-MM-dd')
 
       const curiosity = await BibleCuriosity.query()
@@ -155,7 +155,7 @@ export default class BibleCuriositiesController {
         await curiosity.load('favoritedBy')
         console.log('📊 [BibleCuriositiesController.getToday] Total de favoritedBy:', curiosity.favoritedBy.length)
         console.log('📊 [BibleCuriositiesController.getToday] IDs dos usuários que favoritaram:', curiosity.favoritedBy.map(u => u.id))
-        
+
         isFavorited = curiosity.favoritedBy.some((user) => user.id === auth.user!.id)
         console.log('⭐ [BibleCuriositiesController.getToday] isFavorited:', isFavorited)
       }
