@@ -6,5 +6,10 @@ export default defineConfig({
   base: '/admin/',
   build: {
     cssMinify: false,
+    rollupOptions: {
+      output: {
+        manualChunks: undefined,
+      },
+    },
   },
 })
