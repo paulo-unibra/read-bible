@@ -8,7 +8,6 @@ export default defineConfig({
     transformer: 'postcss',
   },
   build: {
-    minify: 'terser',
     cssMinify: false,
     rollupOptions: {
       output: {
