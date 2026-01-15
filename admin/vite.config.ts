@@ -4,8 +4,11 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   plugins: [react()],
   base: '/admin/',
+  css: {
+    transformer: 'postcss',
+  },
   build: {
-    cssMinify: false,
+    cssMinify: 'esbuild',
     rollupOptions: {
       output: {
         manualChunks: undefined,
