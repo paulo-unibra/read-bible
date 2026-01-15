@@ -8,7 +8,8 @@ export default defineConfig({
     transformer: 'postcss',
   },
   build: {
-    cssMinify: 'esbuild',
+    minify: 'terser',
+    cssMinify: false,
     rollupOptions: {
       output: {
         manualChunks: undefined,
