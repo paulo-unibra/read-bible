@@ -5,6 +5,6 @@ export default defineConfig({
   plugins: [react()],
   base: '/',
   build: {
-    cssCodeSplit: false, // um único CSS
+    cssCodeSplit: false,
   },
 })
