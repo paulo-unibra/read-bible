@@ -90,7 +90,7 @@ const Reports: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [loadingPlayStore, setLoadingPlayStore] = useState(false);
   const [error, setError] = useState("");
-  const [playStoreError, setPlayStoreError] = useState("");
+  const [_playStoreError, setPlayStoreError] = useState("");
   const [isExporting, setIsExporting] = useState(false);
   const [playStoreDays, setPlayStoreDays] = useState(7);
   const [appDownloads, setAppDownloads] = useState(0);
@@ -224,7 +224,6 @@ const Reports: React.FC = () => {
 
       // Cores do tema
       const primaryColor = [14, 52, 112]; // #4d6effff
-      const secondaryColor = [118, 75, 162]; // #764ba2
       const darkGray = [51, 51, 51];
       const lightGray = [128, 128, 128];
       const bgLight = [245, 247, 250];
@@ -238,9 +237,9 @@ const Reports: React.FC = () => {
         bgColor: number[],
         borderColor?: number[]
       ) => {
-        doc.setFillColor(...bgColor);
+        doc.setFillColor(...(bgColor as [number, number, number]));
         if (borderColor) {
-          doc.setDrawColor(...borderColor);
+          doc.setDrawColor(...(borderColor as [number, number, number]));
           doc.setLineWidth(0.5);
         }
         doc.roundedRect(x, y, width, height, 2, 2, borderColor ? "FD" : "F");
@@ -267,7 +266,7 @@ const Reports: React.FC = () => {
       // Cabeçalho - Igreja
       doc.setFontSize(14);
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(...darkGray);
+      doc.setTextColor(...(darkGray as [number, number, number]));
       doc.text("IGREJA EVANGÉLICA ASSEMBLEIA DE DEUS", pageWidth / 2, y, {
         align: "center",
       });
@@ -275,7 +274,7 @@ const Reports: React.FC = () => {
       y += 7;
 
       doc.setFontSize(12);
-      doc.setTextColor(...primaryColor);
+      doc.setTextColor(...(primaryColor as [number, number, number]));
       doc.text("BÍBLIA EM FOCO – RELATÓRIO DE ATIVIDADES", pageWidth / 2, y, {
         align: "center",
       });
@@ -283,7 +282,7 @@ const Reports: React.FC = () => {
       y += 5;
 
       // Linha separadora
-      doc.setDrawColor(...primaryColor);
+      doc.setDrawColor(...(primaryColor as [number, number, number]));
       doc.setLineWidth(1);
       doc.line(15, y, pageWidth - 15, y);
 
@@ -294,7 +293,7 @@ const Reports: React.FC = () => {
 
       doc.setFontSize(10);
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(...darkGray);
+      doc.setTextColor(...(darkGray as [number, number, number]));
       doc.text("Equipe IEADPE – Área 10", 20, y + 7);
 
       doc.setFontSize(9);
@@ -309,7 +308,7 @@ const Reports: React.FC = () => {
       doc.text("Pb. Waldomiro Farias", 60, y + 22);
 
       doc.setFont("helvetica", "italic");
-      doc.setTextColor(...lightGray);
+      doc.setTextColor(...(lightGray as [number, number, number]));
       doc.setFontSize(8);
       doc.text(
         `Gerado em: ${new Date(stats.generatedAt).toLocaleString("pt-BR")}`,
@@ -322,7 +321,7 @@ const Reports: React.FC = () => {
       // Função para desenhar bloco de estatísticas
       const drawStatsBlock = (
         title: string,
-        icon: string,
+        _icon: string,
         items: Array<{
           label: string;
           value: string | number;
@@ -345,17 +344,17 @@ const Reports: React.FC = () => {
 
         y += 6;
 
-        items.forEach((item, index) => {
+        items.forEach((item, _index) => {
           doc.setFontSize(10);
           doc.setFont("helvetica", "normal");
-          doc.setTextColor(...darkGray);
+          doc.setTextColor(...(darkGray as [number, number, number]));
           doc.text(item.label + ":", 20, y);
 
           doc.setFont("helvetica", "bold");
           if (item.highlight) {
-            doc.setTextColor(...primaryColor);
+            doc.setTextColor(...(primaryColor as [number, number, number]));
           } else {
-            doc.setTextColor(...darkGray);
+            doc.setTextColor(...(darkGray as [number, number, number]));
           }
           doc.text(String(item.value), pageWidth - 20, y, { align: "right" });
 
@@ -500,13 +499,13 @@ const Reports: React.FC = () => {
       }
 
       // Rodapé
-      doc.setDrawColor(...primaryColor);
+      doc.setDrawColor(...(primaryColor as [number, number, number]));
       doc.setLineWidth(0.5);
       doc.line(15, pageHeight - 20, pageWidth - 15, pageHeight - 20);
 
       doc.setFontSize(8);
       doc.setFont("helvetica", "italic");
-      doc.setTextColor(...lightGray);
+      doc.setTextColor(...(lightGray as [number, number, number]));
       doc.text(
         "Bíblia em Foco - Sistema de Gerenciamento",
         pageWidth / 2,

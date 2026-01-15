@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import readingPlanService from '../../services/readingPlanService';
 import './IncorrectPlans.css';
 
@@ -25,7 +24,6 @@ interface IncorrectPlan {
 }
 
 export default function IncorrectPlans() {
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [plans, setPlans] = useState<IncorrectPlan[]>([]);
   const [recalculating, setRecalculating] = useState<number | null>(null);
@@ -38,7 +36,7 @@ export default function IncorrectPlans() {
     try {
       setLoading(true);
       const data = await readingPlanService.listIncorrectPlans();
-      setPlans(data.plans);
+      setPlans(data.plans as IncorrectPlan[]);
     } catch (error) {
       console.error('Erro ao carregar planos:', error);
       alert('Erro ao carregar planos incorretos');

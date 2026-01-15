@@ -26,7 +26,7 @@ const JobProgressModal: React.FC<JobProgressModalProps> = ({ jobId, onClose, onC
   const [error, setError] = React.useState('');
 
   React.useEffect(() => {
-    let intervalId: NodeJS.Timeout;
+    let intervalId: ReturnType<typeof setInterval>;
 
     const fetchJobStatus = async () => {
       try {

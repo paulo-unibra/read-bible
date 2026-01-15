@@ -12,7 +12,7 @@ export default function HymnAudioManager() {
   const [saving, setSaving] = useState(false);
   const [driveAudios, setDriveAudios] = useState<DriveAudioFile[]>([]);
   const [syncedAudios, setSyncedAudios] = useState<HymnAudioSync[]>([]);
-  const [selectedTrack, setSelectedTrack] = useState<string | null>(null);
+  const [_selectedTrack, _setSelectedTrack] = useState<string | null>(null);
   
   // Estados de alterações pendentes
   const [pendingChanges, setPendingChanges] = useState<Map<string, Partial<HymnAudioSync>>>(new Map());
@@ -25,7 +25,7 @@ export default function HymnAudioManager() {
   
   // Refs dos elementos de áudio
   const audioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
-  const animationFrameRef = useRef<number>();
+  const animationFrameRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     if (hymnNumber) {
@@ -81,7 +81,7 @@ export default function HymnAudioManager() {
             }
           });
           
-          audioElement.addEventListener('error', (e) => {
+          audioElement.addEventListener('error', (_e) => {
             console.error(`[HymnAudioManager] Erro ao carregar ${audio.instrument}:`, {
               error: audioElement.error,
               src: audioElement.src,
