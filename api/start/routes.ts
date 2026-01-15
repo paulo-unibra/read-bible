@@ -204,4 +204,4 @@ router
       })
       .use(middleware.auth({ guards: ['api'] }))
   })
-  .prefix('/admin')
+
