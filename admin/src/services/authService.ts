@@ -3,7 +3,7 @@ import api from './api';
 
 class AuthService {
   async login(email: string, password: string): Promise<LoginResponse> {
-    const response = await api.post<LoginResponse>('/login', {
+    const response = await api.post<LoginResponse>('/admin/login', {
       email,
       password,
     });
@@ -17,7 +17,7 @@ class AuthService {
 
   async logout(): Promise<void> {
     try {
-      await api.post('/logout');
+      await api.post('/admin/logout');
     } finally {
       localStorage.removeItem('admin_token');
       localStorage.removeItem('admin_user');
@@ -25,7 +25,7 @@ class AuthService {
   }
 
   async me(): Promise<User> {
-    const response = await api.get<User>('/me');
+    const response = await api.get<User>('/admin/me');
     localStorage.setItem('admin_user', JSON.stringify(response.data));
     return response.data;
   }
