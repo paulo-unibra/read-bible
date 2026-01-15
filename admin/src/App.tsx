@@ -16,7 +16,7 @@ import Users from './pages/Users'
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
+      <BrowserRouter basename='/admin'>
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route
