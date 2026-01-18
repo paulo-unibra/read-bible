@@ -280,7 +280,7 @@ export default class BulkEmailController {
           const startDateObj = plan.startDate ? plan.startDate.toJSDate() : null
           const endDateObj = plan.endDate ? plan.endDate.toJSDate() : null
 
-          if (
+          if (!startDateObj || !endDateObj) {
             results.failed++
             results.errors.push({
               userId,
