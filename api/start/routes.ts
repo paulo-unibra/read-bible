@@ -25,6 +25,7 @@ const QuizResultController = () => import('#controllers/quiz_result_controller')
 const ReadingPlanController = () => import('#controllers/reading_plan_controller')
 const ReadingPlanTemplateController = () => import('#controllers/reading_plan_template_controller')
 const HymnAudiosController = () => import('#controllers/hymn_audios_controller')
+const AudioSyncTimestampsController = () => import('#controllers/audio_sync_timestamps_controller')
 import router from '@adonisjs/core/services/router'
 import { middleware } from './kernel.js'
 
@@ -109,6 +110,9 @@ router
 // IMPORTANTE: Rota específica ANTES da rota com parâmetro
 router.get('/hymn-audios/stream/:fileId', [HymnAudiosController, 'streamAudio'])
 router.get('/hymn-audios/:hymnNumber', [HymnAudiosController, 'getByHymnNumber'])
+
+// Audio Sync Timestamps routes (public para o app)
+router.get('/audio-sync/:bookId/:chapterNumber', [AudioSyncTimestampsController, 'show'])
 
 // Admin routes
 router
@@ -223,6 +227,11 @@ router
         router.get('/bulk-email/users', [BulkEmailController, 'getUsersByStatus'])
         router.post('/bulk-email/send', [BulkEmailController, 'sendBulkEmails'])
         router.get('/bulk-email/preview', [BulkEmailController, 'previewEmail'])
+
+        // Audio Sync Timestamps management
+        router.post('/audio-sync', [AudioSyncTimestampsController, 'store'])
+        router.get('/audio-sync/list', [AudioSyncTimestampsController, 'list'])
+        router.get('/audio-sync/:bookId/:chapterNumber', [AudioSyncTimestampsController, 'show'])
       })
       .use(middleware.auth({ guards: ['api'] }))
   })

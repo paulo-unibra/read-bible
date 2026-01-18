@@ -39,10 +39,10 @@ const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
   const [, setCurrentTime] = useState(audioState.currentTime);
 
   useEffect(() => {
-    console.log('[AudioPlayerModal] Visibility changed:', visible);
+    console.log("[AudioPlayerModal] Visibility changed:", visible);
     if (visible) {
       const currentState = AudioService.getState();
-      console.log('[AudioPlayerModal] Modal opened with state:', {
+      console.log("[AudioPlayerModal] Modal opened with state:", {
         isLoading: currentState.isLoading,
         isPlaying: currentState.isPlaying,
         downloadProgress: currentState.downloadProgress,
@@ -54,7 +54,7 @@ const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
 
   useEffect(() => {
     const updateState = (newState: any) => {
-      console.log('[AudioPlayerModal] State updated:', {
+      console.log("[AudioPlayerModal] State updated:", {
         isLoading: newState.isLoading,
         isPlaying: newState.isPlaying,
         downloadProgress: newState.downloadProgress,
@@ -81,7 +81,7 @@ const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
   const modalBg = isDark ? "#1e1e1e" : "#fff";
   const textColor = isDark ? "#e0e0e0" : "#333";
   const iconColor = isDark ? "#90caf9" : "#2196F3";
-  
+
   // Só considera loading se não estiver tocando (evita mostrar loading durante prefetch)
   const isActuallyLoading = audioState.isLoading && !audioState.isPlaying;
 
@@ -123,118 +123,119 @@ const AudioPlayerModal: React.FC<AudioPlayerModalProps> = ({
 
               {/* Progress Bar */}
               <View style={styles.progressContainer}>
-              <Slider
-                style={styles.slider}
-                minimumValue={0}
-                maximumValue={100}
-                value={progress}
-                onSlidingComplete={handleSeek}
-                minimumTrackTintColor={iconColor}
-                maximumTrackTintColor={isDark ? "#555" : "#ddd"}
-                thumbTintColor={iconColor}
-              />
-              <View style={styles.timeContainer}>
-                <Text style={[styles.timeText, { color: textColor }]}>
-                  {AudioService.formatTime(audioState.currentTime)}
-                </Text>
-                <Text style={[styles.timeText, { color: textColor }]}>
-                  {AudioService.formatTime(audioState.duration)}
-                </Text>
+                <Slider
+                  style={styles.slider}
+                  minimumValue={0}
+                  maximumValue={100}
+                  value={progress}
+                  onSlidingComplete={handleSeek}
+                  minimumTrackTintColor={iconColor}
+                  maximumTrackTintColor={isDark ? "#555" : "#ddd"}
+                  thumbTintColor={iconColor}
+                />
+                <View style={styles.timeContainer}>
+                  <Text style={[styles.timeText, { color: textColor }]}>
+                    {AudioService.formatTime(audioState.currentTime)}
+                  </Text>
+                  <Text style={[styles.timeText, { color: textColor }]}>
+                    {AudioService.formatTime(audioState.duration)}
+                  </Text>
+                </View>
               </View>
-            </View>
 
-            {/* Controls */}
-            <View style={styles.controlsContainer}>
-              <TouchableOpacity
-                style={[styles.controlButton, { borderColor: iconColor }]}
-                onPress={() =>
-                  AudioService.seekTo(
-                    Math.max(0, audioState.currentTime - 10000)
-                  )
-                }
-                disabled={isActuallyLoading}
-              >
-                <Ionicons name="play-back" size={24} color={iconColor} />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.playButton, { backgroundColor: iconColor }]}
-                onPress={async () => {
-                  try {
-                    if (
-                      audioState.currentTime === 0 &&
-                      audioState.currentBookId !== null &&
-                      audioState.currentChapter !== null
-                    ) {
-                      await AudioService.loadAndPlay(
-                        audioState.currentBookId,
-                        audioState.currentChapter
-                      );
-                    } else {
-                      if (audioState.isPlaying) {
-                        await AudioService.pause();
-                      } else {
-                        await AudioService.play();
-                      }
-                    }
-                  } catch (error: any) {
-                    const errorMessage = error?.message || "Erro desconhecido";
-                    Alert.alert("Erro no Áudio", errorMessage);
-                  }
-                }}
-                disabled={isActuallyLoading}
-              >
-                {isActuallyLoading ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Ionicons
-                    name={audioState.isPlaying ? "pause" : "play"}
-                    size={32}
-                    color="#fff"
-                  />
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.controlButton, { borderColor: iconColor }]}
-                onPress={() =>
-                  AudioService.seekTo(
-                    Math.min(
-                      audioState.duration,
-                      audioState.currentTime + 10000
+              {/* Controls */}
+              <View style={styles.controlsContainer}>
+                <TouchableOpacity
+                  style={[styles.controlButton, { borderColor: iconColor }]}
+                  onPress={() =>
+                    AudioService.seekTo(
+                      Math.max(0, audioState.currentTime - 10000),
                     )
-                  )
-                }
-                disabled={isActuallyLoading}
-              >
-                <Ionicons name="play-forward" size={24} color={iconColor} />
-              </TouchableOpacity>
-            </View>
+                  }
+                  disabled={isActuallyLoading}
+                >
+                  <Ionicons name="play-back" size={24} color={iconColor} />
+                </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[
-                styles.stopButton,
-                { borderColor: isDark ? "#666" : "#ccc" },
-              ]}
-              onPress={() => {
-                AudioService.stop();
-                onClose(); // Fechar modal ao parar
-              }}
-            >
-              <Ionicons
-                name="stop"
-                size={20}
-                color={isDark ? "#ccc" : "#666"}
-              />
-              <Text
+                <TouchableOpacity
+                  style={[styles.playButton, { backgroundColor: iconColor }]}
+                  onPress={async () => {
+                    try {
+                      if (
+                        audioState.currentTime === 0 &&
+                        audioState.currentBookId !== null &&
+                        audioState.currentChapter !== null
+                      ) {
+                        await AudioService.loadAndPlay(
+                          audioState.currentBookId,
+                          audioState.currentChapter,
+                        );
+                      } else {
+                        if (audioState.isPlaying) {
+                          await AudioService.pause();
+                        } else {
+                          await AudioService.play();
+                        }
+                      }
+                    } catch (error: any) {
+                      const errorMessage =
+                        error?.message || "Erro desconhecido";
+                      Alert.alert("Erro no Áudio", errorMessage);
+                    }
+                  }}
+                  disabled={isActuallyLoading}
+                >
+                  {isActuallyLoading ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Ionicons
+                      name={audioState.isPlaying ? "pause" : "play"}
+                      size={32}
+                      color="#fff"
+                    />
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.controlButton, { borderColor: iconColor }]}
+                  onPress={() =>
+                    AudioService.seekTo(
+                      Math.min(
+                        audioState.duration,
+                        audioState.currentTime + 10000,
+                      ),
+                    )
+                  }
+                  disabled={isActuallyLoading}
+                >
+                  <Ionicons name="play-forward" size={24} color={iconColor} />
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity
                 style={[
-                  styles.stopButtonText,
-                  { color: isDark ? "#ccc" : "#666" },
+                  styles.stopButton,
+                  { borderColor: isDark ? "#666" : "#ccc" },
                 ]}
+                onPress={() => {
+                  AudioService.stop();
+                  onClose(); // Fechar modal ao parar
+                }}
               >
-                Parar
-              </Text>
-            </TouchableOpacity>
+                <Ionicons
+                  name="stop"
+                  size={20}
+                  color={isDark ? "#ccc" : "#666"}
+                />
+                <Text
+                  style={[
+                    styles.stopButtonText,
+                    { color: isDark ? "#ccc" : "#666" },
+                  ]}
+                >
+                  Parar
+                </Text>
+              </TouchableOpacity>
             </View>
           )}
         </View>
@@ -258,23 +259,29 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
   useEffect(() => {
     const updateState = (newState: typeof audioState) => {
       setAudioState(newState);
-      
+
       // Se o áudio parou completamente, resetar estados locais
       if (!newState.isPlaying && !newState.isLoading && !newState.sound) {
         setLocalLoading(false);
         setIsProcessing(false);
       }
     };
-    
+
     const unsubscribe = AudioService.addListener(updateState);
 
     const unEnd = AudioService.onEnded(() => {
-      console.log('[AudioPlayer] onEnded callback triggered', { bookId, chapterNumber, isCurrentChapter: AudioService.isCurrentChapter(bookId, chapterNumber) });
+      console.log("[AudioPlayer] onEnded callback triggered", {
+        bookId,
+        chapterNumber,
+        isCurrentChapter: AudioService.isCurrentChapter(bookId, chapterNumber),
+      });
       if (AudioService.isCurrentChapter(bookId, chapterNumber)) {
-        console.log('[AudioPlayer] Calling onRequestNext');
+        console.log("[AudioPlayer] Calling onRequestNext");
         onRequestNext?.();
       } else {
-        console.log('[AudioPlayer] Not calling onRequestNext - not current chapter');
+        console.log(
+          "[AudioPlayer] Not calling onRequestNext - not current chapter",
+        );
       }
     });
     return () => {
@@ -285,53 +292,59 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
 
   const handleAudioPress = async () => {
     if (isProcessing) {
-      console.log('[AudioPlayer] Already processing, ignoring click');
+      console.log("[AudioPlayer] Already processing, ignoring click");
       return;
     }
 
     try {
-      console.log('[AudioPlayer] handleAudioPress called', { bookId, chapterNumber, isCurrentChapter: AudioService.isCurrentChapter(bookId, chapterNumber) });
-      
+      console.log("[AudioPlayer] handleAudioPress called", {
+        bookId,
+        chapterNumber,
+        isCurrentChapter: AudioService.isCurrentChapter(bookId, chapterNumber),
+      });
+
       if (AudioService.isCurrentChapter(bookId, chapterNumber)) {
         // Se é o capítulo atual, abrir o modal diretamente
-        console.log('[AudioPlayer] Opening modal for current chapter');
+        console.log("[AudioPlayer] Opening modal for current chapter");
         setModalVisible(true);
       } else {
-        console.log('[AudioPlayer] Starting new audio load');
+        console.log("[AudioPlayer] Starting new audio load");
         setIsProcessing(true);
         // Mostrar loading local durante o download/carregamento
         setLocalLoading(true);
-        
+
         try {
-          console.log('[AudioPlayer] Calling AudioService.loadAndPlay...');
+          console.log("[AudioPlayer] Calling AudioService.loadAndPlay...");
           // Carregar e reproduzir o áudio (download + preparação)
           await AudioService.loadAndPlay(bookId, chapterNumber, { bookName });
-          console.log('[AudioPlayer] AudioService.loadAndPlay completed successfully');
-          
+          console.log(
+            "[AudioPlayer] AudioService.loadAndPlay completed successfully",
+          );
+
           // Aguardar um momento para garantir que o estado foi atualizado
-          await new Promise(resolve => setTimeout(resolve, 100));
-          
+          await new Promise((resolve) => setTimeout(resolve, 100));
+
           // Verificar se realmente está tocando antes de abrir o modal
           const currentState = AudioService.getState();
-          console.log('[AudioPlayer] Current state before opening modal:', {
+          console.log("[AudioPlayer] Current state before opening modal:", {
             isLoading: currentState.isLoading,
             isPlaying: currentState.isPlaying,
           });
-          
+
           if (currentState.isPlaying) {
-            console.log('[AudioPlayer] Opening modal after successful load');
+            console.log("[AudioPlayer] Opening modal after successful load");
             setModalVisible(true);
           } else {
-            console.warn('[AudioPlayer] Audio not playing, not opening modal');
+            console.warn("[AudioPlayer] Audio not playing, not opening modal");
           }
         } finally {
-          console.log('[AudioPlayer] Resetting localLoading and isProcessing');
+          console.log("[AudioPlayer] Resetting localLoading and isProcessing");
           setLocalLoading(false);
           setIsProcessing(false);
         }
       }
     } catch (error) {
-      console.error('[AudioPlayer] Error in handleAudioPress:', error);
+      console.error("[AudioPlayer] Error in handleAudioPress:", error);
       setLocalLoading(false);
       setIsProcessing(false);
       const errorMessage =
@@ -346,7 +359,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
       ) {
         Alert.alert(
           "Áudio Indisponível",
-          `O áudio para ${bookName} ${chapterNumber} não está disponível.`
+          `O áudio para ${bookName} ${chapterNumber} não está disponível.`,
         );
       } else {
         Alert.alert("Erro no Áudio", errorMessage);
@@ -357,7 +370,8 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
   const isCurrentChapter = AudioService.isCurrentChapter(bookId, chapterNumber);
   const isLoading = localLoading || (audioState.isLoading && isCurrentChapter);
   const downloadProgress = audioState.downloadProgress || 0;
-  const showProgress = isLoading && downloadProgress > 0 && downloadProgress < 100;
+  const showProgress =
+    isLoading && downloadProgress > 0 && downloadProgress < 100;
   const iconColor = isDark ? "#90caf9" : "#2196F3";
   const iconBg = isDark ? "#2a2a2a" : "#f8f9fa";
 
@@ -429,94 +443,95 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.7)",
-    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.2)",
+    justifyContent: "flex-end",
     alignItems: "center",
   },
   audioModal: {
-    width: "90%",
-    maxWidth: 400,
-    borderRadius: 16,
+    width: "100%",
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
     overflow: "hidden",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 6,
   },
   modalHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: "#e0e0e0",
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
+    fontSize: 14,
+    fontWeight: "600",
   },
   loadingContainer: {
-    padding: 48,
+    padding: 24,
     alignItems: "center",
     justifyContent: "center",
   },
   loadingText: {
-    marginTop: 16,
-    fontSize: 14,
+    marginTop: 8,
+    fontSize: 12,
     textAlign: "center",
   },
   audioContent: {
-    padding: 24,
-    paddingTop: 16,
+    padding: 12,
+    paddingTop: 8,
     alignItems: "center",
   },
   chapterInfo: {
     alignItems: "center",
-    marginBottom: 32,
+    marginBottom: 12,
   },
   chapterName: {
-    fontSize: 20,
-    fontWeight: "bold",
+    fontSize: 15,
+    fontWeight: "600",
     textAlign: "center",
   },
   progressContainer: {
     width: "100%",
-    marginBottom: 32,
+    marginBottom: 12,
   },
   slider: {
-    height: 40,
+    height: 32,
     width: "100%",
   },
   timeContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 8,
+    marginTop: 2,
   },
   timeText: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: "500",
   },
   controlsContainer: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 20,
-    marginBottom: 24,
+    gap: 12,
+    marginBottom: 12,
   },
   controlButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     borderWidth: 2,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "transparent",
   },
   playButton: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
     justifyContent: "center",
     alignItems: "center",
     shadowColor: "#000",

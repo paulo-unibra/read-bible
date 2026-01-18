@@ -13,6 +13,9 @@ interface AudioState {
   currentChapter: number | null;
   currentBookName?: string | null;
   downloadProgress: number; // 0-100
+  currentVerseNumber: number | null; // Versículo sendo narrado
+  totalVerses: number; // Total de versículos do capítulo
+  verseTimestamps: { verseNumber: number; timestampMs: number }[]; // Timestamps reais
 }
 
 class AudioService {
@@ -26,6 +29,9 @@ class AudioService {
     currentChapter: null,
     currentBookName: null,
     downloadProgress: 0,
+    currentVerseNumber: null,
+    totalVerses: 0,
+    verseTimestamps: [],
   };
 
   private listeners: Set<(state: AudioState) => void> = new Set();
@@ -150,7 +156,9 @@ class AudioService {
         interruptionModeIOS: 1, // DuckOthers - permite mixar com outros áudios
         interruptionModeAndroid: 1, // DuckOthers - permite reproduzir durante chamadas
       });
-      console.log('[AudioService] Audio mode initialized with background support');
+      console.log(
+        "[AudioService] Audio mode initialized with background support",
+      );
     } catch (error) {
       console.error("Error initializing audio:", error);
       // Tentar modo fallback mais simples
@@ -186,7 +194,12 @@ class AudioService {
       throw new Error(`Book not found for ID: ${bookId}`);
     }
     const fileName = `${bookName}-${chapter}.mp3`;
-    console.log('[AudioService] Generated filename:', { bookId, bookName, chapter, fileName });
+    console.log("[AudioService] Generated filename:", {
+      bookId,
+      bookName,
+      chapter,
+      fileName,
+    });
     return fileName;
   }
 
@@ -201,53 +214,59 @@ class AudioService {
 
   private async resolveDriveFileId(fileName: string): Promise<string> {
     const listUrl = `https://www.googleapis.com/drive/v3/files?q='${this.DRIVE_FOLDER_ID}'+in+parents+and+name='${fileName}'&key=${this.API_KEY}&fields=files(id,name)`;
-    console.log('[AudioService] Searching Drive for file:', fileName);
-    console.log('[AudioService] Drive URL query:', listUrl);
-    
+    console.log("[AudioService] Searching Drive for file:", fileName);
+    console.log("[AudioService] Drive URL query:", listUrl);
+
     const response = await fetch(listUrl);
     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-    
+
     const data = await response.json();
-    console.log('[AudioService] Drive search result:', data);
-    
+    console.log("[AudioService] Drive search result:", data);
+
     if (!data.files || data.files.length === 0) {
-      console.error('[AudioService] Audio file not found in Drive:', fileName);
+      console.error("[AudioService] Audio file not found in Drive:", fileName);
       throw new Error(`Audio file not found: ${fileName}`);
     }
-    
+
     const file = data.files[0];
     if (!file.id) throw new Error("File ID not found");
-    
-    console.log('[AudioService] Found file in Drive:', { id: file.id, name: file.name });
+
+    console.log("[AudioService] Found file in Drive:", {
+      id: file.id,
+      name: file.name,
+    });
     return file.id;
   }
 
   async isAudioAvailable(bookId: number, chapter: number): Promise<boolean> {
     try {
       const fileName = this.getAudioFileName(bookId, chapter);
-      
+
       await this.ensureAudioDir();
       const localPath = `${this.AUDIO_DIR}${fileName}`;
       const info = await FileSystem.getInfoAsync(localPath);
       if (info.exists && info.size && info.size > 1024) {
-        return true; 
+        return true;
       }
-      
+
       await this.resolveDriveFileId(fileName);
-      return true; 
+      return true;
     } catch (_) {
-      return false; 
+      return false;
     }
   }
 
-  private async getOrDownloadAudioLocalPath(fileName: string, isPrefetch: boolean = false): Promise<string> {
+  private async getOrDownloadAudioLocalPath(
+    fileName: string,
+    isPrefetch: boolean = false,
+  ): Promise<string> {
     await this.ensureAudioDir();
     const localPath = `${this.AUDIO_DIR}${fileName}`;
     const info = await FileSystem.getInfoAsync(localPath);
     if (info.exists && info.size && info.size > 1024) {
       return localPath; // Já baixado
     }
-    
+
     // Só atualizar estado se NÃO for prefetch
     if (!isPrefetch) {
       // Resetar progresso e notificar que está baixando
@@ -255,10 +274,10 @@ class AudioService {
       this.state.isLoading = true;
       this.notifyListeners();
     }
-    
+
     const fileId = await this.resolveDriveFileId(fileName);
     const downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
-    
+
     // Download com callback de progresso
     const downloadResumable = FileSystem.createDownloadResumable(
       downloadUrl,
@@ -267,43 +286,49 @@ class AudioService {
       (downloadProgress) => {
         // Só atualizar progresso se NÃO for prefetch
         if (!isPrefetch) {
-          const progress = downloadProgress.totalBytesWritten / downloadProgress.totalBytesExpectedToWrite;
+          const progress =
+            downloadProgress.totalBytesWritten /
+            downloadProgress.totalBytesExpectedToWrite;
           const progressPercent = Math.round(progress * 100);
           this.state.downloadProgress = progressPercent;
           this.notifyListeners();
         }
-      }
+      },
     );
 
     const result = await downloadResumable.downloadAsync();
     if (!result || result.status !== 200) {
       throw new Error(`Falha ao baixar áudio (status ${result?.status})`);
     }
-    
+
     // Download completo - só atualizar se NÃO for prefetch
     if (!isPrefetch) {
       this.state.downloadProgress = 100;
       this.notifyListeners();
     }
-    
+
     return localPath;
   }
 
   async loadAndPlay(
     bookId: number,
     chapter: number,
-    opts?: { bookName?: string }
+    opts?: { bookName?: string },
   ): Promise<void> {
     try {
-      console.log('[AudioService] loadAndPlay called', { bookId, chapter, bookName: opts?.bookName });
-      
+      console.log("[AudioService] loadAndPlay called", {
+        bookId,
+        chapter,
+        bookName: opts?.bookName,
+      });
+
       // Se já está tocando o mesmo capítulo, apenas pausar/reproduzir
       if (
         this.state.currentBookId === bookId &&
         this.state.currentChapter === chapter &&
         this.state.sound
       ) {
-        console.log('[AudioService] Same chapter - toggling play/pause');
+        console.log("[AudioService] Same chapter - toggling play/pause");
         if (this.state.isPlaying) {
           await this.pause();
         } else {
@@ -314,16 +339,16 @@ class AudioService {
 
       // Guardar referência do som antigo para descarregar DEPOIS
       const oldSound = this.state.sound;
-      
-      console.log('[AudioService] Preparing to load new audio');
-      
+
+      console.log("[AudioService] Preparing to load new audio");
+
       // Parar polling se houver
       this.stopStatusPolling();
 
       // Resetar flag de último disparo para permitir novo onEnded
       this.lastTriggeredEnd = null;
 
-      console.log('[AudioService] Setting loading state');
+      console.log("[AudioService] Setting loading state");
       this.state.isLoading = true;
       this.state.currentBookId = bookId;
       this.state.currentChapter = chapter;
@@ -331,15 +356,15 @@ class AudioService {
       this.notifyListeners();
 
       const fileName = this.getAudioFileName(bookId, chapter);
-      console.log('[AudioService] Getting audio file:', fileName);
+      console.log("[AudioService] Getting audio file:", fileName);
       const localPath = await this.getOrDownloadAudioLocalPath(fileName);
-      console.log('[AudioService] Audio file ready at:', localPath);
+      console.log("[AudioService] Audio file ready at:", localPath);
 
       // Descarregar o som antigo AGORA, antes de criar o novo
       if (oldSound) {
         try {
-          console.log('[AudioService] Unloading old sound...');
-          
+          console.log("[AudioService] Unloading old sound...");
+
           const status = await oldSound.getStatusAsync();
           if (status.isLoaded) {
             if (status.isPlaying) {
@@ -348,32 +373,32 @@ class AudioService {
             await oldSound.stopAsync();
           }
           await oldSound.unloadAsync();
-          console.log('[AudioService] Old sound unloaded successfully');
+          console.log("[AudioService] Old sound unloaded successfully");
         } catch (error) {
-          console.error('[AudioService] Error unloading old sound:', error);
+          console.error("[AudioService] Error unloading old sound:", error);
         }
       }
-      
+
       // Limpar referência do som antigo
       this.state.sound = null;
       this.state.isPlaying = false;
 
       // Reinicializar o áudio antes de criar o som
-      console.log('[AudioService] Initializing audio mode');
+      console.log("[AudioService] Initializing audio mode");
       await this.initializeAudio();
 
       // Criar o som com configuração para continuar em background
-      console.log('[AudioService] Creating sound object');
+      console.log("[AudioService] Creating sound object");
       const { sound } = await Audio.Sound.createAsync(
         { uri: localPath },
-        { 
+        {
           shouldPlay: false,
           progressUpdateIntervalMillis: 1000, // Atualizar progresso a cada 1 segundo
           isLooping: false,
         },
-        (status) => this.onPlaybackStatusUpdate(status)
+        (status) => this.onPlaybackStatusUpdate(status),
       );
-      console.log('[AudioService] Sound object created');
+      console.log("[AudioService] Sound object created");
 
       this.state.sound = sound;
 
@@ -382,23 +407,33 @@ class AudioService {
       let retryCount = 0;
       const maxRetries = 5; // Aumentado para 5 tentativas
 
-      console.log('[AudioService] Starting playback attempts');
+      console.log("[AudioService] Starting playback attempts");
       while (retryCount < maxRetries && !playSuccess) {
         try {
-          console.log(`[AudioService] Playback attempt ${retryCount + 1}/${maxRetries}`);
-          
+          console.log(
+            `[AudioService] Playback attempt ${retryCount + 1}/${maxRetries}`,
+          );
+
           // Tentar reproduzir
           await sound.playAsync();
           playSuccess = true;
-          console.log('[AudioService] Playback started successfully');
+          console.log("[AudioService] Playback started successfully");
         } catch (error: any) {
           retryCount++;
-          console.error(`[AudioService] Play attempt ${retryCount} failed:`, error?.message || error);
-          
+          console.error(
+            `[AudioService] Play attempt ${retryCount} failed:`,
+            error?.message || error,
+          );
+
           // Se for erro de foco de áudio e ainda tem tentativas
-          if (error?.message?.includes("AudioFocusNotAcquired") && retryCount < maxRetries) {
-            console.log(`[AudioService] AudioFocus error, reconfiguring audio mode for retry ${retryCount}...`);
-            
+          if (
+            error?.message?.includes("AudioFocusNotAcquired") &&
+            retryCount < maxRetries
+          ) {
+            console.log(
+              `[AudioService] AudioFocus error, reconfiguring audio mode for retry ${retryCount}...`,
+            );
+
             // Tentar reinicializar o modo de áudio para liberar/readquirir o foco
             try {
               await Audio.setAudioModeAsync({
@@ -407,24 +442,35 @@ class AudioService {
                 interruptionModeAndroid: 1, // DuckOthers - permite mixar
                 shouldDuckAndroid: true, // Abaixa volume em vez de bloquear
               });
-              console.log(`[AudioService] Audio mode reconfigured, retrying...`);
+              console.log(
+                `[AudioService] Audio mode reconfigured, retrying...`,
+              );
             } catch (modeError) {
-              console.error('[AudioService] Error reconfiguring audio mode:', modeError);
+              console.error(
+                "[AudioService] Error reconfiguring audio mode:",
+                modeError,
+              );
             }
           } else {
             // Se não for erro de foco ou acabaram as tentativas, propagar o erro
-            console.error('[AudioService] Non-recoverable error or max retries reached');
+            console.error(
+              "[AudioService] Non-recoverable error or max retries reached",
+            );
             throw error;
           }
         }
       }
 
       if (!playSuccess) {
-        console.error('[AudioService] Failed to play audio after all retries');
-        throw new Error("Não foi possível reproduzir o áudio após múltiplas tentativas");
+        console.error("[AudioService] Failed to play audio after all retries");
+        throw new Error(
+          "Não foi possível reproduzir o áudio após múltiplas tentativas",
+        );
       }
 
-      console.log('[AudioService] Setting final state - isPlaying: true, isLoading: false');
+      console.log(
+        "[AudioService] Setting final state - isPlaying: true, isLoading: false",
+      );
       this.state.isLoading = false;
       this.state.isPlaying = true;
       this.state.downloadProgress = 0; // Resetar progresso após sucesso
@@ -435,9 +481,9 @@ class AudioService {
       // Iniciar polling manual para detectar fim do áudio mesmo com tela bloqueada
       this.startStatusPolling();
 
-      console.log('[AudioService] Notifying listeners - loadAndPlay complete');
+      console.log("[AudioService] Notifying listeners - loadAndPlay complete");
       this.notifyListeners();
-      console.log('[AudioService] loadAndPlay finished successfully');
+      console.log("[AudioService] loadAndPlay finished successfully");
 
       // Fazer prefetch e notificação DEPOIS de notificar o estado final
       PlaybackNotificationService.showOrUpdate({
@@ -463,7 +509,9 @@ class AudioService {
           throw new Error(`Áudio não disponível para este capítulo`);
         }
         if (/AudioFocusNotAcquired/i.test(error.message)) {
-          throw new Error(`Não foi possível obter o foco de áudio. Tente fechar outros aplicativos de mídia e tente novamente.`);
+          throw new Error(
+            `Não foi possível obter o foco de áudio. Tente fechar outros aplicativos de mídia e tente novamente.`,
+          );
         }
       }
       throw new Error("Erro ao carregar áudio");
@@ -473,9 +521,9 @@ class AudioService {
   private startStatusPolling() {
     // Limpar qualquer polling anterior
     this.stopStatusPolling();
-    
-    console.log('[AudioService] Starting status polling');
-    
+
+    console.log("[AudioService] Starting status polling");
+
     // Polling simples para atualizar UI e backup de detecção
     const poll = async () => {
       if (this.state.sound && this.statusCheckInterval) {
@@ -485,42 +533,46 @@ class AudioService {
             this.state.currentTime = status.positionMillis || 0;
             this.state.duration = status.durationMillis || 0;
             this.state.isPlaying = status.isPlaying;
-            
+
             // Notificar listeners sobre mudanças de estado
             this.notifyListeners();
           }
-          
+
           // Agendar próximo poll
           if (this.statusCheckInterval) {
             this.statusCheckInterval = setTimeout(poll, 1000) as any;
           }
         } catch (error) {
-          console.error('[AudioService] Error in status polling:', error);
+          console.error("[AudioService] Error in status polling:", error);
         }
       }
     };
-    
+
     // Iniciar polling
     this.statusCheckInterval = setTimeout(poll, 1000) as any;
   }
 
   private stopStatusPolling() {
     if (this.statusCheckInterval) {
-      console.log('[AudioService] Stopping status polling');
+      console.log("[AudioService] Stopping status polling");
       clearTimeout(this.statusCheckInterval as any);
       this.statusCheckInterval = null;
     }
   }
 
   private triggerEndListeners() {
-    console.log('[AudioService] Triggering', this.endListeners.size, 'onEnded listeners');
+    console.log(
+      "[AudioService] Triggering",
+      this.endListeners.size,
+      "onEnded listeners",
+    );
     this.state.isPlaying = false;
     this.state.currentTime = 0;
     this.endListeners.forEach((l) => {
       try {
-        console.log('[AudioService] Calling onEnded listener');
+        console.log("[AudioService] Calling onEnded listener");
         l();
-        console.log('[AudioService] onEnded listener executed successfully');
+        console.log("[AudioService] onEnded listener executed successfully");
       } catch (e) {
         console.warn("onEnded listener error", e);
       }
@@ -540,10 +592,13 @@ class AudioService {
 
   async prefetch(bookId: number, chapter: number): Promise<boolean> {
     try {
-      console.log('[AudioService] Prefetching next chapter:', { bookId, chapter });
+      console.log("[AudioService] Prefetching next chapter:", {
+        bookId,
+        chapter,
+      });
       const fileName = this.getAudioFileName(bookId, chapter);
       await this.getOrDownloadAudioLocalPath(fileName, true); // isPrefetch = true
-      console.log('[AudioService] Prefetch completed successfully');
+      console.log("[AudioService] Prefetch completed successfully");
       return true;
     } catch (e) {
       console.warn("[AudioService] Prefetch falhou", e);
@@ -557,7 +612,7 @@ class AudioService {
         // Verificar se o som está carregado antes de reproduzir
         const status = await this.state.sound.getStatusAsync();
         console.log("Audio status before play:", { isLoaded: status.isLoaded });
-        
+
         if (!status.isLoaded) {
           console.error("Audio status not loaded:", status);
           throw new Error("Áudio não está carregado");
@@ -565,13 +620,13 @@ class AudioService {
 
         // Reinicializar o modo de áudio antes de reproduzir
         await this.initializeAudio();
-        
+
         await this.state.sound.playAsync();
         this.state.isPlaying = true;
-        
+
         // Reiniciar polling ao retomar reprodução
         this.startStatusPolling();
-        
+
         this.notifyListeners();
         PlaybackNotificationService.showOrUpdate({
           bookName:
@@ -586,10 +641,12 @@ class AudioService {
         }).catch(() => {});
       } catch (error: any) {
         console.error("Error playing audio:", error);
-        
+
         // Se for erro de foco de áudio, mostrar mensagem específica
         if (error?.message?.includes("AudioFocusNotAcquired")) {
-          throw new Error("Não foi possível obter o foco de áudio. Tente fechar outros aplicativos de mídia.");
+          throw new Error(
+            "Não foi possível obter o foco de áudio. Tente fechar outros aplicativos de mídia.",
+          );
         }
         throw error;
       }
@@ -601,10 +658,10 @@ class AudioService {
       try {
         await this.state.sound.pauseAsync();
         this.state.isPlaying = false;
-        
+
         // Parar polling quando pausar
         this.stopStatusPolling();
-        
+
         this.notifyListeners();
         PlaybackNotificationService.showOrUpdate({
           bookName:
@@ -624,11 +681,11 @@ class AudioService {
   }
 
   async stop(): Promise<void> {
-    console.log('[AudioService] Stopping audio');
-    
+    console.log("[AudioService] Stopping audio");
+
     // Parar polling de status
     this.stopStatusPolling();
-    
+
     if (this.state?.sound) {
       try {
         // Primeiro pausar, depois parar, e por fim descarregar
@@ -639,7 +696,7 @@ class AudioService {
         }
         await this.state.sound.stopAsync();
         await this.state.sound.unloadAsync();
-        console.log('[AudioService] Sound unloaded successfully');
+        console.log("[AudioService] Sound unloaded successfully");
       } catch (error) {
         console.error("Error stopping audio:", error);
       }
@@ -654,7 +711,7 @@ class AudioService {
     this.state.duration = 0;
     this.state.currentBookId = null;
     this.state.currentChapter = null;
-    console.log('[AudioService] Audio stopped, state reset');
+    console.log("[AudioService] Audio stopped, state reset");
     this.notifyListeners();
     PlaybackNotificationService.dismiss().catch(() => {});
   }
@@ -673,32 +730,91 @@ class AudioService {
     if (status.isLoaded) {
       const currentTime = status.positionMillis || 0;
       const duration = status.durationMillis || 0;
-      
+
       this.state.currentTime = currentTime;
       this.state.duration = duration;
       this.state.isPlaying = status.isPlaying;
 
+      // Calcular versículo atual
+      if (this.state.verseTimestamps.length > 0) {
+        // Usar timestamps reais se disponíveis
+        let currentVerse = 1;
+        for (let i = 0; i < this.state.verseTimestamps.length; i++) {
+          if (currentTime >= this.state.verseTimestamps[i].timestampMs) {
+            currentVerse = this.state.verseTimestamps[i].verseNumber;
+          } else {
+            break;
+          }
+        }
+        this.state.currentVerseNumber = currentVerse;
+      } else if (this.state.totalVerses > 0 && duration > 0) {
+        // Fallback: calcular baseado no tempo (método antigo)
+        const progress = currentTime / duration;
+        const estimatedVerse =
+          Math.floor(progress * this.state.totalVerses) + 1;
+        this.state.currentVerseNumber = Math.min(
+          estimatedVerse,
+          this.state.totalVerses,
+        );
+      }
+
       // Detectar fim do áudio apenas com didJustFinish (funciona bem com tela desbloqueada)
       if (status.didJustFinish) {
-        console.log('[AudioService] Audio finished (didJustFinish)');
-        
+        console.log("[AudioService] Audio finished (didJustFinish)");
+
         // Evitar disparos duplicados
         const now = Date.now();
-        const canTrigger = !this.lastTriggeredEnd || (now - this.lastTriggeredEnd) > 3000;
-        
+        const canTrigger =
+          !this.lastTriggeredEnd || now - this.lastTriggeredEnd > 3000;
+
         if (canTrigger) {
           this.lastTriggeredEnd = now;
           this.triggerEndListeners();
           this.stopStatusPolling();
         }
       }
-      
+
       this.notifyListeners();
     }
   };
 
   getState(): AudioState {
     return { ...this.state };
+  }
+
+  setTotalVerses(totalVerses: number): void {
+    this.state.totalVerses = totalVerses;
+    this.state.currentVerseNumber = 1;
+    this.notifyListeners();
+  }
+
+  async fetchVerseTimestamps(
+    bookId: number,
+    chapterNumber: number,
+  ): Promise<void> {
+    try {
+      const API_URL =
+        process.env.EXPO_PUBLIC_API_URL || "http://localhost:3333";
+      const response = await fetch(
+        `${API_URL}/audio-sync/${bookId}/${chapterNumber}`,
+      );
+      const data = await response.json();
+
+      if (data.success && data.data && data.data.length > 0) {
+        this.state.verseTimestamps = data.data;
+        console.log(
+          `[AudioService] Loaded ${data.data.length} timestamps for chapter`,
+        );
+      } else {
+        this.state.verseTimestamps = [];
+        console.log(
+          "[AudioService] No timestamps found, using calculation fallback",
+        );
+      }
+    } catch (error) {
+      console.error("[AudioService] Error fetching timestamps:", error);
+      this.state.verseTimestamps = [];
+    }
   }
 
   isCurrentChapter(bookId: number, chapter: number): boolean {

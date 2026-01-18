@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -46,7 +46,7 @@ export default function ChapterReaderScreen() {
   >([]);
 
   const [selectedBookInModal, setSelectedBookInModal] = useState<Book | null>(
-    null
+    null,
   );
 
   const bibleId = params.bibleId as string;
@@ -64,7 +64,7 @@ export default function ChapterReaderScreen() {
   const [loading, setLoading] = useState(true); // Loading inicial completo
   const [initializing, setInitializing] = useState(true);
   const [lastLoadedChapter, setLastLoadedChapter] = useState<number | null>(
-    null
+    null,
   );
   const [chapterLoading, setChapterLoading] = useState(false); // Loading apenas para troca de capítulo
 
@@ -73,6 +73,10 @@ export default function ChapterReaderScreen() {
   const [isLastOfBible, setIsLastOfBible] = useState(false);
   const [loadingChapters, setLoadingChapters] = useState(false);
   const [audioAvailable, setAudioAvailable] = useState(false);
+  const [currentNarratedVerse, setCurrentNarratedVerse] = useState<
+    number | null
+  >(null);
+  const versesListRef = useRef<FlatList>(null);
 
   const [searchModalVisible, setSearchModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -104,14 +108,14 @@ export default function ChapterReaderScreen() {
       return map;
     }
     let newStartIndex = booksList.findIndex((b) =>
-      /Mateus|Matthew/i.test(b.name)
+      /Mateus|Matthew/i.test(b.name),
     );
     if (newStartIndex === -1) {
       if (booksList.length >= 66) newStartIndex = 39;
       else newStartIndex = Math.round(booksList.length * 0.6);
     }
     booksList.forEach((b, idx) =>
-      map.set(b.id, idx < newStartIndex ? "old" : "new")
+      map.set(b.id, idx < newStartIndex ? "old" : "new"),
     );
     return map;
   };
@@ -120,7 +124,7 @@ export default function ChapterReaderScreen() {
   const [bibleSelectorVisible, setBibleSelectorVisible] = useState(false);
   const [availableBibles, setAvailableBibles] = useState<Bible[]>([]);
   const [availableDriveBibles, setAvailableDriveBibles] = useState<DriveFile[]>(
-    []
+    [],
   );
   const [downloading, setDownloading] = useState<string | null>(null);
   // const [downloadProgress, setDownloadProgress] = useState<string>("");
@@ -157,7 +161,8 @@ export default function ChapterReaderScreen() {
   const [selectedReferenceIndex, setSelectedReferenceIndex] = useState(0);
   const [selectedReferenceVerse, setSelectedReferenceVerse] =
     useState<Verse | null>(null);
-  const [selectedReferenceBookName, setSelectedReferenceBookName] = useState<string>("");
+  const [selectedReferenceBookName, setSelectedReferenceBookName] =
+    useState<string>("");
   const [referenceVerseLoading, setReferenceVerseLoading] = useState(false);
   const [showAllReferences, setShowAllReferences] = useState(false);
 
@@ -225,7 +230,7 @@ export default function ChapterReaderScreen() {
   const closeSettings = () => setSettingsModalVisible(false);
   const saveSettings = async (
     fs: "small" | "medium" | "large",
-    theme: "light" | "dark"
+    theme: "light" | "dark",
   ) => {
     try {
       setReaderFontSize(fs);
@@ -251,7 +256,7 @@ export default function ChapterReaderScreen() {
       if (currentChapter === 0) {
         const introduction = await bibleReaderService.getBookIntroduction(
           bibleId,
-          currentBookId
+          currentBookId,
         );
         setBookIntroduction(introduction);
         setVerses([]); // Limpa os versículos pois é introdução
@@ -261,13 +266,13 @@ export default function ChapterReaderScreen() {
         const versesData = await bibleReaderService.getVerses(
           bibleId,
           currentBookId,
-          currentChapter
+          currentChapter,
         );
         console.log(
           "[getVerses] Retornou:",
           versesData?.length || 0,
           "versículos para capítulo",
-          currentChapter
+          currentChapter,
         );
         setVerses(versesData);
       }
@@ -282,17 +287,20 @@ export default function ChapterReaderScreen() {
     if (!currentBookId || currentChapter === null) return;
 
     try {
-      const notes = await NotesService.getNotesByChapter(currentBookId, currentChapter);
+      const notes = await NotesService.getNotesByChapter(
+        currentBookId,
+        currentChapter,
+      );
       const notesMap = new Map<string, string>();
-      
-      notes.forEach(note => {
+
+      notes.forEach((note) => {
         // Armazenar apenas o primeiro versículo da nota
         // Isso garante que o ícone apareça apenas uma vez
         const firstVerse = Math.min(...note.verseNumbers);
         const key = `${note.bookId}-${note.chapterNumber}-${firstVerse}`;
         notesMap.set(key, note.id); // Armazena o ID da nota, não o texto
       });
-      
+
       setVerseNotes(notesMap);
     } catch (error) {
       console.error("Error loading verse notes:", error);
@@ -309,7 +317,7 @@ export default function ChapterReaderScreen() {
     try {
       const available = await AudioService.isAudioAvailable(
         currentBookId,
-        currentChapter
+        currentChapter,
       );
       setAudioAvailable(available);
     } catch (error) {
@@ -330,7 +338,7 @@ export default function ChapterReaderScreen() {
         if (currentBookId === firstBook?.id) {
           const chapters = await bibleReaderService.getChapters(
             bibleId,
-            firstBook.id
+            firstBook.id,
           );
           const hasIntroduction = chapters.some((ch) => ch.chapterNumber === 0);
           const firstChapter = hasIntroduction ? 0 : 1;
@@ -342,7 +350,7 @@ export default function ChapterReaderScreen() {
         if (currentBookId === lastBook?.id) {
           const chapters = await bibleReaderService.getChapters(
             bibleId,
-            lastBook.id
+            lastBook.id,
           );
           const atLastOfBible =
             chapter === chapters[chapters.length - 1]?.chapterNumber;
@@ -354,7 +362,7 @@ export default function ChapterReaderScreen() {
         console.error("Error updating navigation state:", error);
       }
     },
-    [bibleId, currentBookId, currentChapter]
+    [bibleId, currentBookId, currentChapter],
   );
 
   const initializeReader = React.useCallback(async () => {
@@ -375,7 +383,7 @@ export default function ChapterReaderScreen() {
 
       const chapters = await bibleReaderService.getChapters(
         bibleId,
-        currentBookId
+        currentBookId,
       );
       // Calcular totalChapters corretamente: se tem introdução (capítulo 0), remove 1 do length
       const hasIntroduction = chapters.some((ch) => ch.chapterNumber === 0);
@@ -390,7 +398,7 @@ export default function ChapterReaderScreen() {
       const versesData = await bibleReaderService.getVerses(
         bibleId,
         currentBookId,
-        chapterToLoad
+        chapterToLoad,
       );
       setVerses(versesData);
 
@@ -403,11 +411,11 @@ export default function ChapterReaderScreen() {
       DatabaseService.saveLastReading(
         bibleId,
         currentBookId,
-        chapterToLoad
+        chapterToLoad,
       ).catch((error) => {
         console.warn(
           "[DEBUG] Erro ao salvar posição de leitura (não crítico):",
-          error
+          error,
         );
         // Don't show alert for this non-critical operation
       });
@@ -445,7 +453,7 @@ export default function ChapterReaderScreen() {
       console.log("  currentChapter:", currentChapter);
       console.log("  book:", book?.name);
       console.log("  lastLoadedChapter:", lastLoadedChapter);
-      
+
       // Validar se temos todos os dados necessários
       if (
         !bibleId ||
@@ -464,8 +472,13 @@ export default function ChapterReaderScreen() {
         return;
       }
 
-      console.log("✅ Carregando capítulo", currentChapter, "do livro", book.name);
-      
+      console.log(
+        "✅ Carregando capítulo",
+        currentChapter,
+        "do livro",
+        book.name,
+      );
+
       // Se for carregamento inicial, usa loading completo; se for navegação, usa chapterLoading
       if (isInitialLoad) {
         setLoading(true);
@@ -480,13 +493,14 @@ export default function ChapterReaderScreen() {
         setLastLoadedChapter(currentChapter);
         console.log("✅ Capítulo carregado com sucesso!");
 
-        
         // Salvar a última posição de leitura
-        DatabaseService.saveLastReading(bibleId, currentBookId, currentChapter).catch(
-          (error) => {
-            console.warn("Failed to save last reading position:", error);
-          }
-        );
+        DatabaseService.saveLastReading(
+          bibleId,
+          currentBookId,
+          currentChapter,
+        ).catch((error) => {
+          console.warn("Failed to save last reading position:", error);
+        });
       } catch (error) {
         console.error("Error loading chapter data:", error);
       } finally {
@@ -506,7 +520,7 @@ export default function ChapterReaderScreen() {
       lastLoadedChapter,
       loadChapterVerses,
       checkAudioAvailability,
-    ]
+    ],
   );
 
   // Efeito para inicialização
@@ -526,8 +540,11 @@ export default function ChapterReaderScreen() {
     console.log("  initializing:", initializing);
     console.log("  currentChapter:", currentChapter);
     console.log("  lastLoadedChapter:", lastLoadedChapter);
-    console.log("  currentChapter !== lastLoadedChapter:", currentChapter !== lastLoadedChapter);
-    
+    console.log(
+      "  currentChapter !== lastLoadedChapter:",
+      currentChapter !== lastLoadedChapter,
+    );
+
     if (
       !initializing &&
       currentChapter !== null &&
@@ -546,6 +563,62 @@ export default function ChapterReaderScreen() {
       AudioService.cleanup();
     };
   }, []);
+
+  // Configurar total de versículos no AudioService quando carregar o capítulo
+  // DESATIVADO: Sincronização de versículos com áudio
+  /*
+  useEffect(() => {
+    if (verses.length > 0 && currentChapter > 0) {
+      AudioService.setTotalVerses(verses.length);
+      // Buscar timestamps sincronizados do backend
+      AudioService.fetchVerseTimestamps(currentBookId, currentChapter);
+    }
+  }, [verses, currentChapter, currentBookId]);
+  */
+
+  // Escutar mudanças no AudioService para atualizar versículo atual
+  // DESATIVADO: Sincronização de versículos com áudio
+  /*
+  useEffect(() => {
+    const unsubscribe = AudioService.addListener((state) => {
+      if (
+        state.currentBookId === currentBookId &&
+        state.currentChapter === currentChapter &&
+        state.isPlaying
+      ) {
+        setCurrentNarratedVerse(state.currentVerseNumber);
+      } else {
+        setCurrentNarratedVerse(null);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [currentBookId, currentChapter]);
+  */
+
+  // Auto-scroll para o versículo sendo narrado
+  // DESATIVADO: Sincronização de versículos com áudio
+  /*
+  useEffect(() => {
+    if (currentNarratedVerse && verses.length > 0 && versesListRef.current) {
+      const index = verses.findIndex(v => v.verseNumber === currentNarratedVerse);
+      if (index >= 0) {
+        try {
+          versesListRef.current.scrollToIndex({
+            index,
+            animated: true,
+            viewPosition: 0.3, // Posiciona o versículo a 30% da tela
+          });
+        } catch (error) {
+          // Fallback se scrollToIndex falhar
+          console.log("Auto-scroll error:", error);
+        }
+      }
+    }
+  }, [currentNarratedVerse, verses]);
+  */
 
   // Monitorar mudanças no estado do modal da Bíblia
   useEffect(() => {
@@ -604,14 +677,14 @@ export default function ChapterReaderScreen() {
       console.log("=== DATABASE DIAGNOSIS END ===");
       Alert.alert(
         "Diagnóstico",
-        "Check console for database diagnosis results"
+        "Check console for database diagnosis results",
       );
     } catch (error) {
       console.error("Database diagnosis failed:", error);
       Alert.alert(
         "Erro",
         "Falha no diagnóstico do banco: " +
-          (error instanceof Error ? error.message : String(error))
+          (error instanceof Error ? error.message : String(error)),
       );
     }
   };
@@ -661,7 +734,7 @@ export default function ChapterReaderScreen() {
         "currentChapter:",
         currentChapter,
         "totalChapters:",
-        totalChapters
+        totalChapters,
       );
 
       if (direction === "prev") {
@@ -671,7 +744,7 @@ export default function ChapterReaderScreen() {
           // Verificar se existe capítulo 0 (introdução)
           const chapters = await bibleReaderService.getChapters(
             bibleId,
-            currentBookId
+            currentBookId,
           );
           const hasIntroduction = chapters.some((ch) => ch.chapterNumber === 0);
           if (hasIntroduction) {
@@ -714,7 +787,7 @@ export default function ChapterReaderScreen() {
       Alert.alert(
         "Erro de Navegação",
         `Falha ao navegar para o capítulo: ${errorMessage}`,
-        [{ text: "OK" }]
+        [{ text: "OK" }],
       );
     } finally {
       setNavigating(false);
@@ -733,8 +806,8 @@ export default function ChapterReaderScreen() {
           new Promise((_, reject) =>
             setTimeout(
               () => reject(new Error("Timeout na consulta de bíblias")),
-              5000
-            )
+              5000,
+            ),
           ),
         ]);
       };
@@ -784,7 +857,7 @@ export default function ChapterReaderScreen() {
       console.log("=== STARTING DOWNLOAD PROCESS ===");
       setDownloading(driveFile.id);
       console.log(
-        "Download state set, starting googleDriveService.downloadBible..."
+        "Download state set, starting googleDriveService.downloadBible...",
       );
 
       await googleDriveService.downloadBible(driveFile);
@@ -816,7 +889,7 @@ export default function ChapterReaderScreen() {
         console.error("Error saving bible to database:", saveError);
         console.error(
           "Save error details:",
-          JSON.stringify(saveError, null, 2)
+          JSON.stringify(saveError, null, 2),
         );
         throw saveError; // Re-throw para ser capturado pelo catch principal
       }
@@ -827,7 +900,7 @@ export default function ChapterReaderScreen() {
       console.log(
         "Updated bibles from database:",
         updatedLocalBibles.length,
-        "bibles found"
+        "bibles found",
       );
       console.log(
         "Updated bibles list:",
@@ -835,7 +908,7 @@ export default function ChapterReaderScreen() {
           id: b.id,
           name: b.name,
           fileName: b.fileName,
-        }))
+        })),
       );
 
       setAvailableBibles(updatedLocalBibles);
@@ -873,7 +946,7 @@ export default function ChapterReaderScreen() {
 
               const updatedLocalBibles = await DatabaseService.getBibles();
               const downloadedBibles = updatedLocalBibles.filter(
-                (b) => b.isDownloaded
+                (b) => b.isDownloaded,
               );
               setAvailableBibles(updatedLocalBibles);
 
@@ -884,12 +957,12 @@ export default function ChapterReaderScreen() {
                 // Atualizar a configuração preferredBibleId
                 await DatabaseService.saveSetting(
                   "preferredBibleId",
-                  firstAvailableBible.id
+                  firstAvailableBible.id,
                 );
 
                 // Redirecionar para a primeira Bíblia disponível
                 router.replace(
-                  `/chapter-reader?bibleId=${firstAvailableBible.id}&bookId=1&chapterNumber=1`
+                  `/chapter-reader?bibleId=${firstAvailableBible.id}&bookId=1&chapterNumber=1`,
                 );
                 setBibleSelectorVisible(false);
                 return; // Sair da função para evitar mostrar alert
@@ -908,7 +981,7 @@ export default function ChapterReaderScreen() {
                         router.back(); // Voltar para tela anterior
                       },
                     },
-                  ]
+                  ],
                 );
                 return;
               }
@@ -920,7 +993,7 @@ export default function ChapterReaderScreen() {
             }
           },
         },
-      ]
+      ],
     );
   };
 
@@ -939,7 +1012,7 @@ export default function ChapterReaderScreen() {
       setBibleSelectorVisible(false);
 
       router.replace(
-        `/chapter-reader?bibleId=${selectedBible.id}&bookId=${currentBookId}&chapterNumber=${currentChapter}`
+        `/chapter-reader?bibleId=${selectedBible.id}&bookId=${currentBookId}&chapterNumber=${currentChapter}`,
       );
     } catch (error) {
       console.error("Error switching Bible:", error);
@@ -974,7 +1047,7 @@ export default function ChapterReaderScreen() {
 
       const chapters = await bibleReaderService.getChapters(
         bibleId,
-        selectedBook.id
+        selectedBook.id,
       );
       // Calcular totalChapters corretamente: se tem introdução (capítulo 0), remove 1 do length
       const hasIntroduction = chapters.some((ch) => ch.chapterNumber === 0);
@@ -1005,7 +1078,7 @@ export default function ChapterReaderScreen() {
           "Aviso",
           direction === "prev"
             ? "Você já está no primeiro capítulo da Bíblia"
-            : "Você já está no último capítulo da Bíblia"
+            : "Você já está no último capítulo da Bíblia",
         );
         return;
       }
@@ -1013,7 +1086,7 @@ export default function ChapterReaderScreen() {
       const newBook = books[newBookIndex];
       const newBookChapters = await bibleReaderService.getChapters(
         bibleId,
-        newBook.id
+        newBook.id,
       );
 
       let newChapter: number;
@@ -1031,7 +1104,7 @@ export default function ChapterReaderScreen() {
       setCurrentChapter(newChapter);
       // Calcular totalChapters corretamente: se tem introdução (capítulo 0), remove 1 do length
       const hasIntroduction = newBookChapters.some(
-        (ch) => ch.chapterNumber === 0
+        (ch) => ch.chapterNumber === 0,
       );
       const actualTotalChapters = hasIntroduction
         ? newBookChapters.length - 1
@@ -1041,7 +1114,7 @@ export default function ChapterReaderScreen() {
       const versesData = await bibleReaderService.getVerses(
         bibleId,
         newBook.id,
-        newChapter
+        newChapter,
       );
       setVerses(versesData);
 
@@ -1058,7 +1131,7 @@ export default function ChapterReaderScreen() {
     (
       filter: "all" | "ot" | "nt",
       source: SearchResult[],
-      localMap?: Map<number, "old" | "new"> | null
+      localMap?: Map<number, "old" | "new"> | null,
     ) => {
       if (!source) return [] as SearchResult[];
       if (filter === "all") return source;
@@ -1070,7 +1143,7 @@ export default function ChapterReaderScreen() {
         return filter === "ot" ? r.bookId <= 39 : r.bookId > 39;
       });
     },
-    [bookTestamentMap]
+    [bookTestamentMap],
   );
 
   const SEARCH_RESULTS_LIMIT = 1000;
@@ -1088,7 +1161,7 @@ export default function ChapterReaderScreen() {
           setBookTestamentMap(localMap);
         } catch {
           console.warn(
-            "Não foi possível carregar mapa de testamentos agora, usando fallback heurístico."
+            "Não foi possível carregar mapa de testamentos agora, usando fallback heurístico.",
           );
         }
       }
@@ -1096,7 +1169,7 @@ export default function ChapterReaderScreen() {
       let results = await bibleReaderService.searchVerses(
         bibleId,
         searchQuery.trim(),
-        SEARCH_RESULTS_LIMIT
+        SEARCH_RESULTS_LIMIT,
       );
       // Guardar bruto
       setRawSearchResults(results);
@@ -1112,7 +1185,7 @@ export default function ChapterReaderScreen() {
       setSearchCounts({ all: results.length, ot: otCount, nt: ntCount });
       // Aplicar filtro atual
       setSearchResults(
-        applySearchFilter(searchTestamentFilter, results, localMap)
+        applySearchFilter(searchTestamentFilter, results, localMap),
       );
     } catch (error) {
       console.error("Error searching:", error);
@@ -1125,7 +1198,7 @@ export default function ChapterReaderScreen() {
   useEffect(() => {
     if (rawSearchResults) {
       setSearchResults(
-        applySearchFilter(searchTestamentFilter, rawSearchResults)
+        applySearchFilter(searchTestamentFilter, rawSearchResults),
       );
     }
   }, [searchTestamentFilter, rawSearchResults, applySearchFilter]);
@@ -1147,7 +1220,7 @@ export default function ChapterReaderScreen() {
 
           const chapters = await bibleReaderService.getChapters(
             bibleId,
-            result.bookId
+            result.bookId,
           );
           // Calcular totalChapters corretamente: se tem introdução (capítulo 0), remove 1 do length
           const hasIntroduction = chapters.some((ch) => ch.chapterNumber === 0);
@@ -1179,7 +1252,7 @@ export default function ChapterReaderScreen() {
     console.log("  currentBookId:", currentBookId);
     console.log("  currentChapter:", currentChapter);
     console.log("  bibleId:", bibleId);
-    
+
     if (!bibleId || chapterNumber < 0) {
       console.log("❌ Retornando: bibleId ou chapterNumber inválido");
       return;
@@ -1192,7 +1265,7 @@ export default function ChapterReaderScreen() {
         setLoading(true);
         setBook(book);
         setCurrentBookId(book.id);
-        
+
         // IMPORTANTE: Resetar lastLoadedChapter para forçar o recarregamento
         // mesmo se o número do capítulo for o mesmo (ex: intro → intro)
         console.log("🔄 Resetando lastLoadedChapter para forçar reload");
@@ -1228,7 +1301,7 @@ export default function ChapterReaderScreen() {
   };
 
   const openReferencesModal = async (
-    references: { text: string; reference: string; position: number }[]
+    references: { text: string; reference: string; position: number }[],
   ) => {
     if (!references || references.length === 0 || !bibleId) return;
 
@@ -1243,7 +1316,7 @@ export default function ChapterReaderScreen() {
 
   const loadSelectedReference = async (
     index: number,
-    references?: { text: string; reference: string; position: number }[]
+    references?: { text: string; reference: string; position: number }[],
   ) => {
     const refs = references || currentReferences;
     if (index < 0 || index >= refs.length || !bibleId) return;
@@ -1252,7 +1325,7 @@ export default function ChapterReaderScreen() {
       setReferenceVerseLoading(true);
       const verse = await bibleReaderService.getVerseByReference(
         bibleId,
-        refs[index].reference
+        refs[index].reference,
       );
 
       if (verse) {
@@ -1282,7 +1355,7 @@ export default function ChapterReaderScreen() {
       setVerseRefLoading(true);
       const verse = await bibleReaderService.getVerseByReference(
         bibleId,
-        reference
+        reference,
       );
 
       if (verse) {
@@ -1291,7 +1364,7 @@ export default function ChapterReaderScreen() {
       } else {
         Alert.alert(
           "Versículo não encontrado",
-          `Não foi possível encontrar a referência: ${reference}`
+          `Não foi possível encontrar a referência: ${reference}`,
         );
       }
     } catch (error) {
@@ -1325,7 +1398,7 @@ export default function ChapterReaderScreen() {
     bookIdStr: string,
     chapter: number,
     verseStart?: number,
-    verseEnd?: number
+    verseEnd?: number,
   ) => {
     if (!bibleId) return;
 
@@ -1337,7 +1410,7 @@ export default function ChapterReaderScreen() {
       const verses = await bibleReaderService.getVerses(
         bibleId,
         bookId,
-        chapter
+        chapter,
       );
 
       if (!verses || verses.length === 0) {
@@ -1352,7 +1425,7 @@ export default function ChapterReaderScreen() {
         if (verseEnd && verseEnd !== verseStart) {
           // Range de versículos
           selectedVerses = verses.filter(
-            (v) => v.verseNumber >= verseStart && v.verseNumber <= verseEnd
+            (v) => v.verseNumber >= verseStart && v.verseNumber <= verseEnd,
           );
         } else {
           // Versículo único
@@ -1385,36 +1458,21 @@ export default function ChapterReaderScreen() {
     }
   };
 
-  // Handle long press on verse
-  const handleVerseLongPress = (verse: Verse) => {
+  // Handle verse selection with simple press (only one at a time)
+  const handleVersePress = (verse: Verse) => {
     const verseKey = `${verse.bookId}-${verse.chapterNumber}-${verse.verseNumber}`;
-    setSelectionMode(true);
+    const newSelected = new Set<string>();
 
-    // Add the long-pressed verse to selection
-    const newSelected = new Set(selectedVerses);
-    newSelected.add(verseKey);
-    setSelectedVerses(newSelected);
-  };
-
-  // Handle verse selection in selection mode
-  const handleVerseSelection = (verse: Verse) => {
-    if (!selectionMode) return;
-
-    const verseKey = `${verse.bookId}-${verse.chapterNumber}-${verse.verseNumber}`;
-    const newSelected = new Set(selectedVerses);
-
-    if (newSelected.has(verseKey)) {
-      newSelected.delete(verseKey);
-    } else {
+    // Se já estava selecionado, desseleciona (limpa tudo)
+    // Se não estava, seleciona apenas este (limpa outros e adiciona este)
+    if (!selectedVerses.has(verseKey)) {
       newSelected.add(verseKey);
     }
 
     setSelectedVerses(newSelected);
 
-    // Exit selection mode if no verses selected
-    if (newSelected.size === 0) {
-      setSelectionMode(false);
-    }
+    // Ativa modo de seleção se houver versículos selecionados
+    setSelectionMode(newSelected.size > 0);
   };
 
   // Clear selection mode
@@ -1438,12 +1496,12 @@ export default function ChapterReaderScreen() {
 
     const selectedVersesData = verses.filter((verse) =>
       selectedVerses.has(
-        `${verse.bookId}-${verse.chapterNumber}-${verse.verseNumber}`
-      )
+        `${verse.bookId}-${verse.chapterNumber}-${verse.verseNumber}`,
+      ),
     );
 
     const sortedVerses = selectedVersesData.sort(
-      (a, b) => a.verseNumber - b.verseNumber
+      (a, b) => a.verseNumber - b.verseNumber,
     );
 
     const versesText = sortedVerses
@@ -1492,12 +1550,12 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
 
     const selectedVersesData = verses.filter((verse) =>
       selectedVerses.has(
-        `${verse.bookId}-${verse.chapterNumber}-${verse.verseNumber}`
-      )
+        `${verse.bookId}-${verse.chapterNumber}-${verse.verseNumber}`,
+      ),
     );
 
     const sortedVerses = selectedVersesData.sort(
-      (a, b) => a.verseNumber - b.verseNumber
+      (a, b) => a.verseNumber - b.verseNumber,
     );
 
     const verseNumbers = sortedVerses.map((v) => v.verseNumber);
@@ -1506,7 +1564,7 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
     const existingNote = await NotesService.getNoteByReference(
       currentBookId,
       currentChapter,
-      verseNumbers
+      verseNumbers,
     );
 
     if (existingNote) {
@@ -1528,12 +1586,12 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
     try {
       const selectedVersesData = verses.filter((verse) =>
         selectedVerses.has(
-          `${verse.bookId}-${verse.chapterNumber}-${verse.verseNumber}`
-        )
+          `${verse.bookId}-${verse.chapterNumber}-${verse.verseNumber}`,
+        ),
       );
 
       const sortedVerses = selectedVersesData.sort(
-        (a, b) => a.verseNumber - b.verseNumber
+        (a, b) => a.verseNumber - b.verseNumber,
       );
 
       const verseNumbers = sortedVerses.map((v) => v.verseNumber);
@@ -1557,7 +1615,7 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
         currentChapter,
         verseNumbers,
         versesText,
-        noteText.trim()
+        noteText.trim(),
       );
 
       // Atualizar o mapa de anotações localmente
@@ -1580,10 +1638,15 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
   const openVerseNote = async (verse: Verse) => {
     try {
       // Buscar todas as notas do capítulo
-      const notes = await NotesService.getNotesByChapter(verse.bookId, verse.chapterNumber);
-      
+      const notes = await NotesService.getNotesByChapter(
+        verse.bookId,
+        verse.chapterNumber,
+      );
+
       // Encontrar a nota que contém este versículo
-      const note = notes.find(n => n.verseNumbers.includes(verse.verseNumber));
+      const note = notes.find((n) =>
+        n.verseNumbers.includes(verse.verseNumber),
+      );
 
       if (!note) {
         Alert.alert("Info", "Nenhuma anotação encontrada para este versículo");
@@ -1593,16 +1656,16 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
       // Set up for editing
       setNoteText(note.note);
       setIsEditingExistingNote(true);
-      
+
       // Store the verse selection internally but don't activate selection mode
       const newSelection = new Set<string>();
-      note.verseNumbers.forEach(verseNum => {
+      note.verseNumbers.forEach((verseNum) => {
         newSelection.add(`${note.bookId}-${note.chapterNumber}-${verseNum}`);
       });
       setSelectedVerses(newSelection);
       // Don't activate selection mode when viewing/editing notes
       // setSelectionMode(true);
-      
+
       setNoteModalVisible(true);
     } catch (error) {
       console.error("Error opening verse note:", error);
@@ -1629,18 +1692,19 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
             try {
               const selectedVersesData = verses.filter((verse) =>
                 selectedVerses.has(
-                  `${verse.bookId}-${verse.chapterNumber}-${verse.verseNumber}`
-                )
+                  `${verse.bookId}-${verse.chapterNumber}-${verse.verseNumber}`,
+                ),
               );
 
               const sortedVerses = selectedVersesData.sort(
-                (a, b) => a.verseNumber - b.verseNumber
+                (a, b) => a.verseNumber - b.verseNumber,
               );
 
               const verseNumbers = sortedVerses.map((v) => v.verseNumber);
-              const verseRange = verseNumbers.length === 1 
-                ? verseNumbers[0].toString()
-                : `${Math.min(...verseNumbers)}-${Math.max(...verseNumbers)}`;
+              const verseRange =
+                verseNumbers.length === 1
+                  ? verseNumbers[0].toString()
+                  : `${Math.min(...verseNumbers)}-${Math.max(...verseNumbers)}`;
               const noteId = `${currentBookId}-${currentChapter}-${verseRange}`;
 
               await NotesService.deleteNote(noteId);
@@ -1657,7 +1721,7 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
             }
           },
         },
-      ]
+      ],
     );
   };
 
@@ -1676,7 +1740,7 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
         parts.push(
           <Text key={`seg-${cursor}`}>
             {cleanedText.substring(cursor, match.index)}
-          </Text>
+          </Text>,
         );
       }
       const symbol = match[1];
@@ -1699,7 +1763,7 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
             }}
           >
             {symbol}
-          </Text>
+          </Text>,
         );
       } else if (symbol === "ℕ") {
         parts.push(
@@ -1715,17 +1779,17 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
             }}
           >
             ℕ
-          </Text>
+          </Text>,
         );
       }
       cursor = match.index + match[0].length;
     }
     if (cursor < cleanedText.length) {
       parts.push(
-        <Text key={`tail-${cursor}`}>{cleanedText.substring(cursor)}</Text>
+        <Text key={`tail-${cursor}`}>{cleanedText.substring(cursor)}</Text>,
       );
     }
-    
+
     // Adicionar ícone de anotação no final do versículo, se houver
     const favoriteKey = `${verse.bookId}-${verse.chapterNumber}-${verse.verseNumber}`;
     const hasNote = verseNotes.has(favoriteKey);
@@ -1733,15 +1797,15 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
       parts.push(
         <Text key="note-icon" onPress={() => openVerseNote(verse)}>
           {" "}
-          <Ionicons 
-            name="document-text" 
-            size={16} 
-            color={isDark ? "#FFB74D" : "#FF9800"} 
+          <Ionicons
+            name="document-text"
+            size={16}
+            color={isDark ? "#FFB74D" : "#FF9800"}
           />
-        </Text>
+        </Text>,
       );
     }
-    
+
     return <>{parts}</>;
   };
 
@@ -1782,13 +1846,18 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
     const favoriteKey = `${item.bookId}-${item.chapterNumber}-${item.verseNumber}`;
     const isSelected = selectedVerses.has(favoriteKey);
     const hasNote = verseNotes.has(favoriteKey);
-    
+    // DESATIVADO: Sincronização de versículos com áudio
+    // const isBeingNarrated = currentNarratedVerse === item.verseNumber;
+    const isBeingNarrated = false; // Sempre false - funcionalidade desativada
+
     return (
       <View
         style={[
           styles.verseContainer,
           { flexDirection: "column" }, // títulos acima
           isDark && { backgroundColor: "#121212" },
+          // isBeingNarrated && styles.verseBeingNarrated,
+          // isBeingNarrated && isDark && styles.verseBeingNarratedDark,
         ]}
       >
         {/* TÍTULOS (fora da área clicável) */}
@@ -1805,40 +1874,20 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
         {/* ÁREA CLICÁVEL APENAS DO VERSÍCULO */}
         <Pressable
           style={[
-            { flexDirection: "row", alignItems: "flex-start" },
+            {
+              flexDirection: "row",
+              alignItems: "flex-start",
+              paddingVertical: 8,
+              paddingHorizontal: 12,
+              borderRadius: 8,
+              position: "relative",
+            },
             isSelected && styles.verseContainerSelected,
             isSelected && isDark && { backgroundColor: "#263850" },
           ]}
-          onPress={() =>
-            selectionMode ? handleVerseSelection(item) : undefined
-          }
-          onLongPress={() => handleVerseLongPress(item)}
-          delayLongPress={500}
+          onPress={() => handleVersePress(item)}
         >
-          {selectionMode && (
-            <View style={styles.checkboxColumn}>
-              <View style={styles.checkboxContainer}>
-                <View
-                  style={[
-                    styles.checkbox,
-                    isSelected && styles.checkboxSelected,
-                  ]}
-                >
-                  {isSelected && (
-                    <Ionicons name="checkmark" size={14} color="#fff" />
-                  )}
-                </View>
-              </View>
-            </View>
-          )}
-
-          <View
-            style={[
-              styles.verseTextContainer,
-              selectionMode && styles.verseTextWithCheckbox,
-              { flex: 1 },
-            ]}
-          >
+          <View style={[styles.verseTextContainer, { flex: 1 }]}>
             <Text style={[styles.verseText, verseTextDynamic]}>
               {/* Não mostrar número do versículo para introdução (capítulo 0) */}
               {item.chapterNumber !== 0 && (
@@ -1863,6 +1912,30 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
               {/* Área onde aparecerão referências e notas inline */}
             </View>
           </View>
+
+          {/* Botões de ação - aparecem apenas quando selecionado */}
+          {isSelected && (
+            <View style={styles.verseActionButtons}>
+              <TouchableOpacity
+                onPress={openNoteModal}
+                style={[
+                  styles.verseActionButton,
+                  { backgroundColor: isDark ? "#1e88e5" : "#2196F3" },
+                ]}
+              >
+                <Ionicons name="create-outline" size={16} color="#fff" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={shareSelectedVerses}
+                style={[
+                  styles.verseActionButton,
+                  { backgroundColor: isDark ? "#1e88e5" : "#2196F3" },
+                ]}
+              >
+                <Ionicons name="send" size={16} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          )}
         </Pressable>
       </View>
     );
@@ -1898,7 +1971,7 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
     try {
       const chapters = await bibleReaderService.getChapters(
         bibleId,
-        selectedBook.id
+        selectedBook.id,
       );
       // Incluir todos os capítulos, incluindo o 0 se existir introdução
       const chapterNumbers = chapters.map((ch) => ch.chapterNumber);
@@ -1955,47 +2028,30 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
 
         <View style={styles.headerActions}>
           {selectionMode && selectedVerses.size > 0 && (
-            <>
-              <TouchableOpacity
-                onPress={openNoteModal}
-                style={styles.headerButton}
-              >
-                <Ionicons name="create-outline" size={24} color={iconColor} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={shareSelectedVerses}
-                style={styles.headerButton}
-              >
-                <Ionicons name="share-outline" size={24} color={iconColor} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={clearSelection}
-                style={styles.headerButton}
-              >
-                <Ionicons
-                  name="close"
-                  size={24}
-                  color={colorScheme.iconInactive}
-                />
-              </TouchableOpacity>
-            </>
+            <TouchableOpacity
+              onPress={clearSelection}
+              style={styles.headerButton}
+            >
+              <Ionicons
+                name="close"
+                size={24}
+                color={colorScheme.iconInactive}
+              />
+            </TouchableOpacity>
           )}
-          {!selectionMode && (
-            <>
-              <TouchableOpacity
-                onPress={() => setSearchModalVisible(true)}
-                style={styles.headerButton}
-              >
-                <Ionicons name="search" size={24} color={iconColor} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={openBookSelector}
-                style={styles.headerButton}
-              >
-                <Ionicons name="library" size={24} color={iconColor} />
-              </TouchableOpacity>
-            </>
-          )}
+          {/* Botões de pesquisar e selecionar livro sempre visíveis */}
+          <TouchableOpacity
+            onPress={() => setSearchModalVisible(true)}
+            style={styles.headerButton}
+          >
+            <Ionicons name="search" size={24} color={iconColor} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={openBookSelector}
+            style={styles.headerButton}
+          >
+            <Ionicons name="library" size={24} color={iconColor} />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -2056,23 +2112,44 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
                     bookName={book.name}
                     isDark={isDark}
                     onRequestNext={async () => {
-                      console.log('[ChapterReader] onRequestNext called', { navigating, loading, currentChapter });
+                      console.log("[ChapterReader] onRequestNext called", {
+                        navigating,
+                        loading,
+                        currentChapter,
+                      });
                       if (navigating || loading) {
-                        console.log('[ChapterReader] Skipping - already navigating or loading');
+                        console.log(
+                          "[ChapterReader] Skipping - already navigating or loading",
+                        );
                         return;
                       }
                       const prevChapter = currentChapter;
-                      console.log('[ChapterReader] Navigating to next chapter from', prevChapter);
+                      console.log(
+                        "[ChapterReader] Navigating to next chapter from",
+                        prevChapter,
+                      );
                       await navigateChapter("next");
                       const targetChapter = prevChapter + 1;
-                      console.log('[ChapterReader] Starting audio for chapter', targetChapter);
-                      
+                      console.log(
+                        "[ChapterReader] Starting audio for chapter",
+                        targetChapter,
+                      );
+
                       // Chamar diretamente sem setTimeout para funcionar com tela bloqueada
                       try {
-                        await AudioService.loadAndPlay(currentBookId, targetChapter, { bookName: book.name });
-                        console.log('[ChapterReader] Next audio loaded and playing successfully');
+                        await AudioService.loadAndPlay(
+                          currentBookId,
+                          targetChapter,
+                          { bookName: book.name },
+                        );
+                        console.log(
+                          "[ChapterReader] Next audio loaded and playing successfully",
+                        );
                       } catch (err) {
-                        console.error('[ChapterReader] Error loading next audio:', err);
+                        console.error(
+                          "[ChapterReader] Error loading next audio:",
+                          err,
+                        );
                       }
                     }}
                   />
@@ -2152,11 +2229,23 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
         ) : (
           /* Normal Verses List */
           <FlatList
+            ref={versesListRef}
             data={verses}
             renderItem={renderVerse}
             keyExtractor={(item) => item.id.toString()}
             showsVerticalScrollIndicator={false}
             style={[styles.versesList, versesListBg]}
+            onScrollToIndexFailed={(info) => {
+              // Fallback se o item não estiver renderizado ainda
+              const wait = new Promise((resolve) => setTimeout(resolve, 500));
+              wait.then(() => {
+                versesListRef.current?.scrollToIndex({
+                  index: info.index,
+                  animated: true,
+                  viewPosition: 0.3,
+                });
+              });
+            }}
             contentContainerStyle={[
               styles.versesListContent,
               { paddingTop: 8 },
@@ -2473,12 +2562,22 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
                           onPress={() => {
                             console.log("=== MODAL CHAPTER CLICK ===");
                             console.log("Capítulo clicado:", chapterNumber);
-                            console.log("Livro do modal:", selectedBookInModal.id, selectedBookInModal.name);
+                            console.log(
+                              "Livro do modal:",
+                              selectedBookInModal.id,
+                              selectedBookInModal.name,
+                            );
                             console.log("Livro atual:", currentBookId);
                             console.log("Capítulo atual:", currentChapter);
-                            console.log("É o mesmo livro?", selectedBookInModal.id === currentBookId);
-                            console.log("É o mesmo capítulo?", chapterNumber === currentChapter);
-                            
+                            console.log(
+                              "É o mesmo livro?",
+                              selectedBookInModal.id === currentBookId,
+                            );
+                            console.log(
+                              "É o mesmo capítulo?",
+                              chapterNumber === currentChapter,
+                            );
+
                             setBookSelectorVisible(false);
                             // Se o livro selecionado for diferente do atual, mudamos o livro ANTES de navegar
                             if (selectedBookInModal.id !== currentBookId) {
@@ -2486,8 +2585,14 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
                               selectBook(selectedBookInModal);
                             }
                             // Agora navegamos para o capítulo (já com o livro correto)
-                            console.log("📍 Navegando para capítulo:", chapterNumber);
-                            navigateToChapter(chapterNumber, selectedBookInModal);
+                            console.log(
+                              "📍 Navegando para capítulo:",
+                              chapterNumber,
+                            );
+                            navigateToChapter(
+                              chapterNumber,
+                              selectedBookInModal,
+                            );
                           }}
                         >
                           <Text
@@ -2601,11 +2706,23 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
               isDark && { backgroundColor: "#1e1e1e" },
             ]}
           >
-            <View style={[
-              styles.modalHeader,
-              isDark && { backgroundColor: "#1d1d1d", borderBottomColor: "#333" }
-            ]}>
-              <Text style={[styles.modalTitle, { color: isDark ? "#e0e0e0" : "#333" }]}>Referências Bíblicas</Text>
+            <View
+              style={[
+                styles.modalHeader,
+                isDark && {
+                  backgroundColor: "#1d1d1d",
+                  borderBottomColor: "#333",
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.modalTitle,
+                  { color: isDark ? "#e0e0e0" : "#333" },
+                ]}
+              >
+                Referências Bíblicas
+              </Text>
               <TouchableOpacity
                 onPress={() => setReferencesModalVisible(false)}
               >
@@ -2619,7 +2736,10 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
               showsHorizontalScrollIndicator={false}
               style={[
                 styles.referenceLinksContainer,
-                isDark && { backgroundColor: "#2a2a2a", borderBottomColor: "#444" }
+                isDark && {
+                  backgroundColor: "#2a2a2a",
+                  borderBottomColor: "#444",
+                },
               ]}
               contentContainerStyle={styles.referenceLinksContent}
             >
@@ -2653,11 +2773,16 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
                     <TouchableOpacity
                       style={[
                         styles.moreReferencesTab,
-                        isDark && { backgroundColor: "#2a2a2a" }
+                        isDark && { backgroundColor: "#2a2a2a" },
                       ]}
                       onPress={() => setShowAllReferences(true)}
                     >
-                      <Text style={[styles.moreReferencesText, { color: isDark ? "#e0e0e0" : "#333" }]}>
+                      <Text
+                        style={[
+                          styles.moreReferencesText,
+                          { color: isDark ? "#e0e0e0" : "#333" },
+                        ]}
+                      >
                         +{currentReferences.length - 4}
                       </Text>
                     </TouchableOpacity>
@@ -2697,35 +2822,58 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
             {referenceVerseLoading ? (
               <View style={styles.referenceLoadingContainer}>
                 <ActivityIndicator size="large" color="#2196F3" />
-                <Text style={[styles.loadingText, { color: isDark ? "#e0e0e0" : "#333" }]}>Carregando referência...</Text>
+                <Text
+                  style={[
+                    styles.loadingText,
+                    { color: isDark ? "#e0e0e0" : "#333" },
+                  ]}
+                >
+                  Carregando referência...
+                </Text>
               </View>
             ) : selectedReferenceVerse ? (
               <View style={styles.referenceContentContainer}>
-                <View style={[
-                  styles.referenceVerseCard,
-                  isDark && { backgroundColor: "#2a2a2a" }
-                ]}>
+                <View
+                  style={[
+                    styles.referenceVerseCard,
+                    isDark && { backgroundColor: "#2a2a2a" },
+                  ]}
+                >
                   <View style={styles.referenceVerseHeader}>
-                    <Text style={[styles.referenceVerseTitle, { color: isDark ? "#e0e0e0" : "#333" }]}>
+                    <Text
+                      style={[
+                        styles.referenceVerseTitle,
+                        { color: isDark ? "#e0e0e0" : "#333" },
+                      ]}
+                    >
                       {`${selectedReferenceBookName} ${selectedReferenceVerse.chapterNumber}:${selectedReferenceVerse.verseNumber}`}
                     </Text>
                     <TouchableOpacity
                       onPress={() =>
                         openSingleReference(
-                          currentReferences[selectedReferenceIndex].reference
+                          currentReferences[selectedReferenceIndex].reference,
                         )
                       }
                       style={styles.expandButton}
                     >
-                      <Ionicons name="expand-outline" size={16} color="#2196F3" />
+                      <Ionicons
+                        name="expand-outline"
+                        size={16}
+                        color="#2196F3"
+                      />
                     </TouchableOpacity>
                   </View>
-                  <ScrollView 
+                  <ScrollView
                     showsVerticalScrollIndicator={true}
                     style={{ maxHeight: 400 }}
                     contentContainerStyle={{ paddingBottom: 8 }}
                   >
-                    <Text style={[styles.referenceVerseText, { color: isDark ? "#d4d4d4" : "#666" }]}>
+                    <Text
+                      style={[
+                        styles.referenceVerseText,
+                        { color: isDark ? "#d4d4d4" : "#666" },
+                      ]}
+                    >
                       {selectedReferenceVerse.text}
                     </Text>
                   </ScrollView>
@@ -2733,7 +2881,12 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
               </View>
             ) : (
               <View style={styles.referenceErrorContainer}>
-                <Text style={[styles.referenceErrorText, { color: isDark ? "#b0b0b0" : "#666" }]}>
+                <Text
+                  style={[
+                    styles.referenceErrorText,
+                    { color: isDark ? "#b0b0b0" : "#666" },
+                  ]}
+                >
                   Versículo não encontrado.
                 </Text>
               </View>
@@ -2933,7 +3086,7 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
                                 <Text style={styles.downloadDate}>
                                   {" • Baixada em "}
                                   {new Date(
-                                    item.downloadDate
+                                    item.downloadDate,
                                   ).toLocaleDateString("pt-BR")}
                                 </Text>
                               )}
@@ -2987,7 +3140,7 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
                     .filter((driveFile) => !isDownloaded(driveFile))
                     .map((driveFile) => {
                       const bibleInfo = googleDriveService.parseBibleInfo(
-                        driveFile.name
+                        driveFile.name,
                       );
                       const isDownloadingThis = downloading === driveFile.id;
 
@@ -3065,11 +3218,11 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
                                   console.log(
                                     "📱 DOWNLOAD BUTTON PRESSED for:",
                                     driveFile.id,
-                                    driveFile.name
+                                    driveFile.name,
                                   );
                                   console.log(
                                     "🔍 handleDownloadBible function exists:",
-                                    typeof handleDownloadBible
+                                    typeof handleDownloadBible,
                                   );
                                   handleDownloadBible(driveFile);
                                 }}
@@ -3263,8 +3416,8 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
                     {opt === "small"
                       ? "Pequena"
                       : opt === "medium"
-                      ? "Média"
-                      : "Grande"}
+                        ? "Média"
+                        : "Grande"}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -3351,10 +3504,14 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
                 { color: isDark ? "#ccc" : "#666" },
               ]}
             >
-              {book?.name} {currentChapter}:{Array.from(selectedVerses).map(key => {
-                const parts = key.split('-');
-                return parts[2];
-              }).sort((a, b) => Number(a) - Number(b)).join(', ')}
+              {book?.name} {currentChapter}:
+              {Array.from(selectedVerses)
+                .map((key) => {
+                  const parts = key.split("-");
+                  return parts[2];
+                })
+                .sort((a, b) => Number(a) - Number(b))
+                .join(", ")}
             </Text>
 
             <TextInput
@@ -3393,10 +3550,7 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
               {isEditingExistingNote && (
                 <TouchableOpacity
                   onPress={deleteNote}
-                  style={[
-                    styles.noteModalButton,
-                    styles.noteModalDeleteButton,
-                  ]}
+                  style={[styles.noteModalButton, styles.noteModalDeleteButton]}
                 >
                   <Text style={styles.noteModalDeleteText}>Excluir</Text>
                 </TouchableOpacity>
@@ -3408,7 +3562,8 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
                 style={[
                   styles.noteModalButton,
                   styles.noteModalSaveButton,
-                  (!noteText.trim() || savingNote) && styles.noteModalButtonDisabled,
+                  (!noteText.trim() || savingNote) &&
+                    styles.noteModalButtonDisabled,
                 ]}
               >
                 {savingNote ? (
@@ -3550,6 +3705,18 @@ const styles = StyleSheet.create({
   },
   verseContainerSelected: {
     backgroundColor: "#e3f2fd",
+    borderWidth: 1,
+    borderColor: "#90caf9",
+  },
+  verseBeingNarrated: {
+    backgroundColor: "#fff9c4",
+    borderLeftWidth: 3,
+    borderLeftColor: "#fbc02d",
+    paddingLeft: 5,
+  },
+  verseBeingNarratedDark: {
+    backgroundColor: "#3e3519",
+    borderLeftColor: "#fdd835",
   },
   checkboxContainer: {
     marginRight: 8,
@@ -3614,6 +3781,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "bold",
     color: "#2196F3",
+  },
+  verseActionButtons: {
+    flexDirection: "row",
+    gap: 6,
+    alignItems: "center",
+    marginLeft: 8,
+  },
+  verseActionButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
   },
 
   modalContainer: {

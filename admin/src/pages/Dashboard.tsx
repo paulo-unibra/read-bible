@@ -180,6 +180,20 @@ const Dashboard: React.FC = () => {
                 : "Sem permissão"}
             </button>
           </div>
+
+          <div className="dashboard-card">
+            <h3>🎵 Sincronização de Áudio</h3>
+            <p>Sincronizar áudios bíblicos com versículos</p>
+            <button
+              className="card-button"
+              onClick={() => navigate("/audio-sync")}
+              disabled={!hasPermission("gerenciar_conteudo")}
+            >
+              {hasPermission("gerenciar_conteudo")
+                ? "Acessar"
+                : "Sem permissão"}
+            </button>
+          </div>
         </div>
       </main>
     </div>

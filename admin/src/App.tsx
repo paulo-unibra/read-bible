@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { AuthProvider } from "./contexts/AuthContext";
+import AudioSync from "./pages/AudioSync";
 import BibleCuriosities from "./pages/BibleCuriosities/BibleCuriosities";
 import BulkEmail from "./pages/BulkEmail";
 import Dashboard from "./pages/Dashboard";
@@ -105,6 +106,14 @@ function App() {
             element={
               <ProtectedRoute permission="gerenciar_usuarios">
                 <BulkEmail />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/audio-sync"
+            element={
+              <ProtectedRoute permission="gerenciar_conteudo">
+                <AudioSync />
               </ProtectedRoute>
             }
           />
