@@ -277,20 +277,10 @@ export default class BulkEmailController {
           }
 
           // Verificar se as datas do plano são válidas (conversão para Date)
-          const startDateObj = plan.startDate ? new Date(plan.startDate) : null
-          const endDateObj = plan.endDate ? new Date(plan.endDate) : null
+          const startDateObj = plan.startDate ? plan.startDate.toJSDate() : null
+          const endDateObj = plan.endDate ? plan.endDate.toJSDate() : null
 
           if (
-            
-           
-           
-           
-          
-            !startDateObj ||
-            !endDateObj ||
-            isNaN(startDateObj.getTime()) ||
-            isNaN(endDateObj.getTime())
-          ) {
             results.failed++
             results.errors.push({
               userId,
