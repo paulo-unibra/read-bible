@@ -1,22 +1,23 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
-import ProtectedRoute from './components/ProtectedRoute'
-import { AuthProvider } from './contexts/AuthContext'
-import BibleCuriosities from './pages/BibleCuriosities/BibleCuriosities'
-import Dashboard from './pages/Dashboard'
-import HymnAudioList from './pages/HymnAudioList/HymnAudioList'
-import HymnAudioManager from './pages/HymnAudioManager/HymnAudioManager'
-import IncorrectPlans from './pages/IncorrectPlans/IncorrectPlans'
-import Login from './pages/Login'
-import Permissions from './pages/Permissions'
-import Quizzes from './pages/Quizzes'
-import ReadingPlanTemplates from './pages/ReadingPlanTemplates'
-import Reports from './pages/Reports'
-import Users from './pages/Users'
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import ProtectedRoute from "./components/ProtectedRoute";
+import { AuthProvider } from "./contexts/AuthContext";
+import BibleCuriosities from "./pages/BibleCuriosities/BibleCuriosities";
+import BulkEmail from "./pages/BulkEmail";
+import Dashboard from "./pages/Dashboard";
+import HymnAudioList from "./pages/HymnAudioList/HymnAudioList";
+import HymnAudioManager from "./pages/HymnAudioManager/HymnAudioManager";
+import IncorrectPlans from "./pages/IncorrectPlans/IncorrectPlans";
+import Login from "./pages/Login";
+import Permissions from "./pages/Permissions";
+import Quizzes from "./pages/Quizzes";
+import ReadingPlanTemplates from "./pages/ReadingPlanTemplates";
+import Reports from "./pages/Reports";
+import Users from "./pages/Users";
 
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter basename='/admin'>
+      <BrowserRouter basename="/admin">
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route
@@ -99,11 +100,19 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/bulk-email"
+            element={
+              <ProtectedRoute permission="gerenciar_usuarios">
+                <BulkEmail />
+              </ProtectedRoute>
+            }
+          />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
-  )
+  );
 }
 
-export default App
+export default App;

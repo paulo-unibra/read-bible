@@ -15,6 +15,7 @@ const AdminReadingPlanTemplateController = () =>
 const AdminReportController = () => import('#controllers/Admin/report_controller')
 const AdminPlayStoreReportsController = () =>
   import('#controllers/Admin/play_store_reports_controller')
+const BulkEmailController = () => import('#controllers/bulk_email_controller')
 const BibleCuriositiesController = () => import('#controllers/bible_curiosities_controller')
 const ImportController = () => import('#controllers/import_controller')
 const PasswordResetController = () => import('#controllers/password_reset_controller')
@@ -124,10 +125,22 @@ router
       .group(() => {
         router.get('/users', [AdminAuthController, 'listUsers'])
         router.get('/users/stats', [AdminAuthController, 'usersStats'])
-        router.get('/users/:userId/convertible-plans', [AdminAuthController, 'getUserConvertiblePlans'])
-        router.post('/users/:userId/convert-plan', [AdminAuthController, 'convertUserPlanTo365Days'])
-        router.post('/users/:userId/recalculate-plan', [AdminAuthController, 'recalculateUserPlanBooks'])
-        router.get('/users/:userId/plan/:planId/check-duplicates', [AdminAuthController, 'checkUserPlanForDuplicates'])
+        router.get('/users/:userId/convertible-plans', [
+          AdminAuthController,
+          'getUserConvertiblePlans',
+        ])
+        router.post('/users/:userId/convert-plan', [
+          AdminAuthController,
+          'convertUserPlanTo365Days',
+        ])
+        router.post('/users/:userId/recalculate-plan', [
+          AdminAuthController,
+          'recalculateUserPlanBooks',
+        ])
+        router.get('/users/:userId/plan/:planId/check-duplicates', [
+          AdminAuthController,
+          'checkUserPlanForDuplicates',
+        ])
         router.get('/permissions', [AdminAuthController, 'listPermissions'])
         router.post('/permissions', [AdminAuthController, 'createPermission'])
         router.get('/roles', [AdminAuthController, 'listRoles'])
@@ -194,13 +207,22 @@ router
 
         // Reading Plans management
         router.get('/reading-plans/incorrect', [ReadingPlanController, 'listIncorrectPlans'])
-        router.post('/reading-plans/:planId/recalculate', [ReadingPlanController, 'recalculatePlan'])
+        router.post('/reading-plans/:planId/recalculate', [
+          ReadingPlanController,
+          'recalculatePlan',
+        ])
 
         // Bible Curiosities management
         router.get('/curiosities', [BibleCuriositiesController, 'listAll'])
         router.put('/curiosities/:id', [BibleCuriositiesController, 'update'])
         router.patch('/curiosities/:id/toggle', [BibleCuriositiesController, 'toggleActive'])
         router.delete('/curiosities/:id', [BibleCuriositiesController, 'delete'])
+        router.post('/curiosities/bulk-delete', [BibleCuriositiesController, 'bulkDelete'])
+
+        // Bulk Email management
+        router.get('/bulk-email/users', [BulkEmailController, 'getUsersByStatus'])
+        router.post('/bulk-email/send', [BulkEmailController, 'sendBulkEmails'])
+        router.get('/bulk-email/preview', [BulkEmailController, 'previewEmail'])
       })
       .use(middleware.auth({ guards: ['api'] }))
   })

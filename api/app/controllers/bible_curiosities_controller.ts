@@ -129,7 +129,10 @@ export default class BibleCuriositiesController {
   async getToday({ auth, response }: HttpContext) {
     try {
       console.log('🔄 [BibleCuriositiesController.getToday] Iniciado')
-      console.log('👤 [BibleCuriositiesController.getToday] auth.user:', auth.user ? `ID ${auth.user.id}` : 'null')
+      console.log(
+        '👤 [BibleCuriositiesController.getToday] auth.user:',
+        auth.user ? `ID ${auth.user.id}` : 'null'
+      )
 
       const today = DateTime.now().toFormat('yyyy-MM-dd')
 
@@ -153,8 +156,14 @@ export default class BibleCuriositiesController {
       if (auth.user) {
         console.log('🔍 [BibleCuriositiesController.getToday] Carregando favoritedBy...')
         await curiosity.load('favoritedBy')
-        console.log('📊 [BibleCuriositiesController.getToday] Total de favoritedBy:', curiosity.favoritedBy.length)
-        console.log('📊 [BibleCuriositiesController.getToday] IDs dos usuários que favoritaram:', curiosity.favoritedBy.map(u => u.id))
+        console.log(
+          '📊 [BibleCuriositiesController.getToday] Total de favoritedBy:',
+          curiosity.favoritedBy.length
+        )
+        console.log(
+          '📊 [BibleCuriositiesController.getToday] IDs dos usuários que favoritaram:',
+          curiosity.favoritedBy.map((u) => u.id)
+        )
 
         isFavorited = curiosity.favoritedBy.some((user) => user.id === auth.user!.id)
         console.log('⭐ [BibleCuriositiesController.getToday] isFavorited:', isFavorited)
@@ -170,7 +179,10 @@ export default class BibleCuriositiesController {
         sharesCount: curiosity.sharesCount || 0,
       }
 
-      console.log('📤 [BibleCuriositiesController.getToday] Resposta:', JSON.stringify(result, null, 2))
+      console.log(
+        '📤 [BibleCuriositiesController.getToday] Resposta:',
+        JSON.stringify(result, null, 2)
+      )
 
       return response.ok({
         success: true,
@@ -200,7 +212,10 @@ export default class BibleCuriositiesController {
       console.log('📋 [BibleCuriositiesController] Curiosity ID:', curiosityId)
 
       const curiosity = await BibleCuriosity.find(curiosityId)
-      console.log('🔍 [BibleCuriositiesController] Curiosidade encontrada:', curiosity ? 'SIM' : 'NÃO')
+      console.log(
+        '🔍 [BibleCuriositiesController] Curiosidade encontrada:',
+        curiosity ? 'SIM' : 'NÃO'
+      )
 
       if (!curiosity) {
         console.error('❌ [BibleCuriositiesController] Curiosidade não encontrada')
@@ -212,7 +227,10 @@ export default class BibleCuriositiesController {
 
       console.log('📥 [BibleCuriositiesController] Carregando favoritos...')
       await curiosity.load('favoritedBy')
-      console.log('📊 [BibleCuriositiesController] Favoritos carregados:', curiosity.favoritedBy.length)
+      console.log(
+        '📊 [BibleCuriositiesController] Favoritos carregados:',
+        curiosity.favoritedBy.length
+      )
 
       const isFavorited = curiosity.favoritedBy.some((u) => u.id === user.id)
       console.log('⭐ [BibleCuriositiesController] Já está favoritado?', isFavorited)
@@ -247,7 +265,10 @@ export default class BibleCuriositiesController {
       })
     } catch (error) {
       console.error('❌ [BibleCuriositiesController] Erro ao favoritar curiosidade:', error)
-      console.error('❌ [BibleCuriositiesController] Stack trace:', error instanceof Error ? error.stack : 'N/A')
+      console.error(
+        '❌ [BibleCuriositiesController] Stack trace:',
+        error instanceof Error ? error.stack : 'N/A'
+      )
       return response.badRequest({
         success: false,
         message: 'Erro ao favoritar curiosidade',
@@ -464,6 +485,39 @@ export default class BibleCuriositiesController {
       return response.badRequest({
         success: false,
         message: 'Erro ao deletar curiosidade',
+      })
+    }
+  }
+
+  /**
+   * Deletar múltiplas curiosidades em lote (admin)
+   */
+  async bulkDelete({ request, response }: HttpContext) {
+    try {
+      const { ids } = request.only(['ids'])
+
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return response.badRequest({
+          success: false,
+          message: 'IDs inválidos ou vazios',
+        })
+      }
+
+      // Deletar todas as curiosidades com os IDs fornecidos
+      const deleted = await BibleCuriosity.query().whereIn('id', ids).delete()
+
+      return response.ok({
+        success: true,
+        message: `${deleted} curiosidade(s) deletada(s) com sucesso`,
+        data: {
+          deletedCount: deleted,
+        },
+      })
+    } catch (error) {
+      console.error('Erro ao deletar curiosidades em lote:', error)
+      return response.badRequest({
+        success: false,
+        message: 'Erro ao deletar curiosidades em lote',
       })
     }
   }

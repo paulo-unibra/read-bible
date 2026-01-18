@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
-import bibleCuriositiesService from '../../services/bibleCuriositiesService';
-import './BibleCuriosities.css';
+import { useEffect, useState } from "react";
+import bibleCuriositiesService from "../../services/bibleCuriositiesService";
+import "./BibleCuriosities.css";
 
 interface BibleCuriosity {
   id: number;
@@ -11,18 +11,24 @@ interface BibleCuriosity {
   createdAt: string;
 }
 
-type FilterStatus = 'all' | 'active' | 'inactive';
+type FilterStatus = "all" | "active" | "inactive";
 
 export default function BibleCuriosities() {
   const [loading, setLoading] = useState(true);
   const [curiosities, setCuriosities] = useState<BibleCuriosity[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [filter, setFilter] = useState<FilterStatus>('all');
+  const [filter, setFilter] = useState<FilterStatus>("all");
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [editForm, setEditForm] = useState({ content: '', theme: '', date: '' });
+  const [editForm, setEditForm] = useState({
+    content: "",
+    theme: "",
+    date: "",
+  });
   const [actionLoading, setActionLoading] = useState<number | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   useEffect(() => {
     loadCuriosities();
@@ -31,13 +37,18 @@ export default function BibleCuriosities() {
   const loadCuriosities = async () => {
     try {
       setLoading(true);
-      const isActiveParam = filter === 'all' ? undefined : filter === 'active' ? 'true' : 'false';
-      const data = await bibleCuriositiesService.listAll(currentPage, 20, isActiveParam);
+      const isActiveParam =
+        filter === "all" ? undefined : filter === "active" ? "true" : "false";
+      const data = await bibleCuriositiesService.listAll(
+        currentPage,
+        20,
+        isActiveParam,
+      );
       setCuriosities(data.data);
       setTotalPages(data.meta.lastPage);
     } catch (error) {
-      console.error('Erro ao carregar curiosidades:', error);
-      alert('Erro ao carregar curiosidades bíblicas');
+      console.error("Erro ao carregar curiosidades:", error);
+      alert("Erro ao carregar curiosidades bíblicas");
     } finally {
       setLoading(false);
     }
@@ -47,25 +58,25 @@ export default function BibleCuriosities() {
     setEditingId(curiosity.id);
     setEditForm({
       content: curiosity.content,
-      theme: curiosity.theme || '',
+      theme: curiosity.theme || "",
       date: curiosity.date,
     });
   };
 
   const handleCancelEdit = () => {
     setEditingId(null);
-    setEditForm({ content: '', theme: '', date: '' });
+    setEditForm({ content: "", theme: "", date: "" });
   };
 
   const handleSaveEdit = async (id: number) => {
     try {
       setActionLoading(id);
       await bibleCuriositiesService.update(id, editForm);
-      alert('✅ Curiosidade atualizada com sucesso!');
+      alert("✅ Curiosidade atualizada com sucesso!");
       setEditingId(null);
       await loadCuriosities();
     } catch (error: any) {
-      console.error('Erro ao atualizar:', error);
+      console.error("Erro ao atualizar:", error);
       alert(`Erro ao atualizar curiosidade: ${error.message}`);
     } finally {
       setActionLoading(null);
@@ -73,7 +84,7 @@ export default function BibleCuriosities() {
   };
 
   const handleToggleActive = async (id: number, currentStatus: boolean) => {
-    const action = currentStatus ? 'desativar' : 'ativar';
+    const action = currentStatus ? "desativar" : "ativar";
     if (!confirm(`Tem certeza que deseja ${action} esta curiosidade?`)) {
       return;
     }
@@ -81,10 +92,12 @@ export default function BibleCuriosities() {
     try {
       setActionLoading(id);
       await bibleCuriositiesService.toggleActive(id);
-      alert(`✅ Curiosidade ${currentStatus ? 'desativada' : 'ativada'} com sucesso!`);
+      alert(
+        `✅ Curiosidade ${currentStatus ? "desativada" : "ativada"} com sucesso!`,
+      );
       await loadCuriosities();
     } catch (error: any) {
-      console.error('Erro ao alternar status:', error);
+      console.error("Erro ao alternar status:", error);
       alert(`Erro ao ${action} curiosidade: ${error.message}`);
     } finally {
       setActionLoading(null);
@@ -92,17 +105,21 @@ export default function BibleCuriosities() {
   };
 
   const handleDelete = async (id: number, content: string) => {
-    if (!confirm(`Tem certeza que deseja deletar esta curiosidade?\n\n"${content.substring(0, 100)}..."`)) {
+    if (
+      !confirm(
+        `Tem certeza que deseja deletar esta curiosidade?\n\n"${content.substring(0, 100)}..."`,
+      )
+    ) {
       return;
     }
 
     try {
       setActionLoading(id);
       await bibleCuriositiesService.delete(id);
-      alert('✅ Curiosidade deletada com sucesso!');
+      alert("✅ Curiosidade deletada com sucesso!");
       await loadCuriosities();
     } catch (error: any) {
-      console.error('Erro ao deletar:', error);
+      console.error("Erro ao deletar:", error);
       alert(`Erro ao deletar curiosidade: ${error.message}`);
     } finally {
       setActionLoading(null);
@@ -110,23 +127,75 @@ export default function BibleCuriosities() {
   };
 
   const handleGenerate = async () => {
-    if (!confirm('Gerar uma nova curiosidade bíblica com IA?\n\nA curiosidade será criada INATIVA e precisará ser revisada e ativada manualmente.')) {
+    if (
+      !confirm(
+        "Gerar uma nova curiosidade bíblica com IA?\n\nA curiosidade será criada INATIVA e precisará ser revisada e ativada manualmente.",
+      )
+    ) {
       return;
     }
 
     try {
       setGenerating(true);
       await bibleCuriositiesService.generate();
-      alert('✅ Curiosidade gerada com sucesso!\n\nA curiosidade foi criada como INATIVA. Revise o conteúdo e ative quando estiver pronta.');
+      alert(
+        "✅ Curiosidade gerada com sucesso!\n\nA curiosidade foi criada como INATIVA. Revise o conteúdo e ative quando estiver pronta.",
+      );
       // Recarregar mostrando inativas para ver a nova
-      setFilter('inactive');
+      setFilter("inactive");
       setCurrentPage(1);
       await loadCuriosities();
     } catch (error: any) {
-      console.error('Erro ao gerar:', error);
+      console.error("Erro ao gerar:", error);
       alert(`Erro ao gerar curiosidade: ${error.message}`);
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedIds(curiosities.map((c) => c.id));
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  const handleSelectOne = (id: number, checked: boolean) => {
+    if (checked) {
+      setSelectedIds((prev) => [...prev, id]);
+    } else {
+      setSelectedIds((prev) => prev.filter((i) => i !== id));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) {
+      alert("⚠️ Selecione pelo menos uma curiosidade para deletar");
+      return;
+    }
+
+    if (
+      !confirm(
+        `Tem certeza que deseja deletar ${selectedIds.length} curiosidade(s) selecionada(s)?\n\nEsta ação não pode ser desfeita!`,
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setBulkDeleting(true);
+      const result = await bibleCuriositiesService.bulkDelete(selectedIds);
+      alert(
+        `✅ ${result.deletedCount} curiosidade(s) deletada(s) com sucesso!`,
+      );
+      setSelectedIds([]);
+      await loadCuriosities();
+    } catch (error: any) {
+      console.error("Erro ao deletar em lote:", error);
+      alert(`Erro ao deletar curiosidades: ${error.message}`);
+    } finally {
+      setBulkDeleting(false);
     }
   };
 
@@ -141,12 +210,12 @@ export default function BibleCuriosities() {
                 Gerenciar curiosidades geradas por IA e controlar publicação
               </p>
             </div>
-            <button 
+            <button
               className="btn btn-primary btn-generate"
               onClick={handleGenerate}
               disabled={generating}
             >
-              {generating ? '🔄 Gerando...' : '✨ Gerar com IA'}
+              {generating ? "🔄 Gerando..." : "✨ Gerar com IA"}
             </button>
           </div>
         </div>
@@ -157,10 +226,13 @@ export default function BibleCuriosities() {
         <div className="filters">
           <div className="filter-group">
             <label>Status:</label>
-            <select value={filter} onChange={(e) => {
-              setFilter(e.target.value as FilterStatus);
-              setCurrentPage(1);
-            }}>
+            <select
+              value={filter}
+              onChange={(e) => {
+                setFilter(e.target.value as FilterStatus);
+                setCurrentPage(1);
+              }}
+            >
               <option value="all">Todas</option>
               <option value="active">Ativas</option>
               <option value="inactive">Inativas</option>
@@ -168,9 +240,25 @@ export default function BibleCuriosities() {
           </div>
 
           <div className="filter-info">
-            <span className="info-badge">
-              Total: {curiosities.length}
-            </span>
+            <span className="info-badge">Total: {curiosities.length}</span>
+            {selectedIds.length > 0 && (
+              <>
+                <span
+                  className="info-badge"
+                  style={{ backgroundColor: "#ff9800" }}
+                >
+                  {selectedIds.length} selecionada(s)
+                </span>
+                <button
+                  className="btn btn-danger btn-sm"
+                  onClick={handleBulkDelete}
+                  disabled={bulkDeleting}
+                  style={{ marginLeft: "10px" }}
+                >
+                  {bulkDeleting ? "🔄 Deletando..." : "🗑️ Deletar Selecionadas"}
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -185,10 +273,9 @@ export default function BibleCuriosities() {
           <div className="empty-state">
             <p>📭 Nenhuma curiosidade encontrada</p>
             <p className="empty-hint">
-              {filter === 'all' 
-                ? 'Gere curiosidades usando o endpoint /curiosities/generate'
-                : `Não há curiosidades ${filter === 'active' ? 'ativas' : 'inativas'} no momento`
-              }
+              {filter === "all"
+                ? "Gere curiosidades usando o endpoint /curiosities/generate"
+                : `Não há curiosidades ${filter === "active" ? "ativas" : "inativas"} no momento`}
             </p>
           </div>
         )}
@@ -199,45 +286,82 @@ export default function BibleCuriosities() {
               <table className="curiosities-table">
                 <thead>
                   <tr>
-                    <th style={{ width: '80px' }}>ID</th>
-                    <th style={{ width: '120px' }}>Data</th>
-                    <th style={{ width: '150px' }}>Tema</th>
+                    <th style={{ width: "50px" }}>
+                      <input
+                        type="checkbox"
+                        checked={
+                          selectedIds.length === curiosities.length &&
+                          curiosities.length > 0
+                        }
+                        onChange={(e) => handleSelectAll(e.target.checked)}
+                        disabled={curiosities.length === 0}
+                      />
+                    </th>
+                    <th style={{ width: "80px" }}>ID</th>
+                    <th style={{ width: "120px" }}>Data</th>
+                    <th style={{ width: "150px" }}>Tema</th>
                     <th>Conteúdo</th>
-                    <th style={{ width: '100px' }}>Status</th>
-                    <th style={{ width: '200px' }}>Ações</th>
+                    <th style={{ width: "100px" }}>Status</th>
+                    <th style={{ width: "200px" }}>Ações</th>
                   </tr>
                 </thead>
                 <tbody>
                   {curiosities.map((curiosity) => (
                     <tr key={curiosity.id}>
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(curiosity.id)}
+                          onChange={(e) =>
+                            handleSelectOne(curiosity.id, e.target.checked)
+                          }
+                          disabled={editingId === curiosity.id}
+                        />
+                      </td>
                       <td>{curiosity.id}</td>
-                      <td>{new Date(curiosity.date).toLocaleDateString('pt-BR')}</td>
+                      <td>
+                        {new Date(curiosity.date).toLocaleDateString("pt-BR")}
+                      </td>
                       <td>
                         {editingId === curiosity.id ? (
                           <input
                             type="text"
                             value={editForm.theme}
-                            onChange={(e) => setEditForm({ ...editForm, theme: e.target.value })}
+                            onChange={(e) =>
+                              setEditForm({
+                                ...editForm,
+                                theme: e.target.value,
+                              })
+                            }
                             placeholder="Tema"
                           />
                         ) : (
-                          curiosity.theme || '-'
+                          curiosity.theme || "-"
                         )}
                       </td>
                       <td className="content-cell">
                         {editingId === curiosity.id ? (
                           <textarea
                             value={editForm.content}
-                            onChange={(e) => setEditForm({ ...editForm, content: e.target.value })}
+                            onChange={(e) =>
+                              setEditForm({
+                                ...editForm,
+                                content: e.target.value,
+                              })
+                            }
                             rows={4}
                           />
                         ) : (
-                          <div className="content-preview">{curiosity.content}</div>
+                          <div className="content-preview">
+                            {curiosity.content}
+                          </div>
                         )}
                       </td>
                       <td>
-                        <span className={`status-badge ${curiosity.isActive ? 'active' : 'inactive'}`}>
-                          {curiosity.isActive ? '✅ Ativa' : '❌ Inativa'}
+                        <span
+                          className={`status-badge ${curiosity.isActive ? "active" : "inactive"}`}
+                        >
+                          {curiosity.isActive ? "✅ Ativa" : "❌ Inativa"}
                         </span>
                       </td>
                       <td>
@@ -249,7 +373,9 @@ export default function BibleCuriosities() {
                                 onClick={() => handleSaveEdit(curiosity.id)}
                                 disabled={actionLoading === curiosity.id}
                               >
-                                {actionLoading === curiosity.id ? '...' : '💾 Salvar'}
+                                {actionLoading === curiosity.id
+                                  ? "..."
+                                  : "💾 Salvar"}
                               </button>
                               <button
                                 className="btn btn-secondary btn-sm"
@@ -270,16 +396,29 @@ export default function BibleCuriosities() {
                                 ✏️
                               </button>
                               <button
-                                className={`btn ${curiosity.isActive ? 'btn-warning' : 'btn-success'} btn-sm`}
-                                onClick={() => handleToggleActive(curiosity.id, curiosity.isActive)}
+                                className={`btn ${curiosity.isActive ? "btn-warning" : "btn-success"} btn-sm`}
+                                onClick={() =>
+                                  handleToggleActive(
+                                    curiosity.id,
+                                    curiosity.isActive,
+                                  )
+                                }
                                 disabled={actionLoading === curiosity.id}
-                                title={curiosity.isActive ? 'Desativar' : 'Ativar'}
+                                title={
+                                  curiosity.isActive ? "Desativar" : "Ativar"
+                                }
                               >
-                                {actionLoading === curiosity.id ? '...' : curiosity.isActive ? '⏸️' : '▶️'}
+                                {actionLoading === curiosity.id
+                                  ? "..."
+                                  : curiosity.isActive
+                                    ? "⏸️"
+                                    : "▶️"}
                               </button>
                               <button
                                 className="btn btn-danger btn-sm"
-                                onClick={() => handleDelete(curiosity.id, curiosity.content)}
+                                onClick={() =>
+                                  handleDelete(curiosity.id, curiosity.content)
+                                }
                                 disabled={actionLoading === curiosity.id}
                                 title="Deletar"
                               >
@@ -300,7 +439,7 @@ export default function BibleCuriosities() {
               <div className="pagination">
                 <button
                   className="btn btn-secondary"
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
                 >
                   ← Anterior
@@ -310,7 +449,9 @@ export default function BibleCuriosities() {
                 </span>
                 <button
                   className="btn btn-secondary"
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  onClick={() =>
+                    setCurrentPage((p) => Math.min(totalPages, p + 1))
+                  }
                   disabled={currentPage === totalPages}
                 >
                   Próxima →

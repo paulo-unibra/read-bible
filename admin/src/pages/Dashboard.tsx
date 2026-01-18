@@ -1,7 +1,7 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import './Dashboard.css';
+import React from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
+import "./Dashboard.css";
 
 const Dashboard: React.FC = () => {
   const { user, logout, hasPermission } = useAuth();
@@ -10,9 +10,9 @@ const Dashboard: React.FC = () => {
   const handleLogout = async () => {
     try {
       await logout();
-      navigate('/login');
+      navigate("/login");
     } catch (error) {
-      console.error('Erro ao fazer logout:', error);
+      console.error("Erro ao fazer logout:", error);
     }
   };
 
@@ -31,12 +31,14 @@ const Dashboard: React.FC = () => {
       <main className="dashboard-content">
         <div className="welcome-card">
           <h2>Bem-vindo ao Painel Administrativo!</h2>
-          <p>Olá, <strong>{user?.fullName || user?.email}</strong></p>
-          
+          <p>
+            Olá, <strong>{user?.fullName || user?.email}</strong>
+          </p>
+
           <div className="user-details">
             <h3>Seus Perfis:</h3>
             <ul>
-              {user?.roles.map(role => (
+              {user?.roles.map((role) => (
                 <li key={role.id}>
                   <span className="role-badge">{role.name}</span>
                 </li>
@@ -58,96 +60,124 @@ const Dashboard: React.FC = () => {
           <div className="dashboard-card">
             <h3>📊 Relatórios</h3>
             <p>Visualize estatísticas e relatórios</p>
-            <button 
-              className="card-button" 
-              onClick={() => navigate('/reports')}
-              disabled={!hasPermission('visualizar_relatorios')}
+            <button
+              className="card-button"
+              onClick={() => navigate("/reports")}
+              disabled={!hasPermission("visualizar_relatorios")}
             >
-              {hasPermission('visualizar_relatorios') ? 'Acessar' : 'Sem permissão'}
+              {hasPermission("visualizar_relatorios")
+                ? "Acessar"
+                : "Sem permissão"}
             </button>
           </div>
 
           <div className="dashboard-card">
             <h3>👥 Usuários</h3>
             <p>Gerenciar usuários do sistema</p>
-            <button 
-              className="card-button" 
-              onClick={() => navigate('/users')}
-              disabled={!hasPermission('gerenciar_usuarios')}
+            <button
+              className="card-button"
+              onClick={() => navigate("/users")}
+              disabled={!hasPermission("gerenciar_usuarios")}
             >
-              {hasPermission('gerenciar_usuarios') ? 'Acessar' : 'Sem permissão'}
+              {hasPermission("gerenciar_usuarios")
+                ? "Acessar"
+                : "Sem permissão"}
             </button>
           </div>
 
           <div className="dashboard-card">
             <h3>📝 Questionários</h3>
             <p>Gerenciar questionários bíblicos</p>
-            <button 
-              className="card-button" 
-              onClick={() => navigate('/quizzes')}
-              disabled={!hasPermission('gerenciar_questionarios')}
+            <button
+              className="card-button"
+              onClick={() => navigate("/quizzes")}
+              disabled={!hasPermission("gerenciar_questionarios")}
             >
-              {hasPermission('gerenciar_questionarios') ? 'Acessar' : 'Sem permissão'}
+              {hasPermission("gerenciar_questionarios")
+                ? "Acessar"
+                : "Sem permissão"}
             </button>
           </div>
 
           <div className="dashboard-card">
             <h3>📖 Planos de Leitura</h3>
             <p>Gerenciar planos de leitura</p>
-            <button 
-              className="card-button" 
-              onClick={() => navigate('/reading-plans')}
-              disabled={!hasPermission('gerenciar_conteudo')}
+            <button
+              className="card-button"
+              onClick={() => navigate("/reading-plans")}
+              disabled={!hasPermission("gerenciar_conteudo")}
             >
-              {hasPermission('gerenciar_conteudo') ? 'Acessar' : 'Sem permissão'}
+              {hasPermission("gerenciar_conteudo")
+                ? "Acessar"
+                : "Sem permissão"}
             </button>
           </div>
 
           <div className="dashboard-card">
             <h3>🔑 Permissões</h3>
             <p>Visualizar e gerenciar permissões</p>
-            <button 
-              className="card-button" 
-              onClick={() => navigate('/permissions')}
-              disabled={!hasPermission('gerenciar_roles')}
+            <button
+              className="card-button"
+              onClick={() => navigate("/permissions")}
+              disabled={!hasPermission("gerenciar_roles")}
             >
-              {hasPermission('gerenciar_roles') ? 'Acessar' : 'Sem permissão'}
+              {hasPermission("gerenciar_roles") ? "Acessar" : "Sem permissão"}
             </button>
           </div>
 
           <div className="dashboard-card">
             <h3>🎵 Áudios de Hinos</h3>
             <p>Gerenciar sincronização de áudios</p>
-            <button 
-              className="card-button" 
-              onClick={() => navigate('/admin/hymn-audios')}
-              disabled={!hasPermission('gerenciar_conteudo')}
+            <button
+              className="card-button"
+              onClick={() => navigate("/admin/hymn-audios")}
+              disabled={!hasPermission("gerenciar_conteudo")}
             >
-              {hasPermission('gerenciar_conteudo') ? 'Acessar' : 'Sem permissão'}
+              {hasPermission("gerenciar_conteudo")
+                ? "Acessar"
+                : "Sem permissão"}
             </button>
           </div>
 
           <div className="dashboard-card">
             <h3>⚠️ Planos Incorretos</h3>
             <p>Corrigir planos com cálculo incorreto</p>
-            <button 
-              className="card-button" 
-              onClick={() => navigate('/incorrect-plans')}
-              disabled={!hasPermission('gerenciar_conteudo')}
+            <button
+              className="card-button"
+              onClick={() => navigate("/incorrect-plans")}
+              disabled={!hasPermission("gerenciar_conteudo")}
             >
-              {hasPermission('gerenciar_conteudo') ? 'Acessar' : 'Sem permissão'}
+              {hasPermission("gerenciar_conteudo")
+                ? "Acessar"
+                : "Sem permissão"}
             </button>
           </div>
 
           <div className="dashboard-card">
             <h3>📖 Curiosidades Bíblicas</h3>
             <p>Gerenciar curiosidades geradas por IA</p>
-            <button 
-              className="card-button" 
-              onClick={() => navigate('/bible-curiosities')}
-              disabled={!hasPermission('gerenciar_conteudo')}
+            <button
+              className="card-button"
+              onClick={() => navigate("/bible-curiosities")}
+              disabled={!hasPermission("gerenciar_conteudo")}
             >
-              {hasPermission('gerenciar_conteudo') ? 'Acessar' : 'Sem permissão'}
+              {hasPermission("gerenciar_conteudo")
+                ? "Acessar"
+                : "Sem permissão"}
+            </button>
+          </div>
+
+          <div className="dashboard-card">
+            <h3>📧 E-mails em Lote</h3>
+            <p>Enviar e-mails personalizados por status</p>
+            <button
+              className="card-button"
+              onClick={() => navigate("/bulk-email")}
+              disabled={!hasPermission("gerenciar_usuarios")}
+            >
+              {hasPermission("gerenciar_usuarios")
+                ? "Acessar"
+                : "Sem permissão"}
             </button>
           </div>
         </div>
