@@ -1217,10 +1217,10 @@ class DatabaseService {
       // Retornar 0 ao invés de lançar erro - o app pode continuar funcionando
       return 0;
     }
-  }[]
+  }
 
   async getAllHymnsMetadata(): Promise<
-    Array<{ number: number; title: string }>
+    { number: number; title: string }[]
   > {
     try {
       await this.ensureInitialized();

@@ -435,6 +435,70 @@ class AuthService {
   }
 
   /**
+   * Criar plano de leitura para iniciantes (baseado em versículos)
+   */
+  async createBeginnerReadingPlan(): Promise<{
+    success: boolean;
+    message: string;
+    data?: any;
+  }> {
+    try {
+      console.log("[AuthService] 📤 INÍCIO createBeginnerReadingPlan");
+      console.log("[AuthService] Token presente?", !!this.token);
+      console.log("[AuthService] URL:", `${API_URL}/reading-plans/beginner`);
+
+      const response = await fetch(`${API_URL}/reading-plans/beginner`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      console.log(
+        "[AuthService] ✅ Resposta recebida - Status:",
+        response.status,
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(
+          "[AuthService] ❌ Erro ao criar plano para iniciantes:",
+          errorText,
+        );
+        return {
+          success: false,
+          message: `Erro HTTP ${response.status}: ${errorText || response.statusText}`,
+        };
+      }
+
+      const jsonData = await response.json();
+      console.log(
+        "[AuthService] ✅ Plano para iniciantes criado no backend:",
+        jsonData,
+      );
+      return jsonData;
+    } catch (error) {
+      console.error(
+        "[AuthService] ❌ EXCEÇÃO ao criar plano para iniciantes:",
+        error,
+      );
+      console.error(
+        "[AuthService] Tipo:",
+        error instanceof Error ? error.constructor.name : typeof error,
+      );
+      console.error(
+        "[AuthService] Mensagem:",
+        error instanceof Error ? error.message : String(error),
+      );
+      return {
+        success: false,
+        message: `Erro ao conectar com o servidor: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
+  }
+
+  /**
    * Obter plano ativo
    */
   async getActivePlan(): Promise<{

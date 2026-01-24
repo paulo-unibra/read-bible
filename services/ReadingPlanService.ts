@@ -164,6 +164,74 @@ export class ReadingPlanService {
     }
   }
 
+  async createBeginnerPlan(customName: string): Promise<ReadingPlan> {
+    try {
+      console.log(
+        "☁️ Criando plano para iniciantes APENAS no backend (sem salvar localmente)...",
+      );
+
+      // Verificar autenticação
+      const authService = (await import("./AuthService")).default;
+      const token = authService.getToken();
+      const user = authService.getUser();
+
+      if (!token || !user) {
+        throw new Error(
+          "Usuário não autenticado. É necessário estar logado para criar um plano para iniciantes.",
+        );
+      }
+
+      console.log("👤 Usuário autenticado:", user.email);
+      console.log(
+        "📖 Criando plano para iniciantes (baseado em versículos)...",
+      );
+
+      // Criar plano APENAS no backend via endpoint específico /reading-plans/beginner
+      const backendResponse = await authService.createBeginnerReadingPlan();
+
+      console.log(
+        "📡 [createBeginnerPlan] Resposta do backend:",
+        JSON.stringify(backendResponse, null, 2),
+      );
+
+      if (!backendResponse.success) {
+        console.error(
+          "❌ [createBeginnerPlan] Backend retornou erro:",
+          backendResponse.message,
+        );
+        throw new Error(
+          backendResponse.message || "Falha ao criar plano no backend",
+        );
+      }
+
+      console.log(
+        "✅ Plano para iniciantes criado no backend com ID:",
+        backendResponse.data?.plan?.id,
+      );
+      console.log("📊 Backend criou os primeiros 5 dias automaticamente");
+
+      // Retornar o plano do backend
+      const plan: ReadingPlan = {
+        id: backendResponse.data?.plan?.id || `beginner_${Date.now()}`,
+        name: customName,
+        type: "beginner",
+        startDate:
+          backendResponse.data?.plan?.startDate || new Date().toISOString(),
+        endDate:
+          backendResponse.data?.plan?.endDate || new Date().toISOString(),
+        isActive: true,
+        createdDate: new Date().toISOString(),
+        totalDays: backendResponse.data?.plan?.totalDays || 0,
+        completedDays: 0,
+      };
+
+      return plan;
+    } catch (error) {
+      console.error("❌ Error creating beginner plan:", error);
+      throw error;
+    }
+  }
+
   async createNT100DaysPlan(customName: string): Promise<ReadingPlan> {
     try {
       console.log(

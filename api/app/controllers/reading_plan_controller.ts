@@ -2,77 +2,78 @@ import ReadingPlan from '#models/reading_plan'
 import ReadingProgress from '#models/reading_progress'
 import type { HttpContext } from '@adonisjs/core/http'
 import { DateTime } from 'luxon'
+import { BIBLE_VERSES_PER_CHAPTER, getVersesInRange } from '../utils/bible_verses_per_chapter.js'
 
-// Estrutura completa da Bíblia com todos os capítulos
+// Estrutura completa da Bíblia com todos os capítulos e versículos
 const BIBLE_STRUCTURE = [
   // Antigo Testamento
-  { name: 'Gênesis', chapters: 50 },
-  { name: 'Êxodo', chapters: 40 },
-  { name: 'Levítico', chapters: 27 },
-  { name: 'Números', chapters: 36 },
-  { name: 'Deuteronômio', chapters: 34 },
-  { name: 'Josué', chapters: 24 },
-  { name: 'Juízes', chapters: 21 },
-  { name: 'Rute', chapters: 4 },
-  { name: '1 Samuel', chapters: 31 },
-  { name: '2 Samuel', chapters: 24 },
-  { name: '1 Reis', chapters: 22 },
-  { name: '2 Reis', chapters: 25 },
-  { name: '1 Crônicas', chapters: 29 },
-  { name: '2 Crônicas', chapters: 36 },
-  { name: 'Esdras', chapters: 10 },
-  { name: 'Neemias', chapters: 13 },
-  { name: 'Ester', chapters: 10 },
-  { name: 'Jó', chapters: 42 },
-  { name: 'Salmos', chapters: 150 },
-  { name: 'Provérbios', chapters: 31 },
-  { name: 'Eclesiastes', chapters: 12 },
-  { name: 'Cantares', chapters: 8 },
-  { name: 'Isaías', chapters: 66 },
-  { name: 'Jeremias', chapters: 52 },
-  { name: 'Lamentações', chapters: 5 },
-  { name: 'Ezequiel', chapters: 48 },
-  { name: 'Daniel', chapters: 12 },
-  { name: 'Oséias', chapters: 14 },
-  { name: 'Joel', chapters: 3 },
-  { name: 'Amós', chapters: 9 },
-  { name: 'Obadias', chapters: 1 },
-  { name: 'Jonas', chapters: 4 },
-  { name: 'Miquéias', chapters: 7 },
-  { name: 'Naum', chapters: 3 },
-  { name: 'Habacuque', chapters: 3 },
-  { name: 'Sofonias', chapters: 3 },
-  { name: 'Ageu', chapters: 2 },
-  { name: 'Zacarias', chapters: 14 },
-  { name: 'Malaquias', chapters: 4 },
+  { name: 'Gênesis', chapters: 50, verses: 1533 },
+  { name: 'Êxodo', chapters: 40, verses: 1213 },
+  { name: 'Levítico', chapters: 27, verses: 859 },
+  { name: 'Números', chapters: 36, verses: 1288 },
+  { name: 'Deuteronômio', chapters: 34, verses: 959 },
+  { name: 'Josué', chapters: 24, verses: 658 },
+  { name: 'Juízes', chapters: 21, verses: 618 },
+  { name: 'Rute', chapters: 4, verses: 85 },
+  { name: '1 Samuel', chapters: 31, verses: 810 },
+  { name: '2 Samuel', chapters: 24, verses: 695 },
+  { name: '1 Reis', chapters: 22, verses: 816 },
+  { name: '2 Reis', chapters: 25, verses: 719 },
+  { name: '1 Crônicas', chapters: 29, verses: 942 },
+  { name: '2 Crônicas', chapters: 36, verses: 822 },
+  { name: 'Esdras', chapters: 10, verses: 280 },
+  { name: 'Neemias', chapters: 13, verses: 406 },
+  { name: 'Ester', chapters: 10, verses: 167 },
+  { name: 'Jó', chapters: 42, verses: 1070 },
+  { name: 'Salmos', chapters: 150, verses: 2461 },
+  { name: 'Provérbios', chapters: 31, verses: 915 },
+  { name: 'Eclesiastes', chapters: 12, verses: 222 },
+  { name: 'Cantares', chapters: 8, verses: 117 },
+  { name: 'Isaías', chapters: 66, verses: 1292 },
+  { name: 'Jeremias', chapters: 52, verses: 1364 },
+  { name: 'Lamentações', chapters: 5, verses: 154 },
+  { name: 'Ezequiel', chapters: 48, verses: 1273 },
+  { name: 'Daniel', chapters: 12, verses: 357 },
+  { name: 'Oséias', chapters: 14, verses: 197 },
+  { name: 'Joel', chapters: 3, verses: 73 },
+  { name: 'Amós', chapters: 9, verses: 146 },
+  { name: 'Obadias', chapters: 1, verses: 21 },
+  { name: 'Jonas', chapters: 4, verses: 48 },
+  { name: 'Miquéias', chapters: 7, verses: 105 },
+  { name: 'Naum', chapters: 3, verses: 47 },
+  { name: 'Habacuque', chapters: 3, verses: 56 },
+  { name: 'Sofonias', chapters: 3, verses: 53 },
+  { name: 'Ageu', chapters: 2, verses: 38 },
+  { name: 'Zacarias', chapters: 14, verses: 211 },
+  { name: 'Malaquias', chapters: 4, verses: 55 },
   // Novo Testamento
-  { name: 'Mateus', chapters: 28 },
-  { name: 'Marcos', chapters: 16 },
-  { name: 'Lucas', chapters: 24 },
-  { name: 'João', chapters: 21 },
-  { name: 'Atos', chapters: 28 },
-  { name: 'Romanos', chapters: 16 },
-  { name: '1 Coríntios', chapters: 16 },
-  { name: '2 Coríntios', chapters: 13 },
-  { name: 'Gálatas', chapters: 6 },
-  { name: 'Efésios', chapters: 6 },
-  { name: 'Filipenses', chapters: 4 },
-  { name: 'Colossenses', chapters: 4 },
-  { name: '1 Tessalonicenses', chapters: 5 },
-  { name: '2 Tessalonicenses', chapters: 3 },
-  { name: '1 Timóteo', chapters: 6 },
-  { name: '2 Timóteo', chapters: 4 },
-  { name: 'Tito', chapters: 3 },
-  { name: 'Filemom', chapters: 1 },
-  { name: 'Hebreus', chapters: 13 },
-  { name: 'Tiago', chapters: 5 },
-  { name: '1 Pedro', chapters: 5 },
-  { name: '2 Pedro', chapters: 3 },
-  { name: '1 João', chapters: 5 },
-  { name: '2 João', chapters: 1 },
-  { name: '3 João', chapters: 1 },
-  { name: 'Judas', chapters: 1 },
-  { name: 'Apocalipse', chapters: 22 },
+  { name: 'Mateus', chapters: 28, verses: 1071 },
+  { name: 'Marcos', chapters: 16, verses: 678 },
+  { name: 'Lucas', chapters: 24, verses: 1151 },
+  { name: 'João', chapters: 21, verses: 879 },
+  { name: 'Atos', chapters: 28, verses: 1007 },
+  { name: 'Romanos', chapters: 16, verses: 433 },
+  { name: '1 Coríntios', chapters: 16, verses: 437 },
+  { name: '2 Coríntios', chapters: 13, verses: 257 },
+  { name: 'Gálatas', chapters: 6, verses: 149 },
+  { name: 'Efésios', chapters: 6, verses: 155 },
+  { name: 'Filipenses', chapters: 4, verses: 104 },
+  { name: 'Colossenses', chapters: 4, verses: 95 },
+  { name: '1 Tessalonicenses', chapters: 5, verses: 89 },
+  { name: '2 Tessalonicenses', chapters: 3, verses: 47 },
+  { name: '1 Timóteo', chapters: 6, verses: 113 },
+  { name: '2 Timóteo', chapters: 4, verses: 83 },
+  { name: 'Tito', chapters: 3, verses: 46 },
+  { name: 'Filemom', chapters: 1, verses: 25 },
+  { name: 'Hebreus', chapters: 13, verses: 303 },
+  { name: 'Tiago', chapters: 5, verses: 108 },
+  { name: '1 Pedro', chapters: 5, verses: 105 },
+  { name: '2 Pedro', chapters: 3, verses: 61 },
+  { name: '1 João', chapters: 5, verses: 105 },
+  { name: '2 João', chapters: 1, verses: 13 },
+  { name: '3 João', chapters: 1, verses: 14 },
+  { name: 'Judas', chapters: 1, verses: 25 },
+  { name: 'Apocalipse', chapters: 22, verses: 404 },
 ]
 
 export default class ReadingPlanController {
@@ -348,6 +349,175 @@ export default class ReadingPlanController {
       return response.badRequest({
         success: false,
         message: 'Erro ao criar plano de leitura customizado',
+        error: error.message,
+        errorType: error?.constructor?.name,
+      })
+    }
+  }
+
+  /**
+   * Criar plano de leitura para iniciantes (Leia toda a Bíblia até o fim do ano de forma leve)
+   * Distribui ~31.102 versículos proporcionalmente pelos dias restantes até 31/12
+   */
+  async createBeginner({ auth, response }: HttpContext) {
+    try {
+      console.log('🔵 [API] createBeginner - INÍCIO')
+      const user = auth.user!
+      console.log('👤 [API] Usuário autenticado:', { id: user.id, email: user.email })
+
+      // Verificar se já existe um plano ativo
+      console.log('🔍 [API] Verificando planos ativos existentes...')
+      const existingPlan = await ReadingPlan.query()
+        .where('user_id', user.id)
+        .where('is_active', true)
+        .first()
+
+      if (existingPlan) {
+        console.log('⚠️ [API] Usuário já possui plano ativo:', existingPlan.id)
+        return response.conflict({
+          success: false,
+          message: 'Você já possui um plano de leitura ativo',
+        })
+      }
+
+      console.log('✅ [API] Nenhum plano ativo encontrado, criando novo...')
+
+      // Calcular dias até o fim do ano
+      const now = DateTime.now()
+      const endOfYear = DateTime.local(now.year, 12, 31, 23, 59, 59)
+      const totalDays = Math.ceil(endOfYear.diff(now, 'days').days)
+
+      if (totalDays <= 0) {
+        return response.badRequest({
+          success: false,
+          message:
+            'Não é possível criar plano para iniciantes com tão poucos dias restantes no ano',
+        })
+      }
+
+      console.log(`📅 [API] Dias restantes até 31/12/${now.year}: ${totalDays}`)
+
+      // Calcular total de versículos da Bíblia
+      const totalVerses = BIBLE_STRUCTURE.reduce((sum, book) => sum + book.verses, 0)
+      console.log(`📖 [API] Total de versículos na Bíblia: ${totalVerses}`)
+
+      // Calcular versículos por dia (arredonda para cima)
+      const versesPerDay = Math.ceil(totalVerses / totalDays)
+      console.log(
+        `📊 [API] Versículos por dia: ${versesPerDay} (${totalVerses} versículos / ${totalDays} dias)`
+      )
+
+      // Calcular total de capítulos (para estatísticas)
+      const totalChapters = BIBLE_STRUCTURE.reduce((sum, book) => sum + book.chapters, 0)
+
+      // Criar plano para iniciantes
+      const planData = {
+        userId: user.id,
+        name: `Plano para Iniciantes ${now.year}`,
+        type: 'beginner',
+        startDate: now,
+        endDate: endOfYear,
+        isActive: true,
+        currentDay: 1,
+        totalDays: totalDays,
+        chaptersPerDay: versesPerDay, // Usando esse campo para armazenar versículos/dia
+        totalChapters: totalChapters,
+        completedChapters: 0,
+      }
+
+      console.log('💾 [API] Tentando salvar plano no banco...')
+      console.log('   Plan Data:', JSON.stringify(planData, null, 2))
+
+      const plan = await ReadingPlan.create(planData)
+      console.log('✅ [API] Plano salvo com sucesso!')
+      console.log('   ID do plano:', plan.id)
+      console.log('   Nome:', plan.name)
+      console.log('   Tipo:', plan.type)
+      console.log('   Total dias:', plan.totalDays)
+      console.log('   Versículos por dia:', versesPerDay)
+
+      // Gerar os 5 primeiros dias automaticamente
+      console.log(`📚 [API] Gerando os 5 primeiros dias automaticamente...`)
+      let savedCount = 0
+      const initialDaysCount = Math.min(5, totalDays)
+
+      for (let dayNumber = 1; dayNumber <= initialDaysCount; dayNumber++) {
+        console.log(`   📖 Gerando dia ${dayNumber}...`)
+
+        const dayReadings = await this.generateDayReadings(
+          'beginner',
+          dayNumber,
+          versesPerDay,
+          plan.totalDays
+        )
+
+        if (!dayReadings || dayReadings.length === 0) {
+          console.log(`   ⚠️ Não foi possível gerar leituras para o dia ${dayNumber}`)
+          continue
+        }
+
+        console.log(`   📚 Dia ${dayNumber} terá ${dayReadings.length} leitura(s)`)
+
+        for (const bookReading of dayReadings) {
+          console.log(
+            `      💾 Salvando: ${bookReading.bookName} cap ${bookReading.startChapter}-${bookReading.endChapter}`
+          )
+
+          const progressRecord = await ReadingProgress.create({
+            readingPlanId: plan.id,
+            day: dayNumber,
+            bookName: bookReading.bookName,
+            startChapter: bookReading.startChapter,
+            endChapter: bookReading.endChapter,
+            isCompleted: false,
+          })
+
+          console.log(`      ✅ Registro ${progressRecord.id} salvo`)
+          savedCount++
+        }
+      }
+
+      console.log(`✅ [API] ${savedCount} registros dos primeiros ${initialDaysCount} dias criados`)
+
+      // Salvar plano com totais já calculados
+      await plan.save()
+      console.log('✅ [API] Plano salvo com totais calculados')
+
+      console.log('🎉 [API] Plano para iniciantes criado com sucesso!')
+      console.log('📤 [API] Enviando resposta ao cliente...')
+
+      const responseData = {
+        success: true,
+        message: 'Plano para Iniciantes criado com sucesso',
+        data: {
+          plan: {
+            id: plan.id,
+            name: plan.name,
+            type: plan.type,
+            startDate: plan.startDate.toISO(),
+            endDate: plan.endDate.toISO(),
+            totalDays: plan.totalDays,
+            versesPerDay: versesPerDay,
+            totalVerses: totalVerses,
+            totalChapters: plan.totalChapters,
+          },
+        },
+      }
+
+      console.log('📤 [API] Resposta:', JSON.stringify(responseData, null, 2))
+      console.log('🔵 [API] createBeginner - FIM')
+
+      return response.created(responseData)
+    } catch (error) {
+      console.error('❌ [API] ERRO FATAL ao criar plano para iniciantes!')
+      console.error('❌ [API] Tipo do erro:', error?.constructor?.name)
+      console.error('❌ [API] Mensagem:', error?.message)
+      console.error('❌ [API] Stack trace completo:')
+      console.error(error?.stack)
+
+      return response.badRequest({
+        success: false,
+        message: 'Erro ao criar plano de leitura para iniciantes',
         error: error.message,
         errorType: error?.constructor?.name,
       })
@@ -702,7 +872,202 @@ export default class ReadingPlanController {
       `🔧 [generateDayReadings] Tipo: ${planType}, Dia: ${dayNumber}, Capítulos/dia: ${chaptersPerDay}, Total dias: ${totalDays}`
     )
 
-    if (planType === 'sequential') {
+    if (planType === 'beginner') {
+      // Leitura baseada em versículos: distribui ~31.102 versículos proporcionalmente
+      // chaptersPerDay aqui na verdade é versesPerDay
+      const versesPerDay = chaptersPerDay
+
+      console.log(`\n   ╔════════════════════════════════════════════════════════════`)
+      console.log(`   ║ 🔍 DEBUG PLANO INICIANTES - DIA ${dayNumber}`)
+      console.log(`   ╠════════════════════════════════════════════════════════════`)
+      console.log(`   ║ 📖 Versículos por dia (alvo): ${versesPerDay}`)
+
+      // Calcular qual versículo absoluto devemos começar neste dia
+      const startVerse = (dayNumber - 1) * versesPerDay + 1
+      console.log(`   ║ 📍 Versículo absoluto inicial: ${startVerse}`)
+      console.log(`   ║    (Cálculo: (dia ${dayNumber} - 1) × ${versesPerDay} + 1 = ${startVerse})`)
+      console.log(`   ╚════════════════════════════════════════════════════════════\n`)
+
+      // Encontrar livro e capítulo inicial usando dados reais
+      let absoluteVerse = 0
+      let bookIndex = 0
+
+      // Primeiro, encontrar o livro onde começa este dia
+      for (let i = 0; i < BIBLE_VERSES_PER_CHAPTER.length; i++) {
+        const book = BIBLE_VERSES_PER_CHAPTER[i]
+        const bookTotalVerses = book.chapters.reduce((sum, v) => sum + v, 0)
+        if (absoluteVerse + bookTotalVerses >= startVerse) {
+          bookIndex = i
+          break
+        }
+        absoluteVerse += bookTotalVerses
+      }
+
+      const book = BIBLE_VERSES_PER_CHAPTER[bookIndex]
+      const verseInBook = startVerse - absoluteVerse // Versículo dentro deste livro (1-based)
+      const bookTotalVerses = book.chapters.reduce((sum, v) => sum + v, 0)
+
+      console.log(`   📚 Livro inicial encontrado: ${book.name}`)
+      console.log(`      ├─ Total de versículos no livro: ${bookTotalVerses}`)
+      console.log(`      ├─ Total de capítulos no livro: ${book.chapters.length}`)
+      console.log(`      └─ Versículo inicial dentro do livro: ${verseInBook}\n`)
+
+      // Encontrar qual capítulo contém este versículo usando dados reais
+      let currentChapter = 1
+      let versesAccumulated = 0
+      for (let c = 0; c < book.chapters.length; c++) {
+        versesAccumulated += book.chapters[c]
+        if (versesAccumulated >= verseInBook) {
+          currentChapter = c + 1
+          break
+        }
+      }
+
+      console.log(`   🎯 Capítulo inicial encontrado: ${currentChapter}`)
+      console.log(`      └─ Usando contagem REAL de versículos\n`)
+
+      // Coletar capítulos até atingir o total de versículos desejado
+      const readings = []
+      let versesCollected = 0
+      let currentBookIndex = bookIndex
+      let chapterStart = currentChapter
+      let iterationCount = 0
+
+      console.log(`   ╔════════════════════════════════════════════════════════════`)
+      console.log(`   ║ 🔄 COLETANDO CAPÍTULOS`)
+      console.log(`   ║ Alvo: ${versesPerDay} versículos`)
+      console.log(`   ╚════════════════════════════════════════════════════════════\n`)
+
+      const MAX_ITERATIONS = 100 // Proteção contra loop infinito
+
+      while (versesCollected < versesPerDay && currentBookIndex < BIBLE_VERSES_PER_CHAPTER.length) {
+        iterationCount++
+
+        // PROTEÇÃO: Se passou de 100 iterações, algo está errado
+        if (iterationCount > MAX_ITERATIONS) {
+          console.log(`   ❌ ERRO: Limite de iterações atingido (${MAX_ITERATIONS})`)
+          console.log(`   ❌ Parando para evitar loop infinito`)
+          break
+        }
+
+        console.log(`   ┌─ Iteração ${iterationCount} ────────────────────────────────`)
+
+        const currentBook = BIBLE_VERSES_PER_CHAPTER[currentBookIndex]
+        const totalChaptersInBook = currentBook.chapters.length
+
+        // Limite máximo: 25% acima do alvo
+        const maxVersesAllowed = Math.ceil(versesPerDay * 1.25)
+        console.log(
+          `   │  📊 Limite máximo permitido: ${maxVersesAllowed} versículos (125% do alvo)`
+        )
+
+        // Adicionar capítulos um por um até atingir o alvo
+        let chaptersToAdd = 0
+        let versesInBatch = 0
+
+        // Calcular quantos capítulos adicionar deste livro
+        for (let c = chapterStart; c <= totalChaptersInBook; c++) {
+          const versesInThisChapter = currentBook.chapters[c - 1]
+          const potentialTotal = versesCollected + versesInBatch + versesInThisChapter
+
+          console.log(
+            `   │     🔍 Testando cap ${c}: ${versesInThisChapter} vers → Total seria ${potentialTotal}`
+          )
+
+          // REGRA 1: Se já temos algum versículo e adicionar este excederia 25%, PARA
+          if (versesCollected + versesInBatch > 0 && potentialTotal > maxVersesAllowed) {
+            console.log(
+              `   │     ❌ Capítulo ${c} REJEITADO: ${potentialTotal} > ${maxVersesAllowed} (limite 25%)`
+            )
+            break
+          }
+
+          // REGRA 2: Se adicionar este capítulo atingir ou ultrapassar o alvo, adiciona e PARA
+          versesInBatch += versesInThisChapter
+          chaptersToAdd++
+          console.log(`   │     ✅ Capítulo ${c} ACEITO: batch agora tem ${versesInBatch} vers`)
+
+          if (versesCollected + versesInBatch >= versesPerDay) {
+            console.log(
+              `   │     🎯 Alvo atingido! Total: ${versesCollected + versesInBatch} >= ${versesPerDay}`
+            )
+            break
+          }
+        }
+
+        // PROTEÇÃO CONTRA LOOP INFINITO: Se não conseguiu adicionar nenhum capítulo,
+        // significa que já chegamos próximo do alvo e nenhum capítulo cabe mais
+        if (chaptersToAdd === 0) {
+          console.log(`   │  ⚠️  Nenhum capítulo pôde ser adicionado (todos excedem limite)`)
+          console.log(`   │  🎯 Parando aqui com ${versesCollected} versículos`)
+          console.log(`   └────────────────────────────────────────────────────────\n`)
+          break
+        }
+
+        const chapterEnd = chapterStart + chaptersToAdd - 1
+
+        // Obter contagem real de versículos
+        const realVerses = getVersesInRange(currentBook.name, chapterStart, chapterEnd)
+
+        console.log(`   │  📖 Livro: ${currentBook.name}`)
+        console.log(`   │  📝 Versículos restantes para alvo: ${versesPerDay - versesCollected}`)
+        console.log(`   │  📚 Capítulos disponíveis: ${totalChaptersInBook - chapterStart + 1}`)
+        console.log(`   │  ✅ Capítulos a pegar: ${chaptersToAdd}`)
+        console.log(`   │  📖 Range: ${chapterStart}-${chapterEnd}`)
+        console.log(`   │  📊 Versículos REAIS neste bloco: ${realVerses}`)
+
+        readings.push({
+          bookName: currentBook.name,
+          startChapter: chapterStart,
+          endChapter: chapterEnd,
+        })
+
+        const oldVersesCollected = versesCollected
+        versesCollected += realVerses
+
+        console.log(`   │  💹 Progresso: ${oldVersesCollected} → ${versesCollected} versículos`)
+        console.log(
+          `   │  🎯 Status: ${versesCollected}/${versesPerDay} (${((versesCollected / versesPerDay) * 100).toFixed(1)}%)`
+        )
+        console.log(
+          `   │  ${versesCollected <= maxVersesAllowed ? '✓' : '⚠️'} Dentro do limite: ${versesCollected} ${versesCollected <= maxVersesAllowed ? '≤' : '>'} ${maxVersesAllowed}`
+        )
+
+        // Só para quando atingir ou ultrapassar o alvo OU terminar o livro
+        if (versesCollected >= versesPerDay) {
+          console.log(`   │  ✓ ALVO ATINGIDO! ${versesCollected} >= ${versesPerDay}`)
+          console.log(`   └────────────────────────────────────────────────────────\n`)
+          break
+        }
+
+        // Se terminamos o livro, vamos para o próximo
+        if (chapterEnd >= totalChaptersInBook) {
+          console.log(`   │  ⏭️  Livro completo! Indo para próximo livro...`)
+          console.log(`   └────────────────────────────────────────────────────────\n`)
+          currentBookIndex++
+          chapterStart = 1
+        } else {
+          // Ainda há capítulos no livro, continua do próximo
+          console.log(`   │  ➡️  Continuando no mesmo livro (cap ${chapterEnd + 1})`)
+          console.log(`   └────────────────────────────────────────────────────────\n`)
+          chapterStart = chapterEnd + 1
+        }
+      }
+
+      console.log(`   ╔════════════════════════════════════════════════════════════`)
+      console.log(`   ║ ✅ RESULTADO FINAL - DIA ${dayNumber}`)
+      console.log(`   ╠════════════════════════════════════════════════════════════`)
+      console.log(`   ║ 📚 Total de blocos: ${readings.length}`)
+      console.log(`   ║ 📖 Total de versículos: ~${versesCollected}`)
+      console.log(`   ║ 🎯 Alvo era: ${versesPerDay} versículos`)
+      console.log(`   ║ 📊 Percentual: ${((versesCollected / versesPerDay) * 100).toFixed(1)}%`)
+      console.log(
+        `   ║ ${versesCollected >= versesPerDay ? '✓' : '✗'} Status: ${versesCollected >= versesPerDay ? 'ALVO ATINGIDO' : 'ABAIXO DO ALVO'}`
+      )
+      console.log(`   ╚════════════════════════════════════════════════════════════\n`)
+
+      return readings
+    } else if (planType === 'sequential') {
       // Leitura sequencial: lê a Bíblia em ordem, X capítulos por dia
       const startChapter = (dayNumber - 1) * chaptersPerDay + 1
 
