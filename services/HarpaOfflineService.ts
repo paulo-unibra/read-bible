@@ -374,11 +374,13 @@ class HarpaOfflineService {
 
           // Buscar em todas as estrofes
           for (const verse of hymn.verses) {
-            const verseText = verse.lines.join(" ").toLowerCase();
+            // Juntar linhas com espaço (trata \n como espaço)
+            const verseText = verse.lines.join(" ");
+            const lowerText = verseText.toLowerCase();
 
-            if (verseText.includes(lowerQuery)) {
+            if (lowerText.includes(lowerQuery)) {
               // Encontrar posição do match
-              const matchIndex = verseText.indexOf(lowerQuery);
+              const matchIndex = lowerText.indexOf(lowerQuery);
 
               // Criar snippet com contexto (50 caracteres antes e depois)
               const start = Math.max(0, matchIndex - 50);
@@ -387,14 +389,22 @@ class HarpaOfflineService {
                 matchIndex + query.length + 50,
               );
 
-              let snippet = verseText.substring(start, end);
+              // Extrair o trecho com destaque
+              const before = verseText.substring(start, matchIndex);
+              const match = verseText.substring(
+                matchIndex,
+                matchIndex + query.length,
+              );
+              const after = verseText.substring(matchIndex + query.length, end);
 
-              // Adicionar reticências se necessário
-              if (start > 0) snippet = "..." + snippet;
-              if (end < verseText.length) snippet = snippet + "...";
-
-              // Capitalizar primeira letra
-              snippet = snippet.charAt(0).toUpperCase() + snippet.slice(1);
+              let snippet =
+                (start > 0 ? "..." : "") +
+                before +
+                "**" +
+                match +
+                "**" +
+                after.trim() +
+                (end < verseText.length ? "..." : "");
 
               results.push({
                 number: hymn.number,

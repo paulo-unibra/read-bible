@@ -11,7 +11,11 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+import AdBanner from "../components/AdBanner";
 import DatabaseService from "../services/DatabaseService";
 import harpaOfflineService from "../services/HarpaOfflineService";
 
@@ -22,6 +26,7 @@ interface HymnListItem {
 }
 
 export default function HarpaScreen() {
+  const insets = useSafeAreaInsets();
   const [hymns, setHymns] = useState<HymnListItem[]>([]);
   const [filteredHymns, setFilteredHymns] = useState<HymnListItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -243,6 +248,38 @@ export default function HarpaScreen() {
     return null;
   }
 
+  const renderHighlightedSnippet = (snippet: string) => {
+    const parts = snippet.split(/(\*\*.*?\*\*)/g);
+
+    return (
+      <Text
+        style={[
+          styles.hymnSnippet,
+          { color: colors.textSecondary, fontSize: applyFontScale(13) },
+        ]}
+        numberOfLines={2}
+      >
+        {parts.map((part, index) => {
+          if (part.startsWith("**") && part.endsWith("**")) {
+            const highlightedText = part.slice(2, -2);
+            return (
+              <Text
+                key={index}
+                style={[
+                  styles.highlightedText,
+                  { color: colors.accent, fontWeight: "bold" },
+                ]}
+              >
+                {highlightedText}
+              </Text>
+            );
+          }
+          return <Text key={index}>{part}</Text>;
+        })}
+      </Text>
+    );
+  };
+
   const renderDownloadScreen = () => (
     <View style={[styles.downloadContainer, { backgroundColor: colors.bg }]}>
       <Ionicons name="musical-notes" size={80} color={colors.accent} />
@@ -345,17 +382,7 @@ export default function HarpaScreen() {
           >
             {String(item.number).padStart(3, "0")} - {item.title}
           </Text>
-          {item.snippet && (
-            <Text
-              style={[
-                styles.hymnSnippet,
-                { color: colors.textSecondary, fontSize: applyFontScale(13) },
-              ]}
-              numberOfLines={2}
-            >
-              {item.snippet}
-            </Text>
-          )}
+          {item.snippet && renderHighlightedSnippet(item.snippet)}
         </View>
         <Ionicons
           name="chevron-forward"
@@ -405,110 +432,126 @@ export default function HarpaScreen() {
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
-      <StatusBar
-        barStyle={isDark ? "light-content" : "dark-content"}
-        backgroundColor={colors.headerBg}
-      />
-      <View
-        style={[
-          styles.header,
-          {
-            backgroundColor: colors.headerBg,
-            borderBottomColor: colors.border,
-          },
-        ]}
-      >
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={styles.backButton}
-        >
-          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
-        </TouchableOpacity>
-        <Text
-          style={[
-            styles.headerTitle,
-            { color: colors.textPrimary, fontSize: applyFontScale(20) },
-          ]}
-        >
-          Harpa Cristã
-        </Text>
-        <View style={{ width: 40 }} />
-      </View>
-
-      {/* Search Bar */}
-      <View
-        style={[styles.searchContainer, { backgroundColor: colors.headerBg }]}
-      >
+    <>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
+        <StatusBar
+          barStyle={isDark ? "light-content" : "dark-content"}
+          backgroundColor={colors.headerBg}
+        />
         <View
           style={[
-            styles.searchInputContainer,
-            { backgroundColor: colors.searchBg },
+            styles.header,
+            {
+              backgroundColor: colors.headerBg,
+              borderBottomColor: colors.border,
+            },
           ]}
         >
-          <Ionicons name="search" size={20} color={colors.textSecondary} />
-          <TextInput
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backButton}
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
+          </TouchableOpacity>
+          <Text
             style={[
-              styles.searchInput,
-              { color: colors.textPrimary, fontSize: applyFontScale(16) },
+              styles.headerTitle,
+              { color: colors.textPrimary, fontSize: applyFontScale(20) },
             ]}
-            placeholder="Buscar por número ou título..."
-            placeholderTextColor={colors.textSecondary}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          {searchLoading && (
-            <ActivityIndicator
-              size="small"
-              color={colors.accent}
-              style={{ marginRight: 8 }}
+          >
+            Harpa Cristã
+          </Text>
+          <View style={{ width: 40 }} />
+        </View>
+
+        {/* Search Bar */}
+        <View
+          style={[styles.searchContainer, { backgroundColor: colors.headerBg }]}
+        >
+          <View
+            style={[
+              styles.searchInputContainer,
+              { backgroundColor: colors.searchBg },
+            ]}
+          >
+            <Ionicons name="search" size={20} color={colors.textSecondary} />
+            <TextInput
+              style={[
+                styles.searchInput,
+                { color: colors.textPrimary, fontSize: applyFontScale(16) },
+              ]}
+              placeholder="Buscar por número ou título..."
+              placeholderTextColor={colors.textSecondary}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
             />
-          )}
-          {searchQuery.length > 0 && !searchLoading && (
-            <TouchableOpacity onPress={() => setSearchQuery("")}>
+            {searchLoading && (
+              <ActivityIndicator
+                size="small"
+                color={colors.accent}
+                style={{ marginRight: 8 }}
+              />
+            )}
+            {searchQuery.length > 0 && !searchLoading && (
+              <TouchableOpacity onPress={() => setSearchQuery("")}>
+                <Ionicons
+                  name="close-circle"
+                  size={20}
+                  color={colors.textSecondary}
+                />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        {/* Hymns List */}
+        <FlatList
+          data={filteredHymns}
+          renderItem={renderHymnItem}
+          keyExtractor={(item) => item.number.toString()}
+          contentContainerStyle={{
+            paddingBottom: 80,
+            paddingHorizontal: 16,
+            paddingTop: 16,
+          }}
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
               <Ionicons
-                name="close-circle"
-                size={20}
+                name="musical-notes-outline"
+                size={64}
                 color={colors.textSecondary}
               />
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
+              <Text
+                style={[
+                  styles.emptyTitle,
+                  { color: colors.textPrimary, fontSize: applyFontScale(18) },
+                ]}
+              >
+                Nenhum hino encontrado
+              </Text>
+              <Text
+                style={[
+                  styles.emptyText,
+                  { color: colors.textSecondary, fontSize: applyFontScale(14) },
+                ]}
+              >
+                Tente buscar por outro termo
+              </Text>
+            </View>
+          }
+        />
+      </SafeAreaView>
 
-      {/* Hymns List */}
-      <FlatList
-        data={filteredHymns}
-        renderItem={renderHymnItem}
-        keyExtractor={(item) => item.number.toString()}
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Ionicons
-              name="musical-notes-outline"
-              size={64}
-              color={colors.textSecondary}
-            />
-            <Text
-              style={[
-                styles.emptyTitle,
-                { color: colors.textPrimary, fontSize: applyFontScale(18) },
-              ]}
-            >
-              Nenhum hino encontrado
-            </Text>
-            <Text
-              style={[
-                styles.emptyText,
-                { color: colors.textSecondary, fontSize: applyFontScale(14) },
-              ]}
-            >
-              Tente buscar por outro termo
-            </Text>
-          </View>
-        }
-      />
-    </SafeAreaView>
+      {/* Banner fixo - usando fragment para ficar fora do SafeAreaView */}
+      <View
+        style={[
+          styles.bannerContainer,
+          { backgroundColor: colors.bg, paddingBottom: insets.bottom },
+        ]}
+      >
+        <AdBanner />
+      </View>
+    </>
   );
 }
 
@@ -547,9 +590,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
   },
-  listContent: {
-    padding: 16,
-  },
   hymnCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -587,6 +627,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 4,
     fontStyle: "italic",
+  },
+  highlightedText: {
+    fontSize: 13,
+    fontWeight: "bold",
   },
   audioStatus: {
     marginTop: 4,
@@ -730,5 +774,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 16,
     marginTop: 24,
+  },
+  bannerContainer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "#fff",
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    zIndex: 1000,
   },
 });

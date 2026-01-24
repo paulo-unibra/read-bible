@@ -946,7 +946,7 @@ class DatabaseService {
       const totalResult = await this.db.getFirstAsync<{ total: number }>(
         "SELECT COUNT(*) as total FROM quiz_results",
       );
-[]
+      [];
       return {
         completed: result?.completed || 0,
         total: totalResult?.total || 0,
@@ -1005,13 +1005,13 @@ class DatabaseService {
 
   // Salvar múltiplos hinos em uma única transação (MUITO MAIS RÁPIDO e evita locks)
   async saveHymnsBatch(
-    hymns: Array<{
+    hymns: {
       number: number;
       title: string;
       author: string;
       copyright: string;
       verses: any[];
-    }>,
+    }[],
   ): Promise<void> {
     try {
       console.log(`[DB] 💾 Salvando batch de ${hymns.length} hinos...`);
@@ -1035,7 +1035,7 @@ class DatabaseService {
 
       console.log("[DB] 🚀 Iniciando transação...");
       await this.db.execAsync("BEGIN TRANSACTION");
-[]
+      [];
       try {
         for (const hymn of hymns) {
           await this.db.runAsync(
@@ -1109,14 +1109,15 @@ class DatabaseService {
     query: string,
     limit: number = 20,
   ): Promise<
-    Array<{
+    {
       number: number;
       title: string;
       snippet: string;
-    }>
+    }[]
   > {
     try {
-      await this.ensureInitialized();[]
+      await this.ensureInitialized();
+      [];
 
       if (!this.db) {
         console.warn(
@@ -1158,20 +1159,30 @@ class DatabaseService {
 
         // Procurar snippet no conteúdo
         for (const verse of verses) {
-          for (const line of verse.lines) {
-            const lowerLine = line.toLowerCase();
-            const index = lowerLine.indexOf(lowerQuery);
-            if (index !== -1) {
-              const start = Math.max(0, index - 25);
-              const end = Math.min(line.length, index + query.length + 25);
-              snippet =
-                (start > 0 ? "..." : "") +
-                line.substring(start, end) +
-                (end < line.length ? "..." : "");
-              break;
-            }
+          // Juntar todas as linhas com espaço (tratando \n como separador)
+          const verseText = verse.lines.join(" ");
+          const lowerText = verseText.toLowerCase();
+          const index = lowerText.indexOf(lowerQuery);
+
+          if (index !== -1) {
+            const start = Math.max(0, index - 30);
+            const end = Math.min(verseText.length, index + query.length + 30);
+
+            // Extrair o trecho com destaque
+            const before = verseText.substring(start, index);
+            const match = verseText.substring(index, index + query.length);
+            const after = verseText.substring(index + query.length, end);
+
+            snippet =
+              (start > 0 ? "..." : "") +
+              before +
+              "**" +
+              match +
+              "**" +
+              after.trim() +
+              (end < verseText.length ? "..." : "");
+            break;
           }
-          if (snippet) break;
         }
 
         return {
@@ -1206,7 +1217,7 @@ class DatabaseService {
       // Retornar 0 ao invés de lançar erro - o app pode continuar funcionando
       return 0;
     }
-  }
+  }[]
 
   async getAllHymnsMetadata(): Promise<
     Array<{ number: number; title: string }>

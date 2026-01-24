@@ -32,10 +32,10 @@ export default class AudioSyncTimestampsController {
 
         // Inserir novos timestamps
         const records = timestamps.map((ts: { verseNumber: number; timestampMs: number }) => ({
-          book_id: bookId,
-          chapter_number: chapterNumber,
-          verse_number: ts.verseNumber,
-          timestamp_ms: ts.timestampMs,
+          bookId: bookId,
+          chapterNumber: chapterNumber,
+          verseNumber: ts.verseNumber,
+          timestampMs: ts.timestampMs,
         }))
 
         if (records.length > 0) {
