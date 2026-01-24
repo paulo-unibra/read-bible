@@ -114,7 +114,21 @@ const Dashboard: React.FC = () => {
           </div>
 
           <div className="dashboard-card">
-            <h3>🔑 Permissões</h3>
+            <h3>� Planos Ativos</h3>
+            <p>Gerenciar e desabilitar planos ativos</p>
+            <button
+              className="card-button"
+              onClick={() => navigate("/active-plans")}
+              disabled={!hasPermission("gerenciar_conteudo")}
+            >
+              {hasPermission("gerenciar_conteudo")
+                ? "Acessar"
+                : "Sem permissão"}
+            </button>
+          </div>
+
+          <div className="dashboard-card">
+            <h3>�🔑 Permissões</h3>
             <p>Visualizar e gerenciar permissões</p>
             <button
               className="card-button"

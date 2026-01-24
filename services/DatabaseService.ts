@@ -21,13 +21,54 @@ class DatabaseService {
   // Debounce para saveLastReading
   private saveReadingDebounceTimer: any = null;
   private pendingReadingSave: { bibleId: string; bookId: number; chapterNumber: number } | null = null;
+  // Semáforo para operações em batch
+  private batchOperationInProgress = false;
+  // Mutex para evitar inicializações simultâneas
+  private initMutex: Promise<void> | null = null;
+  private initMutexRelease: (() => void) | null = null;
+
+  /**
+   * Adquire lock do mutex
+   */
+  private async acquireMutex(): Promise<() => void> {
+    // Se já há um mutex ativo, aguardar
+    while (this.initMutex) {
+      console.log('[DB] 🔒 Aguardando mutex...');
+      await this.initMutex;
+    }
+    
+    // Criar novo mutex
+    let release: (() => void) | undefined;
+    this.initMutex = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    
+    return release!;
+  }
+
+  /**
+   * Libera lock do mutex
+   */
+  private releaseMutex(release: () => void) {
+    this.initMutex = null;
+    release();
+    console.log('[DB] 🔓 Mutex liberado');
+  }
 
   // Método para criar uma nova conexão independente para cada operação
   private async createFreshConnection(): Promise<SQLite.SQLiteDatabase> {
     try {
-      const connection = await SQLite.openDatabaseAsync(DB_NAME, {
-        useNewConnection: true, // IMPORTANTE: Nova conexão a cada chamada
-      });
+      // GARANTIR que o banco principal foi inicializado primeiro
+      if (!this.db && !global.__READBIBLE_DB_HANDLE) {
+        console.log('⚠️ Banco não inicializado, inicializando agora...');
+        await this.ensureInitialized();
+      }
+      
+      const connection = await SQLite.openDatabaseAsync(DB_NAME);
+      
+      // Habilitar WAL mode para melhor concorrência
+      await connection.execAsync('PRAGMA journal_mode = WAL');
+      await connection.execAsync('PRAGMA busy_timeout = 5000'); // 5 segundos de timeout
       
       // Verificar se as tabelas existem na nova conexão
       const result = await connection.getFirstAsync("SELECT name FROM sqlite_master WHERE type='table' AND name='bibles'");
@@ -41,7 +82,7 @@ class DatabaseService {
       
       return connection;
     } catch (error) {
-      console.error("Erro ao criar nova conexão:", error);
+      console.error("❌ Erro ao criar nova conexão:", error);
       throw error;
     }
   }
@@ -54,7 +95,10 @@ class DatabaseService {
     let connection: SQLite.SQLiteDatabase | null = null;
     
     try {
-      console.log(`� Criando nova conexão para: ${operationName}`);
+      // GARANTIR inicialização antes de qualquer operação
+      await this.ensureInitialized();
+      
+      console.log(`🔧 Criando nova conexão para: ${operationName}`);
       connection = await this.createFreshConnection();
       
       const result = await operation(connection);
@@ -158,6 +202,15 @@ class DatabaseService {
         chapterNumber INTEGER NOT NULL,
         lastReadDate TEXT DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(bibleId, bookId, chapterNumber)
+      );
+
+      CREATE TABLE IF NOT EXISTS harpa_hymns (
+        number INTEGER PRIMARY KEY,
+        title TEXT NOT NULL,
+        author TEXT NOT NULL,
+        copyright TEXT NOT NULL,
+        verses TEXT NOT NULL,
+        createdDate TEXT DEFAULT CURRENT_TIMESTAMP
       );
     `);
   }
@@ -308,73 +361,106 @@ class DatabaseService {
   }
 
   /**
-   * Garantir inicialização única e reutilizável.
+   * Garantir inicialização única e reutilizável com mutex.
    */
-  private async ensureInitialized() {
-    // Simplified initialization without locks for main connection
-    if (this.db) {
-      await this.ensureHealthy();
-      return;
-    }
-    if (global.__READBIBLE_DB_HANDLE) {
-      this.db = global.__READBIBLE_DB_HANDLE;
-      await this.ensureHealthy();
-      return;
-    }
-    if (this.initPromise) {
-      return this.initPromise;
-    }
-    this.initPromise = this.init();
+  private async ensureInitialized(retryCount: number = 0) {
+    const MAX_RETRIES = 3;
+    
+    // Adquirir mutex para evitar inicializações simultâneas
+    const release = await this.acquireMutex();
+    
     try {
-      await this.initPromise;
-    } catch (error) {
-      console.error("Erro na inicialização do banco:", error);
-      this.initPromise = null;
-      throw error;
-    } finally {
-      if (!this.db) this.initPromise = null;
-    }
-  }
-
-  async init() {
-    try {
-      console.log("INICIANDO BANCO DE DADOS");
-      
-      // Check if database is already open
-      if (global.__READBIBLE_DB_HANDLE) {
+      // Se já temos um banco válido, testar e retornar
+      if (this.db && global.__READBIBLE_DB_HANDLE) {
         try {
-          // Test if the existing connection is still valid
+          await this.db.getFirstAsync("SELECT 1");
+          console.log('[DB] ✅ Banco já inicializado e funcionando');
+          return; // Banco está funcionando
+        } catch (error) {
+          console.warn('[DB] ⚠️ Banco existente não responde, será reinicializado...');
+          // Limpar completamente
+          try {
+            await this.db.closeAsync?.();
+          } catch {}
+          this.db = null;
+          global.__READBIBLE_DB_HANDLE = undefined;
+          this.initPromise = null;
+        }
+      }
+      
+      // Se há global handle mas não temos referência local
+      if (!this.db && global.__READBIBLE_DB_HANDLE) {
+        try {
           await global.__READBIBLE_DB_HANDLE.getFirstAsync("SELECT 1");
           this.db = global.__READBIBLE_DB_HANDLE;
-          console.log("Reutilizando conexão existente do banco de dados");
-          return;
+          console.log('[DB] ✅ Reutilizando global handle');
+          return; // Global handle está funcionando
         } catch (error) {
-          // Connection is dead, close it and create new one
-          console.warn("Conexão existente inválida, criando nova conexão:", error);
+          console.warn('[DB] ⚠️ Global handle inválido, limpando...');
           try {
             await global.__READBIBLE_DB_HANDLE.closeAsync?.();
           } catch {}
           global.__READBIBLE_DB_HANDLE = undefined;
         }
       }
-
-      this.db = await SQLite.openDatabaseAsync(DB_NAME, {
-        useNewConnection: false, // Reuse connections to prevent locks
-      });
-      global.__READBIBLE_DB_HANDLE = this.db;
-      await this.createTables();
-    } catch (error) {
-      console.error("Database initialization error:", error);
-      // Reset state on error
-      this.db = null;
-      global.__READBIBLE_DB_HANDLE = undefined;
-      this.initPromise = null;
-      throw error;
+      
+      // Inicializar do zero
+      console.log(`[DB] 🔄 Iniciando nova inicialização (tentativa ${retryCount + 1}/${MAX_RETRIES})...`);
+      
+      try {
+        // Abrir banco
+        this.db = await SQLite.openDatabaseAsync(DB_NAME, {
+          useNewConnection: false,
+        });
+        
+        if (!this.db) {
+          throw new Error('openDatabaseAsync retornou null');
+        }
+        
+        console.log('[DB] 📋 Criando tabelas...');
+        global.__READBIBLE_DB_HANDLE = this.db;
+        await this.createTables();
+        
+        // Teste final robusto
+        console.log('[DB] 🧪 Testando conexão...');
+        await this.db.getFirstAsync("SELECT 1");
+        
+        console.log('[DB] ✅ Banco inicializado e validado com sucesso');
+        
+      } catch (error) {
+        console.error(`[DB] ❌ Erro na inicialização (tentativa ${retryCount + 1}/${MAX_RETRIES}):`, error);
+        
+        // Limpar estado
+        if (this.db) {
+          try {
+            await this.db.closeAsync?.();
+          } catch {}
+        }
+        this.db = null;
+        global.__READBIBLE_DB_HANDLE = undefined;
+        this.initPromise = null;
+        
+        // Retry com delay exponencial
+        if (retryCount < MAX_RETRIES) {
+          const delay = 1000 * (retryCount + 1); // 1s, 2s, 3s
+          console.log(`[DB] 🔄 Tentando novamente em ${delay}ms...`);
+          this.releaseMutex(release); // Liberar antes do delay
+          await new Promise(resolve => setTimeout(resolve, delay));
+          return this.ensureInitialized(retryCount + 1);
+        }
+        
+        throw error;
+      }
+      
+    } finally {
+      // Sempre liberar mutex
+      this.releaseMutex(release);
     }
   }
 
   private async reinitializeDatabase(reason?: string) {
-    console.log("[DB] Reinitializing database", reason ? `(${reason})` : "");
+    console.log("[DB] 🔄 Reinitializando banco", reason ? `(${reason})` : "");
+    // Limpar tudo
     try {
       if (this.db) {
         try {
@@ -386,6 +472,14 @@ class DatabaseService {
     this.initPromise = null;
     this.lastHealthCheck = 0;
     // No more locks to reset - using fresh connections per operation
+    await this.ensureInitialized();
+  }
+
+  /**
+   * Método público para inicializar o banco
+   * Mantido para compatibilidade com código existente
+   */
+  async init(): Promise<void> {
     await this.ensureInitialized();
   }
 
@@ -449,6 +543,15 @@ class DatabaseService {
         lastReadDate TEXT DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(bibleId, bookId, chapterNumber)
       );
+
+      CREATE TABLE IF NOT EXISTS harpa_hymns (
+        number INTEGER PRIMARY KEY,
+        title TEXT NOT NULL,
+        author TEXT NOT NULL,
+        copyright TEXT NOT NULL,
+        verses TEXT NOT NULL,
+        createdDate TEXT DEFAULT CURRENT_TIMESTAMP
+      );
     `);
   }
 
@@ -496,13 +599,16 @@ class DatabaseService {
       return this.biblesCache.data;
     }
 
-    return this.withFreshConnection(async (db) => {
+    try {
+      await this.ensureInitialized();
+      if (!this.db) return [];
+      
       // Double-check cache
       if (this.biblesCache) {
         return this.biblesCache.data;
       }
 
-      const rows = await db.getAllAsync(
+      const rows = await this.db.getAllAsync(
         "SELECT * FROM bibles ORDER BY name"
       );
       const mapped = rows.map((row: any) => {
@@ -524,7 +630,10 @@ class DatabaseService {
       console.log("BÍBLIAS NO BANCO", mapped.length);
       console.log("----------------------");
       return mapped;
-    });
+    } catch (error) {
+      console.error('[DB] Erro em getBibles:', error);
+      return [];
+    }
   }
 
   async deleteBible(bibleId: string): Promise<void> {
@@ -555,28 +664,47 @@ class DatabaseService {
 
   // Settings management
   async saveSetting(key: string, value: string): Promise<void> {
-    return this.withFreshConnection(async (db) => {
-      await db.runAsync(
+    try {
+      await this.ensureInitialized();
+      if (!this.db) throw new Error('Database not initialized');
+      
+      await this.db.runAsync(
         "INSERT OR REPLACE INTO user_settings (key, value) VALUES (?, ?)",
         [key, value]
       );
-    });
+    } catch (error) {
+      console.error('[DB] Erro em saveSetting:', error);
+      throw error;
+    }
   }
 
   async getSetting(key: string): Promise<string | null> {
-    return this.withFreshConnection(async (db) => {
-      const result = (await db.getFirstAsync(
+    try {
+      await this.ensureInitialized();
+      if (!this.db) return null;
+      
+      const result = (await this.db.getFirstAsync(
         "SELECT value FROM user_settings WHERE key = ?",
         [key]
       )) as { value: string } | null;
       return result ? result.value : null;
-    });
+    } catch (error) {
+      console.error('[DB] Erro em getSetting:', error);
+      return null;
+    }
   }
 
   async getMultipleSettings(keys: string[]): Promise<Record<string, string | null>> {
-    return this.withFreshConnection(async (db) => {
+    try {
+      await this.ensureInitialized();
+      if (!this.db) {
+        const settingsMap: Record<string, string | null> = {};
+        keys.forEach(key => { settingsMap[key] = null; });
+        return settingsMap;
+      }
+      
       const placeholders = keys.map(() => '?').join(',');
-      const results = (await db.getAllAsync(
+      const results = (await this.db.getAllAsync(
         `SELECT key, value FROM user_settings WHERE key IN (${placeholders})`,
         keys
       )) as { key: string; value: string }[];
@@ -590,7 +718,12 @@ class DatabaseService {
       });
 
       return settingsMap;
-    });
+    } catch (error) {
+      console.error('[DB] Erro em getMultipleSettings:', error);
+      const settingsMap: Record<string, string | null> = {};
+      keys.forEach(key => { settingsMap[key] = null; });
+      return settingsMap;
+    }
   }
 
   // Favorites management
@@ -683,14 +816,15 @@ class DatabaseService {
       const { bibleId: finalBibleId, bookId: finalBookId, chapterNumber: finalChapter } = this.pendingReadingSave;
       this.pendingReadingSave = null;
       
-      // Tentar salvar usando conexão independente - se falhar, não é crítico
+      // Tentar salvar usando conexão principal - se falhar, não é crítico
       try {
-        await this.withFreshConnection(async (db) => {
-          await db.runAsync(
+        await this.ensureInitialized();
+        if (this.db) {
+          await this.db.runAsync(
             "INSERT OR REPLACE INTO reading_history (bibleId, bookId, chapterNumber, lastReadDate) VALUES (?, ?, ?, ?)",
             [finalBibleId, finalBookId, finalChapter, new Date().toISOString()]
           );
-        });
+        }
       } catch (error) {
         // Salvar leitura não é crítico - ignora erros
         console.warn("[DEBUG] Erro ao salvar posição de leitura (ignorado):", error);
@@ -780,6 +914,242 @@ class DatabaseService {
       
       console.log("All data cleared successfully");
     }, 'clearAllData');
+  }
+
+  // Harpa Hymns Management
+  async saveHymnToDatabase(hymn: {
+    number: number;
+    title: string;
+    author: string;
+    copyright: string;
+    verses: any[];
+  }): Promise<void> {
+    try {
+      await this.ensureInitialized();
+      if (!this.db) throw new Error('Database not initialized');
+      
+      await this.db.runAsync(
+        `INSERT OR REPLACE INTO harpa_hymns (number, title, author, copyright, verses)
+         VALUES (?, ?, ?, ?, ?)`,
+        [hymn.number, hymn.title, hymn.author, hymn.copyright, JSON.stringify(hymn.verses)]
+      );
+    } catch (error) {
+      console.error('[DB] Erro em saveHymnToDatabase:', error);
+      throw error;
+    }
+  }
+
+  // Salvar múltiplos hinos em uma única transação (MUITO MAIS RÁPIDO e evita locks)
+  async saveHymnsBatch(hymns: Array<{
+    number: number;
+    title: string;
+    author: string;
+    copyright: string;
+    verses: any[];
+  }>): Promise<void> {
+    try {
+      console.log(`[DB] 💾 Salvando batch de ${hymns.length} hinos...`);
+      
+      await this.ensureInitialized();
+      
+      if (!this.db) {
+        throw new Error('Database not initialized after ensureInitialized');
+      }
+      
+      // Teste adicional: verificar se o banco responde
+      try {
+        await this.db.getFirstAsync("SELECT 1");
+      } catch (testError) {
+        console.error('[DB] ❌ Banco não responde, tentando reinicializar...');
+        await this.reinitializeDatabase('saveHymnsBatch test failed');
+        if (!this.db) {
+          throw new Error('Database still not ready after reinitialization');
+        }
+      }
+      
+      console.log('[DB] 🚀 Iniciando transação...');
+      await this.db.execAsync('BEGIN TRANSACTION');
+      
+      try {
+        for (const hymn of hymns) {
+          await this.db.runAsync(
+            `INSERT OR REPLACE INTO harpa_hymns (number, title, author, copyright, verses)
+             VALUES (?, ?, ?, ?, ?)`,
+            [hymn.number, hymn.title, hymn.author, hymn.copyright, JSON.stringify(hymn.verses)]
+          );
+        }
+        
+        await this.db.execAsync('COMMIT');
+        console.log(`[DB] ✅ Batch de ${hymns.length} hinos salvo com sucesso`);
+      } catch (error) {
+        console.error('[DB] ❌ Erro durante transação, executando rollback...');
+        try {
+          await this.db.execAsync('ROLLBACK');
+        } catch (rollbackError) {
+          console.error('[DB] ⚠️ Erro no rollback:', rollbackError);
+        }
+        throw error;
+      }
+    } catch (error) {
+      console.error('[DB] ❌ Erro em saveHymnsBatch:', error);
+      throw error;
+    }
+  }
+
+  async getHymnFromDatabase(number: number): Promise<{
+    number: number;
+    title: string;
+    author: string;
+    copyright: string;
+    verses: any[];
+  } | null> {
+    try {
+      await this.ensureInitialized();
+      
+      if (!this.db) {
+        console.warn(`[DB] ⚠️ Database não inicializado em getHymnFromDatabase(${number}), retornando null`);
+        return null;
+      }
+      
+      const result = await this.db.getFirstAsync(
+        'SELECT * FROM harpa_hymns WHERE number = ?',
+        [number]
+      ) as any;
+      
+      if (!result) return null;
+      
+      return {
+        number: result.number,
+        title: result.title,
+        author: result.author,
+        copyright: result.copyright,
+        verses: JSON.parse(result.verses)
+      };
+    } catch (error) {
+      console.error(`[DB] Erro em getHymnFromDatabase(${number}):`, error);
+      return null; // Retornar null ao invés de lançar erro
+    }
+  }
+
+  async searchHymnsInDatabase(query: string, limit: number = 20): Promise<Array<{
+    number: number;
+    title: string;
+    snippet: string;
+  }>> {
+    try {
+      await this.ensureInitialized();
+      
+      if (!this.db) {
+        console.warn('[DB] ⚠️ Database não inicializado em searchHymnsInDatabase, retornando []');
+        return [];
+      }
+      
+      const lowerQuery = query.toLowerCase();
+      
+      // LOG: Ver quantos hinos existem na tabela
+      const countResult = await this.db.getFirstAsync('SELECT COUNT(*) as count FROM harpa_hymns') as any;
+      console.log(`[searchHymns] Total de hinos na tabela: ${countResult?.count || 0}`);
+      
+      // LOG: Query SQL que será executada
+      console.log(`[searchHymns] Query: "${lowerQuery}"`);
+      console.log(`[searchHymns] SQL: SELECT number, title, verses FROM harpa_hymns WHERE LOWER(verses) LIKE '%${lowerQuery}%' LIMIT ${limit}`);
+      
+      // Buscar em verses (JSON)
+      const results = await this.db.getAllAsync(
+        `SELECT number, title, verses 
+         FROM harpa_hymns 
+         WHERE LOWER(verses) LIKE ?
+         LIMIT ?`,
+        [`%${lowerQuery}%`, limit]
+      ) as any[];
+      
+      console.log(`[searchHymns] Resultados encontrados: ${results.length}`);
+      
+      return results.map(row => {
+        const verses = JSON.parse(row.verses);
+        let snippet = '';
+        
+        // Procurar snippet no conteúdo
+        for (const verse of verses) {
+          for (const line of verse.lines) {
+            const lowerLine = line.toLowerCase();
+            const index = lowerLine.indexOf(lowerQuery);
+            if (index !== -1) {
+              const start = Math.max(0, index - 25);
+              const end = Math.min(line.length, index + query.length + 25);
+              snippet = (start > 0 ? '...' : '') + 
+                       line.substring(start, end) + 
+                       (end < line.length ? '...' : '');
+              break;
+            }
+          }
+          if (snippet) break;
+        }
+        
+        return {
+          number: row.number,
+          title: row.title,
+          snippet: snippet || 'Trecho encontrado no hino'
+        };
+      });
+    } catch (error) {
+      console.error('[DB] Erro em searchHymnsInDatabase:', error);
+      return [];
+    }
+  }
+
+  async getHymnsDatabaseCount(): Promise<number> {
+    try {
+      await this.ensureInitialized();
+      
+      if (!this.db) {
+        console.warn('[DB] ⚠️ Database não inicializado em getHymnsDatabaseCount, retornando 0');
+        return 0;
+      }
+      
+      const result = await this.db.getFirstAsync('SELECT COUNT(*) as count FROM harpa_hymns') as any;
+      return result?.count || 0;
+    } catch (error) {
+      console.error('[DB] Erro em getHymnsDatabaseCount:', error);
+      // Retornar 0 ao invés de lançar erro - o app pode continuar funcionando
+      return 0;
+    }
+  }
+
+  async getAllHymnsMetadata(): Promise<Array<{ number: number; title: string }>> {
+    try {
+      await this.ensureInitialized();
+      
+      if (!this.db) {
+        console.warn('[DB] ⚠️ Database não inicializado em getAllHymnsMetadata, retornando []');
+        return [];
+      }
+      
+      const results = await this.db.getAllAsync(
+        'SELECT number, title FROM harpa_hymns ORDER BY number ASC'
+      ) as any[];
+      
+      return results.map(row => ({
+        number: row.number,
+        title: row.title
+      }));
+    } catch (error) {
+      console.error('[DB] Erro em getAllHymnsMetadata:', error);
+      return [];
+    }
+  }
+
+  async clearAllHymns(): Promise<void> {
+    try {
+      await this.ensureInitialized();
+      if (!this.db) throw new Error('Database not initialized');
+      
+      await this.db.runAsync('DELETE FROM harpa_hymns');
+      console.log('[DB] Todos os hinos foram removidos do banco');
+    } catch (error) {
+      console.error('[DB] Erro em clearAllHymns:', error);
+      throw error;
+    }
   }
 }
 

@@ -18,12 +18,14 @@ import harpaOfflineService from '../services/HarpaOfflineService';
 interface HymnListItem {
   number: number;
   title: string;
+  snippet?: string; // Trecho encontrado na busca
 }
 
 export default function HarpaScreen() {
   const [hymns, setHymns] = useState<HymnListItem[]>([]);
   const [filteredHymns, setFilteredHymns] = useState<HymnListItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchLoading, setSearchLoading] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark' | null>(null);
   const [fontSizePref, setFontSizePref] = useState<'small' | 'medium' | 'large'>('medium');
   
@@ -138,19 +140,67 @@ export default function HarpaScreen() {
     }
   };
 
-  const filterHymns = () => {
+  const filterHymns = async () => {
+    // Se busca vazia, mostrar todos os hinos
     if (!searchQuery.trim()) {
-      setFilteredHymns(hymns);
+      // Se hymns estiver vazio, tentar carregar
+      if (hymns.length === 0 && isDownloaded) {
+        console.log('📋 Busca vazia, carregando lista de hinos...');
+        await loadHymnsList();
+      } else {
+        setFilteredHymns(hymns);
+      }
+      setSearchLoading(false);
       return;
     }
 
     const lowerQuery = searchQuery.toLowerCase();
-    const filtered = hymns.filter(
-      hymn =>
-        hymn.title.toLowerCase().includes(lowerQuery) ||
-        hymn.number.toString().includes(searchQuery)
-    );
-    setFilteredHymns(filtered);
+    
+    // Buscar por número ou título (instantâneo)
+    const titleMatches: HymnListItem[] = hymns
+      .filter(
+        hymn =>
+          hymn.title.toLowerCase().includes(lowerQuery) ||
+          hymn.number.toString().includes(searchQuery)
+      )
+      .map(hymn => ({ ...hymn, snippet: undefined }));
+    
+    // Mostrar resultados de título imediatamente
+    setFilteredHymns(titleMatches);
+    
+    // Se a busca for por texto (não apenas número), buscar no conteúdo
+    if (isNaN(Number(searchQuery)) && searchQuery.length >= 3) {
+      setSearchLoading(true);
+      try {
+        console.log('🔍 Buscando no conteúdo por:', lowerQuery);
+        const contentMatches = await harpaOfflineService.searchInContent(lowerQuery);
+        console.log('✅ Encontrados', contentMatches.length, 'hinos no conteúdo');
+        
+        // Criar um mapa de snippets por número do hino
+        const snippetMap = new Map(contentMatches.map(m => [m.number, m.snippet]));
+        
+        // Atualizar titleMatches com snippets quando disponível
+        const titleMatchesWithSnippets = titleMatches.map(hymn => ({
+          ...hymn,
+          snippet: snippetMap.get(hymn.number)
+        }));
+        
+        // Adicionar hinos que só foram encontrados no conteúdo
+        const titleNumbers = new Set(titleMatches.map(h => h.number));
+        const uniqueContentMatches = contentMatches.filter(
+          match => !titleNumbers.has(match.number)
+        );
+        
+        setFilteredHymns([...titleMatchesWithSnippets, ...uniqueContentMatches]);
+      } catch (error) {
+        console.error('Erro ao buscar no conteúdo:', error);
+        setFilteredHymns(titleMatches);
+      } finally {
+        setSearchLoading(false);
+      }
+    } else {
+      setSearchLoading(false);
+    }
   };
 
   const applyFontScale = (base: number) => {
@@ -254,6 +304,17 @@ export default function HarpaScreen() {
           >
             {String(item.number).padStart(3, '0')} - {item.title}
           </Text>
+          {item.snippet && (
+            <Text
+              style={[
+                styles.hymnSnippet,
+                { color: colors.textSecondary, fontSize: applyFontScale(13) },
+              ]}
+              numberOfLines={2}
+            >
+              {item.snippet}
+            </Text>
+          )}
         </View>
         <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
       </TouchableOpacity>
@@ -312,7 +373,10 @@ export default function HarpaScreen() {
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
-          {searchQuery.length > 0 && (
+          {searchLoading && (
+            <ActivityIndicator size="small" color={colors.accent} style={{ marginRight: 8 }} />
+          )}
+          {searchQuery.length > 0 && !searchLoading && (
             <TouchableOpacity onPress={() => setSearchQuery('')}>
               <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
@@ -422,6 +486,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 4,
+  },
+  hymnSnippet: {
+    fontSize: 13,
+    marginTop: 4,
+    fontStyle: 'italic',
   },
   audioStatus: {
     marginTop: 4,

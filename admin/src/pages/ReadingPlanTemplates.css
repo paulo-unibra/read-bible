@@ -933,3 +933,149 @@
   margin-bottom: 24px;
   border-left: 4px solid #dc2626;
 }
+
+/* Plan Types Section */
+.plan-types-section {
+  margin-bottom: 40px;
+}
+
+.plan-types-section h2,
+.templates-section h2 {
+  font-size: 22px;
+  color: #1e293b;
+  margin-bottom: 8px;
+}
+
+.section-description {
+  color: #64748b;
+  margin-bottom: 20px;
+  font-size: 14px;
+}
+
+.plan-types-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+  margin-bottom: 40px;
+}
+
+.plan-type-card {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s;
+  border: 2px solid transparent;
+}
+
+.plan-type-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
+}
+
+.plan-type-card.inactive {
+  opacity: 0.6;
+  background: #f8fafc;
+}
+
+.plan-type-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.plan-type-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #1e293b;
+}
+
+.plan-type-description {
+  color: #64748b;
+  font-size: 14px;
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+
+.plan-type-info {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.status-badge {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status-badge.active {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.status-badge.inactive {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.key-badge {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  background: #f1f5f9;
+  color: #475569;
+  font-family: monospace;
+}
+
+/* Toggle Switch */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 24px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #cbd5e1;
+  transition: 0.4s;
+  border-radius: 24px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.4s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: #10b981;
+}
+
+input:checked + .slider:before {
+  transform: translateX(26px);
+}
+
+.templates-section {
+  margin-top: 40px;
+}

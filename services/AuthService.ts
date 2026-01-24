@@ -312,13 +312,13 @@ class AuthService {
     startDate: string;
     endDate: string;
     totalDays: number;
-    readings: any[];
+    readings?: any[]; // OPCIONAL - backend gera automaticamente se não fornecido
   }): Promise<{ success: boolean; message: string; data?: any }> {
     try {
       console.log('[AuthService] 📤 INÍCIO createCustomReadingPlan');
       console.log('[AuthService] Plano:', planData.name);
       console.log('[AuthService] Type:', planData.type);
-      console.log('[AuthService] Leituras:', planData.readings.length);
+      console.log('[AuthService] Leituras enviadas?', planData.readings ? `Sim (${planData.readings.length})` : 'Não (backend gerará automaticamente)');
       console.log('[AuthService] Token presente?', !!this.token);
       console.log('[AuthService] URL:', `${API_URL}/reading-plans/custom`);
       

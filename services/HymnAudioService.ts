@@ -509,6 +509,33 @@ class HymnAudioService {
   }
 
   /**
+   * Define a velocidade de reprodução para todos os áudios
+   */
+  async setPlaybackRateAll(tracks: HymnAudioTrack[], rate: number): Promise<void> {
+    console.log(`⚡ [HymnAudioService] Alterando velocidade para ${rate}x...`);
+    
+    const loadedTracks = tracks.filter(t => t.sound && t.isLoaded);
+    
+    try {
+      await Promise.all(
+        loadedTracks.map(async (track) => {
+          try {
+            await track.sound!.setRateAsync(rate, true); // true = pitch correction
+            console.log(`✅ [HymnAudioService] ${track.instrument} velocidade alterada para ${rate}x`);
+          } catch (error) {
+            console.error(`❌ [HymnAudioService] Erro ao alterar velocidade de ${track.instrument}:`, error);
+          }
+        })
+      );
+      
+      console.log(`✅ [HymnAudioService] Velocidade de todos os áudios alterada para ${rate}x`);
+    } catch (error) {
+      console.error(`❌ [HymnAudioService] Erro ao alterar velocidade:`, error);
+      throw error;
+    }
+  }
+
+  /**
    * Descarrega todos os áudios da memória
    */
   async unloadAll(tracks: HymnAudioTrack[]): Promise<void> {

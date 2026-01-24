@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { AuthProvider } from "./contexts/AuthContext";
+import ActivePlans from "./pages/ActivePlans/ActivePlans";
 import AudioSync from "./pages/AudioSync";
 import BibleCuriosities from "./pages/BibleCuriosities/BibleCuriosities";
 import BulkEmail from "./pages/BulkEmail";
@@ -58,6 +59,14 @@ function App() {
             element={
               <ProtectedRoute permission="gerenciar_conteudo">
                 <ReadingPlanTemplates />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/active-plans"
+            element={
+              <ProtectedRoute permission="gerenciar_conteudo">
+                <ActivePlans />
               </ProtectedRoute>
             }
           />

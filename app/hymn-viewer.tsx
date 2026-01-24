@@ -5,6 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
+    BackHandler,
     ScrollView,
     StatusBar,
     StyleSheet,
@@ -56,6 +57,7 @@ export default function HymnViewerScreen() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [showPlayer, setShowPlayer] = useState(false); // Controla expansão do player
+  const [playbackRate, setPlaybackRate] = useState(1.0); // Velocidade de reprodução (0.5x a 1.5x)
 
   // Carregar tema ANTES de qualquer renderização
   useEffect(() => {
@@ -88,14 +90,25 @@ export default function HymnViewerScreen() {
       });
     }
 
-    // Cleanup ao desmontar
+    // Cleanup ao desmontar - SEMPRE executar para parar áudio
     return () => {
-      if (theme !== null) {
-        cleanupAudio();
-      }
+      console.log('🧹 [HymnViewer] Limpando áudio ao sair da tela...');
+      cleanupAudio();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [theme]);
+
+  // Interceptar botão de voltar (Android hardware back button)
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      console.log('⬅️ [HymnViewer] Botão voltar pressionado, limpando áudio...');
+      cleanupAudio();
+      return false; // Permite a navegação para trás continuar
+    });
+
+    return () => backHandler.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [audioTracks]);
 
   // Verificar cache quando audioTracks mudar
   useEffect(() => {
@@ -369,6 +382,11 @@ export default function HymnViewerScreen() {
           console.log(`⏱️ [TIMER] Duração obtida em ${Date.now() - durationStartTime}ms`);
           setDuration(firstDuration);
           
+          // Aplicar velocidade de reprodução se não for 1.0x
+          if (playbackRate !== 1.0) {
+            await hymnAudioService.setPlaybackRateAll(loadedTracks, playbackRate);
+          }
+          
           // Tocar imediatamente DO INÍCIO (fromStart=true)
           console.log(`⏱️ [TIMER] Iniciando playback...`);
           const playStartTime = Date.now();
@@ -440,6 +458,19 @@ export default function HymnViewerScreen() {
     }
   };
 
+  const handlePlaybackRateChange = async () => {
+    const rates = [0.5, 0.75, 1.0, 1.25, 1.5];
+    const currentIndex = rates.indexOf(playbackRate);
+    const nextRate = rates[(currentIndex + 1) % rates.length];
+    
+    try {
+      await hymnAudioService.setPlaybackRateAll(audioTracks, nextRate);
+      setPlaybackRate(nextRate);
+    } catch (error) {
+      console.error('Erro ao alterar velocidade:', error);
+    }
+  };
+
   const handleVolumeChange = async (trackIndex: number, volume: number) => {
     try {
       const updatedTracks = [...audioTracks];
@@ -480,6 +511,12 @@ export default function HymnViewerScreen() {
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  const handleBackButton = async () => {
+    console.log('⬅️ [HymnViewer] Botão voltar clicado, parando áudio...');
+    await cleanupAudio();
+    router.back();
   };
 
   const applyFontScale = (base: number) => {
@@ -595,7 +632,7 @@ export default function HymnViewerScreen() {
           backgroundColor={colors.headerBg}
         />
         <View style={[styles.header, { backgroundColor: colors.headerBg, borderBottomColor: colors.border }]}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <TouchableOpacity onPress={handleBackButton} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: colors.textPrimary, fontSize: applyFontScale(20) }]}>
@@ -633,7 +670,7 @@ export default function HymnViewerScreen() {
         backgroundColor={colors.headerBg}
       />
       <View style={[styles.header, { backgroundColor: colors.headerBg, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity onPress={handleBackButton} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.textPrimary, fontSize: applyFontScale(20) }]} numberOfLines={1}>
@@ -806,6 +843,18 @@ export default function HymnViewerScreen() {
                             size={32} 
                             color={colors.accent} 
                           />
+                        </TouchableOpacity>
+                      </View>
+
+                      {/* Controle de velocidade */}
+                      <View style={styles.speedControl}>
+                        <Ionicons name="speedometer-outline" size={16} color={colors.textSecondary} />
+                        <Text style={[styles.speedLabel, { color: colors.textSecondary }]}>Velocidade:</Text>
+                        <TouchableOpacity 
+                          onPress={handlePlaybackRateChange}
+                          style={[styles.speedButton, { backgroundColor: colors.accent }]}
+                        >
+                          <Text style={styles.speedButtonText}>{playbackRate}x</Text>
                         </TouchableOpacity>
                       </View>
 
@@ -1060,6 +1109,29 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 3.84,
     elevation: 5,
+  },
+  speedControl: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 12,
+    paddingHorizontal: 16,
+  },
+  speedLabel: {
+    fontSize: 14,
+  },
+  speedButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    minWidth: 60,
+    alignItems: 'center',
+  },
+  speedButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   progressContainer: {
     flexDirection: 'row',

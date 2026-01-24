@@ -7,18 +7,52 @@ export class ReadingPlanService {
   
   async createDefaultAnnualPlan(customName: string): Promise<ReadingPlan> {
     try {
-      // Criar plano anual local (não usa backend, apenas SQLite local como os templates)
+      console.log('☁️ Criando plano sequencial APENAS no backend (sem salvar localmente)...');
+      
+      // Verificar autenticação
+      const authService = (await import('./AuthService')).default;
+      const token = authService.getToken();
+      const user = authService.getUser();
+      
+      if (!token || !user) {
+        throw new Error('Usuário não autenticado. É necessário estar logado para criar um plano de leitura.');
+      }
+      
+      console.log('👤 Usuário autenticado:', user.email);
+      
       const startDate = new Date();
       startDate.setHours(0, 0, 0, 0);
       const endDate = new Date(startDate.getFullYear(), 11, 31, 23, 59, 59);
       const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
       
-      const planId = `annual_${Date.now()}`;
+      console.log('📅 Datas:', { startDate, endDate, totalDays });
 
-      const plan: ReadingPlan = {
-        id: planId,
+      // Criar plano APENAS no backend (SEM enviar leituras - o backend gera automaticamente)
+      console.log('☁️ Enviando apenas metadados para o backend...');
+      const backendResponse = await authService.createCustomReadingPlan({
         name: customName,
-        type: 'annual',
+        type: 'sequential',
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        totalDays,
+        // NÃO envia readings - o backend gera os primeiros 5 dias automaticamente
+      });
+      
+      console.log('📡 [createDefaultAnnualPlan] Resposta do backend:', JSON.stringify(backendResponse, null, 2));
+      
+      if (!backendResponse.success) {
+        console.error('❌ [createDefaultAnnualPlan] Backend retornou erro:', backendResponse.message);
+        throw new Error(backendResponse.message || 'Falha ao criar plano no backend');
+      }
+      
+      console.log('✅ Plano criado no backend com ID:', backendResponse.data?.plan?.id);
+      console.log('📊 Backend criou os primeiros 5 dias automaticamente');
+      
+      // Retornar o plano do backend
+      const plan: ReadingPlan = {
+        id: backendResponse.data?.plan?.id || `annual_${Date.now()}`,
+        name: customName,
+        type: 'sequential',
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
         isActive: true,
@@ -27,63 +61,16 @@ export class ReadingPlanService {
         completedDays: 0,
       };
 
-      await this.savePlan(plan);
-
-      // Gerar leituras distribuídas pela Bíblia inteira
-      const readings = this.generateFullBibleReadings(startDate, totalDays);
-      
-      // Atualizar o planId em cada dia
-      const readingsWithPlanId = readings.map(reading => ({
-        ...reading,
-        id: `${planId}_${reading.id}`,
-        planId,
-      }));
-      
-      await this.savePlanDays(planId, readingsWithPlanId);
-
-      // Sincronizar com backend
-      try {
-        console.log('☁️ Sincronizando plano sequencial com backend...');
-        const authService = (await import('./AuthService')).default;
-        
-        const token = authService.getToken();
-        const user = authService.getUser();
-        
-        if (!token || !user) {
-          console.log('⚠️ Usuário não autenticado - plano mantido apenas localmente');
-          return plan;
-        }
-        
-        console.log('👤 Usuário autenticado:', user.email);
-        
-        const backendResponse = await authService.createCustomReadingPlan({
-          name: customName,
-          type: 'sequential',
-          startDate: startDate.toISOString(),
-          endDate: endDate.toISOString(),
-          totalDays,
-          readings: readingsWithPlanId,
-        });
-        
-        if (backendResponse.success) {
-          console.log('✅ Plano sincronizado com backend:', backendResponse.data?.plan?.id);
-        } else {
-          console.warn('⚠️ Plano salvo localmente mas falhou ao sincronizar com backend:', backendResponse.message);
-        }
-      } catch (backendError) {
-        console.warn('⚠️ Erro ao sincronizar com backend (plano mantido localmente):', backendError);
-      }
-
       return plan;
     } catch (error) {
-      console.error('Error creating default annual plan:', error);
+      console.error('❌ Error creating default annual plan:', error);
       throw error;
     }
   }
 
   async createInterleavedPlan(customName: string): Promise<ReadingPlan> {
     try {
-      console.log('🔄 Criando plano intercalado no backend:', customName);
+      console.log('☁️ Criando plano intercalado APENAS no backend (sem salvar localmente)...');
       
       // Verificar autenticação
       const authService = (await import('./AuthService')).default;
@@ -103,38 +90,30 @@ export class ReadingPlanService {
       
       console.log('📅 Datas:', { startDate, endDate, totalDays });
 
-      // Gerar leituras intercaladas (AT + NT)
-      console.log('📖 Gerando leituras intercaladas...');
-      const readings = this.generateInterleavedBibleReadings(startDate, totalDays);
-      console.log(`✅ ${readings.length} leituras geradas`);
-      
-      const planId = `interleaved_${Date.now()}`;
-      const readingsWithPlanId = readings.map(reading => ({
-        ...reading,
-        id: `${planId}_${reading.id}`,
-        planId,
-      }));
-
-      // Criar plano APENAS no backend (não salva localmente)
-      console.log('☁️ Criando plano intercalado no backend...');
+      // Criar plano APENAS no backend (SEM enviar leituras - o backend gera automaticamente)
+      console.log('☁️ Enviando apenas metadados para o backend...');
       const backendResponse = await authService.createCustomReadingPlan({
         name: customName,
         type: 'interleaved',
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
         totalDays,
-        readings: readingsWithPlanId,
+        // NÃO envia readings - o backend gera os primeiros 5 dias automaticamente
       });
       
+      console.log('📡 [createInterleavedPlan] Resposta do backend:', JSON.stringify(backendResponse, null, 2));
+      
       if (!backendResponse.success) {
+        console.error('❌ [createInterleavedPlan] Backend retornou erro:', backendResponse.message);
         throw new Error(backendResponse.message || 'Falha ao criar plano no backend');
       }
       
       console.log('✅ Plano criado no backend com ID:', backendResponse.data?.plan?.id);
+      console.log('📊 Backend criou os primeiros 5 dias automaticamente');
       
       // Retornar o plano do backend
       const plan: ReadingPlan = {
-        id: backendResponse.data?.plan?.id || planId,
+        id: backendResponse.data?.plan?.id || `interleaved_${Date.now()}`,
         name: customName,
         type: 'interleaved',
         startDate: startDate.toISOString(),
@@ -148,6 +127,70 @@ export class ReadingPlanService {
       return plan;
     } catch (error) {
       console.error('❌ Error creating interleaved plan:', error);
+      throw error;
+    }
+  }
+  
+  async createNT100DaysPlan(customName: string): Promise<ReadingPlan> {
+    try {
+      console.log('☁️ Criando plano NT 100 dias APENAS no backend (sem salvar localmente)...');
+      
+      // Verificar autenticação
+      const authService = (await import('./AuthService')).default;
+      const token = authService.getToken();
+      const user = authService.getUser();
+      
+      if (!token || !user) {
+        throw new Error('Usuário não autenticado. É necessário estar logado para criar um plano de leitura.');
+      }
+      
+      console.log('👤 Usuário autenticado:', user.email);
+      
+      const startDate = new Date();
+      startDate.setHours(0, 0, 0, 0);
+      const endDate = new Date(startDate);
+      endDate.setDate(endDate.getDate() + 100);
+      const totalDays = 100;
+      
+      console.log('📅 Datas:', { startDate, endDate, totalDays });
+
+      // Criar plano APENAS no backend (SEM enviar leituras - o backend gera automaticamente)
+      console.log('☁️ Enviando apenas metadados para o backend...');
+      const backendResponse = await authService.createCustomReadingPlan({
+        name: customName,
+        type: 'nt-100', // Tipo especial para NT 100 dias
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        totalDays,
+        // NÃO envia readings - o backend gera os primeiros 5 dias automaticamente
+      });
+      
+      console.log('📡 [createNT100DaysPlan] Resposta do backend:', JSON.stringify(backendResponse, null, 2));
+      
+      if (!backendResponse.success) {
+        console.error('❌ [createNT100DaysPlan] Backend retornou erro:', backendResponse.message);
+        throw new Error(backendResponse.message || 'Falha ao criar plano no backend');
+      }
+      
+      console.log('✅ Plano criado no backend com ID:', backendResponse.data?.plan?.id);
+      console.log('📊 Backend criou os primeiros 5 dias automaticamente');
+      
+      // Retornar o plano do backend
+      const plan: ReadingPlan = {
+        id: backendResponse.data?.plan?.id || `nt100_${Date.now()}`,
+        name: customName,
+        type: 'nt-100',
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        isActive: true,
+        createdDate: new Date().toISOString(),
+        totalDays,
+        completedDays: 0,
+      };
+
+      return plan;
+    } catch (error) {
+      console.error('❌ Error creating NT 100 days plan:', error);
       throw error;
     }
   }
@@ -187,7 +230,7 @@ export class ReadingPlanService {
       
       console.log('👤 [createPlanFromTemplate] Usuário autenticado:', user.email);
       
-      // Fetch template details
+      // Fetch template details (apenas para pegar metadados)
       console.log('📡 [createPlanFromTemplate] Buscando template do backend:', `${API_URL}/reading-plan-templates/${templateId}`);
       const response = await fetch(`${API_URL}/reading-plan-templates/${templateId}`);
       console.log('📡 [createPlanFromTemplate] Response status:', response.status, response.statusText);
@@ -222,46 +265,14 @@ export class ReadingPlanService {
         totalDays
       });
 
-      // Convert template readings to the format expected by backend
-      console.log('🔄 [createPlanFromTemplate] Convertendo leituras do template...');
-      const readings: ReadingPlanDay[] = template.readings.map((reading: any, index: number) => {
-        const dayDate = new Date(startDate);
-        dayDate.setDate(dayDate.getDate() + index);
-
-        // Convert bookReadings to the Reading[] format
-        const dayReadings: Reading[] = reading.bookReadings.map((br: any) => {
-          // Determine book ID based on book name
-          const bookId = this.getBookIdByName(br.book);
-          
-          return {
-            id: `${br.book}_${br.chapters[0]}_${br.chapters[br.chapters.length - 1]}`,
-            bookId,
-            startChapter: br.chapters[0],
-            endChapter: br.chapters[br.chapters.length - 1],
-            bookName: br.book,
-          };
-        });
-
-        return {
-          id: `day_${index + 1}`,
-          planId: '', // Will be set by backend
-          dayNumber: reading.day,
-          date: dayDate.toISOString(),
-          readings: dayReadings,
-          isCompleted: false,
-        };
-      });
-      console.log('✅ [createPlanFromTemplate] Leituras convertidas:', readings.length, 'dias');
-
-      // Create plan in backend (NOT locally)
-      console.log('☁️ [createPlanFromTemplate] Enviando para backend via authService.createCustomReadingPlan...');
+      // Create plan in backend (APENAS metadados, SEM enviar leituras)
+      console.log('☁️ [createPlanFromTemplate] Enviando APENAS metadados para backend...');
       console.log('📦 [createPlanFromTemplate] Payload:', {
         name: customName,
         type: template.type,
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
         totalDays,
-        readingsCount: readings.length
       });
       
       const backendResponse = await authService.createCustomReadingPlan({
@@ -270,7 +281,7 @@ export class ReadingPlanService {
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
         totalDays,
-        readings,
+        // NÃO envia readings - o backend gera os primeiros 5 dias automaticamente
       });
 
       console.log('📡 [createPlanFromTemplate] Resposta do backend:', {
@@ -285,6 +296,7 @@ export class ReadingPlanService {
       }
 
       console.log('✅ [createPlanFromTemplate] Plano criado no backend com sucesso! ID:', backendResponse.data?.plan?.id);
+      console.log('📊 Backend criou os primeiros 5 dias automaticamente');
 
       // Return plan structure (but it's stored only in backend)
       const plan: ReadingPlan = {

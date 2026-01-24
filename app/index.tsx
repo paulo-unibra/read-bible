@@ -80,7 +80,7 @@ export default function HomeScreen() {
       return () => {
         mounted = false;
       };
-    }, [])
+    }, []),
   );
 
   const initializeApp = async () => {
@@ -122,41 +122,54 @@ export default function HomeScreen() {
 
   const loadReadingPlan = async () => {
     try {
-      console.log('=== LOAD READING PLAN START ===');
+      console.log("=== LOAD READING PLAN START ===");
       // Primeiro busca planos locais (templates customizados tem prioridade)
       const localPlans = await readingPlanService.getActivePlans();
-      console.log('Local plans found:', localPlans.length);
+      console.log("Local plans found:", localPlans.length);
       if (localPlans.length > 0) {
-        console.log('Using local plan:', localPlans[0]);
+        console.log("Using local plan:", localPlans[0]);
         setHasLocalPlan(true);
         // Pega o primeiro plano ativo local
         const plan = localPlans[0];
 
         // Busca o próximo dia não concluído do plano
         const planDays = await readingPlanService.getPlanDays(plan.id);
-        console.log('Plan days retrieved:', planDays.length);
+        console.log("Plan days retrieved:", planDays.length);
 
         // Busca o primeiro dia que NÃO está concluído (ordenado por número do dia)
         const nextDay = planDays
           .sort((a, b) => a.dayNumber - b.dayNumber)
           .find((day) => !day.isCompleted);
-        
-        console.log('Next uncompleted day:', nextDay ? `Day ${nextDay.dayNumber}` : 'None found');
+
+        console.log(
+          "Next uncompleted day:",
+          nextDay ? `Day ${nextDay.dayNumber}` : "None found",
+        );
 
         // Calcular total de capítulos do plano
         const totalChapters = planDays.reduce((sum, day) => {
-          return sum + day.readings.reduce((chapterSum, reading) => {
-            return chapterSum + (reading.endChapter - reading.startChapter + 1);
-          }, 0);
+          return (
+            sum +
+            day.readings.reduce((chapterSum, reading) => {
+              return (
+                chapterSum + (reading.endChapter - reading.startChapter + 1)
+              );
+            }, 0)
+          );
         }, 0);
 
         // Calcular capítulos completados
         const completedChapters = planDays
-          .filter(day => day.isCompleted)
+          .filter((day) => day.isCompleted)
           .reduce((sum, day) => {
-            return sum + day.readings.reduce((chapterSum, reading) => {
-              return chapterSum + (reading.endChapter - reading.startChapter + 1);
-            }, 0);
+            return (
+              sum +
+              day.readings.reduce((chapterSum, reading) => {
+                return (
+                  chapterSum + (reading.endChapter - reading.startChapter + 1)
+                );
+              }, 0)
+            );
           }, 0);
 
         // Converte para o formato esperado pela tela
@@ -168,22 +181,22 @@ export default function HomeScreen() {
           completedChapters,
           progress: Math.round((plan.completedDays / plan.totalDays) * 100),
         };
-        
-        console.log('Reading plan data prepared:', {
+
+        console.log("Reading plan data prepared:", {
           currentDay: readingPlanData.currentDay,
           totalDays: readingPlanData.totalDays,
           totalChapters: readingPlanData.totalChapters,
           completedChapters: readingPlanData.completedChapters,
           progress: readingPlanData.progress,
           hasStartDate: !!readingPlanData.startDate,
-          completedDays: readingPlanData.completedDays
+          completedDays: readingPlanData.completedDays,
         });
-        
+
         setReadingPlan(readingPlanData);
 
         // Converte readings para o formato esperado
         if (nextDay) {
-          console.log('Setting today readings:', nextDay.readings);
+          console.log("Setting today readings:", nextDay.readings);
           setTodayReadings(nextDay.readings);
           setTodayDayId(nextDay.id); // Guardar o ID do dia do plano
 
@@ -203,48 +216,52 @@ export default function HomeScreen() {
           //         )
           //         .join(" | ")
           //     : "";
-
         } else {
           // Se não há mais dias não concluídos, limpa as leituras
-          console.log('No more uncompleted days - clearing readings');
+          console.log("No more uncompleted days - clearing readings");
           setTodayReadings([]);
           setTodayDayId(null);
         }
-        console.log('=== LOCAL PLAN LOADED SUCCESSFULLY ===');
+        console.log("=== LOCAL PLAN LOADED SUCCESSFULLY ===");
         return;
       }
 
       // Se não encontrou planos locais, busca do backend (sistema antigo - apenas para retrocompatibilidade)
-      console.log('No local plans - trying backend API');
+      console.log("No local plans - trying backend API");
       const planResponse = await authService.getActivePlan();
-      console.log('Backend plan response:', planResponse);
-      
+      console.log("Backend plan response:", planResponse);
+
       if (planResponse.success && planResponse.data) {
-        console.log('Backend plan data:', planResponse.data.plan);
+        console.log("Backend plan data:", planResponse.data.plan);
         setReadingPlan(planResponse.data.plan);
         setHasLocalPlan(false);
-        
+
         // Buscar TODAS as leituras do plano para encontrar a próxima não concluída
         const allReadingsResponse = await authService.getAllPlanReadings();
-        console.log('All readings response:', allReadingsResponse);
-        
+        console.log("All readings response:", allReadingsResponse);
+
         if (allReadingsResponse.success && allReadingsResponse.data) {
-          console.log('Total readings from backend:', allReadingsResponse.data.length);
+          console.log(
+            "Total readings from backend:",
+            allReadingsResponse.data.length,
+          );
           // Encontra a primeira leitura não concluída
           const nextReadings = allReadingsResponse.data
-            .filter(reading => !reading.isCompleted)
+            .filter((reading) => !reading.isCompleted)
             .sort((a, b) => a.day - b.day);
-          
-          console.log('Uncompleted readings found:', nextReadings.length);
-          
+
+          console.log("Uncompleted readings found:", nextReadings.length);
+
           if (nextReadings.length > 0) {
             // Agrupar leituras do mesmo dia
             const firstDay = nextReadings[0].day;
-            const todayReadings = nextReadings.filter(r => r.day === firstDay);
-            
+            const todayReadings = nextReadings.filter(
+              (r) => r.day === firstDay,
+            );
+
             console.log("Próxima leitura não concluída (dia):", firstDay);
             console.log("Leituras do dia:", todayReadings);
-            
+
             setTodayReadings(todayReadings);
           } else {
             // Todas as leituras foram concluídas
@@ -252,15 +269,15 @@ export default function HomeScreen() {
             setTodayReadings([]);
           }
         } else {
-          console.log('Failed to get all readings - using fallback');
+          console.log("Failed to get all readings - using fallback");
           // Fallback para o comportamento antigo se falhar
           setTodayReadings(planResponse.data.todayReadings);
         }
-        
+
         setTodayDayId(null); // Backend não usa IDs locais
-        console.log('=== BACKEND PLAN LOADED SUCCESSFULLY ===');
+        console.log("=== BACKEND PLAN LOADED SUCCESSFULLY ===");
       } else {
-        console.log('No backend plan found');
+        console.log("No backend plan found");
       }
     } catch (error) {
       console.error("=== ERROR LOADING PLAN ===", error);
@@ -304,7 +321,7 @@ export default function HomeScreen() {
         [
           { text: "Cancelar", style: "cancel" },
           { text: "Criar Conta", onPress: () => router.push("/auth") },
-        ]
+        ],
       );
       return;
     }
@@ -319,7 +336,7 @@ export default function HomeScreen() {
             text: "Criar",
             onPress: () => router.push("/select-plan-template"),
           },
-        ]
+        ],
       );
       return;
     }
@@ -334,7 +351,7 @@ export default function HomeScreen() {
 
   const handleMarkReadingComplete = async () => {
     if (!todayReadings.length || !readingPlan || markingComplete) return;
-    
+
     try {
       setMarkingComplete(true);
       console.log("TESTE: ", todayReadings);
@@ -348,9 +365,9 @@ export default function HomeScreen() {
         }
         await readingPlanService.markDayAsCompleted(todayDayId);
         await loadReadingPlan();
-        
+
         // Alerta de parabéns após atualizar
-2
+        2;
         return;
       }
 
@@ -358,7 +375,7 @@ export default function HomeScreen() {
       const response = await authService.completeDay(todayReadings[0].day);
       if (response.success) {
         await loadReadingPlan();
-        
+
         // Alerta de parabéns após atualizar
         // setTimeout(() => {
         //   Alert.alert(
@@ -375,8 +392,8 @@ export default function HomeScreen() {
       } else {
         Alert.alert("Erro", response.message);
       }
-    } catch(error) {
-      console.log('Erro ao marcar leitura como completa:', error);
+    } catch (error) {
+      console.log("Erro ao marcar leitura como completa:", error);
       Alert.alert("Erro", "Falha ao marcar leitura");
     } finally {
       setMarkingComplete(false);
@@ -397,7 +414,7 @@ export default function HomeScreen() {
               text: "Baixar Bíblias",
               onPress: () => router.push("/bible-manager"),
             },
-          ]
+          ],
         );
         return;
       }
@@ -411,17 +428,17 @@ export default function HomeScreen() {
           const books = await bibleReaderService.getBooks(firstBible.id);
           await bibleReaderService.openBible(
             firstBible.id,
-            firstBible.fileName
+            firstBible.fileName,
           );
 
           // Se não tem livros do AT, começar em Mateus
           const hasOldTestament = books.some(
-            (book: Book) => book.testament === "old"
+            (book: Book) => book.testament === "old",
           );
           if (!hasOldTestament) {
             // Procurar por Mateus
             const matthew = books.find((book: Book) =>
-              /Mateus|Matthew/i.test(book.name)
+              /Mateus|Matthew/i.test(book.name),
             );
             if (matthew) {
               startBookId = matthew.id;
@@ -438,7 +455,7 @@ export default function HomeScreen() {
         };
       }
       router.push(
-        `/chapter-reader?bibleId=${lastReading.bibleId}&bookId=${lastReading.bookId}&chapterNumber=${lastReading.chapterNumber}`
+        `/chapter-reader?bibleId=${lastReading.bibleId}&bookId=${lastReading.bookId}&chapterNumber=${lastReading.chapterNumber}`,
       );
     } catch {
       Alert.alert("Erro", "Falha ao abrir Bíblia");
@@ -456,7 +473,7 @@ export default function HomeScreen() {
           return base;
       }
     },
-    [fontSizePref]
+    [fontSizePref],
   );
 
   const handleExportPlan = async () => {
@@ -534,9 +551,9 @@ export default function HomeScreen() {
 
         {/* User greeting or login button */}
         {isAuthenticated ? (
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.userGreeting}
-            onPress={() => router.push('/profile')}
+            onPress={() => router.push("/profile")}
           >
             <Ionicons
               name="person-circle-outline"
@@ -627,59 +644,77 @@ export default function HomeScreen() {
                 // Calcular status baseado nas leituras realmente concluídas
                 const today = new Date();
                 today.setHours(0, 0, 0, 0);
-                
+
                 // Extrair apenas a parte da data (YYYY-MM-DD) para evitar problemas de timezone
-                const startDateStr = readingPlan.startDate.split('T')[0]; // "2026-01-01"
-                const [year, month, day] = startDateStr.split('-').map(Number);
+                const startDateStr = readingPlan.startDate.split("T")[0]; // "2026-01-01"
+                const [year, month, day] = startDateStr.split("-").map(Number);
                 const planStartDate = new Date(year, month - 1, day); // Mês é 0-indexed
                 planStartDate.setHours(0, 0, 0, 0);
-                
-                console.log('=== STATUS BADGE CALCULATION ===');
-                console.log('Today:', today.toISOString());
-                console.log('Plan start date:', readingPlan.startDate);
-                console.log('Plan start date parsed:', planStartDate.toISOString());
-                
+
+                console.log("=== STATUS BADGE CALCULATION ===");
+                console.log("Today:", today.toISOString());
+                console.log("Plan start date:", readingPlan.startDate);
+                console.log(
+                  "Plan start date parsed:",
+                  planStartDate.toISOString(),
+                );
+
                 // Calcular quantos dias se passaram desde o início do plano
                 const daysPassed = Math.floor(
-                  (today.getTime() - planStartDate.getTime()) / (1000 * 60 * 60 * 24)
+                  (today.getTime() - planStartDate.getTime()) /
+                    (1000 * 60 * 60 * 24),
                 );
-                
-                console.log('Days passed:', daysPassed);
-                
+
+                console.log("Days passed:", daysPassed);
+
                 // Contar quantas leituras foram realmente concluídas
                 const completedDays = readingPlan.completedDays || 0;
-                
-                console.log('Completed days:', completedDays);
-                console.log('Current day (next uncompleted):', readingPlan.currentDay);
-                
+
+                console.log("Completed days:", completedDays);
+                console.log(
+                  "Current day (next uncompleted):",
+                  readingPlan.currentDay,
+                );
+
                 // Dia que DEVERIA estar baseado na data (quantos dias já se passaram)
                 // Se começou dia 1/1 e hoje é 10/1, já se passaram 9 dias, então hoje é o dia 10
-                const expectedDayByDate = Math.min(daysPassed + 1, readingPlan.totalDays);
-                
-                console.log('Expected day by date:', expectedDayByDate);
-                console.log('Total days in plan:', readingPlan.totalDays);
-                
+                const expectedDayByDate = Math.min(
+                  daysPassed + 1,
+                  readingPlan.totalDays,
+                );
+
+                console.log("Expected day by date:", expectedDayByDate);
+                console.log("Total days in plan:", readingPlan.totalDays);
+
                 // Calcular status:
                 // - Se completou MENOS que o dia esperado - 1, está atrasado
                 // - Se completou EXATAMENTE o dia esperado - 1, está pendente hoje
                 // - Se completou IGUAL OU MAIS que o dia esperado, está em dia
-                
-                const isLate = completedDays < (expectedDayByDate - 1);
-                const hasNotReadToday = completedDays === (expectedDayByDate - 1);
-                const daysLate = isLate ? (expectedDayByDate - 1 - completedDays) : 0;
-                
-                console.log('Is late:', isLate);
-                console.log('Has not read today:', hasNotReadToday);
-                console.log('Days late:', daysLate);
-                console.log('Calculation: completedDays =', completedDays, ', expectedDayByDate - 1 =', expectedDayByDate - 1);
-                console.log('=== END STATUS CALCULATION ===');
-                
+
+                const isLate = completedDays < expectedDayByDate - 1;
+                const hasNotReadToday = completedDays === expectedDayByDate - 1;
+                const daysLate = isLate
+                  ? expectedDayByDate - 1 - completedDays
+                  : 0;
+
+                console.log("Is late:", isLate);
+                console.log("Has not read today:", hasNotReadToday);
+                console.log("Days late:", daysLate);
+                console.log(
+                  "Calculation: completedDays =",
+                  completedDays,
+                  ", expectedDayByDate - 1 =",
+                  expectedDayByDate - 1,
+                );
+                console.log("=== END STATUS CALCULATION ===");
+
                 if (isLate) {
                   return (
                     <View style={styles.statusBadge}>
                       <Ionicons name="alert-circle" size={14} color="#FF9800" />
-                      <Text style={[styles.statusText, { color: '#FF9800' }]}>
-                        {daysLate} {daysLate === 1 ? 'dia atrasado' : 'dias atrasados'}
+                      <Text style={[styles.statusText, { color: "#FF9800" }]}>
+                        {daysLate}{" "}
+                        {daysLate === 1 ? "dia atrasado" : "dias atrasados"}
                       </Text>
                     </View>
                   );
@@ -687,7 +722,7 @@ export default function HomeScreen() {
                   return (
                     <View style={styles.statusBadge}>
                       <Ionicons name="time-outline" size={14} color="#2196F3" />
-                      <Text style={[styles.statusText, { color: '#2196F3' }]}>
+                      <Text style={[styles.statusText, { color: "#2196F3" }]}>
                         Pendente hoje
                       </Text>
                     </View>
@@ -695,8 +730,12 @@ export default function HomeScreen() {
                 } else {
                   return (
                     <View style={styles.statusBadge}>
-                      <Ionicons name="checkmark-circle" size={14} color="#4CAF50" />
-                      <Text style={[styles.statusText, { color: '#4CAF50' }]}>
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={14}
+                        color="#4CAF50"
+                      />
+                      <Text style={[styles.statusText, { color: "#4CAF50" }]}>
                         Em dia
                       </Text>
                     </View>
@@ -704,11 +743,11 @@ export default function HomeScreen() {
                 }
               })()}
             </View>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.readingInfo}
               onPress={() => {
                 router.push({
-                  pathname: '/daily-reading',
+                  pathname: "/daily-reading",
                   params: {
                     readings: JSON.stringify(todayReadings),
                     hasLocalPlan: hasLocalPlan.toString(),
@@ -722,7 +761,10 @@ export default function HomeScreen() {
                 <Text
                   style={[
                     styles.readingText,
-                    { color: colors.textSecondary, fontSize: applyFontScale(16) },
+                    {
+                      color: colors.textSecondary,
+                      fontSize: applyFontScale(16),
+                    },
                   ]}
                 >
                   {todayReadings.map((reading, index) => (
@@ -735,10 +777,10 @@ export default function HomeScreen() {
                     </Text>
                   ))}
                 </Text>
-                <Ionicons 
-                  name="arrow-forward" 
-                  size={20} 
-                  color={colors.accent} 
+                <Ionicons
+                  name="arrow-forward"
+                  size={20}
+                  color={colors.accent}
                   style={styles.readingArrow}
                 />
               </View>
@@ -777,7 +819,7 @@ export default function HomeScreen() {
               <TouchableOpacity
                 style={[
                   styles.completeButton,
-                  markingComplete && { opacity: 0.7 }
+                  markingComplete && { opacity: 0.7 },
                 ]}
                 onPress={handleMarkReadingComplete}
                 disabled={markingComplete}
@@ -847,7 +889,8 @@ export default function HomeScreen() {
                 },
               ]}
             >
-              Parabéns por concluir seu plano de leitura. Clique aqui para visualizar seu certificado de conclusão.
+              Parabéns por concluir seu plano de leitura. Clique aqui para
+              visualizar seu certificado de conclusão.
             </Text>
           </View>
         ) : !isAuthenticated ? (
@@ -1103,6 +1146,55 @@ export default function HomeScreen() {
             </TouchableOpacity>
           )}
 
+          {/* {isAuthenticated && (
+            <TouchableOpacity
+              style={[
+                styles.actionCard,
+                {
+                  backgroundColor: colors.card,
+                  shadowOpacity: isDark ? 0.25 : 0.1,
+                },
+              ]}
+              onPress={() => router.push("/my-notes")}
+            >
+              <View
+                style={[
+                  styles.actionIcon,
+                  { backgroundColor: colors.surfaceAlt },
+                ]}
+              >
+                <Ionicons
+                  name="document-text-outline"
+                  size={32}
+                  color={isDark ? "#ba68c8" : "#9C27B0"}
+                />
+              </View>
+              <View style={styles.actionContent}>
+                <Text
+                  style={[
+                    styles.actionTitle,
+                    { color: colors.textPrimary, fontSize: applyFontScale(18) },
+                  ]}
+                >
+                  Minhas Anotações
+                </Text>
+                <Text
+                  style={[
+                    styles.actionDescription,
+                    { color: colors.textSecondary, fontSize: applyFontScale(14) },
+                  ]}
+                >
+                  Visualize suas anotações bíblicas
+                </Text>
+              </View>
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color={colors.iconForward}
+              />
+            </TouchableOpacity>
+          )} */}
+
           <TouchableOpacity
             style={[
               styles.actionCard,
@@ -1269,7 +1361,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
-    backgroundColor: 'rgba(0,0,0,0.05)',
+    backgroundColor: "rgba(0,0,0,0.05)",
   },
   statusText: {
     fontSize: 12,

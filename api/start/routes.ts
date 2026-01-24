@@ -18,12 +18,14 @@ const AdminPlayStoreReportsController = () =>
 const BulkEmailController = () => import('#controllers/bulk_email_controller')
 const BibleCuriositiesController = () => import('#controllers/bible_curiosities_controller')
 const ImportController = () => import('#controllers/import_controller')
+const NotesController = () => import('#controllers/notes_controller')
 const PasswordResetController = () => import('#controllers/password_reset_controller')
 const QueueController = () => import('#controllers/queue_controller')
 const QuizController = () => import('#controllers/quiz_controller')
 const QuizResultController = () => import('#controllers/quiz_result_controller')
 const ReadingPlanController = () => import('#controllers/reading_plan_controller')
 const ReadingPlanTemplateController = () => import('#controllers/reading_plan_template_controller')
+const PlanTypesController = () => import('#controllers/plan_types_controller')
 const HymnAudiosController = () => import('#controllers/hymn_audios_controller')
 const AudioSyncTimestampsController = () => import('#controllers/audio_sync_timestamps_controller')
 import router from '@adonisjs/core/services/router'
@@ -55,6 +57,7 @@ router.get('/reading-plans/active', [ReadingPlanController, 'getActive']).use(mi
 router
   .post('/reading-plans/complete', [ReadingPlanController, 'completeDay'])
   .use(middleware.auth())
+router.post('/reading-plans/add-days', [ReadingPlanController, 'addNextDays']).use(middleware.auth())
 router.post('/reading-plans/unmark', [ReadingPlanController, 'unmarkDay']).use(middleware.auth())
 router.get('/reading-plans/history', [ReadingPlanController, 'getHistory']).use(middleware.auth())
 router
@@ -72,6 +75,17 @@ router.get('/ranking/page', [ReadingPlanController, 'getRankingPage'])
 // Reading Plan Templates (public - for mobile app)
 router.get('/reading-plan-templates', [ReadingPlanTemplateController, 'index'])
 router.get('/reading-plan-templates/:id', [ReadingPlanTemplateController, 'show'])
+
+// Plan Types (public - for mobile app to check available plan types)
+router.get('/plan-types', [PlanTypesController, 'active'])
+
+// Notes routes (protected)
+router.get('/notes', [NotesController, 'index']).use(middleware.auth())
+router.get('/notes/:id', [NotesController, 'show']).use(middleware.auth())
+router.get('/notes/chapter/:bookId/:chapterNumber', [NotesController, 'byChapter']).use(middleware.auth())
+router.post('/notes', [NotesController, 'store']).use(middleware.auth())
+router.put('/notes/:id', [NotesController, 'update']).use(middleware.auth())
+router.delete('/notes/:id', [NotesController, 'destroy']).use(middleware.auth())
 
 // Quiz routes
 router.post('/generate-quiz', [QuizController, 'generate'])
@@ -178,6 +192,11 @@ router
           'generateWithAI',
         ])
 
+        // Plan Types management (for default plan types like Sequential, Interleaved)
+        router.get('/plan-types', [PlanTypesController, 'index'])
+        router.put('/plan-types/:id', [PlanTypesController, 'update'])
+        router.patch('/plan-types/:id/toggle', [PlanTypesController, 'toggle'])
+
         // Reports
         router.get('/reports/general-stats', [AdminReportController, 'getGeneralStats'])
         router.get('/reports/app-downloads', [AdminReportController, 'getAppDownloads'])
@@ -211,6 +230,9 @@ router
 
         // Reading Plans management
         router.get('/reading-plans/incorrect', [ReadingPlanController, 'listIncorrectPlans'])
+        router.get('/reading-plans/all', [ReadingPlanController, 'listAllPlans'])
+        router.patch('/reading-plans/:planId/disable', [ReadingPlanController, 'disablePlan'])
+        router.patch('/reading-plans/:planId/enable', [ReadingPlanController, 'enablePlan'])
         router.post('/reading-plans/:planId/recalculate', [
           ReadingPlanController,
           'recalculatePlan',

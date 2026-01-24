@@ -18,6 +18,15 @@ interface Template {
   createdAt: string;
 }
 
+interface PlanType {
+  id: number;
+  key: string;
+  name: string;
+  description: string | null;
+  isActive: boolean;
+  order: number;
+}
+
 interface BookReading {
   book: string;
   chapters: number[];
@@ -31,6 +40,7 @@ interface Reading {
 
 const ReadingPlanTemplates: React.FC = () => {
   const [templates, setTemplates] = useState<Template[]>([]);
+  const [planTypes, setPlanTypes] = useState<PlanType[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -75,13 +85,27 @@ const ReadingPlanTemplates: React.FC = () => {
     setError('');
     
     try {
-      const response = await api.get('/admin/reading-plan-templates');
-      setTemplates(response.data.data);
+      const [templatesRes, typesRes] = await Promise.all([
+        api.get('/admin/reading-plan-templates'),
+        api.get('/admin/plan-types')
+      ]);
+      setTemplates(templatesRes.data.data);
+      setPlanTypes(typesRes.data.data);
     } catch (err) {
-      setError('Erro ao carregar templates');
+      setError('Erro ao carregar dados');
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleTogglePlanType = async (id: number) => {
+    try {
+      await api.patch(`/admin/plan-types/${id}/toggle`);
+      loadTemplates();
+    } catch (err) {
+      alert('Erro ao atualizar tipo de plano');
+      console.error(err);
     }
   };
 
@@ -398,11 +422,47 @@ const ReadingPlanTemplates: React.FC = () => {
         {loading ? (
           <div className="loading">Carregando planos...</div>
         ) : (
-          <div className="templates-grid">
-            {templates.length === 0 ? (
-              <div className="no-data">Nenhum plano encontrado</div>
-            ) : (
-              templates.map(template => (
+          <>
+            {/* Seção de Tipos de Planos Padrão */}
+            <div className="plan-types-section">
+              <h2>Tipos de Planos Padrão</h2>
+              <p className="section-description">
+                Ative ou desative os tipos de planos que os usuários podem escolher no app
+              </p>
+              <div className="plan-types-grid">
+                {planTypes.map(planType => (
+                  <div key={planType.id} className={`plan-type-card ${!planType.isActive ? 'inactive' : ''}`}>
+                    <div className="plan-type-header">
+                      <h3>{planType.name}</h3>
+                      <label className="switch">
+                        <input
+                          type="checkbox"
+                          checked={planType.isActive}
+                          onChange={() => handleTogglePlanType(planType.id)}
+                        />
+                        <span className="slider"></span>
+                      </label>
+                    </div>
+                    <p className="plan-type-description">{planType.description}</p>
+                    <div className="plan-type-info">
+                      <span className={`status-badge ${planType.isActive ? 'active' : 'inactive'}`}>
+                        {planType.isActive ? '✓ Ativo' : '✗ Inativo'}
+                      </span>
+                      <span className="key-badge">{planType.key}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Seção de Templates Personalizados */}
+            <div className="templates-section">
+              <h2>Templates Personalizados</h2>
+              <div className="templates-grid">
+                {templates.length === 0 ? (
+                  <div className="no-data">Nenhum template personalizado encontrado</div>
+                ) : (
+                  templates.map(template => (
                 <div key={template.id} className={`template-card ${!template.isActive ? 'inactive' : ''}`}>
                   <div className="template-header">
                     <h3>{template.name}</h3>
@@ -445,8 +505,10 @@ const ReadingPlanTemplates: React.FC = () => {
                   </div>
                 </div>
               ))
-            )}
+              )}
+            </div>
           </div>
+          </>
         )}
       </div>
 

@@ -53,7 +53,7 @@ export default class ReadingPlan extends BaseModel {
   declare user: BelongsTo<typeof User>
 
   @hasMany(() => ReadingProgress, {
-    foreignKey: 'readingPlanId'
+    foreignKey: 'readingPlanId',
   })
   declare progress: HasMany<typeof ReadingProgress>
 }

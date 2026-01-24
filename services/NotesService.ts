@@ -1,18 +1,18 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AuthService, { API_URL } from './AuthService';
 
 export interface VerseNote {
-  id: string;
+  id: number;
+  userId: number;
   bookId: number;
   bookName: string;
   chapterNumber: number;
-  verseNumbers: number[]; // Array para suportar múltiplos versículos
+  verseNumbers: number[];
   verseText: string;
   note: string;
+  isPrivate: boolean;
   createdAt: string;
   updatedAt: string;
 }
-
-const NOTES_STORAGE_KEY = '@bible_notes';
 
 class NotesService {
   // Salvar ou atualizar uma anotação
@@ -22,43 +22,39 @@ class NotesService {
     chapterNumber: number,
     verseNumbers: number[],
     verseText: string,
-    note: string
+    note: string,
+    isPrivate: boolean = true
   ): Promise<VerseNote> {
     try {
-      const notes = await this.getAllNotes();
-      
-      // Criar ID único baseado na referência bíblica
-      const verseRange = verseNumbers.length === 1 
-        ? verseNumbers[0].toString()
-        : `${Math.min(...verseNumbers)}-${Math.max(...verseNumbers)}`;
-      const noteId = `${bookId}-${chapterNumber}-${verseRange}`;
-      
-      // Verificar se já existe uma nota para esses versículos
-      const existingNoteIndex = notes.findIndex(n => n.id === noteId);
-      
-      const timestamp = new Date().toISOString();
-      const newNote: VerseNote = {
-        id: noteId,
-        bookId,
-        bookName,
-        chapterNumber,
-        verseNumbers,
-        verseText,
-        note,
-        createdAt: existingNoteIndex >= 0 ? notes[existingNoteIndex].createdAt : timestamp,
-        updatedAt: timestamp,
-      };
-      
-      if (existingNoteIndex >= 0) {
-        // Atualizar nota existente
-        notes[existingNoteIndex] = newNote;
-      } else {
-        // Adicionar nova nota
-        notes.push(newNote);
+      const token = await AuthService.getToken();
+      if (!token) {
+        throw new Error('Usuário não autenticado');
       }
-      
-      await AsyncStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(notes));
-      return newNote;
+
+      const response = await fetch(`${API_URL}/notes`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          bookId,
+          bookName,
+          chapterNumber,
+          verseNumbers,
+          verseText,
+          note,
+          isPrivate,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Erro ao salvar anotação');
+      }
+
+      return result.data;
     } catch (error) {
       console.error('Erro ao salvar anotação:', error);
       throw error;
@@ -68,14 +64,25 @@ class NotesService {
   // Buscar todas as anotações
   async getAllNotes(): Promise<VerseNote[]> {
     try {
-      const notesJson = await AsyncStorage.getItem(NOTES_STORAGE_KEY);
-      if (!notesJson) return [];
-      
-      const notes = JSON.parse(notesJson) as VerseNote[];
-      // Ordenar por data de atualização (mais recentes primeiro)
-      return notes.sort((a, b) => 
-        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-      );
+      const token = await AuthService.getToken();
+      if (!token) {
+        return [];
+      }
+
+      const response = await fetch(`${API_URL}/notes`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Erro ao buscar anotações');
+      }
+
+      return result.data || [];
     } catch (error) {
       console.error('Erro ao buscar anotações:', error);
       return [];
@@ -89,13 +96,15 @@ class NotesService {
     verseNumbers: number[]
   ): Promise<VerseNote | null> {
     try {
-      const notes = await this.getAllNotes();
-      const verseRange = verseNumbers.length === 1 
-        ? verseNumbers[0].toString()
-        : `${Math.min(...verseNumbers)}-${Math.max(...verseNumbers)}`;
-      const noteId = `${bookId}-${chapterNumber}-${verseRange}`;
+      const notes = await this.getNotesByChapter(bookId, chapterNumber);
       
-      return notes.find(n => n.id === noteId) || null;
+      // Procurar nota que contenha exatamente esses versículos
+      const note = notes.find(n => 
+        n.verseNumbers.length === verseNumbers.length &&
+        n.verseNumbers.every(v => verseNumbers.includes(v))
+      );
+
+      return note || null;
     } catch (error) {
       console.error('Erro ao buscar anotação:', error);
       return null;
@@ -105,10 +114,25 @@ class NotesService {
   // Buscar anotações de um capítulo específico
   async getNotesByChapter(bookId: number, chapterNumber: number): Promise<VerseNote[]> {
     try {
-      const notes = await this.getAllNotes();
-      return notes.filter(
-        n => n.bookId === bookId && n.chapterNumber === chapterNumber
-      );
+      const token = await AuthService.getToken();
+      if (!token) {
+        return [];
+      }
+
+      const response = await fetch(`${API_URL}/notes/chapter/${bookId}/${chapterNumber}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Erro ao buscar anotações do capítulo');
+      }
+
+      return result.data || [];
     } catch (error) {
       console.error('Erro ao buscar anotações do capítulo:', error);
       return [];
@@ -118,8 +142,8 @@ class NotesService {
   // Buscar anotações de um livro
   async getNotesByBook(bookId: number): Promise<VerseNote[]> {
     try {
-      const notes = await this.getAllNotes();
-      return notes.filter(n => n.bookId === bookId);
+      const allNotes = await this.getAllNotes();
+      return allNotes.filter(n => n.bookId === bookId);
     } catch (error) {
       console.error('Erro ao buscar anotações do livro:', error);
       return [];
@@ -127,11 +151,25 @@ class NotesService {
   }
 
   // Deletar uma anotação
-  async deleteNote(noteId: string): Promise<void> {
+  async deleteNote(noteId: number): Promise<void> {
     try {
-      const notes = await this.getAllNotes();
-      const filteredNotes = notes.filter(n => n.id !== noteId);
-      await AsyncStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(filteredNotes));
+      const token = await AuthService.getToken();
+      if (!token) {
+        throw new Error('Usuário não autenticado');
+      }
+
+      const response = await fetch(`${API_URL}/notes/${noteId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Erro ao deletar anotação');
+      }
     } catch (error) {
       console.error('Erro ao deletar anotação:', error);
       throw error;

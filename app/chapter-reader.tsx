@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -23,6 +24,7 @@ import AudioPlayer from "../components/AudioPlayer";
 import { IntroductionRenderer } from "../components/IntroductionRenderer";
 import QuizButton from "../components/QuizButton";
 import AudioService from "../services/AudioService";
+import AuthService from "../services/AuthService";
 import bibleReaderService from "../services/BibleReaderService";
 import DatabaseService from "../services/DatabaseService";
 import googleDriveService from "../services/GoogleDriveService";
@@ -138,6 +140,10 @@ export default function ChapterReaderScreen() {
   const [noteText, setNoteText] = useState("");
   const [savingNote, setSavingNote] = useState(false);
   const [isEditingExistingNote, setIsEditingExistingNote] = useState(false);
+  const [isViewOnlyMode, setIsViewOnlyMode] = useState(false);
+  const [isNotePrivate, setIsNotePrivate] = useState(true);
+  const [textSelection, setTextSelection] = useState({ start: 0, end: 0 });
+  const noteInputRef = useRef<TextInput>(null);
 
   // Verse notes tracking
   const [verseNotes, setVerseNotes] = useState<Map<string, string>>(new Map());
@@ -173,6 +179,31 @@ export default function ChapterReaderScreen() {
   const [readerTheme, setReaderTheme] = useState<"light" | "dark">("light");
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
 
+  // Verse options bottom sheet state
+  const [verseOptionsVisible, setVerseOptionsVisible] = useState(false);
+  const [selectedVerseForOptions, setSelectedVerseForOptions] =
+    useState<Verse | null>(null);
+  const [verseHighlighted, setVerseHighlighted] = useState(false);
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [selectedHighlightColor, setSelectedHighlightColor] = useState<
+    string | null
+  >(null);
+
+  // Verse highlights storage - key: "bookId-chapter-verse", value: color
+  const [verseHighlights, setVerseHighlights] = useState<
+    Record<string, string>
+  >({});
+
+  // Highlight colors available
+  const highlightColors = [
+    { id: "yellow", color: "#FFF59D", label: "Amarelo" },
+    { id: "green", color: "#A5D6A7", label: "Verde" },
+    { id: "blue", color: "#90CAF9", label: "Azul" },
+    { id: "pink", color: "#F48FB1", label: "Rosa" },
+    { id: "purple", color: "#CE93D8", label: "Roxo" },
+    { id: "orange", color: "#FFCC80", label: "Laranja" },
+  ];
+
   useEffect(() => {
     (async () => {
       try {
@@ -188,6 +219,9 @@ export default function ChapterReaderScreen() {
         console.warn("Falha ao carregar preferências de leitura", e);
       }
     })();
+
+    // Carregar destaques de versículos
+    loadVerseHighlights();
   }, []);
 
   const applyFontScale = (base: number) => {
@@ -1460,19 +1494,190 @@ export default function ChapterReaderScreen() {
 
   // Handle verse selection with simple press (only one at a time)
   const handleVersePress = (verse: Verse) => {
-    const verseKey = `${verse.bookId}-${verse.chapterNumber}-${verse.verseNumber}`;
-    const newSelected = new Set<string>();
+    setSelectedVerseForOptions(verse);
 
-    // Se já estava selecionado, desseleciona (limpa tudo)
-    // Se não estava, seleciona apenas este (limpa outros e adiciona este)
-    if (!selectedVerses.has(verseKey)) {
-      newSelected.add(verseKey);
+    // Verificar se o versículo já está destacado
+    const verseKey = `${verse.bookId}-${verse.chapterNumber}-${verse.verseNumber}`;
+    const isHighlighted = !!verseHighlights[verseKey];
+    setVerseHighlighted(isHighlighted);
+    setSelectedHighlightColor(isHighlighted ? verseHighlights[verseKey] : null);
+
+    setVerseOptionsVisible(true);
+
+    // Destacar temporariamente o versículo
+    const newSelected = new Set<string>();
+    newSelected.add(verseKey);
+    setSelectedVerses(newSelected);
+    setSelectionMode(false);
+  };
+
+  // Load verse highlights from AsyncStorage
+  const loadVerseHighlights = async () => {
+    try {
+      const stored = await AsyncStorage.getItem("verse_highlights");
+      if (stored) {
+        setVerseHighlights(JSON.parse(stored));
+      }
+    } catch (error) {
+      console.error("Erro ao carregar destaques:", error);
+    }
+  };
+
+  // Save verse highlights to AsyncStorage
+  const saveVerseHighlights = async (highlights: Record<string, string>) => {
+    try {
+      await AsyncStorage.setItem(
+        "verse_highlights",
+        JSON.stringify(highlights),
+      );
+      setVerseHighlights(highlights);
+    } catch (error) {
+      console.error("Erro ao salvar destaques:", error);
+    }
+  };
+
+  const toggleVerseHighlight = () => {
+    if (!verseHighlighted) {
+      // Mostrar seletor de cores
+      setShowColorPicker(true);
+    } else {
+      // Remover destaque
+      if (selectedVerseForOptions) {
+        const verseKey = `${selectedVerseForOptions.bookId}-${selectedVerseForOptions.chapterNumber}-${selectedVerseForOptions.verseNumber}`;
+        const newHighlights = { ...verseHighlights };
+        delete newHighlights[verseKey];
+        saveVerseHighlights(newHighlights);
+      }
+      setVerseHighlighted(false);
+      setSelectedHighlightColor(null);
+      setShowColorPicker(false);
+    }
+  };
+
+  const handleColorSelect = async (color: string) => {
+    if (!selectedVerseForOptions) return;
+
+    const verseKey = `${selectedVerseForOptions.bookId}-${selectedVerseForOptions.chapterNumber}-${selectedVerseForOptions.verseNumber}`;
+    const newHighlights = { ...verseHighlights, [verseKey]: color };
+    await saveVerseHighlights(newHighlights);
+
+    setSelectedHighlightColor(color);
+    setVerseHighlighted(true);
+    setShowColorPicker(false);
+  };
+
+  const closeVerseOptions = () => {
+    setVerseOptionsVisible(false);
+    setSelectedVerseForOptions(null);
+    // Limpar seleção visual após fechar
+    setTimeout(() => {
+      if (!selectionMode) {
+        setSelectedVerses(new Set());
+      }
+    }, 300);
+  };
+
+  const handleSaveVerse = async () => {
+    if (!selectedVerseForOptions) return;
+
+    // Verificar se está logado
+    if (!AuthService.isAuthenticated()) {
+      closeVerseOptions();
+      Alert.alert(
+        "Login necessário",
+        "Você precisa fazer login para criar anotações.",
+        [
+          {
+            text: "Cancelar",
+            style: "cancel",
+          },
+          {
+            text: "Fazer Login",
+            onPress: () => router.push("/auth"),
+          },
+        ],
+      );
+      return;
     }
 
+    closeVerseOptions();
+    // Ativar modo de seleção e abrir modal de nota
+    const verseKey = `${selectedVerseForOptions.bookId}-${selectedVerseForOptions.chapterNumber}-${selectedVerseForOptions.verseNumber}`;
+    const newSelected = new Set<string>();
+    newSelected.add(verseKey);
     setSelectedVerses(newSelected);
+    setSelectionMode(true);
+    await openNoteModal();
+  };
 
-    // Ativa modo de seleção se houver versículos selecionados
-    setSelectionMode(newSelected.size > 0);
+  const handleAnnotateVerse = async () => {
+    if (!selectedVerseForOptions) return;
+
+    // Verificar se está logado
+    if (!AuthService.isAuthenticated()) {
+      closeVerseOptions();
+      Alert.alert(
+        "Login necessário",
+        "Você precisa fazer login para visualizar ou criar anotações.",
+        [
+          {
+            text: "Cancelar",
+            style: "cancel",
+          },
+          {
+            text: "Fazer Login",
+            onPress: () => router.push("/auth"),
+          },
+        ],
+      );
+      return;
+    }
+
+    closeVerseOptions();
+
+    // Navegar para a tela de edição de anotação
+    router.push({
+      pathname: "/note-editor",
+      params: {
+        bookId: selectedVerseForOptions.bookId.toString(),
+        bookName: book?.name || "",
+        chapterNumber: selectedVerseForOptions.chapterNumber.toString(),
+        verseNumber: selectedVerseForOptions.verseNumber.toString(),
+        verseText: selectedVerseForOptions.text,
+      },
+    });
+  };
+
+  const handleCopyVerse = async () => {
+    if (!selectedVerseForOptions) return;
+
+    const cleanVerseText = (text: string) => {
+      return text
+        .replace(/[✚ℕ]/g, "")
+        .replace(/\s{2,}/g, " ")
+        .replace(/\s+([.,;:!?])/g, "$1")
+        .trim();
+    };
+
+    const verseText = `${selectedVerseForOptions.verseNumber} - ${cleanVerseText(selectedVerseForOptions.text)}`;
+    const reference = `${book?.name} ${currentChapter}:${selectedVerseForOptions.verseNumber}`;
+
+    // Deep link para o app
+    // const deepLink = `readbible://chapter?bookId=${selectedVerseForOptions.bookId}&chapter=${currentChapter}&verse=${selectedVerseForOptions.verseNumber}`;
+    const deepLink = `https://play.google.com/store/apps/details?id=com.readbible.app`;
+
+    const textToCopy = `${verseText}\n\n${reference}\n\nAplicativo Bíblia em Foco\n${deepLink}`;
+
+    try {
+      await Share.share({
+        message: textToCopy,
+        title: reference,
+      });
+      closeVerseOptions();
+    } catch (error) {
+      console.error("Error sharing verse:", error);
+      Alert.alert("Erro", "Não foi possível copiar o versículo");
+    }
   };
 
   // Clear selection mode
@@ -1514,12 +1719,16 @@ export default function ChapterReaderScreen() {
         ? verseNumbers[0].toString()
         : `${Math.min(...verseNumbers)}-${Math.max(...verseNumbers)}`;
 
+    // Deep link para o app
+    const firstVerse = Math.min(...verseNumbers);
+    const deepLink = `readbible://chapter?bookId=${sortedVerses[0].bookId}&chapter=${currentChapter}&verse=${firstVerse}`;
+
     const shareText = `${versesText}
 
 ${book?.name} ${currentChapter}:${verseRange}
 
 Aplicativo Bíblia em Foco
-Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
+${deepLink}`;
 
     const shareTitle =
       selectedVerses.size === 1
@@ -1575,6 +1784,7 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
       setIsEditingExistingNote(false);
     }
 
+    setIsViewOnlyMode(false); // Desativar modo visualização ao criar/editar
     setNoteModalVisible(true);
   };
 
@@ -1634,6 +1844,147 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
     }
   };
 
+  // Text formatting functions
+  const insertFormatting = (
+    prefix: string,
+    suffix: string,
+    placeholder: string = "texto",
+  ) => {
+    const { start, end } = textSelection;
+    const hasSelection = start !== end;
+
+    const before = noteText.slice(0, start);
+    const selectedText = hasSelection
+      ? noteText.slice(start, end)
+      : placeholder;
+    const after = noteText.slice(end);
+
+    const newText = `${before}${prefix}${selectedText}${suffix}${after}`;
+    setNoteText(newText);
+
+    // Posicionar cursor
+    setTimeout(() => {
+      if (hasSelection) {
+        // Se tinha seleção, posicionar cursor após o texto formatado
+        const newCursorPos =
+          start + prefix.length + selectedText.length + suffix.length;
+        noteInputRef.current?.setNativeProps({
+          selection: { start: newCursorPos, end: newCursorPos },
+        });
+      } else {
+        // Se não tinha seleção, selecionar o placeholder
+        const newCursorPos = start + prefix.length;
+        noteInputRef.current?.setNativeProps({
+          selection: {
+            start: newCursorPos,
+            end: newCursorPos + placeholder.length,
+          },
+        });
+      }
+    }, 10);
+  };
+
+  const applyBold = () => insertFormatting("**", "**", "negrito");
+  const applyItalic = () => insertFormatting("*", "*", "itálico");
+  const applyUnderline = () => insertFormatting("__", "__", "sublinhado");
+  const applyStrikethrough = () => insertFormatting("~~", "~~", "riscado");
+  const applyBulletList = () => {
+    const before = noteText.slice(0, cursorPosition);
+    const after = noteText.slice(cursorPosition);
+    const newLine = before.endsWith("\n") || before === "" ? "" : "\n";
+    const newText = `${before}${newLine}- Item da lista${after}`;
+    setNoteText(newText);
+  };
+
+  // Render formatted text for view mode
+  const renderFormattedText = (text: string) => {
+    const parts: React.ReactNode[] = [];
+    let lastIndex = 0;
+
+    // Regex patterns for markdown
+    const patterns = [
+      { regex: /\*\*([^*]+)\*\*/g, style: { fontWeight: "bold" } }, // Bold
+      { regex: /\*([^*]+)\*/g, style: { fontStyle: "italic" } }, // Italic
+      { regex: /__([^_]+)__/g, style: { textDecorationLine: "underline" } }, // Underline
+      { regex: /~~([^~]+)~~/g, style: { textDecorationLine: "line-through" } }, // Strikethrough
+    ];
+
+    // Split by line to handle lists
+    const lines = text.split("\n");
+
+    return lines.map((line, lineIndex) => {
+      const isListItem = line.trim().startsWith("- ");
+      const lineText = isListItem ? line.trim().substring(2) : line;
+
+      // Apply inline formatting
+      let processedLine: React.ReactNode[] = [];
+      let remaining = lineText;
+      let key = 0;
+
+      while (remaining) {
+        let earliestMatch: {
+          index: number;
+          match: RegExpMatchArray;
+          style: any;
+        } | null = null;
+
+        // Find earliest match among all patterns
+        patterns.forEach(({ regex, style }) => {
+          regex.lastIndex = 0;
+          const match = regex.exec(remaining);
+          if (
+            match &&
+            (earliestMatch === null || match.index < earliestMatch.index)
+          ) {
+            earliestMatch = { index: match.index, match, style };
+          }
+        });
+
+        if (earliestMatch) {
+          // Add text before match
+          if (earliestMatch.index > 0) {
+            processedLine.push(
+              <Text key={`${lineIndex}-${key++}`}>
+                {remaining.slice(0, earliestMatch.index)}
+              </Text>,
+            );
+          }
+
+          // Add formatted text
+          processedLine.push(
+            <Text
+              key={`${lineIndex}-${key++}`}
+              style={earliestMatch.style as any}
+            >
+              {earliestMatch.match[1]}
+            </Text>,
+          );
+
+          remaining = remaining.slice(
+            earliestMatch.index + earliestMatch.match[0].length,
+          );
+        } else {
+          // No more matches, add remaining text
+          processedLine.push(
+            <Text key={`${lineIndex}-${key++}`}>{remaining}</Text>,
+          );
+          remaining = "";
+        }
+      }
+
+      return (
+        <Text
+          key={lineIndex}
+          style={[styles.noteViewText, { color: isDark ? "#fafafa" : "#222" }]}
+        >
+          {isListItem && "• "}
+          {processedLine}
+          {lineIndex < lines.length - 1 && "\n"}
+        </Text>
+      );
+    });
+  };
+
   // Open note for a specific verse (view/edit existing note)
   const openVerseNote = async (verse: Verse) => {
     try {
@@ -1653,9 +2004,10 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
         return;
       }
 
-      // Set up for editing
+      // Set up for viewing (read-only mode)
       setNoteText(note.note);
       setIsEditingExistingNote(true);
+      setIsViewOnlyMode(true); // Ativar modo visualização
 
       // Store the verse selection internally but don't activate selection mode
       const newSelection = new Set<string>();
@@ -1790,22 +2142,6 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
       );
     }
 
-    // Adicionar ícone de anotação no final do versículo, se houver
-    const favoriteKey = `${verse.bookId}-${verse.chapterNumber}-${verse.verseNumber}`;
-    const hasNote = verseNotes.has(favoriteKey);
-    if (hasNote && !selectionMode) {
-      parts.push(
-        <Text key="note-icon" onPress={() => openVerseNote(verse)}>
-          {" "}
-          <Ionicons
-            name="document-text"
-            size={16}
-            color={isDark ? "#FFB74D" : "#FF9800"}
-          />
-        </Text>,
-      );
-    }
-
     return <>{parts}</>;
   };
 
@@ -1850,6 +2186,9 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
     // const isBeingNarrated = currentNarratedVerse === item.verseNumber;
     const isBeingNarrated = false; // Sempre false - funcionalidade desativada
 
+    // Verificar se o versículo está destacado
+    const highlightColor = verseHighlights[favoriteKey];
+
     return (
       <View
         style={[
@@ -1884,6 +2223,7 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
             },
             isSelected && styles.verseContainerSelected,
             isSelected && isDark && { backgroundColor: "#263850" },
+            highlightColor && { backgroundColor: highlightColor },
           ]}
           onPress={() => handleVersePress(item)}
         >
@@ -1896,11 +2236,17 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
                     style={[
                       styles.verseNumber,
                       isDark && { color: colorScheme.verseNumber },
+                      highlightColor && { color: "#1565C0" },
                     ]}
                   >
                     {item.verseNumber}
                   </Text>
-                  <Text style={{ fontWeight: "bold", color: colorScheme.dash }}>
+                  <Text
+                    style={{
+                      fontWeight: "bold",
+                      color: highlightColor ? "#333" : colorScheme.dash,
+                    }}
+                  >
                     {" "}
                     -{" "}
                   </Text>
@@ -1908,34 +2254,41 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
               )}
               {renderVerseText(item.text, item)}
             </Text>
+
+            {/* Indicador visual de nota existente */}
+            {hasNote && (
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  marginTop: 4,
+                  marginLeft: 2,
+                }}
+              >
+                <View
+                  style={[
+                    styles.inlineIconButton,
+                    {
+                      borderColor: isDark ? "#FFB74D" : "#FF9800",
+                      backgroundColor: isDark
+                        ? "rgba(255, 183, 77, 0.1)"
+                        : "rgba(255, 152, 0, 0.05)",
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name="document-text"
+                    size={14}
+                    color={isDark ? "#FFB74D" : "#FF9800"}
+                  />
+                </View>
+              </View>
+            )}
+
             <View style={styles.verseButtonsRow}>
               {/* Área onde aparecerão referências e notas inline */}
             </View>
           </View>
-
-          {/* Botões de ação - aparecem apenas quando selecionado */}
-          {isSelected && (
-            <View style={styles.verseActionButtons}>
-              <TouchableOpacity
-                onPress={openNoteModal}
-                style={[
-                  styles.verseActionButton,
-                  { backgroundColor: isDark ? "#1e88e5" : "#2196F3" },
-                ]}
-              >
-                <Ionicons name="create-outline" size={16} color="#fff" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={shareSelectedVerses}
-                style={[
-                  styles.verseActionButton,
-                  { backgroundColor: isDark ? "#1e88e5" : "#2196F3" },
-                ]}
-              >
-                <Ionicons name="send" size={16} color="#fff" />
-              </TouchableOpacity>
-            </View>
-          )}
         </Pressable>
       </View>
     );
@@ -3463,118 +3816,222 @@ Link do app: https://play.google.com/store/apps/details?id=com.readbible.app`;
         </View>
       </Modal>
 
-      {/* Note Modal */}
+      {/* Verse Options Bottom Sheet */}
       <Modal
-        visible={noteModalVisible}
-        animationType="fade"
+        visible={verseOptionsVisible}
+        animationType="slide"
         transparent
-        onRequestClose={() => setNoteModalVisible(false)}
+        onRequestClose={closeVerseOptions}
       >
-        <View style={styles.settingsOverlay}>
-          <View
+        <Pressable
+          style={styles.verseOptionsOverlay}
+          onPress={closeVerseOptions}
+        >
+          <Pressable
             style={[
-              styles.noteModal,
+              styles.verseOptionsSheet,
               { backgroundColor: isDark ? "#1f1f1f" : "#fff" },
             ]}
+            onPress={(e) => e.stopPropagation()}
           >
-            <View style={styles.noteModalHeader}>
-              <Text
-                style={[
-                  styles.noteModalTitle,
-                  { color: isDark ? "#fafafa" : "#222" },
-                ]}
-              >
-                ✍️ Criar Anotação
-              </Text>
-              <TouchableOpacity
-                onPress={() => setNoteModalVisible(false)}
-                style={styles.noteModalCloseButton}
-              >
-                <Ionicons
-                  name="close"
-                  size={24}
-                  color={isDark ? "#fafafa" : "#222"}
-                />
-              </TouchableOpacity>
-            </View>
+            {/* Handle bar */}
+            <View style={styles.sheetHandle} />
 
-            <Text
-              style={[
-                styles.noteModalSubtitle,
-                { color: isDark ? "#ccc" : "#666" },
-              ]}
+            {/* Verse reference */}
+            {selectedVerseForOptions && (
+              <View style={styles.sheetHeader}>
+                <Text
+                  style={[
+                    styles.sheetTitle,
+                    { color: isDark ? "#fafafa" : "#222" },
+                  ]}
+                >
+                  {book?.name} {currentChapter}:
+                  {selectedVerseForOptions.verseNumber}
+                </Text>
+              </View>
+            )}
+
+            {/* Options */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.sheetOptionsContainer}
+              style={styles.sheetOptions}
             >
-              {book?.name} {currentChapter}:
-              {Array.from(selectedVerses)
-                .map((key) => {
-                  const parts = key.split("-");
-                  return parts[2];
-                })
-                .sort((a, b) => Number(a) - Number(b))
-                .join(", ")}
-            </Text>
-
-            <TextInput
-              style={[
-                styles.noteInput,
-                {
-                  backgroundColor: isDark ? "#2a2a2a" : "#f5f5f5",
-                  color: isDark ? "#fafafa" : "#222",
-                  borderColor: isDark ? "#444" : "#ddd",
-                },
-              ]}
-              placeholder="Digite sua anotação aqui..."
-              placeholderTextColor={isDark ? "#888" : "#999"}
-              multiline
-              numberOfLines={8}
-              value={noteText}
-              onChangeText={setNoteText}
-              textAlignVertical="top"
-            />
-
-            <View style={styles.noteModalFooter}>
-              {/* <TouchableOpacity
-                onPress={() => {
-                  setNoteModalVisible(false);
-                  setNoteText("");
-                  setIsEditingExistingNote(false);
-                }}
-                style={[
-                  styles.noteModalButton,
-                  styles.noteModalCancelButton,
-                ]}
+              {/* Highlight toggle */}
+              <TouchableOpacity
+                style={styles.optionRow}
+                onPress={toggleVerseHighlight}
               >
-                <Text style={styles.noteModalCancelText}>Cancelar</Text>
+                <View
+                  style={[
+                    styles.optionIconContainer,
+                    verseHighlighted &&
+                      selectedHighlightColor && {
+                        backgroundColor: selectedHighlightColor,
+                      },
+                  ]}
+                >
+                  <Ionicons
+                    name={
+                      verseHighlighted ? "color-fill" : "color-fill-outline"
+                    }
+                    size={24}
+                    color={
+                      verseHighlighted ? "#333" : isDark ? "#64B5F6" : "#2196F3"
+                    }
+                  />
+                </View>
+                <Text
+                  style={[
+                    styles.optionLabel,
+                    { color: isDark ? "#e0e0e0" : "#666" },
+                  ]}
+                >
+                  {verseHighlighted ? "Remover" : "Destacar"}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Save (Bookmark) */}
+              {/* <TouchableOpacity 
+                style={styles.optionRow}
+                onPress={handleSaveVerse}
+              >
+                <View style={[
+                  styles.optionIconContainer,
+                  { backgroundColor: isDark ? "rgba(33, 150, 243, 0.1)" : "#e3f2fd" }
+                ]}>
+                  <Ionicons 
+                    name="bookmark-outline" 
+                    size={24} 
+                    color={isDark ? "#64B5F6" : "#2196F3"} 
+                  />
+                </View>
+                <Text style={[
+                  styles.optionLabel,
+                  { color: isDark ? "#fafafa" : "#222" }
+                ]}>
+                  Salvar
+                </Text>
               </TouchableOpacity> */}
 
-              {isEditingExistingNote && (
-                <TouchableOpacity
-                  onPress={deleteNote}
-                  style={[styles.noteModalButton, styles.noteModalDeleteButton]}
-                >
-                  <Text style={styles.noteModalDeleteText}>Excluir</Text>
-                </TouchableOpacity>
-              )}
-
+              {/* Annotation */}
               <TouchableOpacity
-                onPress={saveNote}
-                disabled={!noteText.trim() || savingNote}
+                style={styles.optionRow}
+                onPress={handleAnnotateVerse}
+              >
+                <View
+                  style={[
+                    styles.optionIconContainer,
+                    {
+                      backgroundColor: isDark
+                        ? "rgba(33, 150, 243, 0.1)"
+                        : "#e3f2fd",
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name="reader-outline"
+                    size={24}
+                    color={isDark ? "#64B5F6" : "#2196F3"}
+                  />
+                </View>
+                <Text
+                  style={[
+                    styles.optionLabel,
+                    { color: isDark ? "#fafafa" : "#222" },
+                  ]}
+                >
+                  Anotação
+                </Text>
+              </TouchableOpacity>
+
+              {/* Copy/Share */}
+              <TouchableOpacity
+                style={styles.optionRow}
+                onPress={handleCopyVerse}
+              >
+                <View
+                  style={[
+                    styles.optionIconContainer,
+                    {
+                      backgroundColor: isDark
+                        ? "rgba(33, 150, 243, 0.1)"
+                        : "#e3f2fd",
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name="copy-outline"
+                    size={24}
+                    color={isDark ? "#64B5F6" : "#2196F3"}
+                  />
+                </View>
+                <Text
+                  style={[
+                    styles.optionLabel,
+                    { color: isDark ? "#fafafa" : "#222" },
+                  ]}
+                >
+                  Copiar
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+
+            {/* Color Picker Section */}
+            {showColorPicker && (
+              <View
                 style={[
-                  styles.noteModalButton,
-                  styles.noteModalSaveButton,
-                  (!noteText.trim() || savingNote) &&
-                    styles.noteModalButtonDisabled,
+                  styles.colorPickerSection,
+                  {
+                    backgroundColor: isDark ? "#2d2d2d" : "#f8f8f8",
+                    borderTopColor: isDark ? "#444" : "#e0e0e0",
+                  },
                 ]}
               >
-                {savingNote ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Text style={styles.noteModalSaveText}>Salvar</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
+                <Text
+                  style={[
+                    styles.colorPickerTitle,
+                    { color: isDark ? "#e0e0e0" : "#666" },
+                  ]}
+                >
+                  Escolha uma cor:
+                </Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.colorOptionsContainer}
+                >
+                  {highlightColors.map((item) => (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={styles.colorOption}
+                      onPress={() => handleColorSelect(item.color)}
+                    >
+                      <View
+                        style={[
+                          styles.colorCircle,
+                          { backgroundColor: item.color },
+                        ]}
+                      >
+                        <Ionicons name="checkmark" size={20} color="#333" />
+                      </View>
+                      <Text
+                        style={[
+                          styles.colorLabel,
+                          { color: isDark ? "#ccc" : "#666" },
+                        ]}
+                      >
+                        {item.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+          </Pressable>
+        </Pressable>
       </Modal>
     </SafeAreaView>
   );
@@ -3781,6 +4238,25 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "bold",
     color: "#2196F3",
+  },
+  inlineIconButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginRight: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  inlineActionButton: {
+    paddingHorizontal: 5,
+    paddingVertical: 3,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginHorizontal: 3,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(33, 150, 243, 0.05)",
   },
   verseActionButtons: {
     flexDirection: "row",
@@ -4432,10 +4908,33 @@ const styles = StyleSheet.create({
   noteModalCloseButton: {
     padding: 4,
   },
+  noteModalEditButton: {
+    padding: 4,
+  },
   noteModalSubtitle: {
     fontSize: 14,
     marginBottom: 16,
     fontWeight: "500",
+  },
+  formattingToolbar: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: 8,
+    gap: 4,
+  },
+  formatButton: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 6,
+  },
+  formatButtonLabel: {
+    fontSize: 18,
+    fontWeight: "600",
   },
   noteInput: {
     borderWidth: 1,
@@ -4444,6 +4943,20 @@ const styles = StyleSheet.create({
     fontSize: 15,
     minHeight: 150,
     marginBottom: 20,
+  },
+  noteViewContainer: {
+    borderRadius: 12,
+    padding: 16,
+    minHeight: 150,
+    marginBottom: 20,
+  },
+  noteViewText: {
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  noteInputReadOnly: {
+    opacity: 0.7,
+    backgroundColor: "transparent",
   },
   noteModalFooter: {
     flexDirection: "row",
@@ -4482,6 +4995,73 @@ const styles = StyleSheet.create({
   },
   noteModalButtonDisabled: {
     opacity: 0.5,
+  },
+  saveNoteButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: "#e0e0e0",
+  },
+  saveNoteButtonDisabled: {
+    opacity: 0.5,
+  },
+  saveNoteButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#666",
+  },
+  noteInputMain: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 15,
+    minHeight: 120,
+    marginTop: 16,
+    marginBottom: 12,
+  },
+  privacyToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  privacyToggleIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#f0f0f0",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  privacyToggleText: {
+    fontSize: 15,
+    fontWeight: "500",
+  },
+  selectedVerseContainer: {
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: "#2196F3",
+  },
+  selectedVerseHeader: {
+    marginBottom: 8,
+  },
+  selectedVerseNumber: {
+    fontSize: 14,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  selectedVerseText: {
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  selectedVerseReference: {
+    fontSize: 12,
+    marginTop: 8,
+    fontWeight: "500",
   },
 
   booksContainer: {
@@ -4726,5 +5306,127 @@ const styles = StyleSheet.create({
     marginRight: 8,
     justifyContent: "center",
     alignItems: "center",
+  },
+  // Verse Options Bottom Sheet styles
+  verseOptionsOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
+  },
+  verseOptionsSheet: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingBottom: 34,
+    minHeight: 240,
+    maxHeight: "35%",
+  },
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: "#ddd",
+    borderRadius: 2,
+    alignSelf: "center",
+    marginTop: 12,
+    marginBottom: 20,
+  },
+  sheetHeader: {
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+  sheetTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#222",
+    textAlign: "center",
+  },
+  sheetOptions: {
+    paddingTop: 16,
+  },
+  sheetOptionsContainer: {
+    paddingHorizontal: 20,
+    gap: 20,
+  },
+  optionRow: {
+    flexDirection: "column",
+    alignItems: "center",
+    width: 90,
+  },
+  optionIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#e3f2fd",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+  },
+  optionLabel: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: "#222",
+    textAlign: "center",
+  },
+  colorPickerSection: {
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderTopWidth: 1,
+    borderTopColor: "#e0e0e0",
+  },
+  colorPickerTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#666",
+    marginBottom: 12,
+  },
+  colorOptionsContainer: {
+    flexDirection: "row",
+    gap: 16,
+  },
+  colorOption: {
+    alignItems: "center",
+    width: 70,
+  },
+  colorCircle: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 6,
+    borderWidth: 2,
+    borderColor: "#e0e0e0",
+  },
+  colorLabel: {
+    fontSize: 12,
+    color: "#666",
+    textAlign: "center",
+  },
+  highlightToggle: {
+    width: 56,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#e0e0e0",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+  },
+  highlightToggleActive: {
+    backgroundColor: "#FDD835",
+  },
+  highlightToggleCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#fff",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  highlightToggleCircleActive: {
+    alignSelf: "flex-end",
   },
 });

@@ -1,18 +1,11 @@
 import { Asset } from 'expo-asset';
 import { Directory, File, Paths } from 'expo-file-system';
-import { XMLParser } from 'fast-xml-parser';
-import JSZip from 'jszip';
 import { Alert } from 'react-native';
+import DatabaseService from './DatabaseService';
 
 const HARPA_DIR = new Directory(Paths.document, 'harpa');
 const EXTRACTED_DIR = new Directory(HARPA_DIR, 'extracted');
 const HYMN_NAMES_FILE = new File(HARPA_DIR, 'hymn_names.json');
-
-// Configurar parser XML
-const xmlParser = new XMLParser({
-  ignoreAttributes: false,
-  attributeNamePrefix: '@_',
-});
 
 export interface HymnData {
   number: number;
@@ -39,36 +32,19 @@ class HarpaOfflineService {
   private hymnsList: HymnListItem[] = [];
 
   /**
-   * Verifica se a Harpa já foi baixada
+   * Verifica se a Harpa já foi baixada e está disponível no banco de dados
    */
   async isHarpaDownloaded(): Promise<boolean> {
     try {
-      const dirExists = EXTRACTED_DIR.exists;
-      const fileExists = HYMN_NAMES_FILE.exists;
+      // Verificar quantos hinos existem no banco de dados
+      const count = await DatabaseService.getHymnsDatabaseCount();
+      console.log(`[isHarpaDownloaded] Hinos no banco de dados: ${count}`);
       
-      console.log(`[isHarpaDownloaded] EXTRACTED_DIR.exists: ${dirExists}`);
-      console.log(`[isHarpaDownloaded] HYMN_NAMES_FILE.exists: ${fileExists}`);
+      // Considerar baixado se tiver pelo menos 630 hinos (98% dos 640)
+      const isDownloaded = count >= 630;
+      console.log(`[isHarpaDownloaded] Harpa baixada: ${isDownloaded}`);
       
-      if (!dirExists) {
-        console.log('[isHarpaDownloaded] Diretório não existe');
-        return false;
-      }
-      
-      if (!fileExists) {
-        console.log('[isHarpaDownloaded] Arquivo de nomes não existe');
-        return false;
-      }
-
-      // Verificar se tem arquivos XML
-      const files = EXTRACTED_DIR.list();
-      console.log(`[isHarpaDownloaded] Arquivos encontrados: ${files.length}`);
-      
-      // Aceitar se tiver pelo menos 630 arquivos (98% dos hinos)
-      // Isso permite alguma margem para arquivos faltando ou duplicados
-      const hasEnoughFiles = files.length >= 630;
-      console.log(`[isHarpaDownloaded] Tem arquivos suficientes (>=630): ${hasEnoughFiles}`);
-      
-      return hasEnoughFiles;
+      return isDownloaded;
     } catch (error) {
       console.error('[isHarpaDownloaded] Erro ao verificar download:', error);
       return false;
@@ -76,7 +52,7 @@ class HarpaOfflineService {
   }
 
   /**
-   * Carrega a lista de nomes dos hinos do arquivo local
+   * Carrega a lista de nomes dos hinos do banco de dados
    */
   async getHymnsList(): Promise<HymnListItem[]> {
     try {
@@ -84,13 +60,17 @@ class HarpaOfflineService {
         return this.hymnsList;
       }
 
-      if (HYMN_NAMES_FILE.exists) {
-        const content = await HYMN_NAMES_FILE.text();
-        this.hymnsList = JSON.parse(content);
-        return this.hymnsList;
-      }
-
-      return [];
+      // Buscar todos os hinos do banco de dados
+      const hymns = await DatabaseService.getAllHymnsMetadata();
+      
+      this.hymnsList = hymns.map(h => ({
+        number: h.number,
+        title: h.title,
+        fileName: `${h.number}.json`
+      }));
+      
+      console.log(`[HarpaOffline] ${this.hymnsList.length} hinos carregados do banco`);
+      return this.hymnsList;
     } catch (error) {
       console.error('[HarpaOffline] Erro ao carregar lista de hinos:', error);
       return [];
@@ -138,8 +118,8 @@ class HarpaOfflineService {
 
       if (onProgress) onProgress(5);
 
-      // Descompactar ZIP do bundle
-      await this.extractZipFromBundle(onProgress);
+      // Carregar JSON do bundle
+      await this.loadJsonFromBundle(onProgress);
 
       this.downloadProgress = 100;
       if (onProgress) {
@@ -163,92 +143,82 @@ class HarpaOfflineService {
   }
 
   /**
-   * Extrai o ZIP do bundle do app
+   * Carrega os hinos do arquivo JSON do bundle
    */
-  private async extractZipFromBundle(onProgress?: (progress: number) => void): Promise<void> {
-    console.log('[HarpaOffline] Carregando ZIP do bundle...');
+  private async loadJsonFromBundle(onProgress?: (progress: number) => void): Promise<void> {
+    console.log('[HarpaOffline] Carregando JSON do bundle...');
 
-    // Carregar o ZIP do bundle
-    const zipAsset = Asset.fromModule(require('../assets/harpa/hc_xml.zip'));
-    await zipAsset.downloadAsync();
+    try {
+      if (onProgress) onProgress(10);
 
-    if (!zipAsset.localUri) {
-      throw new Error('Não foi possível carregar o arquivo ZIP');
-    }
+      // Carregar o JSON diretamente (já vem parseado pelo Metro bundler)
+      const hymnsData = require('../assets/harpa/hc_json.json');
 
-    if (onProgress) onProgress(10);
+      console.log(`[HarpaOffline] Encontrados ${hymnsData.length} hinos no JSON`);
 
-    // Ler o arquivo ZIP como ArrayBuffer
-    const response = await fetch(zipAsset.localUri);
-    const arrayBuffer = await response.arrayBuffer();
-    
-    if (onProgress) onProgress(20);
+      if (onProgress) onProgress(20);
 
-    // Descompactar com JSZip
-    const zip = new JSZip();
-    const zipData = await zip.loadAsync(arrayBuffer);
+      const hymnsToSave: HymnData[] = [];
 
-    const files = Object.keys(zipData.files);
-    console.log(`[HarpaOffline] Encontrados ${files.length} arquivos no ZIP`);
-
-    const hymnsList: HymnListItem[] = [];
-    let processed = 0;
-
-    // Extrair cada arquivo
-    for (const fileName of files) {
-      const file = zipData.files[fileName];
-      
-      if (file.dir || !fileName.endsWith('.xml')) {
-        continue;
-      }
-
-      try {
-        // Extrair número e título do nome do arquivo
-        // Formato: "HC 001 Chuvas De Graça (Harpa Cristã).xml"
-        const match = fileName.match(/HC\s+(\d+)\s+(.+?)\s+\(Harpa Cristã\)\.xml/);
+      // Processar cada hino do JSON
+      for (let i = 0; i < hymnsData.length; i++) {
+        const hymnJson = hymnsData[i];
         
-        if (match) {
-          const number = parseInt(match[1]);
-          const title = match[2].trim();
+        try {
+          // Converter formato JSON para formato do app
+          const hymnData: HymnData = {
+            number: hymnJson.number,
+            title: hymnJson.title,
+            author: hymnJson.author || '',
+            copyright: 'Harpa Cristã',
+            verses: hymnJson.verses.map((verse: any) => ({
+              name: verse.chorus ? 'Coro' : `Estrofe ${verse.sequence}`,
+              type: verse.chorus ? 'chorus' : 'verse',
+              lines: verse.lyrics.split('\n').filter((line: string) => line.trim())
+            }))
+          };
           
-          // Ler conteúdo do XML
-          const content = await file.async('text');
+          hymnsToSave.push(hymnData);
           
-          // Salvar arquivo com número como nome
-          const destFile = new File(EXTRACTED_DIR, `${number}.xml`);
-          await destFile.write(content);
-          
-          // Adicionar à lista
-          hymnsList.push({
-            number,
-            title,
-            fileName: fileName,
-          });
+          // Salvar em lotes de 50 hinos
+          if (hymnsToSave.length >= 50) {
+            console.log(`[HarpaOffline] 💾 Salvando lote de ${hymnsToSave.length} hinos no banco...`);
+            await DatabaseService.saveHymnsBatch([...hymnsToSave]);
+            hymnsToSave.length = 0;
+          }
+        } catch (error) {
+          console.warn(`[HarpaOffline] Erro ao processar hino ${hymnJson.number}:`, error);
         }
         
-        processed++;
-        
         // Atualizar progresso (20% a 90%)
-        const progress = Math.floor(20 + (processed / files.length) * 70);
+        const progress = Math.floor(20 + (i / hymnsData.length) * 70);
         this.downloadProgress = progress;
         if (onProgress) {
           onProgress(progress);
         }
-      } catch (error) {
-        console.warn(`[HarpaOffline] Erro ao extrair arquivo ${fileName}:`, error);
       }
+
+      // Salvar hinos restantes
+      if (hymnsToSave.length > 0) {
+        console.log(`[HarpaOffline] 💾 Salvando lote final de ${hymnsToSave.length} hinos no banco...`);
+        await DatabaseService.saveHymnsBatch(hymnsToSave);
+      }
+
+      // Verificar quantos hinos foram salvos no banco
+      const count = await DatabaseService.getHymnsDatabaseCount();
+      console.log(`[HarpaOffline] ✅ Total de ${count} hinos salvos no banco de dados`);
+
+      if (count === 0) {
+        throw new Error('Nenhum hino foi salvo no banco de dados');
+      }
+
+      if (onProgress) onProgress(95);
+
+      console.log(`[HarpaOffline] ✅ Download e conversão concluídos com sucesso!`);
+    } catch (error) {
+      console.error('[HarpaOffline] Erro ao processar JSON:', error);
+      throw error;
     }
-
-    // Ordenar por número
-    hymnsList.sort((a, b) => a.number - b.number);
-
-    // Salvar lista de nomes
-    await HYMN_NAMES_FILE.write(JSON.stringify(hymnsList));
-    this.hymnsList = hymnsList;
-
-    if (onProgress) onProgress(95);
-
-    console.log(`[HarpaOffline] ✅ ${hymnsList.length} hinos extraídos com sucesso`);
   }
 
   /**
@@ -257,226 +227,51 @@ class HarpaOfflineService {
   async getHymnByNumber(hymnNumber: number): Promise<HymnData | null> {
     console.log(`🔍 [HarpaOffline] Buscando hino ${hymnNumber}...`);
     
-    // Verificar cache
+    // Verificar cache em memória
     if (this.hymnsCache.has(hymnNumber)) {
-      console.log(`✅ [HarpaOffline] Hino ${hymnNumber} encontrado no cache`);
+      console.log(`✅ [HarpaOffline] Hino ${hymnNumber} encontrado no cache em memória`);
       return this.hymnsCache.get(hymnNumber)!;
     }
 
-    // Verificar se a Harpa foi baixada
-    const isDownloaded = await this.isHarpaDownloaded();
-    console.log(`📦 [HarpaOffline] Harpa baixada: ${isDownloaded}`);
+    // Buscar no banco de dados
+    const hymnFromDb = await DatabaseService.getHymnFromDatabase(hymnNumber);
     
-    if (!isDownloaded) {
-      // Mostrar detalhes do diagnóstico
-      const dirExists = EXTRACTED_DIR.exists;
-      const fileExists = HYMN_NAMES_FILE.exists;
-      let fileCount = 0;
-      
-      if (dirExists) {
-        try {
-          const files = EXTRACTED_DIR.list();
-          fileCount = files.length;
-        } catch (e) {
-          console.error('Erro ao listar arquivos:', e);
-        }
-      }
-      
-      // Obter caminho de forma segura
-      let dirPath = 'N/A';
-      try {
-        dirPath = EXTRACTED_DIR.path || EXTRACTED_DIR.uri || 'undefined';
-      } catch (e) {
-        dirPath = 'erro ao obter path';
-      }
-      
+    if (hymnFromDb) {
+      console.log(`✅ [HarpaOffline] Hino ${hymnNumber} encontrado no banco de dados`);
+      const hymnData: HymnData = {
+        number: hymnFromDb.number,
+        title: hymnFromDb.title,
+        author: hymnFromDb.author,
+        copyright: hymnFromDb.copyright,
+        verses: hymnFromDb.verses
+      };
+      // Armazenar no cache em memória
+      this.hymnsCache.set(hymnNumber, hymnData);
+      return hymnData;
+    }
+
+    // Hino não encontrado no banco
+    console.warn(`⚠️ [HarpaOffline] Hino ${hymnNumber} não encontrado no banco`);
+    
+    // Verificar se a Harpa foi baixada
+    const count = await DatabaseService.getHymnsDatabaseCount();
+    
+    if (count === 0) {
       Alert.alert(
         'Harpa não baixada',
-        `A Harpa Cristã ainda não foi baixada.\n\n` +
-        `Diagnóstico:\n` +
-        `• Diretório existe: ${dirExists ? 'Sim' : 'Não'}\n` +
-        `• Caminho: ${dirPath}\n` +
-        `• Arquivo de nomes: ${fileExists ? 'Sim' : 'Não'}\n` +
-        `• Arquivos XML: ${fileCount}\n` +
-        `• Necessário: 630+ arquivos\n\n` +
-        `Por favor, faça o download primeiro na tela da Harpa.`
+        'A Harpa Cristã ainda não foi baixada.\n\n' +
+        'Por favor, faça o download primeiro na tela da Harpa.'
       );
       return null;
     }
-
-    try {
-      // Debug: listar todos os arquivos no diretório
-      const dirPath = EXTRACTED_DIR.path;
-      const dirExists = EXTRACTED_DIR.exists;
-      
-      console.log(`📂 [HarpaOffline] EXTRACTED_DIR.path: ${dirPath}`);
-      console.log(`📂 [HarpaOffline] EXTRACTED_DIR.exists: ${dirExists}`);
-      
-      let filesInfo = '';
-      if (dirExists) {
-        const files = EXTRACTED_DIR.list();
-        filesInfo = `Total de arquivos: ${files.length}`;
-        
-        if (files.length > 0 && files.length <= 10) {
-          filesInfo += `\n\nPrimeiros arquivos:\n${files.slice(0, 10).join('\n')}`;
-        }
-      } else {
-        filesInfo = 'Diretório não existe!';
-      }
-
-      const xmlFile = new File(EXTRACTED_DIR, `${hymnNumber}.xml`);
-      const filePath = xmlFile.path;
-      const fileExists = xmlFile.exists;
-      
-      console.log(`📁 [HarpaOffline] Verificando arquivo: ${filePath}`);
-      console.log(`📁 [HarpaOffline] Arquivo existe: ${fileExists}`);
-
-      if (!fileExists) {
-        Alert.alert(
-          `Debug - Hino ${hymnNumber}`,
-          `Arquivo não encontrado!\n\n` +
-          `Caminho: ${filePath}\n\n` +
-          `Diretório existe: ${dirExists}\n` +
-          `${filesInfo}`
-        );
-        return null;
-      }
-
-      console.log(`✅ [HarpaOffline] Arquivo encontrado, lendo conteúdo...`);
-      
-      // Ler arquivo XML
-      const xmlContent = await xmlFile.text();
-      console.log(`📄 [HarpaOffline] Conteúdo XML lido: ${xmlContent.length} caracteres`);
-
-      // Parse do XML
-      const result = xmlParser.parse(xmlContent);
-
-      // Extrair dados do XML
-      const hymnData = this.parseHymnXML(result, hymnNumber);
-
-      // Armazenar no cache
-      if (hymnData) {
-        this.hymnsCache.set(hymnNumber, hymnData);
-        console.log(`✅ [HarpaOffline] Hino ${hymnNumber} carregado e armazenado no cache`);
-      } else {
-        Alert.alert(
-          'Erro ao parsear',
-          `Falha ao processar o XML do hino ${hymnNumber}`
-        );
-      }
-
-      return hymnData;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      Alert.alert(
-        `Erro - Hino ${hymnNumber}`,
-        `Erro ao ler hino:\n\n${errorMessage}\n\nDiretório: ${EXTRACTED_DIR.path}\n\nVerifique se a Harpa foi baixada corretamente.`
-      );
-      console.error(`❌ [HarpaOffline] Erro ao ler hino ${hymnNumber}:`, error);
-      return null;
-    }
-  }
-
-  /**
-   * Parse do XML do hino
-   */
-  private parseHymnXML(xml: any, hymnNumber: number): HymnData | null {
-    try {
-      console.log(`📄 [HarpaOffline] Parsing XML do hino ${hymnNumber}...`);
-      
-      const song = xml.song;
-      
-      if (!song) {
-        console.error('❌ [HarpaOffline] Elemento <song> não encontrado no XML');
-        return null;
-      }
-      
-      // Extrair dados do properties
-      const properties = song.properties || {};
-      const titles = properties.titles || {};
-      const authors = properties.authors || {};
-      
-      const hymnData: HymnData = {
-        number: hymnNumber,
-        title: titles.title || `Hino ${hymnNumber}`,
-        author: authors.author || 'Autor Desconhecido',
-        copyright: properties.copyright || '',
-        verses: [],
-      };
-
-      // Parse das estrofes
-      if (song.lyrics && song.lyrics.verse) {
-        const verses = Array.isArray(song.lyrics.verse) ? song.lyrics.verse : [song.lyrics.verse];
-        
-        for (const verse of verses) {
-          const verseName = verse['@_name'] || '';
-          const verseType = verseName.toLowerCase().includes('c') && !verseName.toLowerCase().includes('v')
-            ? 'chorus' 
-            : 'verse';
-
-          // Parse das linhas
-          const lines: string[] = [];
-          
-          if (verse.lines) {
-            // Verificar se há texto concatenado
-            if (verse.lines['#text']) {
-              const fullText = verse.lines['#text'].trim();
-              
-              // Verificar se há elementos <br> indicando quebras de linha
-              const brCount = Array.isArray(verse.lines.br) ? verse.lines.br.length : 0;
-              
-              if (brCount > 0) {
-                // Dividir o texto pela quantidade de <br>
-                // Como os <br> estão vazios, precisamos dividir o texto manualmente
-                // Vamos tentar dividir em partes aproximadamente iguais
-                const charsPerLine = Math.ceil(fullText.length / (brCount + 1));
-                
-                // Estratégia: dividir por palavras para manter integridade
-                const words = fullText.split(/\s+/);
-                const wordsPerLine = Math.ceil(words.length / (brCount + 1));
-                
-                for (let i = 0; i < brCount + 1; i++) {
-                  const start = i * wordsPerLine;
-                  const end = Math.min((i + 1) * wordsPerLine, words.length);
-                  const lineText = words.slice(start, end).join(' ').trim();
-                  if (lineText) {
-                    lines.push(lineText);
-                  }
-                }
-              } else {
-                // Se não há <br>, usar o texto completo como uma linha
-                lines.push(fullText);
-              }
-            } else if (verse.lines.line) {
-              // Formato alternativo com elementos <line>
-              const lineElements = Array.isArray(verse.lines.line) ? verse.lines.line : [verse.lines.line];
-              
-              for (const line of lineElements) {
-                if (typeof line === 'string') {
-                  lines.push(line.trim());
-                } else if (line['#text']) {
-                  lines.push(line['#text'].trim());
-                }
-              }
-            }
-          }
-
-          hymnData.verses.push({
-            name: verseName,
-            type: verseType,
-            lines,
-          });
-        }
-      } else {
-        console.error('❌ [HarpaOffline] Elemento <lyrics> ou <verse> não encontrado no XML');
-      }
-
-      console.log(`✅ [HarpaOffline] Hino ${hymnNumber} parseado com ${hymnData.verses.length} estrofes`);
-      return hymnData;
-    } catch (error) {
-      console.error('❌ [HarpaOffline] Erro ao fazer parse do XML:', error);
-      return null;
-    }
+    
+    // Hino específico não encontrado
+    Alert.alert(
+      `Hino ${hymnNumber}`,
+      `Hino não encontrado no banco de dados.\n\n` +
+      `Total de hinos disponíveis: ${count}`
+    );
+    return null;
   }
 
   /**
@@ -488,17 +283,121 @@ class HarpaOfflineService {
   }
 
   /**
+   * Busca por texto no conteúdo dos hinos
+   * Retorna lista de hinos com trechos encontrados
+   * AGORA USA O BANCO DE DADOS - MUITO MAIS RÁPIDO!
+   */
+  async searchInContent(query: string): Promise<Array<{ number: number; title: string; snippet: string }>> {
+    try {
+      console.log(`🔍 [HarpaOffline] Buscando "${query}" no banco de dados...`);
+      
+      // Verificar se os hinos foram carregados
+      const count = await DatabaseService.getHymnsDatabaseCount();
+      console.log(`📊 [HarpaOffline] Hinos no banco: ${count}`);
+      
+      if (count === 0) {
+        console.warn('⚠️ [HarpaOffline] Banco de dados vazio! Hinos não foram carregados.');
+        console.warn('💡 [HarpaOffline] É necessário baixar a Harpa Cristã primeiro.');
+        return [];
+      }
+      
+      // Buscar direto no banco (RÁPIDO)
+      const results = await DatabaseService.searchHymnsInDatabase(query, 20);
+      
+      console.log(`✅ [HarpaOffline] Encontrados ${results.length} resultados no banco`);
+      return results;
+      
+    } catch (error) {
+      console.warn(`⚠️ [HarpaOffline] Erro na busca no banco, usando método antigo:`, error);
+      
+      // Fallback: busca manual nos dados do banco
+      return this.searchInContentLegacy(query);
+    }
+  }
+
+  /**
+   * Método antigo de busca (fallback)
+   */
+  private async searchInContentLegacy(query: string): Promise<Array<{ number: number; title: string; snippet: string }>> {
+    try {
+      const lowerQuery = query.toLowerCase();
+      const results: Array<{ number: number; title: string; snippet: string }> = [];
+      const hymnsList = await this.getHymnsList();
+      
+      // Limitar busca para evitar travamento da UI (buscar apenas nos primeiros 5 hinos)
+      const maxHymnsToSearch = Math.min(hymnsList.length, 5);
+      
+      for (let i = 0; i < maxHymnsToSearch; i++) {
+        const hymnItem = hymnsList[i];
+        
+        try {
+          const hymn = await this.getHymnByNumber(hymnItem.number);
+          
+          if (!hymn) continue;
+          
+          // Buscar em todas as estrofes
+          for (const verse of hymn.verses) {
+            const verseText = verse.lines.join(' ').toLowerCase();
+            
+            if (verseText.includes(lowerQuery)) {
+              // Encontrar posição do match
+              const matchIndex = verseText.indexOf(lowerQuery);
+              
+              // Criar snippet com contexto (50 caracteres antes e depois)
+              const start = Math.max(0, matchIndex - 50);
+              const end = Math.min(verseText.length, matchIndex + query.length + 50);
+              
+              let snippet = verseText.substring(start, end);
+              
+              // Adicionar reticências se necessário
+              if (start > 0) snippet = '...' + snippet;
+              if (end < verseText.length) snippet = snippet + '...';
+              
+              // Capitalizar primeira letra
+              snippet = snippet.charAt(0).toUpperCase() + snippet.slice(1);
+              
+              results.push({
+                number: hymn.number,
+                title: hymn.title,
+                snippet: snippet,
+              });
+              
+              break; // Apenas um resultado por hino
+            }
+          }
+          
+          // Limitar resultados
+          if (results.length >= 50) break;
+        } catch (error) {
+          console.error(`Erro ao buscar no hino ${hymnItem.number}:`, error);
+          continue;
+        }
+      }
+      
+      return results;
+    } catch (error) {
+      console.error('[HarpaOffline] Erro ao buscar no conteúdo:', error);
+      return [];
+    }
+  }
+
+  /**
    * Remove todos os dados da Harpa (para re-download)
    */
   async clearHarpaData(): Promise<void> {
     try {
-      if (HARPA_DIR.exists) {
-        HARPA_DIR.delete();
-      }
+      // Limpar banco de dados
+      await DatabaseService.clearAllHymns();
+      console.log('[HarpaOffline] ✅ Hinos removidos do banco de dados');
+      
+      // Limpar cache em memória
       this.hymnsCache.clear();
-      console.log('[HarpaOffline] Dados da Harpa removidos');
+      this.hymnsList = [];
+      
+      console.log('[HarpaOffline] ✅ Dados da Harpa removidos completamente');
     } catch (error) {
-      console.error('[HarpaOffline] Erro ao remover dados:', error);
+      console.error('[HarpaOffline] ❌ Erro ao remover dados:', error);
+      throw error;
     }
   }
 }
