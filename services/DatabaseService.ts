@@ -20,7 +20,11 @@ class DatabaseService {
   private circuitOpenUntil = 0;
   // Debounce para saveLastReading
   private saveReadingDebounceTimer: any = null;
-  private pendingReadingSave: { bibleId: string; bookId: number; chapterNumber: number } | null = null;
+  private pendingReadingSave: {
+    bibleId: string;
+    bookId: number;
+    chapterNumber: number;
+  } | null = null;
   // Semáforo para operações em batch
   private batchOperationInProgress = false;
   // Mutex para evitar inicializações simultâneas
@@ -33,16 +37,16 @@ class DatabaseService {
   private async acquireMutex(): Promise<() => void> {
     // Se já há um mutex ativo, aguardar
     while (this.initMutex) {
-      console.log('[DB] 🔒 Aguardando mutex...');
+      console.log("[DB] 🔒 Aguardando mutex...");
       await this.initMutex;
     }
-    
+
     // Criar novo mutex
     let release: (() => void) | undefined;
-    this.initMutex = new Promise<void>(resolve => {
+    this.initMutex = new Promise<void>((resolve) => {
       release = resolve;
     });
-    
+
     return release!;
   }
 
@@ -52,7 +56,7 @@ class DatabaseService {
   private releaseMutex(release: () => void) {
     this.initMutex = null;
     release();
-    console.log('[DB] 🔓 Mutex liberado');
+    console.log("[DB] 🔓 Mutex liberado");
   }
 
   // Método para criar uma nova conexão independente para cada operação
@@ -60,26 +64,28 @@ class DatabaseService {
     try {
       // GARANTIR que o banco principal foi inicializado primeiro
       if (!this.db && !global.__READBIBLE_DB_HANDLE) {
-        console.log('⚠️ Banco não inicializado, inicializando agora...');
+        console.log("⚠️ Banco não inicializado, inicializando agora...");
         await this.ensureInitialized();
       }
-      
+
       const connection = await SQLite.openDatabaseAsync(DB_NAME);
-      
+
       // Habilitar WAL mode para melhor concorrência
-      await connection.execAsync('PRAGMA journal_mode = WAL');
-      await connection.execAsync('PRAGMA busy_timeout = 5000'); // 5 segundos de timeout
-      
+      await connection.execAsync("PRAGMA journal_mode = WAL");
+      await connection.execAsync("PRAGMA busy_timeout = 5000"); // 5 segundos de timeout
+
       // Verificar se as tabelas existem na nova conexão
-      const result = await connection.getFirstAsync("SELECT name FROM sqlite_master WHERE type='table' AND name='bibles'");
+      const result = await connection.getFirstAsync(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='bibles'",
+      );
       if (!result) {
         // Se não existir, criar as tabelas necessárias
         await this.createTablesOnConnection(connection);
       }
-      
+
       // Sempre executar migração de schema (verifica se é necessário internamente)
       await this.migrateSchema(connection);
-      
+
       return connection;
     } catch (error) {
       console.error("❌ Erro ao criar nova conexão:", error);
@@ -90,19 +96,19 @@ class DatabaseService {
   // Executar operação com conexão independente
   private async withFreshConnection<T>(
     operation: (db: SQLite.SQLiteDatabase) => Promise<T>,
-    operationName: string = 'unknown'
+    operationName: string = "unknown",
   ): Promise<T> {
     let connection: SQLite.SQLiteDatabase | null = null;
-    
+
     try {
       // GARANTIR inicialização antes de qualquer operação
       await this.ensureInitialized();
-      
+
       console.log(`🔧 Criando nova conexão para: ${operationName}`);
       connection = await this.createFreshConnection();
-      
+
       const result = await operation(connection);
-      
+
       console.log(`✅ Operação ${operationName} concluída com sucesso`);
       return result;
     } catch (error) {
@@ -122,7 +128,7 @@ class DatabaseService {
 
   // Método público para forçar reset em casos extremos
   public forceResetLock() {
-    console.warn('🚨 FORCE RESETTING DATABASE CONNECTIONS - Use with caution');
+    console.warn("🚨 FORCE RESETTING DATABASE CONNECTIONS - Use with caution");
     this.initPromise = null;
     // Também reseta o cache para forçar re-inicialização se necessário
     this.biblesCache = null;
@@ -132,17 +138,23 @@ class DatabaseService {
   private consecutiveTimeouts = 0;
   private autoRecoverLock() {
     this.consecutiveTimeouts++;
-    console.warn(`🔄 Auto-recovery: ${this.consecutiveTimeouts} consecutive timeouts`);
-    
+    console.warn(
+      `🔄 Auto-recovery: ${this.consecutiveTimeouts} consecutive timeouts`,
+    );
+
     if (this.consecutiveTimeouts >= 3) {
-      console.warn('🚨 AUTO-RECOVERY: Too many consecutive timeouts, force resetting locks');
+      console.warn(
+        "🚨 AUTO-RECOVERY: Too many consecutive timeouts, force resetting locks",
+      );
       this.forceResetLock();
       this.consecutiveTimeouts = 0;
     }
   }
 
   // Criar tabelas em uma conexão específica
-  private async createTablesOnConnection(db: SQLite.SQLiteDatabase): Promise<void> {
+  private async createTablesOnConnection(
+    db: SQLite.SQLiteDatabase,
+  ): Promise<void> {
     await db.execAsync(`
       CREATE TABLE IF NOT EXISTS bibles (
         id TEXT PRIMARY KEY,
@@ -218,26 +230,43 @@ class DatabaseService {
   // Migração de schema - atualizar tabelas antigas
   private async migrateSchema(db: SQLite.SQLiteDatabase): Promise<void> {
     try {
-      console.log('🔄 Verificando necessidade de migração do schema...');
-      
+      console.log("🔄 Verificando necessidade de migração do schema...");
+
       // Verificar se a coluna 'type' existe em reading_plans
-      const tableInfo = await db.getAllAsync('PRAGMA table_info(reading_plans)') as any[];
-      const hasTypeColumn = tableInfo.some((col: any) => col.name === 'type');
-      const hasStartDateColumn = tableInfo.some((col: any) => col.name === 'startDate');
-      const hasEndDateColumn = tableInfo.some((col: any) => col.name === 'endDate');
-      const hasCompletedDaysColumn = tableInfo.some((col: any) => col.name === 'completedDays');
-      
-      if (!hasTypeColumn || !hasStartDateColumn || !hasEndDateColumn || !hasCompletedDaysColumn) {
-        console.log('⚠️ Schema desatualizado detectado! Migrando tabela reading_plans...');
-        
+      const tableInfo = (await db.getAllAsync(
+        "PRAGMA table_info(reading_plans)",
+      )) as any[];
+      const hasTypeColumn = tableInfo.some((col: any) => col.name === "type");
+      const hasStartDateColumn = tableInfo.some(
+        (col: any) => col.name === "startDate",
+      );
+      const hasEndDateColumn = tableInfo.some(
+        (col: any) => col.name === "endDate",
+      );
+      const hasCompletedDaysColumn = tableInfo.some(
+        (col: any) => col.name === "completedDays",
+      );
+
+      if (
+        !hasTypeColumn ||
+        !hasStartDateColumn ||
+        !hasEndDateColumn ||
+        !hasCompletedDaysColumn
+      ) {
+        console.log(
+          "⚠️ Schema desatualizado detectado! Migrando tabela reading_plans...",
+        );
+
         // Backup dos dados existentes
-        const existingPlans = await db.getAllAsync('SELECT * FROM reading_plans');
+        const existingPlans = await db.getAllAsync(
+          "SELECT * FROM reading_plans",
+        );
         console.log(`📦 Backup de ${existingPlans.length} planos existentes`);
-        
+
         // Dropar e recriar tabela
-        await db.execAsync('DROP TABLE IF EXISTS reading_plans');
-        await db.execAsync('DROP TABLE IF EXISTS reading_plan_days');
-        
+        await db.execAsync("DROP TABLE IF EXISTS reading_plans");
+        await db.execAsync("DROP TABLE IF EXISTS reading_plan_days");
+
         // Recriar com novo schema
         await db.execAsync(`
           CREATE TABLE IF NOT EXISTS reading_plans (
@@ -266,42 +295,47 @@ class DatabaseService {
             UNIQUE(planId, dayNumber)
           );
         `);
-        
-        console.log('✅ Migração de schema concluída!');
+
+        console.log("✅ Migração de schema concluída!");
       } else {
-        console.log('✅ Schema já está atualizado');
+        console.log("✅ Schema já está atualizado");
       }
     } catch (error) {
-      console.error('❌ Erro ao migrar schema:', error);
+      console.error("❌ Erro ao migrar schema:", error);
       // Não lançar erro para não quebrar a inicialização
     }
   }
 
-
-
   private async safeDbOperation<T>(
     operation: () => Promise<T>,
     operationName: string,
-    maxRetries: number = 2
+    maxRetries: number = 2,
   ): Promise<T> {
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
         return await operation();
       } catch (error) {
-        console.error(`Erro em ${operationName} (tentativa ${attempt + 1}):`, error);
-        
+        console.error(
+          `Erro em ${operationName} (tentativa ${attempt + 1}):`,
+          error,
+        );
+
         if (this.isNativePrepareNPE(error)) {
           if (attempt < maxRetries - 1) {
             console.log(`Reinicializando banco para ${operationName}...`);
-            await this.reinitializeDatabase(`${operationName} retry ${attempt + 1}`);
+            await this.reinitializeDatabase(
+              `${operationName} retry ${attempt + 1}`,
+            );
             continue;
           }
         }
-        
+
         throw error;
       }
     }
-    throw new Error(`Operação ${operationName} falhou após ${maxRetries} tentativas`);
+    throw new Error(
+      `Operação ${operationName} falhou após ${maxRetries} tentativas`,
+    );
   }
 
   private async ensureHealthy() {
@@ -323,7 +357,7 @@ class DatabaseService {
         // Log controlado para não inundar
         if (failureCount === 1 || failureCount % 5 === 0) {
           console.warn(
-            `[DB] Health check falhou (prepareAsync/NPE) falhas=${failureCount}`
+            `[DB] Health check falhou (prepareAsync/NPE) falhas=${failureCount}`,
           );
         }
         if (!this.reinitializing) {
@@ -352,7 +386,7 @@ class DatabaseService {
     if (!err) return false;
     const msg = String(err.message || err);
     return (
-      msg.includes("prepareAsync") || 
+      msg.includes("prepareAsync") ||
       msg.includes("NullPointerException") ||
       msg.includes("NativeDatabase.prepareAsync") ||
       msg.includes("database is locked") ||
@@ -365,19 +399,21 @@ class DatabaseService {
    */
   private async ensureInitialized(retryCount: number = 0) {
     const MAX_RETRIES = 3;
-    
+
     // Adquirir mutex para evitar inicializações simultâneas
     const release = await this.acquireMutex();
-    
+
     try {
       // Se já temos um banco válido, testar e retornar
       if (this.db && global.__READBIBLE_DB_HANDLE) {
         try {
           await this.db.getFirstAsync("SELECT 1");
-          console.log('[DB] ✅ Banco já inicializado e funcionando');
+          console.log("[DB] ✅ Banco já inicializado e funcionando");
           return; // Banco está funcionando
         } catch (error) {
-          console.warn('[DB] ⚠️ Banco existente não responde, será reinicializado...');
+          console.warn(
+            "[DB] ⚠️ Banco existente não responde, será reinicializado...",
+          );
           // Limpar completamente
           try {
             await this.db.closeAsync?.();
@@ -387,49 +423,53 @@ class DatabaseService {
           this.initPromise = null;
         }
       }
-      
+
       // Se há global handle mas não temos referência local
       if (!this.db && global.__READBIBLE_DB_HANDLE) {
         try {
           await global.__READBIBLE_DB_HANDLE.getFirstAsync("SELECT 1");
           this.db = global.__READBIBLE_DB_HANDLE;
-          console.log('[DB] ✅ Reutilizando global handle');
+          console.log("[DB] ✅ Reutilizando global handle");
           return; // Global handle está funcionando
         } catch (error) {
-          console.warn('[DB] ⚠️ Global handle inválido, limpando...');
+          console.warn("[DB] ⚠️ Global handle inválido, limpando...");
           try {
             await global.__READBIBLE_DB_HANDLE.closeAsync?.();
           } catch {}
           global.__READBIBLE_DB_HANDLE = undefined;
         }
       }
-      
+
       // Inicializar do zero
-      console.log(`[DB] 🔄 Iniciando nova inicialização (tentativa ${retryCount + 1}/${MAX_RETRIES})...`);
-      
+      console.log(
+        `[DB] 🔄 Iniciando nova inicialização (tentativa ${retryCount + 1}/${MAX_RETRIES})...`,
+      );
+
       try {
         // Abrir banco
         this.db = await SQLite.openDatabaseAsync(DB_NAME, {
           useNewConnection: false,
         });
-        
+
         if (!this.db) {
-          throw new Error('openDatabaseAsync retornou null');
+          throw new Error("openDatabaseAsync retornou null");
         }
-        
-        console.log('[DB] 📋 Criando tabelas...');
+
+        console.log("[DB] 📋 Criando tabelas...");
         global.__READBIBLE_DB_HANDLE = this.db;
         await this.createTables();
-        
+
         // Teste final robusto
-        console.log('[DB] 🧪 Testando conexão...');
+        console.log("[DB] 🧪 Testando conexão...");
         await this.db.getFirstAsync("SELECT 1");
-        
-        console.log('[DB] ✅ Banco inicializado e validado com sucesso');
-        
+
+        console.log("[DB] ✅ Banco inicializado e validado com sucesso");
       } catch (error) {
-        console.error(`[DB] ❌ Erro na inicialização (tentativa ${retryCount + 1}/${MAX_RETRIES}):`, error);
-        
+        console.error(
+          `[DB] ❌ Erro na inicialização (tentativa ${retryCount + 1}/${MAX_RETRIES}):`,
+          error,
+        );
+
         // Limpar estado
         if (this.db) {
           try {
@@ -439,19 +479,18 @@ class DatabaseService {
         this.db = null;
         global.__READBIBLE_DB_HANDLE = undefined;
         this.initPromise = null;
-        
+
         // Retry com delay exponencial
         if (retryCount < MAX_RETRIES) {
           const delay = 1000 * (retryCount + 1); // 1s, 2s, 3s
           console.log(`[DB] 🔄 Tentando novamente em ${delay}ms...`);
           this.releaseMutex(release); // Liberar antes do delay
-          await new Promise(resolve => setTimeout(resolve, delay));
+          await new Promise((resolve) => setTimeout(resolve, delay));
           return this.ensureInitialized(retryCount + 1);
         }
-        
+
         throw error;
       }
-      
     } finally {
       // Sempre liberar mutex
       this.releaseMutex(release);
@@ -557,40 +596,46 @@ class DatabaseService {
 
   // Bible management
   async saveBible(bible: Bible): Promise<void> {
-    console.log('🔥 DatabaseService.saveBible CALLED with:', {
+    console.log("🔥 DatabaseService.saveBible CALLED with:", {
       id: bible.id,
       name: bible.name,
       abbreviation: bible.abbreviation,
       fileName: bible.fileName,
       isDownloaded: bible.isDownloaded,
       downloadDate: bible.downloadDate,
-      size: bible.size
+      size: bible.size,
     });
-    
-    return this.safeDbOperation(async () => {
-      console.log('🔥 About to call ensureInitialized...');
-      await this.ensureInitialized();
-      console.log('🔥 ensureInitialized completed');
-      
-      if (!this.db) throw new Error("Database not initialized");
-      console.log('🔥 Database is initialized, running INSERT OR REPLACE directly...');
-      
-      await this.db.runAsync(
-        "INSERT OR REPLACE INTO bibles (id, name, abbreviation, fileName, isDownloaded, downloadDate, size) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        [
-          bible.id,
-          bible.name,
-          bible.abbreviation,
-          bible.fileName,
-          bible.isDownloaded ? 1 : 0,
-          bible.downloadDate || null,
-          bible.size || null,
-        ]
-      );
-      console.log('🔥 INSERT OR REPLACE completed successfully');
-      this.biblesCache = null; // invalidar cache
-      console.log('🔥 Cache invalidated, saveBible operation completed');
-    }, 'saveBible', 3); // 3 tentativas de retry
+
+    return this.safeDbOperation(
+      async () => {
+        console.log("🔥 About to call ensureInitialized...");
+        await this.ensureInitialized();
+        console.log("🔥 ensureInitialized completed");
+
+        if (!this.db) throw new Error("Database not initialized");
+        console.log(
+          "🔥 Database is initialized, running INSERT OR REPLACE directly...",
+        );
+
+        await this.db.runAsync(
+          "INSERT OR REPLACE INTO bibles (id, name, abbreviation, fileName, isDownloaded, downloadDate, size) VALUES (?, ?, ?, ?, ?, ?, ?)",
+          [
+            bible.id,
+            bible.name,
+            bible.abbreviation,
+            bible.fileName,
+            bible.isDownloaded ? 1 : 0,
+            bible.downloadDate || null,
+            bible.size || null,
+          ],
+        );
+        console.log("🔥 INSERT OR REPLACE completed successfully");
+        this.biblesCache = null; // invalidar cache
+        console.log("🔥 Cache invalidated, saveBible operation completed");
+      },
+      "saveBible",
+      3,
+    ); // 3 tentativas de retry
   }
 
   async getBibles(): Promise<Bible[]> {
@@ -602,14 +647,14 @@ class DatabaseService {
     try {
       await this.ensureInitialized();
       if (!this.db) return [];
-      
+
       // Double-check cache
       if (this.biblesCache) {
         return this.biblesCache.data;
       }
 
       const rows = await this.db.getAllAsync(
-        "SELECT * FROM bibles ORDER BY name"
+        "SELECT * FROM bibles ORDER BY name",
       );
       const mapped = rows.map((row: any) => {
         // Limpar extensões indesejadas no nome exibido (.bbl, .bbl.db, .db)
@@ -631,7 +676,7 @@ class DatabaseService {
       console.log("----------------------");
       return mapped;
     } catch (error) {
-      console.error('[DB] Erro em getBibles:', error);
+      console.error("[DB] Erro em getBibles:", error);
       return [];
     }
   }
@@ -640,40 +685,40 @@ class DatabaseService {
     return this.safeDbOperation(async () => {
       await this.ensureInitialized();
       if (!this.db) throw new Error("Database not initialized");
-      
+
       await this.db.runAsync("DELETE FROM bibles WHERE id = ?", [bibleId]);
       await this.db.runAsync("DELETE FROM favorites WHERE bibleId = ?", [
         bibleId,
       ]);
       this.biblesCache = null;
-    }, 'deleteBible');
+    }, "deleteBible");
   }
 
   async markBibleAsDownloaded(bibleId: string, size?: number): Promise<void> {
     return this.safeDbOperation(async () => {
       await this.ensureInitialized();
       if (!this.db) throw new Error("Database not initialized");
-      
+
       await this.db.runAsync(
         "UPDATE bibles SET isDownloaded = 1, downloadDate = ?, size = ? WHERE id = ?",
-        [new Date().toISOString(), size || null, bibleId]
+        [new Date().toISOString(), size || null, bibleId],
       );
       this.biblesCache = null;
-    }, 'markBibleAsDownloaded');
+    }, "markBibleAsDownloaded");
   }
 
   // Settings management
   async saveSetting(key: string, value: string): Promise<void> {
     try {
       await this.ensureInitialized();
-      if (!this.db) throw new Error('Database not initialized');
-      
+      if (!this.db) throw new Error("Database not initialized");
+
       await this.db.runAsync(
         "INSERT OR REPLACE INTO user_settings (key, value) VALUES (?, ?)",
-        [key, value]
+        [key, value],
       );
     } catch (error) {
-      console.error('[DB] Erro em saveSetting:', error);
+      console.error("[DB] Erro em saveSetting:", error);
       throw error;
     }
   }
@@ -682,46 +727,52 @@ class DatabaseService {
     try {
       await this.ensureInitialized();
       if (!this.db) return null;
-      
+
       const result = (await this.db.getFirstAsync(
         "SELECT value FROM user_settings WHERE key = ?",
-        [key]
+        [key],
       )) as { value: string } | null;
       return result ? result.value : null;
     } catch (error) {
-      console.error('[DB] Erro em getSetting:', error);
+      console.error("[DB] Erro em getSetting:", error);
       return null;
     }
   }
 
-  async getMultipleSettings(keys: string[]): Promise<Record<string, string | null>> {
+  async getMultipleSettings(
+    keys: string[],
+  ): Promise<Record<string, string | null>> {
     try {
       await this.ensureInitialized();
       if (!this.db) {
         const settingsMap: Record<string, string | null> = {};
-        keys.forEach(key => { settingsMap[key] = null; });
+        keys.forEach((key) => {
+          settingsMap[key] = null;
+        });
         return settingsMap;
       }
-      
-      const placeholders = keys.map(() => '?').join(',');
+
+      const placeholders = keys.map(() => "?").join(",");
       const results = (await this.db.getAllAsync(
         `SELECT key, value FROM user_settings WHERE key IN (${placeholders})`,
-        keys
+        keys,
       )) as { key: string; value: string }[];
 
       const settingsMap: Record<string, string | null> = {};
-      keys.forEach(key => {
+      keys.forEach((key) => {
         settingsMap[key] = null;
       });
-      results.forEach(result => {
+      results.forEach((result) => {
         settingsMap[result.key] = result.value;
       });
 
       return settingsMap;
     } catch (error) {
-      console.error('[DB] Erro em getMultipleSettings:', error);
+      console.error("[DB] Erro em getMultipleSettings:", error);
       const settingsMap: Record<string, string | null> = {};
-      keys.forEach(key => { settingsMap[key] = null; });
+      keys.forEach((key) => {
+        settingsMap[key] = null;
+      });
       return settingsMap;
     }
   }
@@ -731,45 +782,45 @@ class DatabaseService {
     bibleId: string,
     bookId: number,
     chapterNumber: number,
-    verseNumber: number
+    verseNumber: number,
   ): Promise<void> {
     return this.safeDbOperation(async () => {
       await this.ensureInitialized();
       if (!this.db) throw new Error("Database not initialized");
-      
+
       await this.db.runAsync(
         "INSERT OR IGNORE INTO favorites (bibleId, bookId, chapterNumber, verseNumber) VALUES (?, ?, ?, ?)",
-        [bibleId, bookId, chapterNumber, verseNumber]
+        [bibleId, bookId, chapterNumber, verseNumber],
       );
-    }, 'addToFavorites');
+    }, "addToFavorites");
   }
 
   async removeFromFavorites(
     bibleId: string,
     bookId: number,
     chapterNumber: number,
-    verseNumber: number
+    verseNumber: number,
   ): Promise<void> {
     return this.safeDbOperation(async () => {
       await this.ensureInitialized();
       if (!this.db) throw new Error("Database not initialized");
-      
+
       await this.db.runAsync(
         "DELETE FROM favorites WHERE bibleId = ? AND bookId = ? AND chapterNumber = ? AND verseNumber = ?",
-        [bibleId, bookId, chapterNumber, verseNumber]
+        [bibleId, bookId, chapterNumber, verseNumber],
       );
-    }, 'removeFromFavorites');
+    }, "removeFromFavorites");
   }
 
   async getFavorites(
-    bibleId: string
+    bibleId: string,
   ): Promise<{ bookId: number; chapterNumber: number; verseNumber: number }[]> {
     await this.ensureInitialized();
     if (!this.db) throw new Error("Database not initialized");
 
     const result = await this.db.getAllAsync(
       "SELECT bookId, chapterNumber, verseNumber FROM favorites WHERE bibleId = ? ORDER BY bookId, chapterNumber, verseNumber",
-      [bibleId]
+      [bibleId],
     );
 
     return result.map((row: any) => ({
@@ -783,14 +834,14 @@ class DatabaseService {
     bibleId: string,
     bookId: number,
     chapterNumber: number,
-    verseNumber: number
+    verseNumber: number,
   ): Promise<boolean> {
     await this.ensureInitialized();
     if (!this.db) throw new Error("Database not initialized");
 
     const result = await this.db.getFirstAsync(
       "SELECT 1 FROM favorites WHERE bibleId = ? AND bookId = ? AND chapterNumber = ? AND verseNumber = ?",
-      [bibleId, bookId, chapterNumber, verseNumber]
+      [bibleId, bookId, chapterNumber, verseNumber],
     );
 
     return !!result;
@@ -800,37 +851,44 @@ class DatabaseService {
   async saveLastReading(
     bibleId: string,
     bookId: number,
-    chapterNumber: number
+    chapterNumber: number,
   ): Promise<void> {
     // Sistema completamente não-bloqueante - retorna imediatamente
     this.pendingReadingSave = { bibleId, bookId, chapterNumber };
-    
+
     if (this.saveReadingDebounceTimer) {
       clearTimeout(this.saveReadingDebounceTimer);
     }
-    
+
     // Salvar em background sem esperar nem bloquear
     this.saveReadingDebounceTimer = setTimeout(async () => {
       if (!this.pendingReadingSave) return;
-      
-      const { bibleId: finalBibleId, bookId: finalBookId, chapterNumber: finalChapter } = this.pendingReadingSave;
+
+      const {
+        bibleId: finalBibleId,
+        bookId: finalBookId,
+        chapterNumber: finalChapter,
+      } = this.pendingReadingSave;
       this.pendingReadingSave = null;
-      
+
       // Tentar salvar usando conexão principal - se falhar, não é crítico
       try {
         await this.ensureInitialized();
         if (this.db) {
           await this.db.runAsync(
             "INSERT OR REPLACE INTO reading_history (bibleId, bookId, chapterNumber, lastReadDate) VALUES (?, ?, ?, ?)",
-            [finalBibleId, finalBookId, finalChapter, new Date().toISOString()]
+            [finalBibleId, finalBookId, finalChapter, new Date().toISOString()],
           );
         }
       } catch (error) {
         // Salvar leitura não é crítico - ignora erros
-        console.warn("[DEBUG] Erro ao salvar posição de leitura (ignorado):", error);
+        console.warn(
+          "[DEBUG] Erro ao salvar posição de leitura (ignorado):",
+          error,
+        );
       }
     }, 2000); // 2 segundos de debounce
-    
+
     // Retorna imediatamente - não bloqueia NADA
     return Promise.resolve();
   }
@@ -844,7 +902,7 @@ class DatabaseService {
     if (!this.db) throw new Error("Database not initialized");
 
     const result = (await this.db.getFirstAsync(
-      "SELECT bibleId, bookId, chapterNumber FROM reading_history ORDER BY lastReadDate DESC LIMIT 1"
+      "SELECT bibleId, bookId, chapterNumber FROM reading_history ORDER BY lastReadDate DESC LIMIT 1",
     )) as { bibleId: string; bookId: number; chapterNumber: number } | null;
 
     return result;
@@ -882,25 +940,25 @@ class DatabaseService {
 
       // Buscar estatísticas de questionários completados
       const result = await this.db.getFirstAsync<{ completed: number }>(
-        "SELECT COUNT(*) as completed FROM quiz_results WHERE score >= 7"
+        "SELECT COUNT(*) as cod FROM quiz_results WHERE score >= 7",
       );
 
       const totalResult = await this.db.getFirstAsync<{ total: number }>(
-        "SELECT COUNT(*) as total FROM quiz_results"
+        "SELECT COUNT(*) as total FROM quiz_results",
       );
-
+[]
       return {
         completed: result?.completed || 0,
         total: totalResult?.total || 0,
       };
-    }, 'getQuizStats');
+    }, "getQuizStats");
   }
 
   async clearAllData(): Promise<void> {
     return this.safeDbOperation(async () => {
       await this.ensureInitialized();
       if (!this.db) throw new Error("Database not initialized");
-      
+
       // Clear all tables
       await this.db.runAsync("DELETE FROM bibles");
       await this.db.runAsync("DELETE FROM user_settings");
@@ -908,12 +966,12 @@ class DatabaseService {
       await this.db.runAsync("DELETE FROM reading_plans");
       await this.db.runAsync("DELETE FROM reading_plan_days");
       await this.db.runAsync("DELETE FROM reading_history");
-      
+
       // Clear cache
       this.biblesCache = null;
-      
+
       console.log("All data cleared successfully");
-    }, 'clearAllData');
+    }, "clearAllData");
   }
 
   // Harpa Hymns Management
@@ -926,72 +984,86 @@ class DatabaseService {
   }): Promise<void> {
     try {
       await this.ensureInitialized();
-      if (!this.db) throw new Error('Database not initialized');
-      
+      if (!this.db) throw new Error("Database not initialized");
+
       await this.db.runAsync(
         `INSERT OR REPLACE INTO harpa_hymns (number, title, author, copyright, verses)
          VALUES (?, ?, ?, ?, ?)`,
-        [hymn.number, hymn.title, hymn.author, hymn.copyright, JSON.stringify(hymn.verses)]
+        [
+          hymn.number,
+          hymn.title,
+          hymn.author,
+          hymn.copyright,
+          JSON.stringify(hymn.verses),
+        ],
       );
     } catch (error) {
-      console.error('[DB] Erro em saveHymnToDatabase:', error);
+      console.error("[DB] Erro em saveHymnToDatabase:", error);
       throw error;
     }
   }
 
   // Salvar múltiplos hinos em uma única transação (MUITO MAIS RÁPIDO e evita locks)
-  async saveHymnsBatch(hymns: Array<{
-    number: number;
-    title: string;
-    author: string;
-    copyright: string;
-    verses: any[];
-  }>): Promise<void> {
+  async saveHymnsBatch(
+    hymns: Array<{
+      number: number;
+      title: string;
+      author: string;
+      copyright: string;
+      verses: any[];
+    }>,
+  ): Promise<void> {
     try {
       console.log(`[DB] 💾 Salvando batch de ${hymns.length} hinos...`);
-      
+
       await this.ensureInitialized();
-      
+
       if (!this.db) {
-        throw new Error('Database not initialized after ensureInitialized');
+        throw new Error("Database not initialized after ensureInitialized");
       }
-      
+
       // Teste adicional: verificar se o banco responde
       try {
         await this.db.getFirstAsync("SELECT 1");
       } catch (testError) {
-        console.error('[DB] ❌ Banco não responde, tentando reinicializar...');
-        await this.reinitializeDatabase('saveHymnsBatch test failed');
+        console.error("[DB] ❌ Banco não responde, tentando reinicializar...");
+        await this.reinitializeDatabase("saveHymnsBatch test failed");
         if (!this.db) {
-          throw new Error('Database still not ready after reinitialization');
+          throw new Error("Database still not ready after reinitialization");
         }
       }
-      
-      console.log('[DB] 🚀 Iniciando transação...');
-      await this.db.execAsync('BEGIN TRANSACTION');
-      
+
+      console.log("[DB] 🚀 Iniciando transação...");
+      await this.db.execAsync("BEGIN TRANSACTION");
+[]
       try {
         for (const hymn of hymns) {
           await this.db.runAsync(
             `INSERT OR REPLACE INTO harpa_hymns (number, title, author, copyright, verses)
              VALUES (?, ?, ?, ?, ?)`,
-            [hymn.number, hymn.title, hymn.author, hymn.copyright, JSON.stringify(hymn.verses)]
+            [
+              hymn.number,
+              hymn.title,
+              hymn.author,
+              hymn.copyright,
+              JSON.stringify(hymn.verses),
+            ],
           );
         }
-        
-        await this.db.execAsync('COMMIT');
+
+        await this.db.execAsync("COMMIT");
         console.log(`[DB] ✅ Batch de ${hymns.length} hinos salvo com sucesso`);
       } catch (error) {
-        console.error('[DB] ❌ Erro durante transação, executando rollback...');
+        console.error("[DB] ❌ Erro durante transação, executando rollback...");
         try {
-          await this.db.execAsync('ROLLBACK');
+          await this.db.execAsync("ROLLBACK");
         } catch (rollbackError) {
-          console.error('[DB] ⚠️ Erro no rollback:', rollbackError);
+          console.error("[DB] ⚠️ Erro no rollback:", rollbackError);
         }
         throw error;
       }
     } catch (error) {
-      console.error('[DB] ❌ Erro em saveHymnsBatch:', error);
+      console.error("[DB] ❌ Erro em saveHymnsBatch:", error);
       throw error;
     }
   }
@@ -1005,25 +1077,27 @@ class DatabaseService {
   } | null> {
     try {
       await this.ensureInitialized();
-      
+
       if (!this.db) {
-        console.warn(`[DB] ⚠️ Database não inicializado em getHymnFromDatabase(${number}), retornando null`);
+        console.warn(
+          `[DB] ⚠️ Database não inicializado em getHymnFromDatabase(${number}), retornando null`,
+        );
         return null;
       }
-      
-      const result = await this.db.getFirstAsync(
-        'SELECT * FROM harpa_hymns WHERE number = ?',
-        [number]
-      ) as any;
-      
+
+      const result = (await this.db.getFirstAsync(
+        "SELECT * FROM harpa_hymns WHERE number = ?",
+        [number],
+      )) as any;
+
       if (!result) return null;
-      
+
       return {
         number: result.number,
         title: result.title,
         author: result.author,
         copyright: result.copyright,
-        verses: JSON.parse(result.verses)
+        verses: JSON.parse(result.verses),
       };
     } catch (error) {
       console.error(`[DB] Erro em getHymnFromDatabase(${number}):`, error);
@@ -1031,44 +1105,57 @@ class DatabaseService {
     }
   }
 
-  async searchHymnsInDatabase(query: string, limit: number = 20): Promise<Array<{
-    number: number;
-    title: string;
-    snippet: string;
-  }>> {
+  async searchHymnsInDatabase(
+    query: string,
+    limit: number = 20,
+  ): Promise<
+    Array<{
+      number: number;
+      title: string;
+      snippet: string;
+    }>
+  > {
     try {
-      await this.ensureInitialized();
-      
+      await this.ensureInitialized();[]
+
       if (!this.db) {
-        console.warn('[DB] ⚠️ Database não inicializado em searchHymnsInDatabase, retornando []');
+        console.warn(
+          "[DB] ⚠️ Database não inicializado em searchHymnsInDatabase, retornando []",
+        );
         return [];
       }
-      
+
       const lowerQuery = query.toLowerCase();
-      
+
       // LOG: Ver quantos hinos existem na tabela
-      const countResult = await this.db.getFirstAsync('SELECT COUNT(*) as count FROM harpa_hymns') as any;
-      console.log(`[searchHymns] Total de hinos na tabela: ${countResult?.count || 0}`);
-      
+      const countResult = (await this.db.getFirstAsync(
+        "SELECT COUNT(*) as count FROM harpa_hymns",
+      )) as any;
+      console.log(
+        `[searchHymns] Total de hinos na tabela: ${countResult?.count || 0}`,
+      );
+
       // LOG: Query SQL que será executada
       console.log(`[searchHymns] Query: "${lowerQuery}"`);
-      console.log(`[searchHymns] SQL: SELECT number, title, verses FROM harpa_hymns WHERE LOWER(verses) LIKE '%${lowerQuery}%' LIMIT ${limit}`);
-      
+      console.log(
+        `[searchHymns] SQL: SELECT number, title, verses FROM harpa_hymns WHERE LOWER(verses) LIKE '%${lowerQuery}%' LIMIT ${limit}`,
+      );
+
       // Buscar em verses (JSON)
-      const results = await this.db.getAllAsync(
+      const results = (await this.db.getAllAsync(
         `SELECT number, title, verses 
          FROM harpa_hymns 
          WHERE LOWER(verses) LIKE ?
          LIMIT ?`,
-        [`%${lowerQuery}%`, limit]
-      ) as any[];
-      
+        [`%${lowerQuery}%`, limit],
+      )) as any[];
+
       console.log(`[searchHymns] Resultados encontrados: ${results.length}`);
-      
-      return results.map(row => {
+
+      return results.map((row) => {
         const verses = JSON.parse(row.verses);
-        let snippet = '';
-        
+        let snippet = "";
+
         // Procurar snippet no conteúdo
         for (const verse of verses) {
           for (const line of verse.lines) {
@@ -1077,23 +1164,24 @@ class DatabaseService {
             if (index !== -1) {
               const start = Math.max(0, index - 25);
               const end = Math.min(line.length, index + query.length + 25);
-              snippet = (start > 0 ? '...' : '') + 
-                       line.substring(start, end) + 
-                       (end < line.length ? '...' : '');
+              snippet =
+                (start > 0 ? "..." : "") +
+                line.substring(start, end) +
+                (end < line.length ? "..." : "");
               break;
             }
           }
           if (snippet) break;
         }
-        
+
         return {
           number: row.number,
           title: row.title,
-          snippet: snippet || 'Trecho encontrado no hino'
+          snippet: snippet || "Trecho encontrado no hino",
         };
       });
     } catch (error) {
-      console.error('[DB] Erro em searchHymnsInDatabase:', error);
+      console.error("[DB] Erro em searchHymnsInDatabase:", error);
       return [];
     }
   }
@@ -1101,40 +1189,48 @@ class DatabaseService {
   async getHymnsDatabaseCount(): Promise<number> {
     try {
       await this.ensureInitialized();
-      
+
       if (!this.db) {
-        console.warn('[DB] ⚠️ Database não inicializado em getHymnsDatabaseCount, retornando 0');
+        console.warn(
+          "[DB] ⚠️ Database não inicializado em getHymnsDatabaseCount, retornando 0",
+        );
         return 0;
       }
-      
-      const result = await this.db.getFirstAsync('SELECT COUNT(*) as count FROM harpa_hymns') as any;
+
+      const result = (await this.db.getFirstAsync(
+        "SELECT COUNT(*) as count FROM harpa_hymns",
+      )) as any;
       return result?.count || 0;
     } catch (error) {
-      console.error('[DB] Erro em getHymnsDatabaseCount:', error);
+      console.error("[DB] Erro em getHymnsDatabaseCount:", error);
       // Retornar 0 ao invés de lançar erro - o app pode continuar funcionando
       return 0;
     }
   }
 
-  async getAllHymnsMetadata(): Promise<Array<{ number: number; title: string }>> {
+  async getAllHymnsMetadata(): Promise<
+    Array<{ number: number; title: string }>
+  > {
     try {
       await this.ensureInitialized();
-      
+
       if (!this.db) {
-        console.warn('[DB] ⚠️ Database não inicializado em getAllHymnsMetadata, retornando []');
+        console.warn(
+          "[DB] ⚠️ Database não inicializado em getAllHymnsMetadata, retornando []",
+        );
         return [];
       }
-      
-      const results = await this.db.getAllAsync(
-        'SELECT number, title FROM harpa_hymns ORDER BY number ASC'
-      ) as any[];
-      
-      return results.map(row => ({
+
+      const results = (await this.db.getAllAsync(
+        "SELECT number, title FROM harpa_hymns ORDER BY number ASC",
+      )) as any[];
+
+      return results.map((row) => ({
         number: row.number,
-        title: row.title
+        title: row.title,
       }));
     } catch (error) {
-      console.error('[DB] Erro em getAllHymnsMetadata:', error);
+      console.error("[DB] Erro em getAllHymnsMetadata:", error);
       return [];
     }
   }
@@ -1142,12 +1238,12 @@ class DatabaseService {
   async clearAllHymns(): Promise<void> {
     try {
       await this.ensureInitialized();
-      if (!this.db) throw new Error('Database not initialized');
-      
-      await this.db.runAsync('DELETE FROM harpa_hymns');
-      console.log('[DB] Todos os hinos foram removidos do banco');
+      if (!this.db) throw new Error("Database not initialized");
+
+      await this.db.runAsync("DELETE FROM harpa_hymns");
+      console.log("[DB] Todos os hinos foram removidos do banco");
     } catch (error) {
-      console.error('[DB] Erro em clearAllHymns:', error);
+      console.error("[DB] Erro em clearAllHymns:", error);
       throw error;
     }
   }
@@ -1162,7 +1258,7 @@ declare global {
 
 if (__DEV__) {
   global.__FORCE_RESET_DB_LOCK = () => {
-    console.warn('🚨 MANUAL EMERGENCY DATABASE LOCK RESET');
+    console.warn("🚨 MANUAL EMERGENCY DATABASE LOCK RESET");
     databaseServiceInstance.forceResetLock();
   };
 }

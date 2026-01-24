@@ -28,9 +28,7 @@ export default class PlanTypesController {
    */
   async active({ response }: HttpContext) {
     try {
-      const planTypes = await PlanType.query()
-        .where('is_active', true)
-        .orderBy('order', 'asc')
+      const planTypes = await PlanType.query().where('is_active', true).orderBy('order', 'asc')
 
       return response.ok({
         success: true,

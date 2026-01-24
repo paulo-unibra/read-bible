@@ -13,12 +13,14 @@ Migração do sistema de parsing de **XML (de arquivo ZIP)** para **JSON (arquiv
 #### 1. `services/HarpaOfflineService.ts`
 
 **Mudanças:**
+
 - ✅ Removida dependência `jszip` e `fast-xml-parser`
 - ✅ Método `extractZipFromBundle()` modificado para ler JSON
 - ✅ Método `extractVerses()` removido (não mais necessário)
 - ✅ Parsing simplificado diretamente do JSON
 
 **Antes (XML):**
+
 ```typescript
 // Descompactar ZIP
 const zip = new JSZip();
@@ -26,28 +28,29 @@ const zipData = await zip.loadAsync(arrayBuffer);
 
 // Para cada arquivo XML
 for (const fileName of files) {
-  const content = await file.async('text');
+  const content = await file.async("text");
   const parsedXml = xmlParser.parse(content);
   const song = parsedXml.song;
-  
+
   // Extrair verses com lógica complexa
-  verses: this.extractVerses(song)
+  verses: this.extractVerses(song);
 }
 ```
 
 **Depois (JSON):**
+
 ```typescript
 // Carregar JSON direto
-const jsonAsset = Asset.fromModule(require('../assets/harpa/hc_json.json'));
+const jsonAsset = Asset.fromModule(require("../assets/harpa/hc_json.json"));
 const response = await fetch(jsonAsset.localUri);
 const hymnsData = await response.json();
 
 // Mapear diretamente
 verses: hymnJson.verses.map((verse: any) => ({
-  name: verse.chorus ? 'Coro' : `Estrofe ${verse.sequence}`,
-  type: verse.chorus ? 'chorus' : 'verse',
-  lines: verse.lyrics.split('\n').filter((line: string) => line.trim())
-}))
+  name: verse.chorus ? "Coro" : `Estrofe ${verse.sequence}`,
+  type: verse.chorus ? "chorus" : "verse",
+  lines: verse.lyrics.split("\n").filter((line: string) => line.trim()),
+}));
 ```
 
 ### Estrutura do JSON
@@ -94,11 +97,13 @@ verses: hymnJson.verses.map((verse: any) => ({
 ### Como Testar
 
 1. Limpar dados da Harpa:
+
 ```typescript
 await HarpaOfflineService.clearHarpaData();
 ```
 
 2. Baixar novamente:
+
 ```typescript
 await HarpaOfflineService.downloadHarpa((progress) => {
   console.log(`Progress: ${progress}%`);
@@ -111,14 +116,17 @@ await HarpaOfflineService.downloadHarpa((progress) => {
 ### Arquivos Obsoletos
 
 Os seguintes arquivos não são mais necessários:
+
 - `assets/harpa/hc_xml.zip` (pode ser removido)
 
 O arquivo necessário agora é:
+
 - `assets/harpa/hc_json.json` (20078 linhas, 640 hinos)
 
 ### Dependências Removidas
 
 No `package.json`, as seguintes dependências **NÃO** são mais necessárias:
+
 - `jszip`
 - `fast-xml-parser`
 

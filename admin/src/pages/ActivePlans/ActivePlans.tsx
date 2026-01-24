@@ -1,6 +1,25 @@
-import { useState, useEffect } from "react";
-import { Container, MainContent, PageTitle, FiltersSection, Input, Select, Button, Table, Thead, Tbody, Tr, Th, Td, Badge, Pagination, EmptyState, ErrorMessage, ActionButton } from "../../components/ui/StyledComponents";
+import { useEffect, useState } from "react";
 import Sidebar from "../../components/Sidebar";
+import {
+    ActionButton,
+    Badge,
+    Button,
+    Container,
+    EmptyState,
+    ErrorMessage,
+    FiltersSection,
+    Input,
+    MainContent,
+    PageTitle,
+    Pagination,
+    Select,
+    Table,
+    Tbody,
+    Td,
+    Th,
+    Thead,
+    Tr,
+} from "../../components/ui/StyledComponents";
 import api from "../../services/api";
 
 interface User {
@@ -84,7 +103,9 @@ const ActivePlans = () => {
 
     try {
       setActionLoading(planId);
-      const response = await api.patch(`/admin/reading-plans/${planId}/disable`);
+      const response = await api.patch(
+        `/admin/reading-plans/${planId}/disable`,
+      );
 
       if (response.data.success) {
         alert("Plano desabilitado com sucesso!");
@@ -145,7 +166,10 @@ const ActivePlans = () => {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+          <Select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
             <option value="all">Todos os Status</option>
             <option value="active">Ativos</option>
             <option value="inactive">Inativos</option>
@@ -181,7 +205,9 @@ const ActivePlans = () => {
                       <div>
                         <strong>{plan.user.name}</strong>
                         <br />
-                        <small style={{ color: "#666" }}>{plan.user.email}</small>
+                        <small style={{ color: "#666" }}>
+                          {plan.user.email}
+                        </small>
                       </div>
                     </Td>
                     <Td>{plan.name}</Td>
@@ -189,7 +215,8 @@ const ActivePlans = () => {
                       <Badge type="info">{getTypeBadge(plan.type)}</Badge>
                     </Td>
                     <Td>
-                      {formatDate(plan.startDate)} até {formatDate(plan.endDate)}
+                      {formatDate(plan.startDate)} até{" "}
+                      {formatDate(plan.endDate)}
                       <br />
                       <small style={{ color: "#666" }}>
                         Dia {plan.currentDay} de {plan.totalDays}
@@ -222,7 +249,9 @@ const ActivePlans = () => {
                           disabled={actionLoading === plan.id}
                           style={{ backgroundColor: "#dc3545" }}
                         >
-                          {actionLoading === plan.id ? "Desabilitando..." : "Desabilitar"}
+                          {actionLoading === plan.id
+                            ? "Desabilitando..."
+                            : "Desabilitar"}
                         </ActionButton>
                       ) : (
                         <ActionButton
@@ -230,7 +259,9 @@ const ActivePlans = () => {
                           disabled={actionLoading === plan.id}
                           style={{ backgroundColor: "#28a745" }}
                         >
-                          {actionLoading === plan.id ? "Reativando..." : "Reativar"}
+                          {actionLoading === plan.id
+                            ? "Reativando..."
+                            : "Reativar"}
                         </ActionButton>
                       )}
                     </Td>

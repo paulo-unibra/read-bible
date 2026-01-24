@@ -7,6 +7,7 @@ Adicionado controle de velocidade de reprodução para os áudios dos hinos da H
 ## Características
 
 ### Opções de Velocidade
+
 - **0.5x** - Metade da velocidade (mais lento)
 - **0.75x** - 75% da velocidade
 - **1.0x** - Velocidade normal (padrão)
@@ -53,34 +54,37 @@ O controle de velocidade está localizado no player expandido do hino, abaixo do
 #### 1. `/app/hymn-viewer.tsx`
 
 **Estado adicionado:**
+
 ```typescript
 const [playbackRate, setPlaybackRate] = useState(1.0);
 ```
 
 **Função de controle:**
+
 ```typescript
 const handlePlaybackRateChange = async () => {
   const rates = [0.5, 0.75, 1.0, 1.25, 1.5];
   const currentIndex = rates.indexOf(playbackRate);
   const nextRate = rates[(currentIndex + 1) % rates.length];
-  
+
   try {
     await hymnAudioService.setPlaybackRateAll(audioTracks, nextRate);
     setPlaybackRate(nextRate);
   } catch (error) {
-    console.error('Erro ao alterar velocidade:', error);
+    console.error("Erro ao alterar velocidade:", error);
   }
 };
 ```
 
 **Componente UI:**
+
 ```tsx
 <View style={styles.speedControl}>
   <Ionicons name="speedometer-outline" size={16} color={colors.textSecondary} />
   <Text style={[styles.speedLabel, { color: colors.textSecondary }]}>
     Velocidade:
   </Text>
-  <TouchableOpacity 
+  <TouchableOpacity
     onPress={handlePlaybackRateChange}
     style={[styles.speedButton, { backgroundColor: colors.accent }]}
   >
@@ -92,12 +96,13 @@ const handlePlaybackRateChange = async () => {
 #### 2. `/services/HymnAudioService.ts`
 
 **Nova função:**
+
 ```typescript
 async setPlaybackRateAll(tracks: HymnAudioTrack[], rate: number): Promise<void> {
   console.log(`⚡ [HymnAudioService] Alterando velocidade para ${rate}x...`);
-  
+
   const loadedTracks = tracks.filter(t => t.sound && t.isLoaded);
-  
+
   try {
     await Promise.all(
       loadedTracks.map(async (track) => {
@@ -109,7 +114,7 @@ async setPlaybackRateAll(tracks: HymnAudioTrack[], rate: number): Promise<void> 
         }
       })
     );
-    
+
     console.log(`✅ [HymnAudioService] Velocidade de todos os áudios alterada para ${rate}x`);
   } catch (error) {
     console.error(`❌ [HymnAudioService] Erro ao alterar velocidade:`, error);
@@ -153,6 +158,7 @@ sound.setRateAsync(rate: number, shouldCorrectPitch: boolean)
 ```
 
 **Parâmetros:**
+
 - `rate`: Taxa de reprodução (0.5 a 2.0 são valores comuns)
 - `shouldCorrectPitch`: `true` mantém o tom original, `false` altera o tom
 

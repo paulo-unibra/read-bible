@@ -1,4 +1,4 @@
-import AuthService, { API_URL } from './AuthService';
+import AuthService, { API_URL } from "./AuthService";
 
 export interface VerseNote {
   id: number;
@@ -23,19 +23,19 @@ class NotesService {
     verseNumbers: number[],
     verseText: string,
     note: string,
-    isPrivate: boolean = true
+    isPrivate: boolean = true,
   ): Promise<VerseNote> {
     try {
       const token = await AuthService.getToken();
       if (!token) {
-        throw new Error('Usuário não autenticado');
+        throw new Error("Usuário não autenticado");
       }
 
       const response = await fetch(`${API_URL}/notes`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           bookId,
@@ -51,12 +51,12 @@ class NotesService {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.message || 'Erro ao salvar anotação');
+        throw new Error(result.message || "Erro ao salvar anotação");
       }
 
       return result.data;
     } catch (error) {
-      console.error('Erro ao salvar anotação:', error);
+      console.error("Erro ao salvar anotação:", error);
       throw error;
     }
   }
@@ -70,21 +70,21 @@ class NotesService {
       }
 
       const response = await fetch(`${API_URL}/notes`, {
-        method: 'GET',
+        method: "GET",
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
       });
 
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.message || 'Erro ao buscar anotações');
+        throw new Error(result.message || "Erro ao buscar anotações");
       }
 
       return result.data || [];
     } catch (error) {
-      console.error('Erro ao buscar anotações:', error);
+      console.error("Erro ao buscar anotações:", error);
       return [];
     }
   }
@@ -93,48 +93,57 @@ class NotesService {
   async getNoteByReference(
     bookId: number,
     chapterNumber: number,
-    verseNumbers: number[]
+    verseNumbers: number[],
   ): Promise<VerseNote | null> {
     try {
       const notes = await this.getNotesByChapter(bookId, chapterNumber);
-      
+
       // Procurar nota que contenha exatamente esses versículos
-      const note = notes.find(n => 
-        n.verseNumbers.length === verseNumbers.length &&
-        n.verseNumbers.every(v => verseNumbers.includes(v))
+      const note = notes.find(
+        (n) =>
+          n.verseNumbers.length === verseNumbers.length &&
+          n.verseNumbers.every((v) => verseNumbers.includes(v)),
       );
 
       return note || null;
     } catch (error) {
-      console.error('Erro ao buscar anotação:', error);
+      console.error("Erro ao buscar anotação:", error);
       return null;
     }
   }
 
   // Buscar anotações de um capítulo específico
-  async getNotesByChapter(bookId: number, chapterNumber: number): Promise<VerseNote[]> {
+  async getNotesByChapter(
+    bookId: number,
+    chapterNumber: number,
+  ): Promise<VerseNote[]> {
     try {
       const token = await AuthService.getToken();
       if (!token) {
         return [];
       }
 
-      const response = await fetch(`${API_URL}/notes/chapter/${bookId}/${chapterNumber}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
+      const response = await fetch(
+        `${API_URL}/notes/chapter/${bookId}/${chapterNumber}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         },
-      });
+      );
 
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.message || 'Erro ao buscar anotações do capítulo');
+        throw new Error(
+          result.message || "Erro ao buscar anotações do capítulo",
+        );
       }
 
       return result.data || [];
     } catch (error) {
-      console.error('Erro ao buscar anotações do capítulo:', error);
+      console.error("Erro ao buscar anotações do capítulo:", error);
       return [];
     }
   }
@@ -143,9 +152,9 @@ class NotesService {
   async getNotesByBook(bookId: number): Promise<VerseNote[]> {
     try {
       const allNotes = await this.getAllNotes();
-      return allNotes.filter(n => n.bookId === bookId);
+      return allNotes.filter((n) => n.bookId === bookId);
     } catch (error) {
-      console.error('Erro ao buscar anotações do livro:', error);
+      console.error("Erro ao buscar anotações do livro:", error);
       return [];
     }
   }
@@ -155,30 +164,38 @@ class NotesService {
     try {
       const token = await AuthService.getToken();
       if (!token) {
-        throw new Error('Usuário não autenticado');
+        throw new Error("Usuário não autenticado");
       }
 
       const response = await fetch(`${API_URL}/notes/${noteId}`, {
-        method: 'DELETE',
+        method: "DELETE",
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
       });
 
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.message || 'Erro ao deletar anotação');
+        throw new Error(result.message || "Erro ao deletar anotação");
       }
     } catch (error) {
-      console.error('Erro ao deletar anotação:', error);
+      console.error("Erro ao deletar anotação:", error);
       throw error;
     }
   }
 
   // Verificar se existe anotação para versículos específicos
-  async hasNote(bookId: number, chapterNumber: number, verseNumbers: number[]): Promise<boolean> {
-    const note = await this.getNoteByReference(bookId, chapterNumber, verseNumbers);
+  async hasNote(
+    bookId: number,
+    chapterNumber: number,
+    verseNumbers: number[],
+  ): Promise<boolean> {
+    const note = await this.getNoteByReference(
+      bookId,
+      chapterNumber,
+      verseNumbers,
+    );
     return note !== null;
   }
 }

@@ -31,7 +31,9 @@ export default class ReadingPlanProgressService {
         .first()
 
       if (existingDay) {
-        console.log(`⚠️ [ProgressService] Dia ${nextDayData.dayNumber} já existe no plano ${planId}`)
+        console.log(
+          `⚠️ [ProgressService] Dia ${nextDayData.dayNumber} já existe no plano ${planId}`
+        )
         return false
       }
 

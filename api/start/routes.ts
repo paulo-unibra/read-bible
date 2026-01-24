@@ -57,7 +57,9 @@ router.get('/reading-plans/active', [ReadingPlanController, 'getActive']).use(mi
 router
   .post('/reading-plans/complete', [ReadingPlanController, 'completeDay'])
   .use(middleware.auth())
-router.post('/reading-plans/add-days', [ReadingPlanController, 'addNextDays']).use(middleware.auth())
+router
+  .post('/reading-plans/add-days', [ReadingPlanController, 'addNextDays'])
+  .use(middleware.auth())
 router.post('/reading-plans/unmark', [ReadingPlanController, 'unmarkDay']).use(middleware.auth())
 router.get('/reading-plans/history', [ReadingPlanController, 'getHistory']).use(middleware.auth())
 router
@@ -82,7 +84,9 @@ router.get('/plan-types', [PlanTypesController, 'active'])
 // Notes routes (protected)
 router.get('/notes', [NotesController, 'index']).use(middleware.auth())
 router.get('/notes/:id', [NotesController, 'show']).use(middleware.auth())
-router.get('/notes/chapter/:bookId/:chapterNumber', [NotesController, 'byChapter']).use(middleware.auth())
+router
+  .get('/notes/chapter/:bookId/:chapterNumber', [NotesController, 'byChapter'])
+  .use(middleware.auth())
 router.post('/notes', [NotesController, 'store']).use(middleware.auth())
 router.put('/notes/:id', [NotesController, 'update']).use(middleware.auth())
 router.delete('/notes/:id', [NotesController, 'destroy']).use(middleware.auth())

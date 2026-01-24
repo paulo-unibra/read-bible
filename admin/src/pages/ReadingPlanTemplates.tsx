@@ -1,17 +1,17 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { BIBLE_BOOKS } from '../constants/bibleBooks';
-import { useAuth } from '../contexts/AuthContext';
-import api from '../services/api';
-import './ReadingPlanTemplates.css';
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { BIBLE_BOOKS } from "../constants/bibleBooks";
+import { useAuth } from "../contexts/AuthContext";
+import api from "../services/api";
+import "./ReadingPlanTemplates.css";
 
 interface Template {
   id: number;
   name: string;
   description: string;
-  type: 'annual' | 'custom' | 'sequential' | 'thematic';
+  type: "annual" | "custom" | "sequential" | "thematic";
   duration: number;
-  testament: 'old' | 'new' | 'both';
+  testament: "old" | "new" | "both";
   readingsCount: number;
   isActive: boolean;
   order: number;
@@ -42,37 +42,37 @@ const ReadingPlanTemplates: React.FC = () => {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [planTypes, setPlanTypes] = useState<PlanType[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
-  
+
   const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    type: 'annual' as 'annual' | 'custom' | 'sequential' | 'thematic',
-    duration: '',
-    testament: 'both' as 'old' | 'new' | 'both',
+    name: "",
+    description: "",
+    type: "annual" as "annual" | "custom" | "sequential" | "thematic",
+    duration: "",
+    testament: "both" as "old" | "new" | "both",
     isActive: true,
     order: 0,
   });
-  
+
   const [readings, setReadings] = useState<Reading[]>([]);
-  const [formError, setFormError] = useState('');
+  const [formError, setFormError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [importSuccess, setImportSuccess] = useState('');
-  
+  const [importSuccess, setImportSuccess] = useState("");
+
   // Estados para IA
   const [showAIModal, setShowAIModal] = useState(false);
-  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiPrompt, setAiPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generationProgress, setGenerationProgress] = useState('');
+  const [generationProgress, setGenerationProgress] = useState("");
 
   const { hasPermission, logout } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!hasPermission('gerenciar_conteudo')) {
-      navigate('/dashboard');
+    if (!hasPermission("gerenciar_conteudo")) {
+      navigate("/dashboard");
       return;
     }
 
@@ -82,17 +82,17 @@ const ReadingPlanTemplates: React.FC = () => {
 
   const loadTemplates = async () => {
     setLoading(true);
-    setError('');
-    
+    setError("");
+
     try {
       const [templatesRes, typesRes] = await Promise.all([
-        api.get('/admin/reading-plan-templates'),
-        api.get('/admin/plan-types')
+        api.get("/admin/reading-plan-templates"),
+        api.get("/admin/plan-types"),
       ]);
       setTemplates(templatesRes.data.data);
       setPlanTypes(typesRes.data.data);
     } catch (err) {
-      setError('Erro ao carregar dados');
+      setError("Erro ao carregar dados");
       console.error(err);
     } finally {
       setLoading(false);
@@ -104,7 +104,7 @@ const ReadingPlanTemplates: React.FC = () => {
       await api.patch(`/admin/plan-types/${id}/toggle`);
       loadTemplates();
     } catch (err) {
-      alert('Erro ao atualizar tipo de plano');
+      alert("Erro ao atualizar tipo de plano");
       console.error(err);
     }
   };
@@ -125,57 +125,73 @@ const ReadingPlanTemplates: React.FC = () => {
     } else {
       setEditingTemplate(null);
       setFormData({
-        name: '',
-        description: '',
-        type: 'annual',
-        duration: '',
-        testament: 'both',
+        name: "",
+        description: "",
+        type: "annual",
+        duration: "",
+        testament: "both",
         isActive: true,
         order: 0,
       });
       setReadings([]);
     }
     setShowModal(true);
-    setFormError('');
+    setFormError("");
   };
 
   const loadTemplateReadings = async (templateId: number) => {
     try {
-      const response = await api.get(`/admin/reading-plan-templates/${templateId}`);
+      const response = await api.get(
+        `/admin/reading-plan-templates/${templateId}`,
+      );
       setReadings(response.data.readings || []);
     } catch (err) {
-      console.error('Erro ao carregar leituras:', err);
+      console.error("Erro ao carregar leituras:", err);
     }
   };
 
   const handleCloseModal = () => {
     setShowModal(false);
     setEditingTemplate(null);
-    setFormError('');
+    setFormError("");
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >,
+  ) => {
     const { name, value, type } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
+      [name]:
+        type === "checkbox" ? (e.target as HTMLInputElement).checked : value,
     }));
   };
 
   const handleAddReading = () => {
-    setReadings(prev => [...prev, {
-      day: prev.length + 1,
-      bookReadings: [{ book: '', chapters: [] }],
-      description: ''
-    }]);
+    setReadings((prev) => [
+      ...prev,
+      {
+        day: prev.length + 1,
+        bookReadings: [{ book: "", chapters: [] }],
+        description: "",
+      },
+    ]);
   };
 
   const handleRemoveReading = (index: number) => {
-    setReadings(prev => prev.filter((_, i) => i !== index).map((r, i) => ({ ...r, day: i + 1 })));
+    setReadings((prev) =>
+      prev.filter((_, i) => i !== index).map((r, i) => ({ ...r, day: i + 1 })),
+    );
   };
 
-  const handleReadingChange = (index: number, field: keyof Reading, value: string | BookReading[]) => {
-    setReadings(prev => {
+  const handleReadingChange = (
+    index: number,
+    field: keyof Reading,
+    value: string | BookReading[],
+  ) => {
+    setReadings((prev) => {
       const updated = [...prev];
       updated[index] = { ...updated[index], [field]: value };
       return updated;
@@ -183,27 +199,35 @@ const ReadingPlanTemplates: React.FC = () => {
   };
 
   const handleAddBookToReading = (readingIndex: number) => {
-    setReadings(prev => {
+    setReadings((prev) => {
       const updated = [...prev];
-      updated[readingIndex].bookReadings.push({ book: '', chapters: [] });
+      updated[readingIndex].bookReadings.push({ book: "", chapters: [] });
       return updated;
     });
   };
 
-  const handleRemoveBookFromReading = (readingIndex: number, bookIndex: number) => {
-    setReadings(prev => {
+  const handleRemoveBookFromReading = (
+    readingIndex: number,
+    bookIndex: number,
+  ) => {
+    setReadings((prev) => {
       const updated = [...prev];
       updated[readingIndex].bookReadings.splice(bookIndex, 1);
       return updated;
     });
   };
 
-  const handleBookReadingChange = (readingIndex: number, bookIndex: number, field: keyof BookReading, value: string | number[]) => {
-    setReadings(prev => {
+  const handleBookReadingChange = (
+    readingIndex: number,
+    bookIndex: number,
+    field: keyof BookReading,
+    value: string | number[],
+  ) => {
+    setReadings((prev) => {
       const updated = [...prev];
       updated[readingIndex].bookReadings[bookIndex] = {
         ...updated[readingIndex].bookReadings[bookIndex],
-        [field]: value
+        [field]: value,
       };
       return updated;
     });
@@ -211,7 +235,7 @@ const ReadingPlanTemplates: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setFormError('');
+    setFormError("");
     setIsSubmitting(true);
 
     try {
@@ -220,26 +244,29 @@ const ReadingPlanTemplates: React.FC = () => {
         readings,
       };
 
-      console.log('Enviando template:', payload);
+      console.log("Enviando template:", payload);
 
       if (editingTemplate) {
-        await api.put(`/admin/reading-plan-templates/${editingTemplate.id}`, payload);
+        await api.put(
+          `/admin/reading-plan-templates/${editingTemplate.id}`,
+          payload,
+        );
       } else {
-        await api.post('/admin/reading-plan-templates', payload);
+        await api.post("/admin/reading-plan-templates", payload);
       }
 
       handleCloseModal();
       loadTemplates();
     } catch (err) {
       const error = err as { response?: { data?: { error?: string } } };
-      setFormError(error.response?.data?.error || 'Erro ao salvar template');
+      setFormError(error.response?.data?.error || "Erro ao salvar template");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleDelete = async (id: number) => {
-    if (!window.confirm('Tem certeza que deseja deletar este template?')) {
+    if (!window.confirm("Tem certeza que deseja deletar este template?")) {
       return;
     }
 
@@ -247,73 +274,82 @@ const ReadingPlanTemplates: React.FC = () => {
       await api.delete(`/admin/reading-plan-templates/${id}`);
       loadTemplates();
     } catch (err) {
-      setError('Erro ao deletar template');
+      setError("Erro ao deletar template");
       console.error(err);
     }
   };
 
   const handleLogout = async () => {
     await logout();
-    navigate('/login');
+    navigate("/login");
   };
 
   const handleGenerateWithAI = async () => {
     if (!aiPrompt.trim()) {
-      setFormError('Digite uma instrução para a IA');
+      setFormError("Digite uma instrução para a IA");
       return;
     }
 
     setIsGenerating(true);
-    setFormError('');
-    setGenerationProgress('🤖 Enviando instrução para a IA...');
+    setFormError("");
+    setGenerationProgress("🤖 Enviando instrução para a IA...");
 
     try {
-      setGenerationProgress('🧠 IA processando sua solicitação...');
-      
-      const response = await api.post('/admin/reading-plan-templates/generate-with-ai', {
-        prompt: aiPrompt
-      });
+      setGenerationProgress("🧠 IA processando sua solicitação...");
 
-      setGenerationProgress('✅ Plano gerado com sucesso!');
-      
+      const response = await api.post(
+        "/admin/reading-plan-templates/generate-with-ai",
+        {
+          prompt: aiPrompt,
+        },
+      );
+
+      setGenerationProgress("✅ Plano gerado com sucesso!");
+
       const generatedPlan = response.data.plan;
-      
+
       // Preencher formulário com dados gerados
       setFormData({
-        name: generatedPlan.name || '',
-        description: generatedPlan.description || '',
-        type: generatedPlan.type || 'custom',
-        duration: generatedPlan.duration?.toString() || generatedPlan.readings.length.toString(),
-        testament: generatedPlan.testament || 'both',
-        isActive: generatedPlan.isActive !== undefined ? generatedPlan.isActive : true,
+        name: generatedPlan.name || "",
+        description: generatedPlan.description || "",
+        type: generatedPlan.type || "custom",
+        duration:
+          generatedPlan.duration?.toString() ||
+          generatedPlan.readings.length.toString(),
+        testament: generatedPlan.testament || "both",
+        isActive:
+          generatedPlan.isActive !== undefined ? generatedPlan.isActive : true,
         order: generatedPlan.order || 0,
       });
 
       // Preencher leituras
-      const generatedReadings: Reading[] = generatedPlan.readings.map((reading: any, index: number) => ({
-        day: reading.day || index + 1,
-        bookReadings: Array.isArray(reading.bookReadings) 
-          ? reading.bookReadings.map((br: any) => ({
-              book: br.book || '',
-              chapters: Array.isArray(br.chapters) ? br.chapters : []
-            }))
-          : [],
-        description: reading.description || ''
-      }));
+      const generatedReadings: Reading[] = generatedPlan.readings.map(
+        (reading: any, index: number) => ({
+          day: reading.day || index + 1,
+          bookReadings: Array.isArray(reading.bookReadings)
+            ? reading.bookReadings.map((br: any) => ({
+                book: br.book || "",
+                chapters: Array.isArray(br.chapters) ? br.chapters : [],
+              }))
+            : [],
+          description: reading.description || "",
+        }),
+      );
 
       setReadings(generatedReadings);
-      setImportSuccess(`🎉 Plano gerado pela IA! ${generatedReadings.length} dias de leitura criados.`);
-      setTimeout(() => setImportSuccess(''), 5000);
-      
+      setImportSuccess(
+        `🎉 Plano gerado pela IA! ${generatedReadings.length} dias de leitura criados.`,
+      );
+      setTimeout(() => setImportSuccess(""), 5000);
+
       // Fechar modal de IA e abrir modal de criação
       setShowAIModal(false);
       setShowModal(true);
-      setAiPrompt('');
-      
+      setAiPrompt("");
     } catch (err) {
       const error = err as { response?: { data?: { error?: string } } };
-      setFormError(error.response?.data?.error || 'Erro ao gerar plano com IA');
-      setGenerationProgress('');
+      setFormError(error.response?.data?.error || "Erro ao gerar plano com IA");
+      setGenerationProgress("");
     } finally {
       setIsGenerating(false);
     }
@@ -327,69 +363,83 @@ const ReadingPlanTemplates: React.FC = () => {
     reader.onload = (event) => {
       try {
         const jsonData = JSON.parse(event.target?.result as string);
-        
+
         // Validar estrutura básica
-        if (!jsonData.name || !jsonData.readings || !Array.isArray(jsonData.readings)) {
-          setFormError('JSON inválido: deve conter "name" e "readings" (array)');
+        if (
+          !jsonData.name ||
+          !jsonData.readings ||
+          !Array.isArray(jsonData.readings)
+        ) {
+          setFormError(
+            'JSON inválido: deve conter "name" e "readings" (array)',
+          );
           return;
         }
 
         // Preencher formulário com dados do JSON
         setFormData({
-          name: jsonData.name || '',
-          description: jsonData.description || '',
-          type: jsonData.type || 'custom',
-          duration: jsonData.duration?.toString() || jsonData.readings.length.toString(),
-          testament: jsonData.testament || 'both',
+          name: jsonData.name || "",
+          description: jsonData.description || "",
+          type: jsonData.type || "custom",
+          duration:
+            jsonData.duration?.toString() ||
+            jsonData.readings.length.toString(),
+          testament: jsonData.testament || "both",
           isActive: jsonData.isActive !== undefined ? jsonData.isActive : true,
           order: jsonData.order || 0,
         });
 
         // Preencher leituras
-        const importedReadings: Reading[] = jsonData.readings.map((reading: any, index: number) => ({
-          day: reading.day || index + 1,
-          bookReadings: Array.isArray(reading.bookReadings) 
-            ? reading.bookReadings.map((br: any) => ({
-                book: br.book || '',
-                chapters: Array.isArray(br.chapters) ? br.chapters : []
-              }))
-            : [],
-          description: reading.description || ''
-        }));
+        const importedReadings: Reading[] = jsonData.readings.map(
+          (reading: any, index: number) => ({
+            day: reading.day || index + 1,
+            bookReadings: Array.isArray(reading.bookReadings)
+              ? reading.bookReadings.map((br: any) => ({
+                  book: br.book || "",
+                  chapters: Array.isArray(br.chapters) ? br.chapters : [],
+                }))
+              : [],
+            description: reading.description || "",
+          }),
+        );
 
         setReadings(importedReadings);
-        setImportSuccess(`✅ JSON importado com sucesso! ${importedReadings.length} leituras carregadas.`);
-        setTimeout(() => setImportSuccess(''), 5000);
-        setFormError('');
+        setImportSuccess(
+          `✅ JSON importado com sucesso! ${importedReadings.length} leituras carregadas.`,
+        );
+        setTimeout(() => setImportSuccess(""), 5000);
+        setFormError("");
       } catch (error) {
-        setFormError(`Erro ao processar JSON: ${error instanceof Error ? error.message : 'Formato inválido'}`);
+        setFormError(
+          `Erro ao processar JSON: ${error instanceof Error ? error.message : "Formato inválido"}`,
+        );
       }
     };
 
     reader.onerror = () => {
-      setFormError('Erro ao ler arquivo');
+      setFormError("Erro ao ler arquivo");
     };
 
     reader.readAsText(file);
     // Limpar input para permitir reimportar o mesmo arquivo
-    e.target.value = '';
+    e.target.value = "";
   };
 
   const getTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
-      annual: 'Anual',
-      custom: 'Personalizado',
-      sequential: 'Sequencial',
-      thematic: 'Temático'
+      annual: "Anual",
+      custom: "Personalizado",
+      sequential: "Sequencial",
+      thematic: "Temático",
     };
     return labels[type] || type;
   };
 
   const getTestamentLabel = (testament: string) => {
     const labels: Record<string, string> = {
-      old: 'AT',
-      new: 'NT',
-      both: 'Ambos'
+      old: "AT",
+      new: "NT",
+      both: "Ambos",
     };
     return labels[testament] || testament;
   };
@@ -398,7 +448,10 @@ const ReadingPlanTemplates: React.FC = () => {
     <div className="templates-page">
       <div className="templates-header">
         <div className="header-content">
-          <button onClick={() => navigate('/dashboard')} className="back-button">
+          <button
+            onClick={() => navigate("/dashboard")}
+            className="back-button"
+          >
             ← Voltar
           </button>
           <h1>Planos de Leitura</h1>
@@ -427,11 +480,15 @@ const ReadingPlanTemplates: React.FC = () => {
             <div className="plan-types-section">
               <h2>Tipos de Planos Padrão</h2>
               <p className="section-description">
-                Ative ou desative os tipos de planos que os usuários podem escolher no app
+                Ative ou desative os tipos de planos que os usuários podem
+                escolher no app
               </p>
               <div className="plan-types-grid">
-                {planTypes.map(planType => (
-                  <div key={planType.id} className={`plan-type-card ${!planType.isActive ? 'inactive' : ''}`}>
+                {planTypes.map((planType) => (
+                  <div
+                    key={planType.id}
+                    className={`plan-type-card ${!planType.isActive ? "inactive" : ""}`}
+                  >
                     <div className="plan-type-header">
                       <h3>{planType.name}</h3>
                       <label className="switch">
@@ -443,10 +500,14 @@ const ReadingPlanTemplates: React.FC = () => {
                         <span className="slider"></span>
                       </label>
                     </div>
-                    <p className="plan-type-description">{planType.description}</p>
+                    <p className="plan-type-description">
+                      {planType.description}
+                    </p>
                     <div className="plan-type-info">
-                      <span className={`status-badge ${planType.isActive ? 'active' : 'inactive'}`}>
-                        {planType.isActive ? '✓ Ativo' : '✗ Inativo'}
+                      <span
+                        className={`status-badge ${planType.isActive ? "active" : "inactive"}`}
+                      >
+                        {planType.isActive ? "✓ Ativo" : "✗ Inativo"}
                       </span>
                       <span className="key-badge">{planType.key}</span>
                     </div>
@@ -460,81 +521,116 @@ const ReadingPlanTemplates: React.FC = () => {
               <h2>Templates Personalizados</h2>
               <div className="templates-grid">
                 {templates.length === 0 ? (
-                  <div className="no-data">Nenhum template personalizado encontrado</div>
+                  <div className="no-data">
+                    Nenhum template personalizado encontrado
+                  </div>
                 ) : (
-                  templates.map(template => (
-                <div key={template.id} className={`template-card ${!template.isActive ? 'inactive' : ''}`}>
-                  <div className="template-header">
-                    <h3>{template.name}</h3>
-                    <div className="template-badges">
-                      <span className={`type-badge ${template.type}`}>
-                        {getTypeLabel(template.type)}
-                      </span>
-                      <span className="testament-badge">
-                        {getTestamentLabel(template.testament)}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <p className="template-description">{template.description}</p>
-                  
-                  <div className="template-stats">
-                    <div className="stat">
-                      <span className="stat-label">Duração:</span>
-                      <span className="stat-value">{template.duration} dias</span>
-                    </div>
-                    <div className="stat">
-                      <span className="stat-label">Leituras:</span>
-                      <span className="stat-value">{template.readingsCount}</span>
-                    </div>
-                    <div className="stat">
-                      <span className="stat-label">Status:</span>
-                      <span className={`stat-value ${template.isActive ? 'active' : 'inactive'}`}>
-                        {template.isActive ? 'Ativo' : 'Inativo'}
-                      </span>
-                    </div>
-                  </div>
+                  templates.map((template) => (
+                    <div
+                      key={template.id}
+                      className={`template-card ${!template.isActive ? "inactive" : ""}`}
+                    >
+                      <div className="template-header">
+                        <h3>{template.name}</h3>
+                        <div className="template-badges">
+                          <span className={`type-badge ${template.type}`}>
+                            {getTypeLabel(template.type)}
+                          </span>
+                          <span className="testament-badge">
+                            {getTestamentLabel(template.testament)}
+                          </span>
+                        </div>
+                      </div>
 
-                  <div className="template-actions">
-                    <button onClick={() => handleOpenModal(template)} className="edit-btn">
-                      ✏️ Editar
-                    </button>
-                    <button onClick={() => handleDelete(template.id)} className="delete-btn">
-                      🗑️ Deletar
-                    </button>
-                  </div>
-                </div>
-              ))
-              )}
+                      <p className="template-description">
+                        {template.description}
+                      </p>
+
+                      <div className="template-stats">
+                        <div className="stat">
+                          <span className="stat-label">Duração:</span>
+                          <span className="stat-value">
+                            {template.duration} dias
+                          </span>
+                        </div>
+                        <div className="stat">
+                          <span className="stat-label">Leituras:</span>
+                          <span className="stat-value">
+                            {template.readingsCount}
+                          </span>
+                        </div>
+                        <div className="stat">
+                          <span className="stat-label">Status:</span>
+                          <span
+                            className={`stat-value ${template.isActive ? "active" : "inactive"}`}
+                          >
+                            {template.isActive ? "Ativo" : "Inativo"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="template-actions">
+                        <button
+                          onClick={() => handleOpenModal(template)}
+                          className="edit-btn"
+                        >
+                          ✏️ Editar
+                        </button>
+                        <button
+                          onClick={() => handleDelete(template.id)}
+                          className="delete-btn"
+                        >
+                          🗑️ Deletar
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
-          </div>
           </>
         )}
       </div>
 
       {/* Modal de IA */}
       {showAIModal && (
-        <div className="modal-overlay" onClick={() => !isGenerating && setShowAIModal(false)}>
-          <div className="modal-content modal-ai" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="modal-overlay"
+          onClick={() => !isGenerating && setShowAIModal(false)}
+        >
+          <div
+            className="modal-content modal-ai"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="modal-header">
               <h2>🤖 Gerar Plano com IA</h2>
               {!isGenerating && (
-                <button className="close-button" onClick={() => setShowAIModal(false)}>×</button>
+                <button
+                  className="close-button"
+                  onClick={() => setShowAIModal(false)}
+                >
+                  ×
+                </button>
               )}
             </div>
 
             <div className="ai-modal-body">
               {formError && <div className="form-error">{formError}</div>}
-              
+
               {!isGenerating ? (
                 <>
                   <div className="ai-instructions">
-                    <p>💡 <strong>Dica:</strong> Seja específico sobre o que deseja. Exemplos:</p>
+                    <p>
+                      💡 <strong>Dica:</strong> Seja específico sobre o que
+                      deseja. Exemplos:
+                    </p>
                     <ul>
                       <li>"Criar plano de 30 dias lendo os Salmos"</li>
                       <li>"Plano de 90 dias lendo os Evangelhos e Atos"</li>
                       <li>"Leitura do Novo Testamento em 100 dias"</li>
-                      <li>"Plano de 1 ano lendo toda a Bíblia sequencialmente"</li>
+                      <li>
+                        "Plano de 1 ano lendo toda a Bíblia sequencialmente"
+                      </li>
                     </ul>
                   </div>
 
@@ -550,16 +646,16 @@ const ReadingPlanTemplates: React.FC = () => {
                   </div>
 
                   <div className="modal-footer">
-                    <button 
-                      type="button" 
-                      onClick={() => setShowAIModal(false)} 
+                    <button
+                      type="button"
+                      onClick={() => setShowAIModal(false)}
                       className="cancel-button"
                     >
                       Cancelar
                     </button>
-                    <button 
-                      type="button" 
-                      onClick={handleGenerateWithAI} 
+                    <button
+                      type="button"
+                      onClick={handleGenerateWithAI}
                       className="ai-generate-button"
                       disabled={!aiPrompt.trim()}
                     >
@@ -574,7 +670,9 @@ const ReadingPlanTemplates: React.FC = () => {
                     <div className="ai-brain">🧠</div>
                   </div>
                   <p className="ai-progress-text">{generationProgress}</p>
-                  <p className="ai-wait-text">Isso pode levar alguns segundos...</p>
+                  <p className="ai-wait-text">
+                    Isso pode levar alguns segundos...
+                  </p>
                 </div>
               )}
             </div>
@@ -585,15 +683,22 @@ const ReadingPlanTemplates: React.FC = () => {
       {/* Modal de Criação/Edição */}
       {showModal && (
         <div className="modal-overlay" onClick={handleCloseModal}>
-          <div className="modal-content modal-large" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="modal-content modal-large"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="modal-header">
-              <h2>{editingTemplate ? '✏️ Editar Plano' : '➕ Criar Plano'}</h2>
-              <button className="close-button" onClick={handleCloseModal}>×</button>
+              <h2>{editingTemplate ? "✏️ Editar Plano" : "➕ Criar Plano"}</h2>
+              <button className="close-button" onClick={handleCloseModal}>
+                ×
+              </button>
             </div>
 
             <form onSubmit={handleSubmit} className="template-form">
               {formError && <div className="form-error">{formError}</div>}
-              {importSuccess && <div className="form-success">{importSuccess}</div>}
+              {importSuccess && (
+                <div className="form-success">{importSuccess}</div>
+              )}
 
               {/* Botão de Importar JSON */}
               <div className="import-section">
@@ -605,7 +710,7 @@ const ReadingPlanTemplates: React.FC = () => {
                       type="file"
                       accept=".json"
                       onChange={handleImportJson}
-                      style={{ display: 'none' }}
+                      style={{ display: "none" }}
                     />
                   </label>
                   <span className="import-hint">
@@ -615,7 +720,7 @@ const ReadingPlanTemplates: React.FC = () => {
                 <details className="json-example">
                   <summary>Ver exemplo de estrutura JSON</summary>
                   <pre className="json-code">
-{`{
+                    {`{
   "name": "Plano Exemplo",
   "description": "Descrição do plano",
   "type": "custom",
@@ -669,7 +774,12 @@ const ReadingPlanTemplates: React.FC = () => {
 
                 <div className="form-group">
                   <label>Tipo *</label>
-                  <select name="type" value={formData.type} onChange={handleInputChange} required>
+                  <select
+                    name="type"
+                    value={formData.type}
+                    onChange={handleInputChange}
+                    required
+                  >
                     <option value="annual">Anual</option>
                     <option value="custom">Personalizado</option>
                     <option value="sequential">Sequencial</option>
@@ -706,7 +816,12 @@ const ReadingPlanTemplates: React.FC = () => {
 
                 <div className="form-group">
                   <label>Testamento *</label>
-                  <select name="testament" value={formData.testament} onChange={handleInputChange} required>
+                  <select
+                    name="testament"
+                    value={formData.testament}
+                    onChange={handleInputChange}
+                    required
+                  >
                     <option value="both">Ambos</option>
                     <option value="old">Antigo Testamento</option>
                     <option value="new">Novo Testamento</option>
@@ -741,7 +856,11 @@ const ReadingPlanTemplates: React.FC = () => {
               <div className="readings-section">
                 <div className="readings-header">
                   <h3>📚 Leituras Diárias ({readings.length})</h3>
-                  <button type="button" onClick={handleAddReading} className="add-reading-btn">
+                  <button
+                    type="button"
+                    onClick={handleAddReading}
+                    className="add-reading-btn"
+                  >
                     + Adicionar Dia
                   </button>
                 </div>
@@ -750,7 +869,11 @@ const ReadingPlanTemplates: React.FC = () => {
                   {readings.length === 0 ? (
                     <div className="no-readings">
                       <p>Nenhuma leitura adicionada ainda.</p>
-                      <button type="button" onClick={handleAddReading} className="add-first-reading">
+                      <button
+                        type="button"
+                        onClick={handleAddReading}
+                        className="add-first-reading"
+                      >
                         + Adicionar Primeira Leitura
                       </button>
                     </div>
@@ -772,11 +895,15 @@ const ReadingPlanTemplates: React.FC = () => {
                           {reading.bookReadings.map((bookReading, bookIdx) => (
                             <div key={bookIdx} className="book-reading-item">
                               <div className="book-reading-header">
-                                <span className="book-reading-label">📖 Leitura {bookIdx + 1}</span>
+                                <span className="book-reading-label">
+                                  📖 Leitura {bookIdx + 1}
+                                </span>
                                 {reading.bookReadings.length > 1 && (
                                   <button
                                     type="button"
-                                    onClick={() => handleRemoveBookFromReading(idx, bookIdx)}
+                                    onClick={() =>
+                                      handleRemoveBookFromReading(idx, bookIdx)
+                                    }
                                     className="remove-book-btn"
                                     title="Remover livro"
                                   >
@@ -789,33 +916,61 @@ const ReadingPlanTemplates: React.FC = () => {
                                   <label>Livro</label>
                                   <select
                                     value={bookReading.book}
-                                    onChange={(e) => handleBookReadingChange(idx, bookIdx, 'book', e.target.value)}
+                                    onChange={(e) =>
+                                      handleBookReadingChange(
+                                        idx,
+                                        bookIdx,
+                                        "book",
+                                        e.target.value,
+                                      )
+                                    }
                                   >
                                     <option value="">Selecione um livro</option>
                                     <optgroup label="Antigo Testamento">
-                                      {BIBLE_BOOKS.filter(b => b.testament === 'old').map(book => (
-                                        <option key={book.name} value={book.name}>{book.name}</option>
+                                      {BIBLE_BOOKS.filter(
+                                        (b) => b.testament === "old",
+                                      ).map((book) => (
+                                        <option
+                                          key={book.name}
+                                          value={book.name}
+                                        >
+                                          {book.name}
+                                        </option>
                                       ))}
                                     </optgroup>
                                     <optgroup label="Novo Testamento">
-                                      {BIBLE_BOOKS.filter(b => b.testament === 'new').map(book => (
-                                        <option key={book.name} value={book.name}>{book.name}</option>
+                                      {BIBLE_BOOKS.filter(
+                                        (b) => b.testament === "new",
+                                      ).map((book) => (
+                                        <option
+                                          key={book.name}
+                                          value={book.name}
+                                        >
+                                          {book.name}
+                                        </option>
                                       ))}
                                     </optgroup>
                                   </select>
                                 </div>
 
                                 <div className="form-group">
-                                  <label>Capítulos (separados por vírgula)</label>
+                                  <label>
+                                    Capítulos (separados por vírgula)
+                                  </label>
                                   <input
                                     type="text"
-                                    value={bookReading.chapters.join(', ')}
+                                    value={bookReading.chapters.join(", ")}
                                     onChange={(e) => {
                                       const chapters = e.target.value
-                                        .split(',')
-                                        .map(c => parseInt(c.trim()))
-                                        .filter(c => !isNaN(c));
-                                      handleBookReadingChange(idx, bookIdx, 'chapters', chapters);
+                                        .split(",")
+                                        .map((c) => parseInt(c.trim()))
+                                        .filter((c) => !isNaN(c));
+                                      handleBookReadingChange(
+                                        idx,
+                                        bookIdx,
+                                        "chapters",
+                                        chapters,
+                                      );
                                     }}
                                     placeholder="Ex: 1, 2, 3"
                                   />
@@ -836,8 +991,14 @@ const ReadingPlanTemplates: React.FC = () => {
                           <label>Descrição do dia (opcional)</label>
                           <input
                             type="text"
-                            value={reading.description || ''}
-                            onChange={(e) => handleReadingChange(idx, 'description', e.target.value)}
+                            value={reading.description || ""}
+                            onChange={(e) =>
+                              handleReadingChange(
+                                idx,
+                                "description",
+                                e.target.value,
+                              )
+                            }
                             placeholder="Ex: A criação do mundo e início da história"
                           />
                         </div>
@@ -848,11 +1009,24 @@ const ReadingPlanTemplates: React.FC = () => {
               </div>
 
               <div className="modal-footer">
-                <button type="button" onClick={handleCloseModal} className="cancel-button" disabled={isSubmitting}>
+                <button
+                  type="button"
+                  onClick={handleCloseModal}
+                  className="cancel-button"
+                  disabled={isSubmitting}
+                >
                   Cancelar
                 </button>
-                <button type="submit" className="submit-button" disabled={isSubmitting}>
-                  {isSubmitting ? 'Salvando...' : editingTemplate ? '💾 Salvar' : '➕ Criar'}
+                <button
+                  type="submit"
+                  className="submit-button"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting
+                    ? "Salvando..."
+                    : editingTemplate
+                      ? "💾 Salvar"
+                      : "➕ Criar"}
                 </button>
               </div>
             </form>

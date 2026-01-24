@@ -4,7 +4,7 @@ import db from '@adonisjs/lucid/services/db'
 export default class extends BaseSeeder {
   async run() {
     const now = new Date().toISOString().slice(0, 19).replace('T', ' ')
-    
+
     await db.table('plan_types').insert([
       {
         key: 'sequential',

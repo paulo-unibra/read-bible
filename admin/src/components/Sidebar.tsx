@@ -1,7 +1,7 @@
 import React from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
+import { useLocation, useNavigate } from "react-router-dom";
 import styled from "styled-components";
+import { useAuth } from "../contexts/AuthContext";
 
 const SidebarContainer = styled.aside`
   width: 250px;
@@ -19,7 +19,7 @@ const Logo = styled.div`
   padding: 0 20px 20px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   margin-bottom: 20px;
-  
+
   h2 {
     margin: 0;
     font-size: 20px;
@@ -34,19 +34,21 @@ const Nav = styled.nav`
 
 const NavItem = styled.button<{ active?: boolean }>`
   padding: 12px 20px;
-  background: ${props => props.active ? 'rgba(78, 204, 163, 0.2)' : 'transparent'};
+  background: ${(props) =>
+    props.active ? "rgba(78, 204, 163, 0.2)" : "transparent"};
   border: none;
-  border-left: 3px solid ${props => props.active ? '#4ecca3' : 'transparent'};
+  border-left: 3px solid
+    ${(props) => (props.active ? "#4ecca3" : "transparent")};
   color: white;
   text-align: left;
   cursor: pointer;
   transition: all 0.3s;
   font-size: 14px;
-  
+
   &:hover {
     background: rgba(78, 204, 163, 0.1);
   }
-  
+
   &:disabled {
     opacity: 0.4;
     cursor: not-allowed;
@@ -57,13 +59,13 @@ const UserSection = styled.div`
   padding: 20px;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   margin-top: auto;
-  
+
   p {
     margin: 0 0 10px;
     font-size: 12px;
     color: rgba(255, 255, 255, 0.7);
   }
-  
+
   strong {
     color: white;
     font-size: 14px;
@@ -80,7 +82,7 @@ const LogoutButton = styled.button`
   cursor: pointer;
   margin-top: 10px;
   font-size: 14px;
-  
+
   &:hover {
     background: #c82333;
   }
@@ -101,18 +103,62 @@ const Sidebar: React.FC = () => {
   };
 
   const menuItems = [
-    { path: "/dashboard", label: "🏠 Dashboard", permission: "acessar_painel_administrativo" },
+    {
+      path: "/dashboard",
+      label: "🏠 Dashboard",
+      permission: "acessar_painel_administrativo",
+    },
     { path: "/users", label: "👥 Usuários", permission: "gerenciar_usuarios" },
-    { path: "/permissions", label: "🔑 Permissões", permission: "gerenciar_roles" },
-    { path: "/quizzes", label: "📝 Questionários", permission: "gerenciar_questionarios" },
-    { path: "/reading-plans", label: "📖 Templates de Planos", permission: "gerenciar_conteudo" },
-    { path: "/active-plans", label: "📋 Planos Ativos", permission: "gerenciar_conteudo" },
-    { path: "/incorrect-plans", label: "⚠️ Planos Incorretos", permission: "gerenciar_conteudo" },
-    { path: "/bible-curiosities", label: "📚 Curiosidades", permission: "gerenciar_conteudo" },
-    { path: "/admin/hymn-audios", label: "🎵 Áudios de Hinos", permission: "gerenciar_conteudo" },
-    { path: "/audio-sync", label: "🔊 Sync Áudio", permission: "gerenciar_conteudo" },
-    { path: "/bulk-email", label: "📧 E-mails", permission: "gerenciar_usuarios" },
-    { path: "/reports", label: "📊 Relatórios", permission: "visualizar_relatorios" },
+    {
+      path: "/permissions",
+      label: "🔑 Permissões",
+      permission: "gerenciar_roles",
+    },
+    {
+      path: "/quizzes",
+      label: "📝 Questionários",
+      permission: "gerenciar_questionarios",
+    },
+    {
+      path: "/reading-plans",
+      label: "📖 Templates de Planos",
+      permission: "gerenciar_conteudo",
+    },
+    {
+      path: "/active-plans",
+      label: "📋 Planos Ativos",
+      permission: "gerenciar_conteudo",
+    },
+    {
+      path: "/incorrect-plans",
+      label: "⚠️ Planos Incorretos",
+      permission: "gerenciar_conteudo",
+    },
+    {
+      path: "/bible-curiosities",
+      label: "📚 Curiosidades",
+      permission: "gerenciar_conteudo",
+    },
+    {
+      path: "/admin/hymn-audios",
+      label: "🎵 Áudios de Hinos",
+      permission: "gerenciar_conteudo",
+    },
+    {
+      path: "/audio-sync",
+      label: "🔊 Sync Áudio",
+      permission: "gerenciar_conteudo",
+    },
+    {
+      path: "/bulk-email",
+      label: "📧 E-mails",
+      permission: "gerenciar_usuarios",
+    },
+    {
+      path: "/reports",
+      label: "📊 Relatórios",
+      permission: "visualizar_relatorios",
+    },
   ];
 
   return (
@@ -120,7 +166,7 @@ const Sidebar: React.FC = () => {
       <Logo>
         <h2>ReadBible Admin</h2>
       </Logo>
-      
+
       <Nav>
         {menuItems.map((item) => (
           <NavItem
@@ -133,7 +179,7 @@ const Sidebar: React.FC = () => {
           </NavItem>
         ))}
       </Nav>
-      
+
       <UserSection>
         <p>Logado como</p>
         <strong>{user?.fullName || user?.email}</strong>

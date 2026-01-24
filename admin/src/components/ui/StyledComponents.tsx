@@ -32,7 +32,7 @@ export const Input = styled.input`
   font-size: 14px;
   flex: 1;
   min-width: 250px;
-  
+
   &:focus {
     outline: none;
     border-color: #4ecca3;
@@ -46,7 +46,7 @@ export const Select = styled.select`
   font-size: 14px;
   background: white;
   cursor: pointer;
-  
+
   &:focus {
     outline: none;
     border-color: #4ecca3;
@@ -62,11 +62,11 @@ export const Button = styled.button`
   font-size: 14px;
   cursor: pointer;
   transition: background 0.3s;
-  
+
   &:hover {
     background: #45b893;
   }
-  
+
   &:disabled {
     background: #ccc;
     cursor: not-allowed;
@@ -98,7 +98,7 @@ export const Tr = styled.tr`
   &:not(:last-child) {
     border-bottom: 1px solid #eee;
   }
-  
+
   &:hover {
     background: #f9f9f9;
   }
@@ -127,24 +127,34 @@ export const Badge = styled.span<BadgeProps>`
   border-radius: 12px;
   font-size: 12px;
   font-weight: 600;
-  
-  background: ${props => {
+
+  background: ${(props) => {
     switch (props.type) {
-      case "success": return "#d4edda";
-      case "error": return "#f8d7da";
-      case "warning": return "#fff3cd";
-      case "info": return "#d1ecf1";
-      default: return "#e2e3e5";
+      case "success":
+        return "#d4edda";
+      case "error":
+        return "#f8d7da";
+      case "warning":
+        return "#fff3cd";
+      case "info":
+        return "#d1ecf1";
+      default:
+        return "#e2e3e5";
     }
   }};
-  
-  color: ${props => {
+
+  color: ${(props) => {
     switch (props.type) {
-      case "success": return "#155724";
-      case "error": return "#721c24";
-      case "warning": return "#856404";
-      case "info": return "#0c5460";
-      default: return "#383d41";
+      case "success":
+        return "#155724";
+      case "error":
+        return "#721c24";
+      case "warning":
+        return "#856404";
+      case "info":
+        return "#0c5460";
+      default:
+        return "#383d41";
     }
   }};
 `;
@@ -155,7 +165,7 @@ export const Pagination = styled.div`
   align-items: center;
   gap: 20px;
   margin-top: 30px;
-  
+
   span {
     color: #666;
     font-size: 14px;

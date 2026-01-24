@@ -37,7 +37,7 @@ private async createFreshConnection(): Promise<SQLite.SQLiteDatabase> {
       console.log('⚠️ Banco não inicializado, inicializando agora...');
       await this.ensureInitialized();
     }
-    
+
     const connection = await SQLite.openDatabaseAsync(DB_NAME);
     // ... resto do código
   }
@@ -52,11 +52,11 @@ private async withFreshConnection<T>(
   operationName: string = 'unknown'
 ): Promise<T> {
   let connection: SQLite.SQLiteDatabase | null = null;
-  
+
   try {
     // GARANTIR inicialização antes de qualquer operação
     await this.ensureInitialized();
-    
+
     console.log(`🔧 Criando nova conexão para: ${operationName}`);
     connection = await this.createFreshConnection();
     // ... resto do código

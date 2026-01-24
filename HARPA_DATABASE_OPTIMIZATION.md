@@ -3,6 +3,7 @@
 ## Problema Identificado
 
 A busca por conteúdo nos hinos estava muito lenta porque:
+
 1. Lia arquivos XML do sistema de arquivos
 2. Fazia parse XML a cada busca
 3. Processava apenas 5-20 hinos para evitar travamento da UI
@@ -25,6 +26,7 @@ Implementado **cache em banco de dados SQLite** que armazena os hinos parseados 
 ### 1. DatabaseService.ts
 
 **Tabela adicionada:**
+
 ```sql
 CREATE TABLE IF NOT EXISTS harpa_hymns (
   number INTEGER PRIMARY KEY,
@@ -37,6 +39,7 @@ CREATE TABLE IF NOT EXISTS harpa_hymns (
 ```
 
 **Métodos adicionados:**
+
 - `saveHymnToDatabase(hymn)` - Salva hino parseado no banco
 - `getHymnFromDatabase(number)` - Busca hino específico
 - `searchHymnsInDatabase(query, limit)` - Busca por conteúdo com snippets
@@ -45,18 +48,22 @@ CREATE TABLE IF NOT EXISTS harpa_hymns (
 ### 2. HarpaOfflineService.ts
 
 **Durante o Download (extractZipFromBundle):**
+
 ```typescript
 // ANTES: Apenas salvava XML
 await destFile.write(content);
 
 // AGORA: Parseia e salva no banco também
 const parsedXml = xmlParser.parse(content);
-const hymnData = { /* dados parseados */ };
+const hymnData = {
+  /* dados parseados */
+};
 await DatabaseService.saveHymnToDatabase(hymnData);
 await destFile.write(content); // Mantém XML como fallback
 ```
 
 **Ao Buscar Hino (getHymnByNumber):**
+
 ```typescript
 // ANTES: Sempre lia e parseava XML
 const xmlContent = await xmlFile.text();
@@ -70,6 +77,7 @@ if (hymnFromDb) return hymnFromDb; // RÁPIDO!
 ```
 
 **Busca por Conteúdo (searchInContent):**
+
 ```typescript
 // ANTES: Carregava 5-20 XMLs e parseava cada um
 for (let i = 0; i < 5; i++) {
@@ -86,6 +94,7 @@ const results = await DatabaseService.searchHymnsInDatabase(query, 20);
 ### 3. Método extractVerses
 
 Criado método auxiliar para extrair verses do XML:
+
 ```typescript
 private extractVerses(song: any): Array<{...}> {
   // Parse estruturado das estrofes e linhas
@@ -96,6 +105,7 @@ private extractVerses(song: any): Array<{...}> {
 ## Fluxo de Funcionamento
 
 ### 1️⃣ **Primeiro Download (apenas uma vez)**
+
 ```
 Usuário clica "Baixar Harpa"
   ↓
@@ -110,6 +120,7 @@ Pronto! (demora ~30-60 segundos, mas é só uma vez)
 ```
 
 ### 2️⃣ **Abrir um Hino**
+
 ```
 Usuário clica em hino #123
   ↓
@@ -121,10 +132,11 @@ Exibe hino instantaneamente 🚀
 ```
 
 ### 3️⃣ **Buscar por Conteúdo**
+
 ```
 Usuário digita "jesus cristo"
   ↓
-Query SQL: SELECT * FROM harpa_hymns 
+Query SQL: SELECT * FROM harpa_hymns
            WHERE LOWER(verses) LIKE '%jesus cristo%'
            LIMIT 20
   ↓
@@ -135,15 +147,16 @@ Exibe snippets do conteúdo encontrado
 
 ## Performance Comparada
 
-| Operação | ANTES (XML) | AGORA (SQLite) | Melhoria |
-|----------|-------------|----------------|----------|
-| Abrir 1 hino | 100-300ms | 20-50ms | **3-6x mais rápido** |
-| Buscar conteúdo | 10-15s (5 hinos) | 200-500ms (640 hinos) | **30-50x mais rápido** |
-| Primeiro download | 30-45s | 40-60s | +15s (mas só uma vez) |
+| Operação          | ANTES (XML)      | AGORA (SQLite)        | Melhoria               |
+| ----------------- | ---------------- | --------------------- | ---------------------- |
+| Abrir 1 hino      | 100-300ms        | 20-50ms               | **3-6x mais rápido**   |
+| Buscar conteúdo   | 10-15s (5 hinos) | 200-500ms (640 hinos) | **30-50x mais rápido** |
+| Primeiro download | 30-45s           | 40-60s                | +15s (mas só uma vez)  |
 
 ## Testes Recomendados
 
 1. **Limpar app e reinstalar:**
+
    ```bash
    # Apagar dados do app no dispositivo
    # Instalar novamente

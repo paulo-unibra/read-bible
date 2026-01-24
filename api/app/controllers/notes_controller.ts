@@ -1,6 +1,6 @@
-import type { HttpContext } from '@adonisjs/core/http'
 import Note from '#models/note'
 import { createNoteValidator, updateNoteValidator } from '#validators/note'
+import type { HttpContext } from '@adonisjs/core/http'
 
 export default class NotesController {
   /**
@@ -9,9 +9,7 @@ export default class NotesController {
   async index({ auth, response }: HttpContext) {
     try {
       const user = auth.user!
-      const notes = await Note.query()
-        .where('user_id', user.id)
-        .orderBy('updated_at', 'desc')
+      const notes = await Note.query().where('user_id', user.id).orderBy('updated_at', 'desc')
 
       return response.ok({
         success: true,
@@ -59,10 +57,7 @@ export default class NotesController {
   async show({ auth, params, response }: HttpContext) {
     try {
       const user = auth.user!
-      const note = await Note.query()
-        .where('id', params.id)
-        .where('user_id', user.id)
-        .firstOrFail()
+      const note = await Note.query().where('id', params.id).where('user_id', user.id).firstOrFail()
 
       return response.ok({
         success: true,
@@ -83,10 +78,10 @@ export default class NotesController {
     try {
       console.log('🔵 [STORE] Iniciando criação de nota')
       console.log('🔵 [STORE] Auth user:', auth.user?.id, auth.user?.email)
-      
+
       const user = auth.user!
       console.log('🔵 [STORE] Request body:', request.body())
-      
+
       const payload = await request.validateUsing(createNoteValidator)
       console.log('🔵 [STORE] Payload validado:', JSON.stringify(payload, null, 2))
 
@@ -130,7 +125,7 @@ export default class NotesController {
         isPrivate: payload.isPrivate ?? true,
       }
       console.log('🔵 [STORE] Dados da nota:', JSON.stringify(noteData, null, 2))
-      
+
       const note = await Note.create(noteData)
       console.log('✅ [STORE] Nota criada com sucesso:', note.id)
 
@@ -159,10 +154,7 @@ export default class NotesController {
       const user = auth.user!
       const payload = await request.validateUsing(updateNoteValidator)
 
-      const note = await Note.query()
-        .where('id', params.id)
-        .where('user_id', user.id)
-        .firstOrFail()
+      const note = await Note.query().where('id', params.id).where('user_id', user.id).firstOrFail()
 
       note.note = payload.note ?? note.note
       note.isPrivate = payload.isPrivate ?? note.isPrivate
@@ -188,10 +180,7 @@ export default class NotesController {
   async destroy({ auth, params, response }: HttpContext) {
     try {
       const user = auth.user!
-      const note = await Note.query()
-        .where('id', params.id)
-        .where('user_id', user.id)
-        .firstOrFail()
+      const note = await Note.query().where('id', params.id).where('user_id', user.id).firstOrFail()
 
       await note.delete()
 

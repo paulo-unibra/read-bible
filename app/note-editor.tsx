@@ -2,17 +2,17 @@ import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Keyboard,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AuthService from "../services/AuthService";
@@ -43,7 +43,7 @@ export default function NoteEditorScreen() {
       const existingNote = await NotesService.getNoteByReference(
         bookId,
         chapterNumber,
-        [verseNumber]
+        [verseNumber],
       );
 
       if (existingNote) {
@@ -87,7 +87,7 @@ export default function NoteEditorScreen() {
         [verseNumber],
         versesText,
         noteText.trim(),
-        isNotePrivate
+        isNotePrivate,
       );
 
       Alert.alert("Sucesso", "Anotação salva com sucesso!", [
@@ -120,9 +120,11 @@ export default function NoteEditorScreen() {
             try {
               const notes = await NotesService.getNotesByChapter(
                 bookId,
-                chapterNumber
+                chapterNumber,
               );
-              const note = notes.find((n) => n.verseNumbers.includes(verseNumber));
+              const note = notes.find((n) =>
+                n.verseNumbers.includes(verseNumber),
+              );
 
               if (note) {
                 await NotesService.deleteNote(note.id);
@@ -139,7 +141,7 @@ export default function NoteEditorScreen() {
             }
           },
         },
-      ]
+      ],
     );
   };
 
@@ -161,7 +163,10 @@ export default function NoteEditorScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backButton}
+          >
             <Ionicons name="arrow-back" size={24} color="#222" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Anotação</Text>
@@ -225,10 +230,7 @@ export default function NoteEditorScreen() {
 
           {/* Botão de excluir (apenas se estiver editando) */}
           {isEditingExistingNote && (
-            <TouchableOpacity
-              style={styles.deleteButton}
-              onPress={deleteNote}
-            >
+            <TouchableOpacity style={styles.deleteButton} onPress={deleteNote}>
               <Ionicons name="trash-outline" size={20} color="#f44336" />
               <Text style={styles.deleteButtonText}>Excluir Anotação</Text>
             </TouchableOpacity>

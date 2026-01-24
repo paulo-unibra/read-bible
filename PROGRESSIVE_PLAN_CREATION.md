@@ -13,13 +13,17 @@ Alteramos a estratégia de criação de planos de leitura para otimizar o desemp
 ## Novo Comportamento
 
 ### 1. Criação Inicial (apenas 5 dias)
+
 Quando o usuário cria um novo plano de leitura:
+
 - São criados apenas os **primeiros 5 dias** de leitura no banco (`reading_progress`)
 - O modelo `reading_plan` continua o mesmo (SEM mudanças na estrutura)
 - Isso torna a criação muito mais rápida
 
 ### 2. Criação Progressiva (sob demanda)
+
 O app mobile controla quando criar mais dias:
+
 - Quando o usuário completar dias e precisar de mais, o app chama o endpoint `/reading-plans/add-days`
 - Envia um array com os próximos dias a serem criados
 - O backend valida e cria apenas os dias que ainda não existem
@@ -27,14 +31,17 @@ O app mobile controla quando criar mais dias:
 ## Arquivos Modificados
 
 ### 1. Controller `ReadingPlanController`
+
 **Arquivo**: `api/app/controllers/reading_plan_controller.ts`
 
 #### Método `createCustom`
+
 - Cria apenas os primeiros 5 dias no `ReadingProgress`
 - Plano (`reading_plans`) permanece igual (sem campo `readingsTemplate`)
 - Calcula o total de capítulos baseado no array completo enviado
 
 #### Novo Método `addNextDays`
+
 - Endpoint: `POST /reading-plans/add-days`
 - Recebe array de dias a serem adicionados
 - Valida se os dias já existem (evita duplicação)
@@ -64,15 +71,19 @@ POST /reading-plans/add-days
 ```
 
 ### 2. Rotas
+
 **Arquivo**: `api/start/routes.ts`
 
 Adicionada nova rota:
+
 ```typescript
-router.post('/reading-plans/add-days', [ReadingPlanController, 'addNextDays'])
-  .use(middleware.auth())
+router
+  .post("/reading-plans/add-days", [ReadingPlanController, "addNextDays"])
+  .use(middleware.auth());
 ```
 
 ### 3. Serviço `ReadingPlanProgressService` (simplificado)
+
 **Arquivo**: `api/app/services/reading_plan_progress_service.ts`
 
 - Removido método que dependia de `readingsTemplate`
@@ -113,12 +124,15 @@ router.post('/reading-plans/add-days', [ReadingPlanController, 'addNextDays'])
 ## API Endpoints
 
 ### POST /reading-plans/custom
+
 Cria plano com apenas 5 dias iniciais
 
 ### POST /reading-plans/add-days
+
 Adiciona mais dias ao plano existente
 
 **Request:**
+
 ```json
 {
   "readings": [
@@ -137,6 +151,7 @@ Adiciona mais dias ao plano existente
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -162,6 +177,7 @@ O sistema gera logs úteis:
 ## Compatibilidade
 
 Esta mudança é **totalmente retrocompatível**:
+
 - Planos antigos continuam funcionando normalmente
 - Estrutura do `reading_plans` não mudou
 - Apenas a forma de popular `reading_progress` foi otimizada

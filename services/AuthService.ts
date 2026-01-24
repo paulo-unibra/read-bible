@@ -1,7 +1,10 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import Constants from 'expo-constants';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import Constants from "expo-constants";
 
-export const API_URL = process.env.EXPO_PUBLIC_API_URL || Constants.expoConfig?.extra?.apiUrl || 'http://localhost:1999';
+export const API_URL =
+  process.env.EXPO_PUBLIC_API_URL ||
+  Constants.expoConfig?.extra?.apiUrl ||
+  "http://localhost:1999";
 
 export interface User {
   id: number;
@@ -50,59 +53,69 @@ class AuthService {
    */
   async init() {
     try {
-      const token = await AsyncStorage.getItem('@auth_token');
-      const userJson = await AsyncStorage.getItem('@auth_user');
-      
+      const token = await AsyncStorage.getItem("@auth_token");
+      const userJson = await AsyncStorage.getItem("@auth_user");
+
       if (token && userJson) {
         this.token = token;
         this.user = JSON.parse(userJson);
       }
     } catch (error) {
-      console.error('Erro ao inicializar auth:', error);
+      console.error("Erro ao inicializar auth:", error);
     }
   }
 
   /**
    * Registrar novo usuário
    */
-  async register(name: string, email: string, password: string): Promise<AuthResponse> {
+  async register(
+    name: string,
+    email: string,
+    password: string,
+  ): Promise<AuthResponse> {
     try {
-      console.log('📝 Tentando registrar...');
-      console.log('📡 API_URL:', API_URL);
-      console.log('📧 Email:', email);
-      
+      console.log("📝 Tentando registrar...");
+      console.log("📡 API_URL:", API_URL);
+      console.log("📧 Email:", email);
+
       const response = await fetch(`${API_URL}/auth/register`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ name, email, password }),
       });
 
-      console.log('📨 Response status:', response.status);
-      console.log('📨 Response ok:', response.ok);
+      console.log("📨 Response status:", response.status);
+      console.log("📨 Response ok:", response.ok);
 
       const data: AuthResponse = await response.json();
-      console.log('📦 Response data:', JSON.stringify(data, null, 2));
+      console.log("📦 Response data:", JSON.stringify(data, null, 2));
 
       if (data.success && data.data) {
         this.token = data.data.token;
         this.user = data.data.user;
-        
-        await AsyncStorage.setItem('@auth_token', data.data.token);
-        await AsyncStorage.setItem('@auth_user', JSON.stringify(data.data.user));
+
+        await AsyncStorage.setItem("@auth_token", data.data.token);
+        await AsyncStorage.setItem(
+          "@auth_user",
+          JSON.stringify(data.data.user),
+        );
       }
 
       return data;
     } catch (error) {
-      console.error('❌ Erro ao registrar:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-      const errorDetails = `URL: ${API_URL}\nErro: ${errorMessage}\nTipo: ${error instanceof TypeError ? 'Network/Connection' : 'Other'}`;
-      
-      const troubleshootMsg = error instanceof TypeError && errorMessage.includes('Network request failed')
-        ? '\n\n💡 Dicas:\n- Verifique sua conexão com internet\n- Tente conectar-se via WiFi\n- Redes móveis podem bloquear portas personalizadas'
-        : '';
-      
+      console.error("❌ Erro ao registrar:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Erro desconhecido";
+      const errorDetails = `URL: ${API_URL}\nErro: ${errorMessage}\nTipo: ${error instanceof TypeError ? "Network/Connection" : "Other"}`;
+
+      const troubleshootMsg =
+        error instanceof TypeError &&
+        errorMessage.includes("Network request failed")
+          ? "\n\n💡 Dicas:\n- Verifique sua conexão com internet\n- Tente conectar-se via WiFi\n- Redes móveis podem bloquear portas personalizadas"
+          : "";
+
       return {
         success: false,
         message: `Erro ao conectar com o servidor\n\n${errorDetails}${troubleshootMsg}`,
@@ -116,42 +129,48 @@ class AuthService {
    */
   async login(email: string, password: string): Promise<AuthResponse> {
     try {
-      console.log('🔐 Tentando login...');
-      console.log('📡 API_URL:', API_URL);
-      console.log('📧 Email:', email);
-      
+      console.log("🔐 Tentando login...");
+      console.log("📡 API_URL:", API_URL);
+      console.log("📧 Email:", email);
+
       const response = await fetch(`${API_URL}/auth/login`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ email, password }),
       });
 
-      console.log('📨 Response status:', response.status);
-      console.log('📨 Response ok:', response.ok);
+      console.log("📨 Response status:", response.status);
+      console.log("📨 Response ok:", response.ok);
 
       const data: AuthResponse = await response.json();
-      console.log('📦 Response data:', JSON.stringify(data, null, 2));
+      console.log("📦 Response data:", JSON.stringify(data, null, 2));
 
       if (data.success && data.data) {
         this.token = data.data.token;
         this.user = data.data.user;
-        
-        await AsyncStorage.setItem('@auth_token', data.data.token);
-        await AsyncStorage.setItem('@auth_user', JSON.stringify(data.data.user));
+
+        await AsyncStorage.setItem("@auth_token", data.data.token);
+        await AsyncStorage.setItem(
+          "@auth_user",
+          JSON.stringify(data.data.user),
+        );
       }
 
       return data;
     } catch (error) {
-      console.error('❌ Erro ao fazer login:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-      const errorDetails = `URL: ${API_URL}\nErro: ${errorMessage}\nTipo: ${error instanceof TypeError ? 'Network/Connection' : 'Other'}`;
-      
-      const troubleshootMsg = error instanceof TypeError && errorMessage.includes('Network request failed')
-        ? '\n\n💡 Dicas:\n- Verifique sua conexão com internet\n- Tente conectar-se via WiFi\n- Redes móveis podem bloquear portas personalizadas'
-        : '';
-      
+      console.error("❌ Erro ao fazer login:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Erro desconhecido";
+      const errorDetails = `URL: ${API_URL}\nErro: ${errorMessage}\nTipo: ${error instanceof TypeError ? "Network/Connection" : "Other"}`;
+
+      const troubleshootMsg =
+        error instanceof TypeError &&
+        errorMessage.includes("Network request failed")
+          ? "\n\n💡 Dicas:\n- Verifique sua conexão com internet\n- Tente conectar-se via WiFi\n- Redes móveis podem bloquear portas personalizadas"
+          : "";
+
       return {
         success: false,
         message: `Erro ao conectar com o servidor\n\n${errorDetails}${troubleshootMsg}`,
@@ -167,19 +186,19 @@ class AuthService {
     try {
       if (this.token) {
         await fetch(`${API_URL}/auth/logout`, {
-          method: 'POST',
+          method: "POST",
           headers: {
-            'Authorization': `Bearer ${this.token}`,
+            Authorization: `Bearer ${this.token}`,
           },
         });
       }
     } catch (error) {
-      console.error('Erro ao fazer logout:', error);
+      console.error("Erro ao fazer logout:", error);
     } finally {
       this.token = null;
       this.user = null;
-      await AsyncStorage.removeItem('@auth_token');
-      await AsyncStorage.removeItem('@auth_user');
+      await AsyncStorage.removeItem("@auth_token");
+      await AsyncStorage.removeItem("@auth_user");
     }
   }
 
@@ -189,30 +208,32 @@ class AuthService {
   async updateUserName(name: string): Promise<void> {
     try {
       if (!this.user) {
-        throw new Error('Usuário não autenticado');
+        throw new Error("Usuário não autenticado");
       }
 
       // Atualizar localmente
       this.user.name = name;
-      await AsyncStorage.setItem('@auth_user', JSON.stringify(this.user));
+      await AsyncStorage.setItem("@auth_user", JSON.stringify(this.user));
 
       // Tentar atualizar no backend (se disponível)
       if (this.token) {
         try {
           await fetch(`${API_URL}/auth/profile`, {
-            method: 'PUT',
+            method: "PUT",
             headers: {
-              'Authorization': `Bearer ${this.token}`,
-              'Content-Type': 'application/json',
+              Authorization: `Bearer ${this.token}`,
+              "Content-Type": "application/json",
             },
             body: JSON.stringify({ name }),
           });
         } catch (error) {
-          console.log('Backend não disponível, nome atualizado apenas localmente');
+          console.log(
+            "Backend não disponível, nome atualizado apenas localmente",
+          );
         }
       }
     } catch (error) {
-      console.error('Erro ao atualizar nome:', error);
+      console.error("Erro ao atualizar nome:", error);
       throw error;
     }
   }
@@ -244,58 +265,85 @@ class AuthService {
   async createReadingPlan(): Promise<any> {
     try {
       // Verificar token no AsyncStorage
-      const storedToken = await AsyncStorage.getItem('@auth_token');
-      
+      const storedToken = await AsyncStorage.getItem("@auth_token");
+
       if (storedToken !== this.token) {
-        console.warn('[AuthService] ⚠️ ATENÇÃO: Token em memória diferente do AsyncStorage!');
-        console.log('[AuthService] Token em memória:', this.token?.substring(0, 30) + '...');
-        console.log('[AuthService] Token no storage:', storedToken?.substring(0, 30) + '...');
+        console.warn(
+          "[AuthService] ⚠️ ATENÇÃO: Token em memória diferente do AsyncStorage!",
+        );
+        console.log(
+          "[AuthService] Token em memória:",
+          this.token?.substring(0, 30) + "...",
+        );
+        console.log(
+          "[AuthService] Token no storage:",
+          storedToken?.substring(0, 30) + "...",
+        );
       }
 
       const response = await fetch(`${API_URL}/reading-plans`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Authorization': `Bearer ${this.token}`,
-          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.token}`,
+          "Content-Type": "application/json",
         },
       });
 
-      console.log('[AuthService] Status da resposta:', response.status);
-      console.log('[AuthService] Status Text:', response.statusText);
-      
+      console.log("[AuthService] Status da resposta:", response.status);
+      console.log("[AuthService] Status Text:", response.statusText);
+
       // Log dos headers da resposta
-      console.log('[AuthService] 📄 Response Headers:');
+      console.log("[AuthService] 📄 Response Headers:");
       response.headers.forEach((value, key) => {
         console.log(`[AuthService]   ${key}: ${value}`);
       });
-      
+
       if (!response.ok) {
-        console.error('[AuthService] ❌ Resposta não OK:', response.status, response.statusText);
+        console.error(
+          "[AuthService] ❌ Resposta não OK:",
+          response.status,
+          response.statusText,
+        );
         const errorText = await response.text();
-        console.error('[AuthService] Corpo do erro:', errorText);
-        
+        console.error("[AuthService] Corpo do erro:", errorText);
+
         // Tentar parsear como JSON se possível
         try {
           const errorJson = JSON.parse(errorText);
-          console.error('[AuthService] Erro estruturado:', JSON.stringify(errorJson, null, 2));
+          console.error(
+            "[AuthService] Erro estruturado:",
+            JSON.stringify(errorJson, null, 2),
+          );
         } catch {
-          console.error('[AuthService] Erro em texto puro:', errorText);
+          console.error("[AuthService] Erro em texto puro:", errorText);
         }
-        
+
         return {
           success: false,
           message: `Erro HTTP ${response.status}: ${errorText || response.statusText}`,
         };
       }
-      
+
       const jsonData = await response.json();
-      console.log('[AuthService] Dados JSON recebidos:', JSON.stringify(jsonData, null, 2));
+      console.log(
+        "[AuthService] Dados JSON recebidos:",
+        JSON.stringify(jsonData, null, 2),
+      );
       return jsonData;
     } catch (error) {
-      console.error('[AuthService] Erro ao criar plano:', error);
-      console.error('[AuthService] Tipo do erro:', error instanceof Error ? error.constructor.name : typeof error);
-      console.error('[AuthService] Mensagem:', error instanceof Error ? error.message : String(error));
-      console.error('[AuthService] Stack:', error instanceof Error ? error.stack : 'N/A');
+      console.error("[AuthService] Erro ao criar plano:", error);
+      console.error(
+        "[AuthService] Tipo do erro:",
+        error instanceof Error ? error.constructor.name : typeof error,
+      );
+      console.error(
+        "[AuthService] Mensagem:",
+        error instanceof Error ? error.message : String(error),
+      );
+      console.error(
+        "[AuthService] Stack:",
+        error instanceof Error ? error.stack : "N/A",
+      );
       return {
         success: false,
         message: `Erro ao conectar com o servidor: ${error instanceof Error ? error.message : String(error)}`,
@@ -315,43 +363,70 @@ class AuthService {
     readings?: any[]; // OPCIONAL - backend gera automaticamente se não fornecido
   }): Promise<{ success: boolean; message: string; data?: any }> {
     try {
-      console.log('[AuthService] 📤 INÍCIO createCustomReadingPlan');
-      console.log('[AuthService] Plano:', planData.name);
-      console.log('[AuthService] Type:', planData.type);
-      console.log('[AuthService] Leituras enviadas?', planData.readings ? `Sim (${planData.readings.length})` : 'Não (backend gerará automaticamente)');
-      console.log('[AuthService] Token presente?', !!this.token);
-      console.log('[AuthService] URL:', `${API_URL}/reading-plans/custom`);
-      
+      console.log("[AuthService] 📤 INÍCIO createCustomReadingPlan");
+      console.log("[AuthService] Plano:", planData.name);
+      console.log("[AuthService] Type:", planData.type);
+      console.log(
+        "[AuthService] Leituras enviadas?",
+        planData.readings
+          ? `Sim (${planData.readings.length})`
+          : "Não (backend gerará automaticamente)",
+      );
+      console.log("[AuthService] Token presente?", !!this.token);
+      console.log("[AuthService] URL:", `${API_URL}/reading-plans/custom`);
+
       const requestBody = JSON.stringify(planData);
-      console.log('[AuthService] Tamanho do body:', requestBody.length, 'bytes');
-      
+      console.log(
+        "[AuthService] Tamanho do body:",
+        requestBody.length,
+        "bytes",
+      );
+
       const response = await fetch(`${API_URL}/reading-plans/custom`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Authorization': `Bearer ${this.token}`,
-          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.token}`,
+          "Content-Type": "application/json",
         },
         body: requestBody,
       });
 
-      console.log('[AuthService] ✅ Resposta recebida - Status:', response.status);
-      
+      console.log(
+        "[AuthService] ✅ Resposta recebida - Status:",
+        response.status,
+      );
+
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('[AuthService] ❌ Erro ao criar plano customizado:', errorText);
+        console.error(
+          "[AuthService] ❌ Erro ao criar plano customizado:",
+          errorText,
+        );
         return {
           success: false,
           message: `Erro HTTP ${response.status}: ${errorText || response.statusText}`,
         };
       }
-      
+
       const jsonData = await response.json();
-      console.log('[AuthService] ✅ Plano customizado criado no backend:', jsonData);
+      console.log(
+        "[AuthService] ✅ Plano customizado criado no backend:",
+        jsonData,
+      );
       return jsonData;
     } catch (error) {
-      console.error('[AuthService] ❌ EXCEÇÃO ao criar plano customizado:', error);
-      console.error('[AuthService] Tipo:', error instanceof Error ? error.constructor.name : typeof error);
-      console.error('[AuthService] Mensagem:', error instanceof Error ? error.message : String(error));
+      console.error(
+        "[AuthService] ❌ EXCEÇÃO ao criar plano customizado:",
+        error,
+      );
+      console.error(
+        "[AuthService] Tipo:",
+        error instanceof Error ? error.constructor.name : typeof error,
+      );
+      console.error(
+        "[AuthService] Mensagem:",
+        error instanceof Error ? error.message : String(error),
+      );
       return {
         success: false,
         message: `Erro ao conectar com o servidor: ${error instanceof Error ? error.message : String(error)}`,
@@ -362,31 +437,37 @@ class AuthService {
   /**
    * Obter plano ativo
    */
-  async getActivePlan(): Promise<{ success: boolean; data: { plan: ReadingPlan; todayReadings: TodayReading[] } | null }> {
+  async getActivePlan(): Promise<{
+    success: boolean;
+    data: { plan: ReadingPlan; todayReadings: TodayReading[] } | null;
+  }> {
     try {
-      console.log('=== GET ACTIVE PLAN REQUEST ===');
-      console.log('API URL:', `${API_URL}/reading-plans/active`);
-      console.log('Token exists:', !!this.token);
-      console.log('Token preview:', this.token ? `${this.token.substring(0, 20)}...` : 'null');
-      
+      console.log("=== GET ACTIVE PLAN REQUEST ===");
+      console.log("API URL:", `${API_URL}/reading-plans/active`);
+      console.log("Token exists:", !!this.token);
+      console.log(
+        "Token preview:",
+        this.token ? `${this.token.substring(0, 20)}...` : "null",
+      );
+
       const response = await fetch(`${API_URL}/reading-plans/active`, {
-        method: 'GET',
+        method: "GET",
         headers: {
-          'Authorization': `Bearer ${this.token}`,
+          Authorization: `Bearer ${this.token}`,
         },
       });
 
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
-      
+      console.log("Response status:", response.status);
+      console.log("Response ok:", response.ok);
+
       const data = await response.json();
-      console.log('Response data:', JSON.stringify(data, null, 2));
-      console.log('=== GET ACTIVE PLAN RESPONSE ===');
+      console.log("Response data:", JSON.stringify(data, null, 2));
+      console.log("=== GET ACTIVE PLAN RESPONSE ===");
 
       return data;
     } catch (error) {
-      console.error('=== ERROR IN GET ACTIVE PLAN ===');
-      console.error('Erro ao buscar plano:', error);
+      console.error("=== ERROR IN GET ACTIVE PLAN ===");
+      console.error("Erro ao buscar plano:", error);
       return {
         success: false,
         data: null,
@@ -397,18 +478,21 @@ class AuthService {
   /**
    * Obter todas as leituras do plano ativo
    */
-  async getAllPlanReadings(): Promise<{ success: boolean; data: TodayReading[] | null }> {
+  async getAllPlanReadings(): Promise<{
+    success: boolean;
+    data: TodayReading[] | null;
+  }> {
     try {
       const response = await fetch(`${API_URL}/reading-plans/all-readings`, {
-        method: 'GET',
+        method: "GET",
         headers: {
-          'Authorization': `Bearer ${this.token}`,
+          Authorization: `Bearer ${this.token}`,
         },
       });
 
       return await response.json();
     } catch (error) {
-      console.error('Erro ao buscar todas as leituras:', error);
+      console.error("Erro ao buscar todas as leituras:", error);
       return {
         success: false,
         data: null,
@@ -421,23 +505,22 @@ class AuthService {
    */
   async completeDay(day: number): Promise<any> {
     try {
-
-      console.log('Chamando completeDay com day:', day);
+      console.log("Chamando completeDay com day:", day);
       const response = await fetch(`${API_URL}/reading-plans/complete`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Authorization': `Bearer ${this.token}`,
-          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.token}`,
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ day }),
       });
 
       return await response.json();
     } catch (error) {
-      console.error('Erro ao completar dia:', error);
+      console.error("Erro ao completar dia:", error);
       return {
         success: false,
-        message: 'Erro ao conectar com o servidor',
+        message: "Erro ao conectar com o servidor",
       };
     }
   }
@@ -448,15 +531,15 @@ class AuthService {
   async getHistory(): Promise<any> {
     try {
       const response = await fetch(`${API_URL}/reading-plans/history`, {
-        method: 'GET',
+        method: "GET",
         headers: {
-          'Authorization': `Bearer ${this.token}`,
+          Authorization: `Bearer ${this.token}`,
         },
       });
 
       return await response.json();
     } catch (error) {
-      console.error('Erro ao buscar histórico:', error);
+      console.error("Erro ao buscar histórico:", error);
       return {
         success: false,
         data: [],
@@ -470,15 +553,15 @@ class AuthService {
   async getAllHistory(): Promise<any> {
     try {
       const response = await fetch(`${API_URL}/reading-plans/all-history`, {
-        method: 'GET',
+        method: "GET",
         headers: {
-          'Authorization': `Bearer ${this.token}`,
+          Authorization: `Bearer ${this.token}`,
         },
       });
 
       return await response.json();
     } catch (error) {
-      console.error('Erro ao buscar histórico completo:', error);
+      console.error("Erro ao buscar histórico completo:", error);
       return {
         success: false,
         data: [],
@@ -492,20 +575,20 @@ class AuthService {
   async unmarkDay(day: number): Promise<any> {
     try {
       const response = await fetch(`${API_URL}/reading-plans/unmark`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.token}`,
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${this.token}`,
         },
         body: JSON.stringify({ day }),
       });
 
       return await response.json();
     } catch (error) {
-      console.error('Erro ao desmarcar dia:', error);
+      console.error("Erro ao desmarcar dia:", error);
       return {
         success: false,
-        message: 'Erro ao conectar com o servidor',
+        message: "Erro ao conectar com o servidor",
       };
     }
   }
@@ -516,18 +599,18 @@ class AuthService {
   async deletePlan(): Promise<any> {
     try {
       const response = await fetch(`${API_URL}/reading-plans`, {
-        method: 'DELETE',
+        method: "DELETE",
         headers: {
-          'Authorization': `Bearer ${this.token}`,
+          Authorization: `Bearer ${this.token}`,
         },
       });
 
       return await response.json();
     } catch (error) {
-      console.error('Erro ao excluir plano:', error);
+      console.error("Erro ao excluir plano:", error);
       return {
         success: false,
-        message: 'Erro ao conectar com o servidor',
+        message: "Erro ao conectar com o servidor",
       };
     }
   }
@@ -538,23 +621,23 @@ class AuthService {
   async getStats(): Promise<any> {
     try {
       const response = await fetch(`${API_URL}/auth/stats`, {
-        method: 'GET',
+        method: "GET",
         headers: {
-          'Authorization': `Bearer ${this.token}`,
-          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.token}`,
+          "Content-Type": "application/json",
         },
       });
 
       if (!response.ok) {
-        throw new Error('Falha ao buscar estatísticas');
+        throw new Error("Falha ao buscar estatísticas");
       }
 
       return await response.json();
     } catch (error) {
-      console.error('Erro ao buscar estatísticas:', error);
+      console.error("Erro ao buscar estatísticas:", error);
       return {
         success: false,
-        message: 'Erro ao conectar com o servidor',
+        message: "Erro ao conectar com o servidor",
         data: null,
       };
     }

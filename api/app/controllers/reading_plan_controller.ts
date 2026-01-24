@@ -210,28 +210,35 @@ export default class ReadingPlanController {
       // Calcular capítulos por dia baseado no tipo de plano
       let totalBibleChapters: number
       let chaptersPerDay: number
-      
+
       if (type === 'interleaved') {
         // Para intercalado, ambos AT e NT devem terminar no mesmo dia
         // AT: 929 capítulos, NT: 260 capítulos
-        const atChapters = BIBLE_STRUCTURE.slice(0, 39).reduce((sum, book) => sum + book.chapters, 0)
+        const atChapters = BIBLE_STRUCTURE.slice(0, 39).reduce(
+          (sum, book) => sum + book.chapters,
+          0
+        )
         const ntChapters = BIBLE_STRUCTURE.slice(39).reduce((sum, book) => sum + book.chapters, 0)
-        
+
         const atChaptersPerDay = Math.ceil(atChapters / totalDays)
         const ntChaptersPerDay = Math.ceil(ntChapters / totalDays)
-        
+
         totalBibleChapters = atChapters + ntChapters
         chaptersPerDay = atChaptersPerDay + ntChaptersPerDay
-        
+
         console.log(`📖 [API] Intercalado - AT: ${atChapters} caps, NT: ${ntChapters} caps`)
-        console.log(`📊 [API] Capítulos por dia: AT ${atChaptersPerDay} + NT ${ntChaptersPerDay} = ${chaptersPerDay} total`)
+        console.log(
+          `📊 [API] Capítulos por dia: AT ${atChaptersPerDay} + NT ${ntChaptersPerDay} = ${chaptersPerDay} total`
+        )
       } else {
         // Para sequencial, calcular baseado no total da Bíblia
         totalBibleChapters = BIBLE_STRUCTURE.reduce((sum, book) => sum + book.chapters, 0)
         chaptersPerDay = Math.ceil(totalBibleChapters / totalDays)
-        
+
         console.log(`📖 [API] Total de capítulos da Bíblia: ${totalBibleChapters}`)
-        console.log(`📊 [API] Capítulos por dia necessários: ${chaptersPerDay} (${totalBibleChapters} capítulos / ${totalDays} dias)`)
+        console.log(
+          `📊 [API] Capítulos por dia necessários: ${chaptersPerDay} (${totalBibleChapters} capítulos / ${totalDays} dias)`
+        )
       }
 
       // Criar plano customizado
@@ -253,7 +260,7 @@ export default class ReadingPlanController {
 
       console.log('💾 [API] Tentando salvar plano no banco...')
       console.log('   Plan Data:', JSON.stringify(planData, null, 2))
-      
+
       const plan = await ReadingPlan.create(planData)
       console.log('✅ [API] Plano salvo com sucesso!')
       console.log('   ID do plano:', plan.id)
@@ -265,22 +272,29 @@ export default class ReadingPlanController {
       console.log(`📚 [API] Gerando os 5 primeiros dias automaticamente...`)
       let savedCount = 0
       const initialDaysCount = Math.min(5, totalDays)
-      
+
       for (let dayNumber = 1; dayNumber <= initialDaysCount; dayNumber++) {
         console.log(`   📖 Gerando dia ${dayNumber}...`)
-        
-        const dayReadings = await this.generateDayReadings(plan.type, dayNumber, plan.chaptersPerDay, plan.totalDays)
-        
+
+        const dayReadings = await this.generateDayReadings(
+          plan.type,
+          dayNumber,
+          plan.chaptersPerDay,
+          plan.totalDays
+        )
+
         if (!dayReadings || dayReadings.length === 0) {
           console.log(`   ⚠️ Não foi possível gerar leituras para o dia ${dayNumber}`)
           continue
         }
 
         console.log(`   📚 Dia ${dayNumber} terá ${dayReadings.length} leitura(s)`)
-        
+
         for (const bookReading of dayReadings) {
-          console.log(`      💾 Salvando: ${bookReading.bookName} cap ${bookReading.startChapter}-${bookReading.endChapter}`)
-          
+          console.log(
+            `      💾 Salvando: ${bookReading.bookName} cap ${bookReading.startChapter}-${bookReading.endChapter}`
+          )
+
           const progressRecord = await ReadingProgress.create({
             readingPlanId: plan.id,
             day: dayNumber,
@@ -289,7 +303,7 @@ export default class ReadingPlanController {
             endChapter: bookReading.endChapter,
             isCompleted: false,
           })
-          
+
           console.log(`      ✅ Registro ${progressRecord.id} salvo`)
           savedCount++
         }
@@ -303,7 +317,7 @@ export default class ReadingPlanController {
 
       console.log('🎉 [API] Plano customizado criado com sucesso!')
       console.log('📤 [API] Enviando resposta ao cliente...')
-      
+
       const responseData = {
         success: true,
         message: 'Plano de leitura customizado criado com sucesso',
@@ -319,10 +333,10 @@ export default class ReadingPlanController {
           },
         },
       }
-      
+
       console.log('📤 [API] Resposta:', JSON.stringify(responseData, null, 2))
       console.log('🔵 [API] createCustom - FIM')
-      
+
       return response.created(responseData)
     } catch (error) {
       console.error('❌ [API] ERRO FATAL ao criar plano customizado!')
@@ -330,7 +344,7 @@ export default class ReadingPlanController {
       console.error('❌ [API] Mensagem:', error?.message)
       console.error('❌ [API] Stack trace completo:')
       console.error(error?.stack)
-      
+
       return response.badRequest({
         success: false,
         message: 'Erro ao criar plano de leitura customizado',
@@ -486,7 +500,7 @@ export default class ReadingPlanController {
       await plan.save()
 
       console.log('🔄 [API] Verificando se precisa criar próximos dias...')
-      
+
       // Buscar quantos dias estão criados à frente
       const lastDay = await ReadingProgress.query()
         .where('reading_plan_id', plan.id)
@@ -495,8 +509,10 @@ export default class ReadingPlanController {
 
       const lastDayNumber = lastDay?.$extras?.maxDay ? Number(lastDay.$extras.maxDay) : 0
       const daysAhead = lastDayNumber - plan.currentDay + 1
-      
-      console.log(`📊 [API] Dias criados à frente: ${daysAhead} (último dia: ${lastDayNumber}, dia atual: ${plan.currentDay})`)
+
+      console.log(
+        `📊 [API] Dias criados à frente: ${daysAhead} (último dia: ${lastDayNumber}, dia atual: ${plan.currentDay})`
+      )
 
       // Se temos menos de 5 dias à frente, criar mais
       if (daysAhead < 5) {
@@ -508,17 +524,24 @@ export default class ReadingPlanController {
 
         for (let dayNumber = startDay; dayNumber <= endDay; dayNumber++) {
           console.log(`   📖 Auto-gerando dia ${dayNumber}...`)
-          
-          const dayReadings = await this.generateDayReadings(plan.type, dayNumber, plan.chaptersPerDay, plan.totalDays)
-          
+
+          const dayReadings = await this.generateDayReadings(
+            plan.type,
+            dayNumber,
+            plan.chaptersPerDay,
+            plan.totalDays
+          )
+
           if (!dayReadings || dayReadings.length === 0) {
             console.log(`   ⚠️ Não foi possível gerar leituras para o dia ${dayNumber}`)
             break
           }
 
           for (const bookReading of dayReadings) {
-            console.log(`      💾 Auto-salvando: ${bookReading.bookName} cap ${bookReading.startChapter}-${bookReading.endChapter}`)
-            
+            console.log(
+              `      💾 Auto-salvando: ${bookReading.bookName} cap ${bookReading.startChapter}-${bookReading.endChapter}`
+            )
+
             await ReadingProgress.create({
               readingPlanId: plan.id,
               day: dayNumber,
@@ -529,7 +552,7 @@ export default class ReadingPlanController {
             })
           }
         }
-        
+
         console.log(`✅ [API] ${endDay - startDay + 1} novos dias criados automaticamente`)
       } else {
         console.log(`✅ [API] Já tem ${daysAhead} dias à frente, não precisa criar mais`)
@@ -559,10 +582,10 @@ export default class ReadingPlanController {
       console.log('🔵 [API] addNextDays - INÍCIO')
       const user = auth.user!
       console.log('👤 [API] Usuário:', user.id)
-      
+
       const { count } = request.only(['count'])
       const daysToAdd = count || 5
-      
+
       console.log('📊 [API] Dias a adicionar:', daysToAdd)
 
       const plan = await ReadingPlan.query()
@@ -582,7 +605,7 @@ export default class ReadingPlanController {
         id: plan.id,
         type: plan.type,
         currentDay: plan.currentDay,
-        totalDays: plan.totalDays
+        totalDays: plan.totalDays,
       })
 
       // Buscar o maior dia já criado
@@ -599,26 +622,33 @@ export default class ReadingPlanController {
       let savedCount = 0
       const startDay = lastDayNumber + 1
       const endDay = Math.min(startDay + daysToAdd - 1, plan.totalDays)
-      
+
       console.log(`🔨 [API] Gerando dias ${startDay} até ${endDay}...`)
 
       for (let dayNumber = startDay; dayNumber <= endDay; dayNumber++) {
         console.log(`   📖 Gerando dia ${dayNumber}...`)
-        
+
         // Gerar leitura baseada no tipo do plano
-        const dayReadings = await this.generateDayReadings(plan.type, dayNumber, plan.chaptersPerDay, plan.totalDays)
-        
+        const dayReadings = await this.generateDayReadings(
+          plan.type,
+          dayNumber,
+          plan.chaptersPerDay,
+          plan.totalDays
+        )
+
         if (!dayReadings || dayReadings.length === 0) {
           console.log(`   ⚠️ Não foi possível gerar leituras para o dia ${dayNumber}`)
           break
         }
 
         console.log(`   📚 Dia ${dayNumber} terá ${dayReadings.length} leitura(s)`)
-        
+
         // Criar registros para este dia
         for (const bookReading of dayReadings) {
-          console.log(`      💾 Salvando: ${bookReading.bookName} cap ${bookReading.startChapter}-${bookReading.endChapter}`)
-          
+          console.log(
+            `      💾 Salvando: ${bookReading.bookName} cap ${bookReading.startChapter}-${bookReading.endChapter}`
+          )
+
           const record = await ReadingProgress.create({
             readingPlanId: plan.id,
             day: dayNumber,
@@ -627,7 +657,7 @@ export default class ReadingPlanController {
             endChapter: bookReading.endChapter,
             isCompleted: false,
           })
-          
+
           console.log(`      ✅ Registro ${record.id} salvo`)
           savedCount++
         }
@@ -650,7 +680,7 @@ export default class ReadingPlanController {
       console.error('❌ [API] Tipo:', error?.constructor?.name)
       console.error('❌ [API] Mensagem:', error?.message)
       console.error('❌ [API] Stack:', error?.stack)
-      
+
       return response.badRequest({
         success: false,
         message: 'Erro ao adicionar dias ao plano',
@@ -662,20 +692,27 @@ export default class ReadingPlanController {
   /**
    * Gera as leituras de um dia específico baseado no tipo do plano
    */
-  private async generateDayReadings(planType: string, dayNumber: number, chaptersPerDay: number, totalDays: number) {
-    console.log(`🔧 [generateDayReadings] Tipo: ${planType}, Dia: ${dayNumber}, Capítulos/dia: ${chaptersPerDay}, Total dias: ${totalDays}`)
-    
+  private async generateDayReadings(
+    planType: string,
+    dayNumber: number,
+    chaptersPerDay: number,
+    totalDays: number
+  ) {
+    console.log(
+      `🔧 [generateDayReadings] Tipo: ${planType}, Dia: ${dayNumber}, Capítulos/dia: ${chaptersPerDay}, Total dias: ${totalDays}`
+    )
+
     if (planType === 'sequential') {
       // Leitura sequencial: lê a Bíblia em ordem, X capítulos por dia
       const startChapter = (dayNumber - 1) * chaptersPerDay + 1
-      
+
       console.log(`   Capítulo absoluto inicial: ${startChapter}`)
-      
+
       // Encontrar livro e capítulo inicial
       let absoluteChapter = 0
       let bookIndex = 0
       let bookStartChapter = 1
-      
+
       for (let i = 0; i < BIBLE_STRUCTURE.length; i++) {
         const book = BIBLE_STRUCTURE[i]
         if (absoluteChapter + book.chapters >= startChapter) {
@@ -685,30 +722,34 @@ export default class ReadingPlanController {
         }
         absoluteChapter += book.chapters
       }
-      
-      console.log(`   Livro inicial: ${BIBLE_STRUCTURE[bookIndex].name}, capítulo: ${bookStartChapter}`)
-      
+
+      console.log(
+        `   Livro inicial: ${BIBLE_STRUCTURE[bookIndex].name}, capítulo: ${bookStartChapter}`
+      )
+
       // Coletar leituras (pode abranger múltiplos livros)
       const readings = []
       let chaptersCollected = 0
       let currentBookIndex = bookIndex
       let currentChapter = bookStartChapter
-      
+
       while (chaptersCollected < chaptersPerDay && currentBookIndex < BIBLE_STRUCTURE.length) {
         const book = BIBLE_STRUCTURE[currentBookIndex]
         const chaptersRemaining = book.chapters - currentChapter + 1
         const chaptersToTake = Math.min(chaptersPerDay - chaptersCollected, chaptersRemaining)
-        
-        console.log(`   📖 ${book.name}: capítulos ${currentChapter}-${currentChapter + chaptersToTake - 1} (${chaptersToTake} caps)`)
-        
+
+        console.log(
+          `   📖 ${book.name}: capítulos ${currentChapter}-${currentChapter + chaptersToTake - 1} (${chaptersToTake} caps)`
+        )
+
         readings.push({
           bookName: book.name,
           startChapter: currentChapter,
-          endChapter: currentChapter + chaptersToTake - 1
+          endChapter: currentChapter + chaptersToTake - 1,
         })
-        
+
         chaptersCollected += chaptersToTake
-        
+
         // Se terminou o livro, vai para o próximo
         if (currentChapter + chaptersToTake - 1 >= book.chapters) {
           currentBookIndex++
@@ -717,42 +758,45 @@ export default class ReadingPlanController {
           currentChapter += chaptersToTake
         }
       }
-      
-      console.log(`   ✅ Total: ${readings.length} bloco(s) de leitura, ${chaptersCollected} capítulos`)
+
+      console.log(
+        `   ✅ Total: ${readings.length} bloco(s) de leitura, ${chaptersCollected} capítulos`
+      )
       return readings
-    } 
-    else if (planType === 'interleaved') {
+    } else if (planType === 'interleaved') {
       // Leitura intercalada: AT e NT avançam proporcionalmente para terminar juntos
       const atBooks = BIBLE_STRUCTURE.slice(0, 39) // Gênesis até Malaquias
       const ntBooks = BIBLE_STRUCTURE.slice(39) // Mateus até Apocalipse
-      
+
       const totalAtChapters = atBooks.reduce((sum, book) => sum + book.chapters, 0) // 929
       const totalNtChapters = ntBooks.reduce((sum, book) => sum + book.chapters, 0) // 260
-      
+
       // Calcular posição exata usando proporção do dia
       // AT: capítulo inicial = (dayNumber-1) * 929 / totalDays
       //     capítulo final = dayNumber * 929 / totalDays
       // NT: capítulo inicial = (dayNumber-1) * 260 / totalDays
       //     capítulo final = dayNumber * 260 / totalDays
-      
-      const atStartChapter = Math.floor((dayNumber - 1) * totalAtChapters / totalDays) + 1
-      const atEndChapter = Math.floor(dayNumber * totalAtChapters / totalDays)
+
+      const atStartChapter = Math.floor(((dayNumber - 1) * totalAtChapters) / totalDays) + 1
+      const atEndChapter = Math.floor((dayNumber * totalAtChapters) / totalDays)
       const atChaptersThisDay = atEndChapter - atStartChapter + 1
-      
-      const ntStartChapter = Math.floor((dayNumber - 1) * totalNtChapters / totalDays) + 1
-      const ntEndChapter = Math.floor(dayNumber * totalNtChapters / totalDays)
+
+      const ntStartChapter = Math.floor(((dayNumber - 1) * totalNtChapters) / totalDays) + 1
+      const ntEndChapter = Math.floor((dayNumber * totalNtChapters) / totalDays)
       const ntChaptersThisDay = ntEndChapter - ntStartChapter + 1
-      
-      console.log(`   Dia ${dayNumber}/${totalDays}: AT ${atChaptersThisDay} caps (${atStartChapter}-${atEndChapter}), NT ${ntChaptersThisDay} caps (${ntStartChapter}-${ntEndChapter})`)
-      
+
+      console.log(
+        `   Dia ${dayNumber}/${totalDays}: AT ${atChaptersThisDay} caps (${atStartChapter}-${atEndChapter}), NT ${ntChaptersThisDay} caps (${ntStartChapter}-${ntEndChapter})`
+      )
+
       const readings = []
-      
+
       // Coletar capítulos do AT (baseado na posição calculada)
       if (atStartChapter <= totalAtChapters) {
         let atAbsoluteChapter = 0
         let atBookIndex = 0
         let atBookStartChapter = 1
-        
+
         for (let i = 0; i < atBooks.length; i++) {
           if (atAbsoluteChapter + atBooks[i].chapters >= atStartChapter) {
             atBookIndex = i
@@ -761,27 +805,32 @@ export default class ReadingPlanController {
           }
           atAbsoluteChapter += atBooks[i].chapters
         }
-        
+
         // Coletar capítulos do AT
         let atChaptersCollected = 0
         let currentAtIndex = atBookIndex
         let currentAtChapter = atBookStartChapter
-        
+
         while (atChaptersCollected < atChaptersThisDay && currentAtIndex < atBooks.length) {
           const book = atBooks[currentAtIndex]
           const chaptersRemaining = book.chapters - currentAtChapter + 1
-          const chaptersToTake = Math.min(atChaptersThisDay - atChaptersCollected, chaptersRemaining)
-          
-          console.log(`   📖 AT: ${book.name} ${currentAtChapter}-${currentAtChapter + chaptersToTake - 1}`)
-          
+          const chaptersToTake = Math.min(
+            atChaptersThisDay - atChaptersCollected,
+            chaptersRemaining
+          )
+
+          console.log(
+            `   📖 AT: ${book.name} ${currentAtChapter}-${currentAtChapter + chaptersToTake - 1}`
+          )
+
           readings.push({
             bookName: book.name,
             startChapter: currentAtChapter,
-            endChapter: currentAtChapter + chaptersToTake - 1
+            endChapter: currentAtChapter + chaptersToTake - 1,
           })
-          
+
           atChaptersCollected += chaptersToTake
-          
+
           if (currentAtChapter + chaptersToTake - 1 >= book.chapters) {
             currentAtIndex++
             currentAtChapter = 1
@@ -790,13 +839,13 @@ export default class ReadingPlanController {
           }
         }
       }
-      
+
       // Coletar capítulos do NT (baseado na posição calculada)
       if (ntStartChapter <= totalNtChapters) {
         let ntAbsoluteChapter = 0
         let ntBookIndex = 0
         let ntBookStartChapter = 1
-        
+
         for (let i = 0; i < ntBooks.length; i++) {
           if (ntAbsoluteChapter + ntBooks[i].chapters >= ntStartChapter) {
             ntBookIndex = i
@@ -805,27 +854,32 @@ export default class ReadingPlanController {
           }
           ntAbsoluteChapter += ntBooks[i].chapters
         }
-        
+
         // Coletar capítulos do NT
         let ntChaptersCollected = 0
         let currentNtIndex = ntBookIndex
         let currentNtChapter = ntBookStartChapter
-        
+
         while (ntChaptersCollected < ntChaptersThisDay && currentNtIndex < ntBooks.length) {
           const book = ntBooks[currentNtIndex]
           const chaptersRemaining = book.chapters - currentNtChapter + 1
-          const chaptersToTake = Math.min(ntChaptersThisDay - ntChaptersCollected, chaptersRemaining)
-          
-          console.log(`   📖 NT: ${book.name} ${currentNtChapter}-${currentNtChapter + chaptersToTake - 1}`)
-          
+          const chaptersToTake = Math.min(
+            ntChaptersThisDay - ntChaptersCollected,
+            chaptersRemaining
+          )
+
+          console.log(
+            `   📖 NT: ${book.name} ${currentNtChapter}-${currentNtChapter + chaptersToTake - 1}`
+          )
+
           readings.push({
             bookName: book.name,
             startChapter: currentNtChapter,
-            endChapter: currentNtChapter + chaptersToTake - 1
+            endChapter: currentNtChapter + chaptersToTake - 1,
           })
-          
+
           ntChaptersCollected += chaptersToTake
-          
+
           if (currentNtChapter + chaptersToTake - 1 >= book.chapters) {
             currentNtIndex++
             currentNtChapter = 1
@@ -834,11 +888,11 @@ export default class ReadingPlanController {
           }
         }
       }
-      
+
       console.log(`   ✅ Intercalado: ${readings.length} bloco(s) de leitura`)
       return readings
     }
-    
+
     console.log(`   ⚠️ Tipo de plano desconhecido: ${planType}`)
     return []
   }
@@ -1610,7 +1664,7 @@ export default class ReadingPlanController {
         const expectedDays = Math.ceil(endDate.diff(startDate, 'days').days)
 
         // Contar quantos dias REALMENTE existem no reading_progress
-        const daysInProgress = new Set(plan.progress.map(p => p.day))
+        const daysInProgress = new Set(plan.progress.map((p) => p.day))
         const maxDayInProgress = Math.max(...Array.from(daysInProgress), 0)
         const actualProgressDays = daysInProgress.size
 
@@ -1618,17 +1672,17 @@ export default class ReadingPlanController {
         // 1. Se o número de dias no progress é menor que o esperado
         // 2. Se o max day é menor que expected days (faltam dias no final)
         const missingDays = expectedDays - maxDayInProgress
-        const isIncorrect = missingDays > 5 || actualProgressDays < (expectedDays * 0.95)
+        const isIncorrect = missingDays > 5 || actualProgressDays < expectedDays * 0.95
 
         if (isIncorrect) {
           // Contar quantos dias já foram lidos
           const completedDays = new Set(
-            plan.progress.filter(p => p.isCompleted).map(p => p.day)
+            plan.progress.filter((p) => p.isCompleted).map((p) => p.day)
           ).size
 
           // Contar capítulos completados
           const completedChapters = plan.progress
-            .filter(p => p.isCompleted)
+            .filter((p) => p.isCompleted)
             .reduce((sum, p) => sum + (p.endChapter - p.startChapter + 1), 0)
 
           let issue = ''
@@ -1688,18 +1742,17 @@ export default class ReadingPlanController {
       const { planId } = params
 
       // Buscar plano
-      const plan = await ReadingPlan.query()
-        .where('id', planId)
-        .preload('progress')
-        .firstOrFail()
+      const plan = await ReadingPlan.query().where('id', planId).preload('progress').firstOrFail()
 
       console.log(`[RecalculatePlan] Recalculando plano ${planId}...`)
 
       // Buscar progresso completado
-      const completedProgress = plan.progress.filter(p => p.isCompleted)
-      const completedDays = new Set(completedProgress.map(p => p.day))
+      const completedProgress = plan.progress.filter((p) => p.isCompleted)
+      const completedDays = new Set(completedProgress.map((p) => p.day))
 
-      console.log(`[RecalculatePlan] Progresso atual: ${completedProgress.length} registros completados em ${completedDays.size} dias`)
+      console.log(
+        `[RecalculatePlan] Progresso atual: ${completedProgress.length} registros completados em ${completedDays.size} dias`
+      )
 
       // Mapear o que já foi lido (livro + capítulos)
       const completedChaptersMap = new Map<string, Set<number>>()
@@ -1727,7 +1780,9 @@ export default class ReadingPlanController {
       const originalEndDate = plan.endDate
       const originalTotalDays = Math.ceil(originalEndDate.diff(originalStartDate, 'days').days)
 
-      console.log(`[RecalculatePlan] Mantendo período original: ${originalTotalDays} dias (${originalStartDate.toISO()} até ${originalEndDate.toISO()})`)
+      console.log(
+        `[RecalculatePlan] Mantendo período original: ${originalTotalDays} dias (${originalStartDate.toISO()} até ${originalEndDate.toISO()})`
+      )
 
       const totalChapters = BIBLE_STRUCTURE.reduce((sum, book) => sum + book.chapters, 0)
       const remainingChapters = totalChapters - totalCompletedChapters
@@ -1736,14 +1791,18 @@ export default class ReadingPlanController {
       const maxDayCompleted = Math.max(...completedDays, 0)
       const daysToCreate = originalTotalDays - maxDayCompleted
 
-      console.log(`[RecalculatePlan] Último dia completado: ${maxDayCompleted}, dias totais: ${originalTotalDays}, faltam criar: ${daysToCreate}`)
+      console.log(
+        `[RecalculatePlan] Último dia completado: ${maxDayCompleted}, dias totais: ${originalTotalDays}, faltam criar: ${daysToCreate}`
+      )
 
       // Usar 4 capítulos por dia como padrão, ajustando os últimos dias se necessário
       const baseChaptersPerDay = 4
       const daysWithBaseChapters = Math.floor(remainingChapters / baseChaptersPerDay)
       const remainingChaptersInLastDay = remainingChapters % baseChaptersPerDay
 
-      console.log(`[RecalculatePlan] Distribuição: ${daysWithBaseChapters} dias com ${baseChaptersPerDay} cap/dia + último dia com ${remainingChaptersInLastDay} capítulos`)
+      console.log(
+        `[RecalculatePlan] Distribuição: ${daysWithBaseChapters} dias com ${baseChaptersPerDay} cap/dia + último dia com ${remainingChaptersInLastDay} capítulos`
+      )
 
       // Deletar APENAS os registros NÃO completados
       const deletedCount = await ReadingProgress.query()
@@ -1782,7 +1841,9 @@ export default class ReadingPlanController {
         // Livro completamente lido, continuar para o próximo
       }
 
-      console.log(`[RecalculatePlan] Reiniciando de: ${BIBLE_STRUCTURE[bookIndex]?.name} cap ${currentChapter}, dia ${currentDay}`)
+      console.log(
+        `[RecalculatePlan] Reiniciando de: ${BIBLE_STRUCTURE[bookIndex]?.name} cap ${currentChapter}, dia ${currentDay}`
+      )
 
       // Gerar novos registros de progresso com distribuição inteligente
       let newRecordsCount = 0
@@ -1853,7 +1914,9 @@ export default class ReadingPlanController {
         currentDay++
       }
 
-      console.log(`[RecalculatePlan] ${newRecordsCount} novos registros criados, ${chaptersDistributed} capítulos distribuídos`)
+      console.log(
+        `[RecalculatePlan] ${newRecordsCount} novos registros criados, ${chaptersDistributed} capítulos distribuídos`
+      )
 
       // Atualizar plano (mantendo datas originais)
       plan.totalDays = originalTotalDays
@@ -1919,10 +1982,11 @@ export default class ReadingPlanController {
 
       // Buscar por nome do plano ou email do usuário
       if (search) {
-        query.whereHas('user', (userQuery) => {
-          userQuery.whereILike('email', `%${search}%`)
-            .orWhereILike('full_name', `%${search}%`)
-        }).orWhereILike('name', `%${search}%`)
+        query
+          .whereHas('user', (userQuery) => {
+            userQuery.whereILike('email', `%${search}%`).orWhereILike('full_name', `%${search}%`)
+          })
+          .orWhereILike('name', `%${search}%`)
       }
 
       const plans = await query.paginate(page, limit)
@@ -1959,10 +2023,11 @@ export default class ReadingPlanController {
             stats: {
               totalProgress: progressCount[0].$extras.total,
               completedDays: completedCount[0].$extras.total,
-              completionPercentage: plan.totalDays > 0 
-                ? Math.round((completedCount[0].$extras.total / plan.totalDays) * 100)
-                : 0
-            }
+              completionPercentage:
+                plan.totalDays > 0
+                  ? Math.round((completedCount[0].$extras.total / plan.totalDays) * 100)
+                  : 0,
+            },
           }
         })
       )

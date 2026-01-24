@@ -1,22 +1,22 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
+import { useRouter } from "expo-router";
+import React, { useCallback, useEffect, useState } from "react";
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  ActivityIndicator,
-  Modal,
-  Alert,
-  StyleSheet,
-  SafeAreaView,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useTheme } from '../hooks/theme-context';
-import NotesService, { VerseNote } from '../services/NotesService';
-import { DatabaseService } from '../services/DatabaseService';
-import BibleReaderService from '../services/BibleReaderService';
-import { useFocusEffect } from '@react-navigation/native';
+    ActivityIndicator,
+    Alert,
+    Modal,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from "react-native";
+import { useTheme } from "../hooks/theme-context";
+import BibleReaderService from "../services/BibleReaderService";
+import { DatabaseService } from "../services/DatabaseService";
+import NotesService, { VerseNote } from "../services/NotesService";
 
 interface BibleBook {
   id: number;
@@ -34,13 +34,13 @@ export default function MyNotesScreen() {
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [selectedNote, setSelectedNote] = useState<VerseNote | null>(null);
   const [showNoteModal, setShowNoteModal] = useState(false);
-  const [bibleId, setBibleId] = useState<string>('');
+  const [bibleId, setBibleId] = useState<string>("");
 
   // Load notes when screen is focused
   useFocusEffect(
     useCallback(() => {
       loadData();
-    }, [])
+    }, []),
   );
 
   useEffect(() => {
@@ -53,8 +53,8 @@ export default function MyNotesScreen() {
       await loadNotes();
       await loadBooks();
     } catch (error) {
-      console.error('Error loading data:', error);
-      Alert.alert('Erro', 'Não foi possível carregar os dados');
+      console.error("Error loading data:", error);
+      Alert.alert("Erro", "Não foi possível carregar os dados");
     } finally {
       setLoading(false);
     }
@@ -65,28 +65,31 @@ export default function MyNotesScreen() {
       // Get first downloaded Bible to load books
       const bibles = await DatabaseService.getBibles();
       const downloadedBible = bibles.find((b) => b.isDownloaded);
-      
+
       if (!downloadedBible) {
-        console.log('No downloaded bible found');
+        console.log("No downloaded bible found");
         setBooks([]);
         return;
       }
 
       setBibleId(downloadedBible.id);
-      
+
       // Open Bible and get books
-      await BibleReaderService.openBible(downloadedBible.id, downloadedBible.fileName);
+      await BibleReaderService.openBible(
+        downloadedBible.id,
+        downloadedBible.fileName,
+      );
       const bibleBooks = await BibleReaderService.getBooks(downloadedBible.id);
-      
+
       // Ensure books have correct structure
       const formattedBooks = bibleBooks.map((book: any) => ({
         id: book.id || book.book_id,
         name: book.name || book.book_name,
       }));
-      
+
       setBooks(formattedBooks);
     } catch (error) {
-      console.error('Error loading books:', error);
+      console.error("Error loading books:", error);
       setBooks([]);
       // Don't show alert, just log the error
     }
@@ -98,8 +101,8 @@ export default function MyNotesScreen() {
       const allNotes = await NotesService.getAllNotes();
       setNotes(allNotes);
     } catch (error) {
-      console.error('Error loading notes:', error);
-      Alert.alert('Erro', 'Não foi possível carregar as anotações');
+      console.error("Error loading notes:", error);
+      Alert.alert("Erro", "Não foi possível carregar as anotações");
     } finally {
       setLoading(false);
     }
@@ -115,33 +118,33 @@ export default function MyNotesScreen() {
 
   const handleDeleteNote = async (noteId: string) => {
     Alert.alert(
-      'Excluir Anotação',
-      'Tem certeza que deseja excluir esta anotação?',
+      "Excluir Anotação",
+      "Tem certeza que deseja excluir esta anotação?",
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: "Cancelar", style: "cancel" },
         {
-          text: 'Excluir',
-          style: 'destructive',
+          text: "Excluir",
+          style: "destructive",
           onPress: async () => {
             try {
               await NotesService.deleteNote(noteId);
               setNotes(notes.filter((note) => note.id !== noteId));
               setShowNoteModal(false);
-              Alert.alert('Sucesso', 'Anotação excluída');
+              Alert.alert("Sucesso", "Anotação excluída");
             } catch (error) {
-              console.error('Error deleting note:', error);
-              Alert.alert('Erro', 'Não foi possível excluir a anotação');
+              console.error("Error deleting note:", error);
+              Alert.alert("Erro", "Não foi possível excluir a anotação");
             }
           },
         },
-      ]
+      ],
     );
   };
 
   const handleGoToVerse = (note: VerseNote) => {
     setShowNoteModal(false);
     router.push({
-      pathname: '/chapter-reader',
+      pathname: "/chapter-reader",
       params: {
         bookId: note.bookId,
         chapterNumber: note.chapterNumber,
@@ -164,15 +167,15 @@ export default function MyNotesScreen() {
     ];
 
     // Split by line to handle bullet lists
-    const lines = text.split('\n');
-    
+    const lines = text.split("\n");
+
     lines.forEach((line, lineIndex) => {
-      if (line.trim().startsWith('- ')) {
+      if (line.trim().startsWith("- ")) {
         // Bullet list item
         parts.push(
           <Text key={`line-${lineIndex}`} style={styles.bulletItem}>
             • {line.substring(2)}
-          </Text>
+          </Text>,
         );
       } else {
         // Process inline formatting
@@ -181,8 +184,13 @@ export default function MyNotesScreen() {
         let lastIndex = 0;
 
         // Find all matches for all patterns
-        const allMatches: Array<{ index: number; length: number; text: string; style: any }> = [];
-        
+        const allMatches: Array<{
+          index: number;
+          length: number;
+          text: string;
+          style: any;
+        }> = [];
+
         patterns.forEach(({ regex, style }) => {
           let match;
           while ((match = regex.exec(line)) !== null) {
@@ -206,7 +214,7 @@ export default function MyNotesScreen() {
           tempParts.push(
             <Text key={`match-${i}`} style={match.style}>
               {match.text}
-            </Text>
+            </Text>,
           );
           lastIndex = match.index + match.length;
         });
@@ -222,13 +230,13 @@ export default function MyNotesScreen() {
         parts.push(
           <Text key={`line-${lineIndex}`} style={styles.noteText}>
             {tempParts}
-          </Text>
+          </Text>,
         );
       }
 
       // Add line break except for last line
       if (lineIndex < lines.length - 1) {
-        parts.push(<Text key={`br-${lineIndex}`}>{'\n'}</Text>);
+        parts.push(<Text key={`br-${lineIndex}`}>{"\n"}</Text>);
       }
     });
 
@@ -236,9 +244,10 @@ export default function MyNotesScreen() {
   };
 
   const renderNoteCard = (note: VerseNote) => {
-    const verseReference = note.verseNumbers.length === 1
-      ? note.verseNumbers[0].toString()
-      : `${Math.min(...note.verseNumbers)}-${Math.max(...note.verseNumbers)}`;
+    const verseReference =
+      note.verseNumbers.length === 1
+        ? note.verseNumbers[0].toString()
+        : `${Math.min(...note.verseNumbers)}-${Math.max(...note.verseNumbers)}`;
 
     return (
       <TouchableOpacity
@@ -254,14 +263,14 @@ export default function MyNotesScreen() {
             <Ionicons
               name="bookmark"
               size={16}
-              color={isDark ? '#64b5f6' : '#1976D2'}
+              color={isDark ? "#64b5f6" : "#1976D2"}
             />
             <Text style={[styles.noteBookName, { color: colors.textPrimary }]}>
               {note.bookName} {note.chapterNumber}:{verseReference}
             </Text>
           </View>
           <Text style={[styles.noteDate, { color: colors.textSecondary }]}>
-            {new Date(note.updatedAt).toLocaleDateString('pt-BR')}
+            {new Date(note.updatedAt).toLocaleDateString("pt-BR")}
           </Text>
         </View>
         <Text
@@ -276,17 +285,27 @@ export default function MyNotesScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={isDark ? '#64b5f6' : '#1976D2'} />
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: colors.background }]}
+      >
+        <ActivityIndicator
+          size="large"
+          color={isDark ? "#64b5f6" : "#1976D2"}
+        />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.background }]}
+    >
       {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.card }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backButton}
+        >
           <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
@@ -297,9 +316,9 @@ export default function MyNotesScreen() {
           style={styles.filterButton}
         >
           <Ionicons
-            name={selectedBook ? 'filter' : 'filter-outline'}
+            name={selectedBook ? "filter" : "filter-outline"}
             size={24}
-            color={isDark ? '#64b5f6' : '#1976D2'}
+            color={isDark ? "#64b5f6" : "#1976D2"}
           />
           {selectedBook && (
             <View style={styles.filterBadge}>
@@ -310,8 +329,8 @@ export default function MyNotesScreen() {
       </View>
 
       {/* Notes List */}
-      <ScrollView 
-        style={styles.scrollView} 
+      <ScrollView
+        style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
@@ -324,15 +343,23 @@ export default function MyNotesScreen() {
             />
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
               {selectedBook
-                ? 'Nenhuma anotação para este livro'
-                : 'Você ainda não tem anotações'}
+                ? "Nenhuma anotação para este livro"
+                : "Você ainda não tem anotações"}
             </Text>
             {selectedBook && (
               <TouchableOpacity
                 onPress={() => setSelectedBook(null)}
-                style={[styles.clearFilterButton, { backgroundColor: colors.surfaceAlt }]}
+                style={[
+                  styles.clearFilterButton,
+                  { backgroundColor: colors.surfaceAlt },
+                ]}
               >
-                <Text style={[styles.clearFilterText, { color: colors.textPrimary }]}>
+                <Text
+                  style={[
+                    styles.clearFilterText,
+                    { color: colors.textPrimary },
+                  ]}
+                >
                   Limpar Filtro
                 </Text>
               </TouchableOpacity>
@@ -365,13 +392,21 @@ export default function MyNotesScreen() {
 
             {selectedBook && (
               <TouchableOpacity
-                style={[styles.clearFilterModalButton, { backgroundColor: colors.surfaceAlt }]}
+                style={[
+                  styles.clearFilterModalButton,
+                  { backgroundColor: colors.surfaceAlt },
+                ]}
                 onPress={() => {
                   setSelectedBook(null);
                   setShowFilterModal(false);
                 }}
               >
-                <Text style={[styles.clearFilterModalText, { color: colors.textPrimary }]}>
+                <Text
+                  style={[
+                    styles.clearFilterModalText,
+                    { color: colors.textPrimary },
+                  ]}
+                >
                   Mostrar Todas
                 </Text>
               </TouchableOpacity>
@@ -384,7 +419,12 @@ export default function MyNotesScreen() {
                   style={[
                     styles.bookItem,
                     selectedBook === book.id && styles.selectedBookItem,
-                    { backgroundColor: selectedBook === book.id ? colors.surfaceAlt : 'transparent' },
+                    {
+                      backgroundColor:
+                        selectedBook === book.id
+                          ? colors.surfaceAlt
+                          : "transparent",
+                    },
                   ]}
                   onPress={() => {
                     setSelectedBook(book.id);
@@ -401,7 +441,11 @@ export default function MyNotesScreen() {
                     {book.name}
                   </Text>
                   {selectedBook === book.id && (
-                    <Ionicons name="checkmark" size={20} color={isDark ? '#64b5f6' : '#1976D2'} />
+                    <Ionicons
+                      name="checkmark"
+                      size={20}
+                      color={isDark ? "#64b5f6" : "#1976D2"}
+                    />
                   )}
                 </TouchableOpacity>
               ))}
@@ -422,14 +466,20 @@ export default function MyNotesScreen() {
             {selectedNote && (
               <>
                 <View style={styles.modalHeader}>
-                  <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>
+                  <Text
+                    style={[styles.modalTitle, { color: colors.textPrimary }]}
+                  >
                     {selectedNote.bookName} {selectedNote.chapterNumber}:
                     {selectedNote.verseNumbers.length === 1
                       ? selectedNote.verseNumbers[0]
                       : `${Math.min(...selectedNote.verseNumbers)}-${Math.max(...selectedNote.verseNumbers)}`}
                   </Text>
                   <TouchableOpacity onPress={() => setShowNoteModal(false)}>
-                    <Ionicons name="close" size={24} color={colors.textPrimary} />
+                    <Ionicons
+                      name="close"
+                      size={24}
+                      color={colors.textPrimary}
+                    />
                   </TouchableOpacity>
                 </View>
 
@@ -441,11 +491,23 @@ export default function MyNotesScreen() {
 
                 <View style={styles.noteActions}>
                   <TouchableOpacity
-                    style={[styles.actionButton, { backgroundColor: colors.surfaceAlt }]}
+                    style={[
+                      styles.actionButton,
+                      { backgroundColor: colors.surfaceAlt },
+                    ]}
                     onPress={() => handleGoToVerse(selectedNote)}
                   >
-                    <Ionicons name="book-outline" size={20} color={isDark ? '#64b5f6' : '#1976D2'} />
-                    <Text style={[styles.actionButtonText, { color: colors.textPrimary }]}>
+                    <Ionicons
+                      name="book-outline"
+                      size={20}
+                      color={isDark ? "#64b5f6" : "#1976D2"}
+                    />
+                    <Text
+                      style={[
+                        styles.actionButtonText,
+                        { color: colors.textPrimary },
+                      ]}
+                    >
                       Ir para o Texto
                     </Text>
                   </TouchableOpacity>
@@ -455,7 +517,9 @@ export default function MyNotesScreen() {
                     onPress={() => handleDeleteNote(selectedNote.id)}
                   >
                     <Ionicons name="trash-outline" size={20} color="#fff" />
-                    <Text style={[styles.actionButtonText, { color: '#fff' }]}>Excluir</Text>
+                    <Text style={[styles.actionButtonText, { color: "#fff" }]}>
+                      Excluir
+                    </Text>
                   </TouchableOpacity>
                 </View>
               </>
@@ -472,47 +536,47 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 12,
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+    borderBottomColor: "rgba(0, 0, 0, 0.1)",
   },
   backButton: {
     padding: 8,
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     flex: 1,
-    textAlign: 'center',
+    textAlign: "center",
   },
   filterButton: {
     padding: 8,
-    position: 'relative',
+    position: "relative",
   },
   filterBadge: {
-    position: 'absolute',
+    position: "absolute",
     top: 4,
     right: 4,
-    backgroundColor: '#f44336',
+    backgroundColor: "#f44336",
     borderRadius: 8,
     width: 16,
     height: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   filterBadgeText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 10,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   scrollView: {
     flex: 1,
@@ -529,26 +593,26 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 12,
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
   },
   noteHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 8,
   },
   noteReference: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
     flex: 1,
   },
   noteBookName: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   noteDate: {
     fontSize: 12,
@@ -559,14 +623,14 @@ const styles = StyleSheet.create({
   },
   emptyState: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 60,
   },
   emptyText: {
     fontSize: 16,
     marginTop: 16,
-    textAlign: 'center',
+    textAlign: "center",
   },
   clearFilterButton: {
     marginTop: 16,
@@ -576,66 +640,66 @@ const styles = StyleSheet.create({
   },
   clearFilterText: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
   },
   filterModal: {
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: '80%',
+    maxHeight: "80%",
   },
   modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+    borderBottomColor: "rgba(0, 0, 0, 0.1)",
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   clearFilterModalButton: {
     margin: 16,
     padding: 12,
     borderRadius: 8,
-    alignItems: 'center',
+    alignItems: "center",
   },
   clearFilterModalText: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   booksList: {
     maxHeight: 400,
   },
   bookItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.05)',
+    borderBottomColor: "rgba(0, 0, 0, 0.05)",
   },
   selectedBookItem: {
     borderLeftWidth: 3,
-    borderLeftColor: '#1976D2',
+    borderLeftColor: "#1976D2",
   },
   bookItemText: {
     fontSize: 16,
   },
   selectedBookText: {
-    fontWeight: '600',
+    fontWeight: "600",
   },
   noteModal: {
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: '80%',
-    minHeight: '50%',
+    maxHeight: "80%",
+    minHeight: "50%",
   },
   noteContent: {
     padding: 16,
@@ -649,16 +713,16 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
   boldText: {
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   italicText: {
-    fontStyle: 'italic',
+    fontStyle: "italic",
   },
   underlineText: {
-    textDecorationLine: 'underline',
+    textDecorationLine: "underline",
   },
   strikethroughText: {
-    textDecorationLine: 'line-through',
+    textDecorationLine: "line-through",
   },
   bulletItem: {
     fontSize: 16,
@@ -666,26 +730,26 @@ const styles = StyleSheet.create({
     paddingLeft: 8,
   },
   noteActions: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
     padding: 16,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(0, 0, 0, 0.1)',
+    borderTopColor: "rgba(0, 0, 0, 0.1)",
   },
   actionButton: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 8,
     paddingVertical: 12,
     borderRadius: 8,
   },
   deleteButton: {
-    backgroundColor: '#f44336',
+    backgroundColor: "#f44336",
   },
   actionButtonText: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
   },
 });
