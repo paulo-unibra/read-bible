@@ -51,11 +51,12 @@ router.post('/password/verify-token', [PasswordResetController, 'verifyToken'])
 router.post('/password/reset', [PasswordResetController, 'resetPassword'])
 
 // Reading Plan routes (protected)
-router.post('/reading-plans', [ReadingPlanController, 'create']).use(middleware.auth())
-router.post('/reading-plans/custom', [ReadingPlanController, 'createCustom']).use(middleware.auth())
+// IMPORTANTE: Rotas específicas ANTES das rotas genéricas
 router
   .post('/reading-plans/beginner', [ReadingPlanController, 'createBeginner'])
   .use(middleware.auth())
+router.post('/reading-plans/custom', [ReadingPlanController, 'createCustom']).use(middleware.auth())
+router.post('/reading-plans', [ReadingPlanController, 'create']).use(middleware.auth())
 router.get('/reading-plans/active', [ReadingPlanController, 'getActive']).use(middleware.auth())
 router
   .post('/reading-plans/complete', [ReadingPlanController, 'completeDay'])
