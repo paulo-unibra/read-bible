@@ -5,7 +5,7 @@ export default class extends BaseSeeder {
   async run() {
     const now = new Date().toISOString().slice(0, 19).replace('T', ' ')
 
-    await db.table('plan_types').insert([
+    const planTypes = [
       {
         key: 'sequential',
         name: 'Sequencial',
@@ -33,6 +33,15 @@ export default class extends BaseSeeder {
         created_at: now,
         updated_at: now,
       },
-    ])
+    ]
+
+    // Inserir apenas os que não existem
+    for (const planType of planTypes) {
+      const exists = await db.from('plan_types').where('key', planType.key).first()
+
+      if (!exists) {
+        await db.table('plan_types').insert(planType)
+      }
+    }
   }
 }
