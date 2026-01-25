@@ -414,7 +414,7 @@ export default class ReadingPlanController {
       const planData = {
         userId: user.id,
         name: `Plano para Iniciantes ${now.year}`,
-        type: 'beginner',
+        type: 'custom' as const,
         startDate: now,
         endDate: endOfYear,
         isActive: true,
@@ -893,8 +893,7 @@ export default class ReadingPlanController {
       let bookIndex = 0
 
       // Primeiro, encontrar o livro onde começa este dia
-      for (let i = 0; i < BIBLE_VERSES_PER_CHAPTER.length; i++) {
-        const book = BIBLE_VERSES_PER_CHAPTER[i]
+      for (const [i, book] of BIBLE_VERSES_PER_CHAPTER.entries()) {
         const bookTotalVerses = book.chapters.reduce((sum, v) => sum + v, 0)
         if (absoluteVerse + bookTotalVerses >= startVerse) {
           bookIndex = i
@@ -1078,8 +1077,7 @@ export default class ReadingPlanController {
       let bookIndex = 0
       let bookStartChapter = 1
 
-      for (let i = 0; i < BIBLE_STRUCTURE.length; i++) {
-        const book = BIBLE_STRUCTURE[i]
+      for (const [i, book] of BIBLE_STRUCTURE.entries()) {
         if (absoluteChapter + book.chapters >= startChapter) {
           bookIndex = i
           bookStartChapter = startChapter - absoluteChapter
@@ -1162,13 +1160,13 @@ export default class ReadingPlanController {
         let atBookIndex = 0
         let atBookStartChapter = 1
 
-        for (let i = 0; i < atBooks.length; i++) {
-          if (atAbsoluteChapter + atBooks[i].chapters >= atStartChapter) {
+        for (const [i, atBook] of atBooks.entries()) {
+          if (atAbsoluteChapter + atBook.chapters >= atStartChapter) {
             atBookIndex = i
             atBookStartChapter = atStartChapter - atAbsoluteChapter
             break
           }
-          atAbsoluteChapter += atBooks[i].chapters
+          atAbsoluteChapter += atBook.chapters
         }
 
         // Coletar capítulos do AT
@@ -1211,13 +1209,13 @@ export default class ReadingPlanController {
         let ntBookIndex = 0
         let ntBookStartChapter = 1
 
-        for (let i = 0; i < ntBooks.length; i++) {
-          if (ntAbsoluteChapter + ntBooks[i].chapters >= ntStartChapter) {
+        for (const [i, ntBook] of ntBooks.entries()) {
+          if (ntAbsoluteChapter + ntBook.chapters >= ntStartChapter) {
             ntBookIndex = i
             ntBookStartChapter = ntStartChapter - ntAbsoluteChapter
             break
           }
-          ntAbsoluteChapter += ntBooks[i].chapters
+          ntAbsoluteChapter += ntBook.chapters
         }
 
         // Coletar capítulos do NT
@@ -2183,8 +2181,7 @@ export default class ReadingPlanController {
       let currentChapter = 1
 
       // Pular livros/capítulos já completados
-      for (let i = 0; i < BIBLE_STRUCTURE.length; i++) {
-        const book = BIBLE_STRUCTURE[i]
+      for (const [i, book] of BIBLE_STRUCTURE.entries()) {
         const completedInBook = completedChaptersMap.get(book.name) || new Set()
 
         if (completedInBook.size === 0) {

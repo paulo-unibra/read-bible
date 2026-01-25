@@ -1,192 +1,48 @@
+import ReadingPlan from '#models/reading_plan'
+import ReadingProgress from '#models/reading_progress'
 import { BaseCommand } from '@adonisjs/core/ace'
 import { CommandOptions } from '@adonisjs/core/types/ace'
-import ReadingPlan from '#models/reading_plan'
-import ReadingPlanItem from '#models/reading_plan_item'
 import db from '@adonisjs/lucid/services/db'
+import { DateTime } from 'luxon'
 
 export default class CreateBeginnerPlan extends BaseCommand {
   static commandName = 'create:beginner-plan'
   static description =
-   
     'Cria o plano de leitura para iniciantes que divide a Bíblia até o fim do ano'
 
   static options: CommandOptions = {
     startApp: true,
   }
 
-  // Dados de versículos por capítulo (Todos os 1189 capítulos da Bíblia)
+  // Estrutura da Bíblia: cada número no array chapters representa o número de versículos naquele capítulo
   private bibleStructure = [
-    /
-/      Antigo Testamen
-t     o
-     
-        
-       
-       ,
-      ,
-   
     {
-     
-     
-     
-        
-       ,
-      ,
-   
-     
       book: 'Gênesis',
-     
-     
-        
-       ,
-      ,
-   
-     
       bookId: 1,
-     
-     
-        
-       ,
-      ,
-   
-     
       chapters: [
-     
-     
-        
-       ,
-      ,
-   
-     
-        31, 25, 24, 
-2     6, 32, 22,
-      24, 22, 29,
-         32, 32, 20, 18, 24, 21, 16, 27, 33, 38, 18, 34, 24, 20,
-       ,
-      ,
-   
-     
-        67, 34, 35, 4
-6     , 22, 35, 
-4     3, 55, 32, 
-        20, 31, 29, 43, 36, 30, 23, 23, 57, 38, 34, 34, 28, 34,,
-      ,
-   
+        31, 25, 24, 26, 32, 22, 24, 22, 29, 32, 32, 20, 18, 24, 21, 16, 27, 33, 38, 18, 34, 24, 20,
+        67, 34, 35, 46, 22, 35, 43, 55, 32, 20, 31, 29, 43, 36, 30, 23, 23, 57, 38, 34, 34, 28, 34,
         31, 22, 33, 26,
-     
       ],
-     
-     
-        
-       ,
-      ,
-   
-    }
-,     
-     
-     
-        
-       ,
-      ,
-   
+    },
     {
-     
-     
-     
-        ,
-      ,
-   
-     
       book: 'Êxodo',
-     
-     
-        
-       ,
-      ,
-   
-     
       bookId: 2,
-     
-     
-        
-       ,
-      ,
-   
-     
       chapters: [
-     
-     
-        
-       ,
-      ,
-   
         22, 25, 22, 31, 23, 30, 25, 32, 35, 29, 10, 51, 22, 31, 27, 36, 16, 27, 25, 26, 36, 31, 33,
         18, 40, 37, 21, 43, 46, 38, 18, 35, 23, 35, 35, 38, 29, 31, 43, 38,
       ],
-    }
-     ,
-     
-     
-        
-       ,
-      ,
-   
+    },
     {
-     
-     
-     
-        
-       
-       
-       
-       
-       ,
-      ,
-   
-     
       book: 'Levítico',
-     
-     
-        
-       ,
-      ,
-   
       bookId: 3,
       chapters: [
-     
-        17, 16, 17, 3
-5     , 19, 30, 3
-8     , 36, 24, 2
-        0, 47, 8, 59, 57, 33, 34, 16, 30, 37, 27, 24, 33, 44,
-       
-       ,
-      ,
-   
-     
+        17, 16, 17, 35, 19, 30, 38, 36, 24, 20, 47, 8, 59, 57, 33, 34, 16, 30, 37, 27, 24, 33, 44,
         23, 55, 46, 34,
-     
-     
-        
-       
-       ,
-      ,
-   
       ],
-    }
-     ,
-     
-     
-        
-       
-       ,
-      ,
-   
+    },
     {
-     
-      book: 'Números'
-     ,
-     ,
-   
+      book: 'Números',
       bookId: 4,
       chapters: [
         54, 34, 51, 49, 31, 27, 89, 26, 23, 36, 35, 16, 33, 45, 41, 50, 13, 32, 22, 29, 35, 41, 30,
@@ -196,64 +52,17 @@ t     o
     {
       book: 'Deuteronômio',
       bookId: 5,
-     
       chapters: [
-     
-     ,
-   
         46, 37, 29, 49, 33, 25, 26, 20, 29, 22, 32, 32, 18, 29, 23, 22, 20, 22, 21, 20, 23, 30, 25,
         22, 19, 19, 26, 68, 29, 20, 30, 52, 29, 12,
-     
       ],
-     
-     
-        
-       ,
-      ,
-   
-    }
-,     
-     
-     ,
-   
+    },
     {
-     
-     
-     
-        
-       ,
-      ,
-   
-     
-      book: 'Josué'
-,     
-     
-        ,
-      ,
-   
-     
+      book: 'Josué',
       bookId: 6,
-     
-     
-        
-       ,
-      ,
-   
-     
       chapters: [
-     
-     ,
-   
-     
-        18, 24, 17, 24, 15
-     , 27, 26, 35
-     , 27, 43, 23, 24, 33, 15, 63, 10, 18, 28, 51, 9, 45, 34, 16,,
-   
-     
+        18, 24, 17, 24, 15, 27, 26, 35, 27, 43, 23, 24, 33, 15, 63, 10, 18, 28, 51, 9, 45, 34, 16,
         33,
-     
-     ,
-   
       ],
     },
     {
@@ -273,12 +82,6 @@ t     o
       ],
     },
     {
-     
-     
-     
-        ,
-      ,
-   
       book: '2 Samuel',
       bookId: 10,
       chapters: [
@@ -349,7 +152,7 @@ t     o
       ],
     },
     { book: 'Eclesiastes', bookId: 21, chapters: [18, 26, 22, 16, 20, 12, 29, 17, 18, 20, 10, 14] },
-    { book: 'Cânticos', bookId: 22, chapters: [17, 17, 11, 16, 16, 13, 13, 14] },
+    { book: 'Cantares', bookId: 22, chapters: [17, 17, 11, 16, 16, 13, 13, 14] },
     {
       book: 'Isaías',
       bookId: 23,
@@ -385,21 +188,20 @@ t     o
       chapters: [11, 23, 5, 19, 15, 11, 16, 14, 17, 15, 12, 14, 16, 9],
     },
     { book: 'Joel', bookId: 29, chapters: [20, 32, 21] },
-    { book: 'Amós', bookId: 30, chapters: [1: 'Obadias', bookId: 31, chapters: [2: 'Jonas', bookId: 32, chapters: [17, 10, 10, 11] },
+    { book: 'Amós', bookId: 30, chapters: [15, 27, 14, 13, 15, 25, 26, 20, 15] },
+    { book: 'Obadias', bookId: 31, chapters: [21] },
+    { book: 'Jonas', bookId: 32, chapters: [17, 10, 10, 11] },
     { book: 'Miquéias', bookId: 33, chapters: [16, 13, 12, 13, 15, 16, 20] },
     { book: 'Naum', bookId: 34, chapters: [15, 13, 19] },
     { book: 'Habacuque', bookId: 35, chapters: [17, 20, 19] },
     { book: 'Sofonias', bookId: 36, chapters: [18, 15, 20] },
     { book: 'Ageu', bookId: 37, chapters: [15, 23] },
     {
-        
-      
       book: 'Zacarias',
       bookId: 38,
       chapters: [21, 13, 10, 14, 11, 15, 14, 23, 17, 12, 17, 14, 9, 21],
     },
     { book: 'Malaquias', bookId: 39, chapters: [14, 17, 18, 6] },
-    // Novo Testamento
     {
       book: 'Mateus',
       bookId: 40,
@@ -482,18 +284,20 @@ t     o
     this.logger.info('Criando Plano de Leitura para Iniciantes...')
 
     // Calcular dias até o fim do ano
-    const today = new Date()
-    const endOfYear = new Date(today.getFullYear(), 11, 31) // 31 de dezembro
-    const daysUntilEndOfYear = Math.ceil(
-      (endOfYear.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
-    )
+    const today = DateTime.now()
+    const endOfYear = DateTime.fromObject({ year: today.year, month: 12, day: 31 })
+    const daysUntilEndOfYear = Math.ceil(endOfYear.diff(today, 'days').days)
 
     this.logger.info(`📅 Dias até o fim do ano: ${daysUntilEndOfYear}`)
 
     // Total de versículos na Bíblia
-    const totalVerses = 31102
+    const totalVerses = this.bibleStructure.reduce(
+      (sum, book) => sum + book.chapters.reduce((s, v) => s + v, 0),
+      0
+    )
     const versesPerDay = Math.ceil(totalVerses / daysUntilEndOfYear)
 
+    this.logger.info(`📖 Total de versículos: ${totalVerses}`)
     this.logger.info(`📖 Versículos por dia: ${versesPerDay}`)
 
     // Criar estrutura de leituras
@@ -559,25 +363,32 @@ t     o
       const plan = await ReadingPlan.create(
         {
           name: 'Plano para Iniciantes',
-          description: 'Leia toda a Bíblia até o fim do ano de forma leve',
+          type: 'yearly',
           totalDays: readings.length,
-          isDefault: false,
+          currentDay: 1,
+          chaptersPerDay: 3,
+          totalChapters: 1189,
+          completedChapters: 0,
+          isActive: false,
+          startDate: today,
+          endDate: endOfYear,
         },
         { client: trx }
       )
 
       this.logger.info(`✅ Plano criado com ID: ${plan.id}`)
 
-      // Criar as primeiras 5 leituras como exemplo
-      const itemsToCreate = readings.slice(0, 5).map((reading) => ({
+      // Criar os registros de progresso para cada leitura
+      const progressItems = readings.map((reading) => ({
         readingPlanId: plan.id,
         dayNumber: reading.dayNumber,
-        content: JSON.stringify(reading.chapters),
+        chapters: JSON.stringify(reading.chapters),
+        isCompleted: false,
       }))
 
-      await ReadingPlanItem.createMany(itemsToCreate, { client: trx })
+      await ReadingProgress.createMany(progressItems, { client: trx })
 
-      this.logger.info(`✅ Primeiras 5 leituras criadas`)
+      this.logger.info(`✅ ${readings.length} leituras criadas`)
 
       // Mostrar resumo das primeiras 5
       this.logger.info('\n📋 Resumo das primeiras 5 leituras:')
@@ -587,12 +398,8 @@ t     o
           `   Dia ${reading.dayNumber}: ${reading.totalVerses} versículos - ${chaptersStr}`
         )
       })
-
-      this.logger.info(
-        `\n💡 Para criar o resto das leituras, execute: node ace create:remaining-readings ${plan.id}`
-      )
     })
 
-    this.logger.success('Plano criado com sucesso!')
+    this.logger.success('✅ Plano para Iniciantes criado com sucesso!')
   }
 }

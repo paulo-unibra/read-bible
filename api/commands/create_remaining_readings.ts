@@ -1,5 +1,5 @@
 import ReadingPlan from '#models/reading_plan'
-import ReadingPlanItem from '#models/reading_plan_item'
+import ReadingProgress from '#models/reading_progress'
 import { BaseCommand, args } from '@adonisjs/core/ace'
 import { CommandOptions } from '@adonisjs/core/types/ace'
 
@@ -11,8 +11,8 @@ export default class CreateRemainingReadings extends BaseCommand {
     startApp: true,
   }
 
-  @args.number({ description: 'ID do plano de leitura' })
-  declare planId: number
+  @args.string({ description: 'ID do plano de leitura' })
+  declare planId: string
 
   async run() {
     this.logger.info(`Criando leituras restantes para o plano ${this.planId}...`)
@@ -25,12 +25,11 @@ export default class CreateRemainingReadings extends BaseCommand {
     }
 
     // Buscar leituras já criadas
-    const existingItems = await ReadingPlanItem.query()
+    const existingItems = await ReadingProgress.query()
       .where('reading_plan_id', this.planId)
-      .orderBy('day_number', 'asc')
+      .orderBy('day', 'asc')
 
-    const lastDayNumber =
-      existingItems.length > 0 ? existingItems[existingItems.length - 1].dayNumber : 0
+    const lastDayNumber = existingItems.length > 0 ? existingItems[existingItems.length - 1].day : 0
 
     if (lastDayNumber >= plan.totalDays) {
       this.logger.info('✅ Todas as leituras já foram criadas!')
