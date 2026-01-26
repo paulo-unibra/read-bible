@@ -17,7 +17,7 @@ export default class ReadingPlan extends BaseModel {
   declare name: string
 
   @column()
-  declare type: 'yearly' | 'custom'
+  declare type: 'yearly' | 'custom' | 'sequential' | 'interleaved' | 'beginner'
 
   @column.dateTime()
   declare startDate: DateTime
