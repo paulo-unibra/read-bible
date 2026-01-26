@@ -20,7 +20,7 @@ export default await Env.create(new URL('../', import.meta.url), {
   DEEPSEEK_API_KEY: Env.schema.string(),
   GCS_BUCKET_NAME: Env.schema.string.optional(),
   GCS_CREDENTIALS: Env.schema.string.optional(),
-  
+
   // Resend Email Service
   RESEND_API_KEY: Env.schema.string(),
   RESEND_FROM_EMAIL: Env.schema.string(),
