@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
     ActivityIndicator,
@@ -729,6 +729,16 @@ export default function ChapterReaderScreen() {
   useEffect(() => {
     console.log("bibleSelectorVisible changed to:", bibleSelectorVisible);
   }, [bibleSelectorVisible]);
+
+  // Recarregar notas quando a tela recebe foco (volta de note-editor)
+  useFocusEffect(
+    useCallback(() => {
+      if (!initializing && currentBookId && currentChapter) {
+        console.log("🔄 Tela recebeu foco - recarregando notas");
+        loadVerseNotes();
+      }
+    }, [currentBookId, currentChapter, initializing, loadVerseNotes]),
+  );
 
   // Função para testar download (desenvolvimento) - DESABILITADA
   /*
