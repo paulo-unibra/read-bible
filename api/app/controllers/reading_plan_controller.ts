@@ -281,7 +281,8 @@ export default class ReadingPlanController {
           plan.type,
           dayNumber,
           plan.chaptersPerDay,
-          plan.totalDays
+          plan.totalDays,
+          plan.id
         )
 
         if (!dayReadings || dayReadings.length === 0) {
@@ -448,7 +449,8 @@ export default class ReadingPlanController {
           'beginner',
           dayNumber,
           versesPerDay,
-          plan.totalDays
+          plan.totalDays,
+          plan.id
         )
 
         if (!dayReadings || dayReadings.length === 0) {
@@ -699,7 +701,8 @@ export default class ReadingPlanController {
             plan.type,
             dayNumber,
             plan.chaptersPerDay,
-            plan.totalDays
+            plan.totalDays,
+            plan.id
           )
 
           if (!dayReadings || dayReadings.length === 0) {
@@ -803,7 +806,8 @@ export default class ReadingPlanController {
           plan.type,
           dayNumber,
           plan.chaptersPerDay,
-          plan.totalDays
+          plan.totalDays,
+          plan.id
         )
 
         if (!dayReadings || dayReadings.length === 0) {
@@ -866,7 +870,8 @@ export default class ReadingPlanController {
     planType: string,
     dayNumber: number,
     chaptersPerDay: number,
-    totalDays: number
+    totalDays: number,
+    planId?: number
   ) {
     console.log(
       `🔧 [generateDayReadings] Tipo: ${planType}, Dia: ${dayNumber}, Capítulos/dia: ${chaptersPerDay}, Total dias: ${totalDays}`
@@ -878,52 +883,116 @@ export default class ReadingPlanController {
       const versesPerDay = chaptersPerDay
 
       console.log(`\n   ╔════════════════════════════════════════════════════════════`)
-      console.log(`   ║ 🔍 DEBUG PLANO INICIANTES - DIA ${dayNumber}`)
+      console.log(`   ║ 🔍 DEBUG PLANO FÁCIL DE LER - DIA ${dayNumber}`)
       console.log(`   ╠════════════════════════════════════════════════════════════`)
       console.log(`   ║ 📖 Versículos por dia (alvo): ${versesPerDay}`)
 
-      // Calcular qual versículo absoluto devemos começar neste dia
-      const startVerse = (dayNumber - 1) * versesPerDay + 1
-      console.log(`   ║ 📍 Versículo absoluto inicial: ${startVerse}`)
-      console.log(`   ║    (Cálculo: (dia ${dayNumber} - 1) × ${versesPerDay} + 1 = ${startVerse})`)
+      // CORREÇÃO: Para dia > 1, buscar onde o dia anterior parou
+      let startVerse: number = (dayNumber - 1) * versesPerDay + 1 // Valor padrão
+      let bookIndex: number = 0
+      let currentChapter: number = 1
+
+      if (dayNumber > 1 && planId) {
+        console.log(`   ║ 🔍 Buscando último capítulo do dia ${dayNumber - 1}...`)
+
+        // Buscar último registro do dia anterior
+        const lastReading = await ReadingProgress.query()
+          .where('reading_plan_id', planId)
+          .where('day', dayNumber - 1)
+          .orderBy('id', 'desc')
+          .first()
+
+        if (lastReading) {
+          console.log(
+            `   ║ 📚 Último registro do dia anterior: ${lastReading.bookName} ${lastReading.startChapter}-${lastReading.endChapter}`
+          )
+
+          // Encontrar o índice do livro
+          bookIndex = BIBLE_VERSES_PER_CHAPTER.findIndex((b) => b.name === lastReading.bookName)
+
+          if (bookIndex !== -1) {
+            const book = BIBLE_VERSES_PER_CHAPTER[bookIndex]
+
+            // O próximo dia começa DEPOIS do último capítulo lido
+            if (lastReading.endChapter >= book.chapters.length) {
+              // Se terminou o livro, vai para o próximo livro
+              bookIndex++
+
+              console.log(
+                `   ║ ⏭️  Livro anterior completo, indo para: ${BIBLE_VERSES_PER_CHAPTER[bookIndex]?.name || 'FIM'}`
+              )
+            } else {
+              // Continua no mesmo livro, próximo capítulo
+              currentChapter = lastReading.endChapter + 1
+              console.log(`   ║ ➡️  Continuando em ${book.name}, capítulo ${currentChapter}`)
+            }
+
+            // Calcular versículo absoluto baseado na posição real
+            startVerse = 0
+            for (let i = 0; i < bookIndex; i++) {
+              startVerse += BIBLE_VERSES_PER_CHAPTER[i].chapters.reduce((sum, v) => sum + v, 0)
+            }
+            for (let c = 0; c < currentChapter - 1; c++) {
+              startVerse += book.chapters[c]
+            }
+            startVerse += 1 // Versículo é 1-based
+
+            console.log(`   ║ 📍 Versículo absoluto inicial (real): ${startVerse}`)
+          }
+        } else {
+          console.log(`   ║ ⚠️  Dia anterior não encontrado, usando cálculo padrão`)
+          startVerse = (dayNumber - 1) * versesPerDay + 1
+        }
+      } else {
+        // Dia        console.log(`   ║ 📍 Versículo absoluto inicial: ${startVerse}`)
+        console.log(
+          `   ║    (Cálculo: (dia ${dayNumber} - 1) × ${versesPerDay} + 1 = ${startVerse})`
+        )
+      }
+
       console.log(`   ╚════════════════════════════════════════════════════════════\n`)
 
-      // Encontrar livro e capítulo inicial usando dados reais
-      let absoluteVerse = 0
-      let bookIndex = 0
+      // Se não foi encontrado via histórico, calcular usando o versículo absoluto
+      if (dayNumber === 1 || !planId) {
+        let absoluteVerse = 0
 
-      // Primeiro, encontrar o livro onde começa este dia
-      for (const [i, book] of BIBLE_VERSES_PER_CHAPTER.entries()) {
+        // Primeiro, encontrar o livro onde começa este dia
+        for (const [i, book] of BIBLE_VERSES_PER_CHAPTER.entries()) {
+          const bookTotalVerses = book.chapters.reduce((sum, v) => sum + v, 0)
+          if (absoluteVerse + bookTotalVerses >= startVerse) {
+            bookIndex = i
+            break
+          }
+          absoluteVerse += bookTotalVerses
+        }
+
+        const book = BIBLE_VERSES_PER_CHAPTER[bookIndex]
+        const verseInBook = startVerse - absoluteVerse // Versículo dentro deste livro (1-based)
         const bookTotalVerses = book.chapters.reduce((sum, v) => sum + v, 0)
-        if (absoluteVerse + bookTotalVerses >= startVerse) {
-          bookIndex = i
-          break
+
+        console.log(`   📚 Livro inicial encontrado: ${book.name}`)
+        console.log(`      ├─ Total de versículos no livro: ${bookTotalVerses}`)
+        console.log(`      ├─ Total de capítulos no livro: ${book.chapters.length}`)
+        console.log(`      └─ Versículo inicial dentro do livro: ${verseInBook}\n`)
+
+        // Encontrar qual capítulo contém este versículo usando dados reais
+        currentChapter = 1
+        let versesAccumulated = 0
+        for (let c = 0; c < book.chapters.length; c++) {
+          versesAccumulated += book.chapters[c]
+          if (versesAccumulated >= verseInBook) {
+            currentChapter = c + 1
+            break
+          }
         }
-        absoluteVerse += bookTotalVerses
+
+        console.log(`   🎯 Capítulo inicial encontrado: ${currentChapter}`)
+        console.log(`      └─ Usando contagem REAL de versículos\n`)
+      } else {
+        const book = BIBLE_VERSES_PER_CHAPTER[bookIndex]
+        console.log(`   📚 Livro inicial (via histórico): ${book.name}`)
+        console.log(`   🎯 Capítulo inicial (via histórico): ${currentChapter}\n`)
       }
-
-      const book = BIBLE_VERSES_PER_CHAPTER[bookIndex]
-      const verseInBook = startVerse - absoluteVerse // Versículo dentro deste livro (1-based)
-      const bookTotalVerses = book.chapters.reduce((sum, v) => sum + v, 0)
-
-      console.log(`   📚 Livro inicial encontrado: ${book.name}`)
-      console.log(`      ├─ Total de versículos no livro: ${bookTotalVerses}`)
-      console.log(`      ├─ Total de capítulos no livro: ${book.chapters.length}`)
-      console.log(`      └─ Versículo inicial dentro do livro: ${verseInBook}\n`)
-
-      // Encontrar qual capítulo contém este versículo usando dados reais
-      let currentChapter = 1
-      let versesAccumulated = 0
-      for (let c = 0; c < book.chapters.length; c++) {
-        versesAccumulated += book.chapters[c]
-        if (versesAccumulated >= verseInBook) {
-          currentChapter = c + 1
-          break
-        }
-      }
-
-      console.log(`   🎯 Capítulo inicial encontrado: ${currentChapter}`)
-      console.log(`      └─ Usando contagem REAL de versículos\n`)
 
       // Coletar capítulos até atingir o total de versículos desejado
       const readings = []
