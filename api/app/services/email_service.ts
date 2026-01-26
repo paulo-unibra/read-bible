@@ -198,6 +198,8 @@ Este é um e-mail automático, por favor não responda.
 
     const isDev = env.get('NODE_ENV') !== 'production'
     const recipient = isDev ? env.get('TEST_EMAIL_RECIPIENT', email) : email
+    const fromEmail = env.get('RESEND_FROM_EMAIL')
+    const fromName = env.get('RESEND_FROM_NAME', 'Bíblia em Foco')
 
     const statusConfig = {
       em_dia: {
@@ -230,11 +232,7 @@ Este é um e-mail automático, por favor não responda.
     const config = statusConfig[status]
     const progressPercent = Math.round(statusDetails.percentComplete)
 
-    const mailOptions = {
-      from: `"${env.get('SMTP_FROM_NAME')}" <${env.get('SMTP_FROM')}>`,
-      to: recipient,
-      subject: `${config.emoji} ${config.title} - Bíblia em Foco`,
-      html: `
+    const htmlContent = `
         <!DOCTYPE html>
         <html>
         <head>
@@ -418,8 +416,9 @@ Este é um e-mail automático, por favor não responda.
           </div>
         </body>
         </html>
-      `,
-      text: `
+      `
+
+    const textContent = `
 Olá, ${userName}!
 
 ${config.emoji} ${config.title}
@@ -441,13 +440,24 @@ Continue sua jornada no app Bíblia em Foco!
 ---
 Este é um e-mail automático, por favor não responda.
 © ${new Date().getFullYear()} Bíblia em Foco - Todos os direitos reservados
-      `.trim(),
-    }
+      `.trim()
 
     try {
-      const info = await this.transporter.sendMail(mailOptions)
-      console.log(`✅ E-mail de ${status} enviado para ${recipient}:`, info.messageId)
-      return { success: true, messageId: info.messageId, recipient }
+      const { data, error } = await this.resend.emails.send({
+        from: `${fromName} <${fromEmail}>`,
+        to: recipient,
+        subject: `${config.emoji} ${config.title} - Bíblia em Foco`,
+        html: htmlContent,
+        text: textContent,
+      })
+
+      if (error) {
+        console.error(`❌ Erro ao enviar e-mail de ${status}:`, error)
+        throw error
+      }
+
+      console.log(`✅ E-mail de ${status} enviado para ${recipient}:`, data?.id)
+      return { success: true, messageId: data?.id, recipient }
     } catch (error) {
       console.error(`❌ Erro ao enviar e-mail de ${status}:`, error)
       throw error
