@@ -20,11 +20,10 @@ export default await Env.create(new URL('../', import.meta.url), {
   DEEPSEEK_API_KEY: Env.schema.string(),
   GCS_BUCKET_NAME: Env.schema.string.optional(),
   GCS_CREDENTIALS: Env.schema.string.optional(),
-  SMTP_HOST: Env.schema.string(),
-  SMTP_PORT: Env.schema.number(),
-  SMTP_USER: Env.schema.string(),
-  SMTP_PASSWORD: Env.schema.string(),
-  SMTP_FROM: Env.schema.string(),
-  SMTP_FROM_NAME: Env.schema.string(),
+  
+  // Resend Email Service
+  RESEND_API_KEY: Env.schema.string(),
+  RESEND_FROM_EMAIL: Env.schema.string(),
+  RESEND_FROM_NAME: Env.schema.string.optional(),
   TEST_EMAIL_RECIPIENT: Env.schema.string.optional(),
 })

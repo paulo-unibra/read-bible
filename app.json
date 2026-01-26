@@ -24,7 +24,25 @@
       "predictiveBackGestureEnabled": false,
       "config": {
         "googleMobileAdsAppId": "ca-app-pub-5942901200629242~1274274321"
-      }
+      },
+      "permissions": [
+        "INTERNET",
+        "MODIFY_AUDIO_SETTINGS",
+        "READ_CALENDAR",
+        "READ_MEDIA_AUDIO",
+        "SYSTEM_ALERT_WINDOW",
+        "VIBRATE",
+        "WRITE_CALENDAR"
+      ],
+      "blockedPermissions": [
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "READ_MEDIA_IMAGES",
+        "READ_MEDIA_VIDEO",
+        "READ_MEDIA_VISUAL_USER_SELECTED",
+        "RECORD_AUDIO",
+        "CAMERA"
+      ]
     },
     "web": {
       "output": "static",

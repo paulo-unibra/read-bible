@@ -1,27 +1,18 @@
 import env from '#start/env'
-import nodemailer from 'nodemailer'
+import { Resend } from 'resend'
 
 class EmailService {
-  private transporter: nodemailer.Transporter
+  private resend: Resend
 
   constructor() {
-    this.transporter = nodemailer.createTransport({
-      host: env.get('SMTP_HOST'),
-      port: env.get('SMTP_PORT'),
-      secure: false, // true for 465, false for other ports
-      auth: {
-        user: env.get('SMTP_USER'),
-        pass: env.get('SMTP_PASSWORD'),
-      },
-    })
+    this.resend = new Resend(env.get('RESEND_API_KEY'))
   }
 
   async sendPasswordResetToken(email: string, token: string, userName: string) {
-    const mailOptions = {
-      from: `"${env.get('SMTP_FROM_NAME')}" <${env.get('SMTP_FROM')}>`,
-      to: email,
-      subject: 'Código de Recuperação de Senha - Bíblia em Foco',
-      html: `
+    const fromEmail = env.get('RESEND_FROM_EMAIL')
+    const fromName = env.get('RESEND_FROM_NAME', 'Bíblia em Foco')
+
+    const htmlContent = `
         <!DOCTYPE html>
         <html>
         <head>
@@ -114,8 +105,9 @@ class EmailService {
           </div>
         </body>
         </html>
-      `,
-      text: `
+      `
+
+    const textContent = `
 Olá, ${userName}!
 
 Você solicitou a recuperação de senha da sua conta no aplicativo Bíblia em Foco.
@@ -131,13 +123,24 @@ Digite este código no aplicativo para redefinir sua senha.
 ---
 Este é um e-mail automático, por favor não responda.
 © ${new Date().getFullYear()} Bíblia em Foco - Todos os direitos reservados
-      `.trim(),
-    }
+      `.trim()
 
     try {
-      const info = await this.transporter.sendMail(mailOptions)
-      console.log('✅ E-mail enviado com sucesso:', info.messageId)
-      return { success: true, messageId: info.messageId }
+      const { data, error } = await this.resend.emails.send({
+        from: `${fromName} <${fromEmail}>`,
+        to: email,
+        subject: 'Código de Recuperação de Senha - Bíblia em Foco',
+        html: htmlContent,
+        text: textContent,
+      })
+
+      if (error) {
+        console.error('❌ Erro ao enviar e-mail:', error)
+        throw error
+      }
+
+      console.log('✅ E-mail enviado com sucesso:', data?.id)
+      return { success: true, messageId: data?.id }
     } catch (error) {
       console.error('❌ Erro ao enviar e-mail:', error)
       throw error
@@ -146,11 +149,14 @@ Este é um e-mail automático, por favor não responda.
 
   async verifyConnection() {
     try {
-      await this.transporter.verify()
-      console.log('✅ Servidor SMTP pronto para enviar e-mails')
+      // Resend não tem um método de verificação, então vamos simular
+      if (!env.get('RESEND_API_KEY')) {
+        throw new Error('RESEND_API_KEY não configurada')
+      }
+      console.log('✅ Resend configurado e pronto para enviar e-mails')
       return true
     } catch (error) {
-      console.error('❌ Erro na conexão SMTP:', error)
+      console.error('❌ Erro na configuração do Resend:', error)
       return false
     }
   }

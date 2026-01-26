@@ -1,5 +1,5 @@
 import emailService from '#services/email_service'
-import { BaseCommand } from '@adonisjs/core/ace'
+import { BaseCommand, args } from '@adonisjs/core/ace'
 import { CommandOptions } from '@adonisjs/core/types/ace'
 
 export default class TestEmail extends BaseCommand {
@@ -10,22 +10,25 @@ export default class TestEmail extends BaseCommand {
     startApp: true,
   }
 
+  @args.string({ description: 'Email do destinatário', required: false })
+  declare email: string
+
   async run() {
     this.logger.info('🧪 Testando serviço de e-mail...')
 
     try {
-      // Verificar conexão SMTP
-      this.logger.info('📡 Verificando conexão SMTP...')
+      // Verificar configuração Resend
+      this.logger.info('📡 Verificando configuração Resend...')
       const connected = await emailService.verifyConnection()
 
       if (!connected) {
-        this.logger.error('❌ Falha na conexão SMTP')
+        this.logger.error('❌ Falha na configuração do Resend')
         return
       }
 
       // Enviar e-mail de teste
       this.logger.info('📧 Enviando e-mail de teste...')
-      const testEmail = 'pr1999ricardo@gmail.com'
+      const testEmail = this.email || 'pr1999ricardo@gmail.com'
       const testToken = '123456'
       const testName = 'Usuário Teste'
 
