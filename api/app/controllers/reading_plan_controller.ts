@@ -880,17 +880,18 @@ export default class ReadingPlanController {
     if (planType === 'beginner') {
       // Leitura baseada em versículos: distribui ~31.102 versículos proporcionalmente
       // chaptersPerDay aqui na verdade é versesPerDay
-      const versesPerDay = chaptersPerDay
+      let versesPerDay = chaptersPerDay
 
       console.log(`\n   ╔════════════════════════════════════════════════════════════`)
       console.log(`   ║ 🔍 DEBUG PLANO FÁCIL DE LER - DIA ${dayNumber}`)
       console.log(`   ╠════════════════════════════════════════════════════════════`)
-      console.log(`   ║ 📖 Versículos por dia (alvo): ${versesPerDay}`)
+      console.log(`   ║ 📖 Versículos por dia (alvo inicial): ${versesPerDay}`)
 
       // CORREÇÃO: Para dia > 1, buscar onde o dia anterior parou
       let startVerse: number = (dayNumber - 1) * versesPerDay + 1 // Valor padrão
       let bookIndex: number = 0
       let currentChapter: number = 1
+      let shouldRecalculate = false
 
       if (dayNumber > 1 && planId) {
         console.log(`   ║ 🔍 Buscando último capítulo do dia ${dayNumber - 1}...`)
@@ -921,6 +922,14 @@ export default class ReadingPlanController {
               console.log(
                 `   ║ ⏭️  Livro anterior completo, indo para: ${BIBLE_VERSES_PER_CHAPTER[bookIndex]?.name || 'FIM'}`
               )
+
+              // 🔥 NOVA LÓGICA: Se está chegando em Romanos, recalcular versículos por dia
+              if (BIBLE_VERSES_PER_CHAPTER[bookIndex]?.name === 'Romanos') {
+                console.log(`   ║`)
+                console.log(`   ║ 🔥 RECALCULANDO: Chegou em Romanos!`)
+                console.log(`   ║`)
+                shouldRecalculate = true
+              }
             } else {
               // Continua no mesmo livro, próximo capítulo
               currentChapter = lastReading.endChapter + 1
@@ -938,13 +947,43 @@ export default class ReadingPlanController {
             startVerse += 1 // Versículo é 1-based
 
             console.log(`   ║ 📍 Versículo absoluto inicial (real): ${startVerse}`)
+
+            // 🔥 RECALCULAR versículos por dia se necessário
+            if (shouldRecalculate) {
+              // Calcular total de versículos da Bíblia
+              const totalBibleVerses = BIBLE_VERSES_PER_CHAPTER.reduce(
+                (sum, bk) => sum + bk.chapters.reduce((s, v) => s + v, 0),
+                0
+              )
+
+              // Versículos restantes = Total da Bíblia - Versículo atual
+              const remainingVerses = totalBibleVerses - startVerse + 1
+
+              // Dias restantes = Total de dias - Dia atual + 1
+              const remainingDays = totalDays - dayNumber + 1
+
+              // Novo cálculo: versículos por dia = versículos restantes / dias restantes
+              const oldVersesPerDay = versesPerDay
+              versesPerDay = Math.ceil(remainingVerses / remainingDays)
+
+              console.log(`   ║`)
+              console.log(`   ║ 📊 RECÁLCULO DE VERSÍCULOS POR DIA:`)
+              console.log(`   ║ ├─ Total da Bíblia: ${totalBibleVerses} versículos`)
+              console.log(`   ║ ├─ Versículos lidos: ${startVerse - 1}`)
+              console.log(`   ║ ├─ Versículos restantes: ${remainingVerses}`)
+              console.log(`   ║ ├─ Dias restantes: ${remainingDays}`)
+              console.log(`   ║ ├─ Versículos/dia ANTIGO: ${oldVersesPerDay}`)
+              console.log(`   ║ └─ Versículos/dia NOVO: ${versesPerDay}`)
+              console.log(`   ║`)
+            }
           }
         } else {
           console.log(`   ║ ⚠️  Dia anterior não encontrado, usando cálculo padrão`)
           startVerse = (dayNumber - 1) * versesPerDay + 1
         }
       } else {
-        // Dia        console.log(`   ║ 📍 Versículo absoluto inicial: ${startVerse}`)
+        // Dia 1
+        console.log(`   ║ 📍 Versículo absoluto inicial: ${startVerse}`)
         console.log(
           `   ║    (Cálculo: (dia ${dayNumber} - 1) × ${versesPerDay} + 1 = ${startVerse})`
         )
