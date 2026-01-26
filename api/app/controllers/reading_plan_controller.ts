@@ -864,6 +864,114 @@ export default class ReadingPlanController {
   }
 
   /**
+   * Gera leitura baseada em capítulos (usado a partir de Romanos)
+   */
+  private async generateChapterBasedReading(
+    startBookIndex: number,
+    startChapter: number,
+    chaptersPerDay: number,
+    dayNumber: number,
+    totalDays: number,
+    planId: number
+  ) {
+    console.log(`\n   ╔════════════════════════════════════════════════════════════`)
+    console.log(`   ║ 📖 LEITURA POR CAPÍTULOS - DIA ${dayNumber}`)
+    console.log(`   ╠════════════════════════════════════════════════════════════`)
+    console.log(`   ║ Capítulos por dia: ${chaptersPerDay.toFixed(2)}`)
+    console.log(`   ╚════════════════════════════════════════════════════════════\n`)
+
+    // Calcular quantos capítulos ler hoje
+    // Estratégia: distribuir de forma inteligente
+    // Ex: se for 1.25 caps/dia, alguns dias terão 1 cap, outros terão 2 caps
+
+    let chaptersToRead = Math.floor(chaptersPerDay)
+
+    // Calcular capítulos já lidos e capítulos restantes
+    const totalChaptersFromRomanos = BIBLE_VERSES_PER_CHAPTER.slice(startBookIndex).reduce(
+      (sum, book) => sum + book.chapters.length,
+      0
+    )
+
+    // Buscar quantos capítulos já foram lidos desde Romanos
+    const romanosIndex = BIBLE_VERSES_PER_CHAPTER.findIndex((b) => b.name === 'Romanos')
+    let chaptersReadSinceRomanos = 0
+
+    if (dayNumber > 1) {
+      // Contar capítulos lidos desde o primeiro dia que começou em Romanos
+      const readingsSinceRomanos = await ReadingProgress.query()
+        .where('reading_plan_id', planId)
+        .whereIn(
+          'book_name',
+          BIBLE_VERSES_PER_CHAPTER.slice(romanosIndex).map((b) => b.name)
+        )
+        .select('book_name', 'start_chapter', 'end_chapter')
+
+      for (const reading of readingsSinceRomanos) {
+        chaptersReadSinceRomanos += reading.endChapter - reading.startChapter + 1
+      }
+    }
+
+    const chaptersRemaining = totalChaptersFromRomanos - chaptersReadSinceRomanos
+    const daysRemaining = totalDays - dayNumber + 1
+
+    // Capítulos esperados até agora (se estivesse perfeitamente distribuído)
+    const expectedChaptersRead = (totalChaptersFromRomanos / daysRemaining) * (dayNumber - 1)
+
+    // Se está atrasado (leu menos que o esperado), ler um capítulo a mais
+    if (chaptersReadSinceRomanos < expectedChaptersRead) {
+      chaptersToRead = Math.ceil(chaptersPerDay)
+    }
+
+    console.log(`   📊 Status da leitura:`)
+    console.log(`      ├─ Total de capítulos (desde Romanos): ${totalChaptersFromRomanos}`)
+    console.log(`      ├─ Capítulos lidos até ontem: ${chaptersReadSinceRomanos}`)
+    console.log(`      ├─ Capítulos restantes: ${chaptersRemaining}`)
+    console.log(`      ├─ Dias restantes: ${daysRemaining}`)
+    console.log(`      ├─ Esperado até ontem: ${expectedChaptersRead.toFixed(1)}`)
+    console.log(`      └─ Capítulos a ler HOJE: ${chaptersToRead}`)
+    console.log(``)
+
+    // Coletar capítulos
+    const readings = []
+    let currentBookIndex = startBookIndex
+    let currentChapter = startChapter
+    let chaptersCollected = 0
+
+    while (
+      chaptersCollected < chaptersToRead &&
+      currentBookIndex < BIBLE_VERSES_PER_CHAPTER.length
+    ) {
+      const book = BIBLE_VERSES_PER_CHAPTER[currentBookIndex]
+      const chaptersRemainingInBook = book.chapters.length - currentChapter + 1
+      const chaptersToTake = Math.min(chaptersToRead - chaptersCollected, chaptersRemainingInBook)
+
+      console.log(
+        `   📖 ${book.name}: caps ${currentChapter}-${currentChapter + chaptersToTake - 1} (${chaptersToTake} caps)`
+      )
+
+      readings.push({
+        bookName: book.name,
+        startChapter: currentChapter,
+        endChapter: currentChapter + chaptersToTake - 1,
+      })
+
+      chaptersCollected += chaptersToTake
+
+      // Se terminou o livro, vai para o próximo
+      if (currentChapter + chaptersToTake - 1 >= book.chapters.length) {
+        currentBookIndex++
+        currentChapter = 1
+      } else {
+        currentChapter += chaptersToTake
+      }
+    }
+
+    console.log(`   ✅ Total: ${readings.length} bloco(s), ${chaptersCollected} capítulos\n`)
+
+    return readings
+  }
+
+  /**
    * Gera as leituras de um dia específico baseado no tipo do plano
    */
   private async generateDayReadings(
@@ -886,6 +994,61 @@ export default class ReadingPlanController {
       console.log(`   ║ 🔍 DEBUG PLANO FÁCIL DE LER - DIA ${dayNumber}`)
       console.log(`   ╠════════════════════════════════════════════════════════════`)
       console.log(`   ║ 📖 Versículos por dia (alvo inicial): ${versesPerDay}`)
+
+      // 🔍 VERIFICAR se já está em Romanos ou posterior
+      if (dayNumber > 1 && planId) {
+        const lastReading = await ReadingProgress.query()
+          .where('reading_plan_id', planId)
+          .where('day', dayNumber - 1)
+          .orderBy('id', 'desc')
+          .first()
+
+        if (lastReading) {
+          const romanosIndex = BIBLE_VERSES_PER_CHAPTER.findIndex((b) => b.name === 'Romanos')
+          const currentBookIndex = BIBLE_VERSES_PER_CHAPTER.findIndex(
+            (b) => b.name === lastReading.bookName
+          )
+
+          // Se já está em Romanos ou depois, usar leitura por capítulos
+          if (currentBookIndex >= romanosIndex) {
+            console.log(`   ║ 📖 Já está em ${lastReading.bookName} (depois de Romanos)`)
+            console.log(`   ║ 🔄 Usando leitura por CAPÍTULOS`)
+            console.log(`   ╚════════════════════════════════════════════════════════════\n`)
+
+            const book = BIBLE_VERSES_PER_CHAPTER[currentBookIndex]
+            let nextBookIndex = currentBookIndex
+            let nextChapter = lastReading.endChapter + 1
+
+            // Se terminou o livro, vai para o próximo
+            if (lastReading.endChapter >= book.chapters.length) {
+              nextBookIndex++
+              nextChapter = 1
+            }
+
+            // Calcular capítulos restantes
+            let remainingChapters = 0
+            for (let i = nextBookIndex; i < BIBLE_VERSES_PER_CHAPTER.length; i++) {
+              if (i === nextBookIndex) {
+                remainingChapters += BIBLE_VERSES_PER_CHAPTER[i].chapters.length - nextChapter + 1
+              } else {
+                remainingChapters += BIBLE_VERSES_PER_CHAPTER[i].chapters.length
+              }
+            }
+
+            const remainingDays = totalDays - dayNumber + 1
+            const chaptersPerDayFromNow = remainingChapters / remainingDays
+
+            return await this.generateChapterBasedReading(
+              nextBookIndex,
+              nextChapter,
+              chaptersPerDayFromNow,
+              dayNumber,
+              totalDays,
+              planId
+            )
+          }
+        }
+      }
 
       // CORREÇÃO: Para dia > 1, buscar onde o dia anterior parou
       let startVerse: number = (dayNumber - 1) * versesPerDay + 1 // Valor padrão
@@ -923,10 +1086,11 @@ export default class ReadingPlanController {
                 `   ║ ⏭️  Livro anterior completo, indo para: ${BIBLE_VERSES_PER_CHAPTER[bookIndex]?.name || 'FIM'}`
               )
 
-              // 🔥 NOVA LÓGICA: Se está chegando em Romanos, recalcular versículos por dia
+              // 🔥 NOVA LÓGICA: Se está chegando em Romanos, mudar para contagem de capítulos
               if (BIBLE_VERSES_PER_CHAPTER[bookIndex]?.name === 'Romanos') {
                 console.log(`   ║`)
-                console.log(`   ║ 🔥 RECALCULANDO: Chegou em Romanos!`)
+                console.log(`   ║ 🔥 MUDANÇA DE ESTRATÉGIA: Chegou em Romanos!`)
+                console.log(`   ║ 📖 A partir de agora: contagem por CAPÍTULOS`)
                 console.log(`   ║`)
                 shouldRecalculate = true
               }
@@ -948,33 +1112,39 @@ export default class ReadingPlanController {
 
             console.log(`   ║ 📍 Versículo absoluto inicial (real): ${startVerse}`)
 
-            // 🔥 RECALCULAR versículos por dia se necessário
+            // 🔥 MUDAR para contagem de CAPÍTULOS a partir de Romanos
             if (shouldRecalculate) {
-              // Calcular total de versículos da Bíblia
-              const totalBibleVerses = BIBLE_VERSES_PER_CHAPTER.reduce(
-                (sum, bk) => sum + bk.chapters.reduce((s, v) => s + v, 0),
-                0
-              )
+              console.log(`   ║`)
+              console.log(`   ║ 📊 CALCULANDO CAPÍTULOS POR DIA:`)
 
-              // Versículos restantes = Total da Bíblia - Versículo atual
-              const remainingVerses = totalBibleVerses - startVerse + 1
+              // Calcular total de capítulos de Romanos até Apocalipse
+              let remainingChapters = 0
+              for (let i = bookIndex; i < BIBLE_VERSES_PER_CHAPTER.length; i++) {
+                remainingChapters += BIBLE_VERSES_PER_CHAPTER[i].chapters.length
+              }
 
               // Dias restantes = Total de dias - Dia atual + 1
               const remainingDays = totalDays - dayNumber + 1
 
-              // Novo cálculo: versículos por dia = versículos restantes / dias restantes
-              const oldVersesPerDay = versesPerDay
-              versesPerDay = Math.ceil(remainingVerses / remainingDays)
+              // Capítulos por dia = capítulos restantes / dias restantes
+              const chaptersPerDayFromRomanos = remainingChapters / remainingDays
 
-              console.log(`   ║`)
-              console.log(`   ║ 📊 RECÁLCULO DE VERSÍCULOS POR DIA:`)
-              console.log(`   ║ ├─ Total da Bíblia: ${totalBibleVerses} versículos`)
-              console.log(`   ║ ├─ Versículos lidos: ${startVerse - 1}`)
-              console.log(`   ║ ├─ Versículos restantes: ${remainingVerses}`)
+              console.log(
+                `   ║ ├─ Capítulos restantes (Romanos até Apocalipse): ${remainingChapters}`
+              )
               console.log(`   ║ ├─ Dias restantes: ${remainingDays}`)
-              console.log(`   ║ ├─ Versículos/dia ANTIGO: ${oldVersesPerDay}`)
-              console.log(`   ║ └─ Versículos/dia NOVO: ${versesPerDay}`)
+              console.log(`   ║ └─ Capítulos/dia: ${chaptersPerDayFromRomanos.toFixed(2)}`)
               console.log(`   ║`)
+
+              // Retornar leitura baseada em capítulos
+              return await this.generateChapterBasedReading(
+                bookIndex,
+                currentChapter,
+                chaptersPerDayFromRomanos,
+                dayNumber,
+                totalDays,
+                planId!
+              )
             }
           }
         } else {
