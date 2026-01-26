@@ -414,7 +414,7 @@ export default class ReadingPlanController {
       const planData = {
         userId: user.id,
         name: `Plano para Iniciantes ${now.year}`,
-        type: 'custom' as const,
+        type: 'beginner' as const,
         startDate: now,
         endDate: endOfYear,
         isActive: true,

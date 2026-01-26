@@ -2,14 +2,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../hooks/theme-context";
@@ -82,7 +82,7 @@ export default function SelectPlanTemplateScreen() {
     const versesPerDay = Math.ceil(totalVerses / daysRemaining);
     return {
       id: -3, // ID -3 para o template iniciante
-      name: `Plano para Iniciantes ${new Date().getFullYear()}`,
+      name: `Plano Fácil de Ler ${new Date().getFullYear()}`,
       description: `Leia toda a Bíblia até o fim do ano de forma leve. ${versesPerDay} versículos por dia durante ${daysRemaining} dias.`,
       type: "custom",
       duration: daysRemaining,
