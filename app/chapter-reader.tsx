@@ -321,23 +321,94 @@ export default function ChapterReaderScreen() {
     if (!currentBookId || currentChapter === null) return;
 
     try {
+      console.log("🔍 [loadVerseNotes] Carregando notas para:", {
+        currentBookId,
+        currentChapter,
+      });
+
       const notes = await NotesService.getNotesByChapter(
         currentBookId,
         currentChapter,
       );
+
+      console.log("📝 [loadVerseNotes] Notas recebidas:", notes.length);
+
       const notesMap = new Map<string, string>();
 
       notes.forEach((note) => {
-        // Armazenar apenas o primeiro versículo da nota
-        // Isso garante que o ícone apareça apenas uma vez
-        const firstVerse = Math.min(...note.verseNumbers);
-        const key = `${note.bookId}-${note.chapterNumber}-${firstVerse}`;
-        notesMap.set(key, note.id); // Armazena o ID da nota, não o texto
+        try {
+          // Armazenar apenas o primeiro versículo da nota
+          // Isso garante que o ícone apareça apenas uma vez
+
+          console.log(
+            "🔍 [loadVerseNotes] Processando nota:",
+            note.id,
+            "verseNumbers tipo:",
+            typeof note.verseNumbers,
+            "valor:",
+            note.verseNumbers,
+          );
+
+          // Garantir que verseNumbers é um array
+          let verseNumbers: number[];
+
+          if (Array.isArray(note.verseNumbers)) {
+            verseNumbers = note.verseNumbers;
+          } else if (typeof note.verseNumbers === "string") {
+            try {
+              const parsed = JSON.parse(note.verseNumbers);
+              verseNumbers = Array.isArray(parsed) ? parsed : [parsed];
+            } catch (e) {
+              console.error(
+                "❌ [loadVerseNotes] Erro ao parsear verseNumbers:",
+                e,
+              );
+              return; // Pula esta nota
+            }
+          } else if (typeof note.verseNumbers === "number") {
+            verseNumbers = [note.verseNumbers];
+          } else {
+            console.error(
+              "❌ [loadVerseNotes] Formato inválido de verseNumbers:",
+              note.verseNumbers,
+            );
+            return; // Pula esta nota
+          }
+
+          console.log(
+            "✅ [loadVerseNotes] verseNumbers parseado:",
+            verseNumbers,
+          );
+
+          const firstVerse = Math.min(...verseNumbers);
+          const key = `${note.bookId}-${note.chapterNumber}-${firstVerse}`;
+
+          console.log(
+            "🔑 [loadVerseNotes] Criando chave:",
+            key,
+            "para nota ID:",
+            note.id,
+          );
+
+          notesMap.set(key, note.id.toString()); // Armazena o ID da nota, não o texto
+        } catch (noteError) {
+          console.error(
+            "❌ [loadVerseNotes] Erro ao processar nota individual:",
+            noteError,
+          );
+        }
       });
+
+      console.log(
+        "✅ [loadVerseNotes] Map criado com",
+        notesMap.size,
+        "entradas",
+      );
+      console.log("🗺️ [loadVerseNotes] Chaves:", Array.from(notesMap.keys()));
 
       setVerseNotes(notesMap);
     } catch (error) {
-      console.error("Error loading verse notes:", error);
+      console.error("❌ [loadVerseNotes] Error loading verse notes:", error);
     }
   }, [currentBookId, currentChapter]);
 
@@ -1648,6 +1719,44 @@ export default function ChapterReaderScreen() {
     });
   };
 
+  const handleViewVerseNotes = async () => {
+    if (!selectedVerseForOptions) return;
+
+    // Verificar se está logado
+    if (!AuthService.isAuthenticated()) {
+      closeVerseOptions();
+      Alert.alert(
+        "Login necessário",
+        "Você precisa fazer login para visualizar anotações.",
+        [
+          {
+            text: "Cancelar",
+            style: "cancel",
+          },
+          {
+            text: "Fazer Login",
+            onPress: () => router.push("/auth"),
+          },
+        ],
+      );
+      return;
+    }
+
+    closeVerseOptions();
+
+    // Navegar para a tela de visualização de notas do versículo
+    router.push({
+      pathname: "/verse-notes",
+      params: {
+        bookId: selectedVerseForOptions.bookId.toString(),
+        bookName: book?.name || "",
+        chapterNumber: selectedVerseForOptions.chapterNumber.toString(),
+        verseNumber: selectedVerseForOptions.verseNumber.toString(),
+        verseText: selectedVerseForOptions.text,
+      },
+    });
+  };
+
   const handleCopyVerse = async () => {
     if (!selectedVerseForOptions) return;
 
@@ -2182,6 +2291,19 @@ ${deepLink}`;
     const favoriteKey = `${item.bookId}-${item.chapterNumber}-${item.verseNumber}`;
     const isSelected = selectedVerses.has(favoriteKey);
     const hasNote = verseNotes.has(favoriteKey);
+
+    // Debug log para primeiro versículo
+    if (item.verseNumber === 1) {
+      console.log("🔍 [renderVerse] Verificando nota para v1:", {
+        favoriteKey,
+        hasNote,
+        verseNotesSize: verseNotes.size,
+        verseNotesKeys: Array.from(verseNotes.keys()),
+        itemBookId: item.bookId,
+        currentBookId,
+      });
+    }
+
     // DESATIVADO: Sincronização de versículos com áudio
     // const isBeingNarrated = currentNarratedVerse === item.verseNumber;
     const isBeingNarrated = false; // Sempre false - funcionalidade desativada
@@ -3946,6 +4068,48 @@ ${deepLink}`;
                   Anotação
                 </Text>
               </TouchableOpacity>
+
+              {/* Ver Notas - apenas se o versículo tiver notas */}
+              {selectedVerseForOptions &&
+                (() => {
+                  const verseKey = `${selectedVerseForOptions.bookId}-${selectedVerseForOptions.chapterNumber}-${selectedVerseForOptions.verseNumber}`;
+                  const hasNote = verseNotes.has(verseKey);
+
+                  if (hasNote) {
+                    return (
+                      <TouchableOpacity
+                        style={styles.optionRow}
+                        onPress={handleViewVerseNotes}
+                      >
+                        <View
+                          style={[
+                            styles.optionIconContainer,
+                            {
+                              backgroundColor: isDark
+                                ? "rgba(255, 183, 77, 0.1)"
+                                : "rgba(255, 152, 0, 0.05)",
+                            },
+                          ]}
+                        >
+                          <Ionicons
+                            name="document-text"
+                            size={24}
+                            color={isDark ? "#FFB74D" : "#FF9800"}
+                          />
+                        </View>
+                        <Text
+                          style={[
+                            styles.optionLabel,
+                            { color: isDark ? "#fafafa" : "#222" },
+                          ]}
+                        >
+                          Ver notas
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  }
+                  return null;
+                })()}
 
               {/* Copy/Share */}
               <TouchableOpacity

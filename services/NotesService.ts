@@ -82,7 +82,36 @@ class NotesService {
         throw new Error(result.message || "Erro ao buscar anotações");
       }
 
-      return result.data || [];
+      // Garantir que verseNumbers seja sempre um array
+      const notes = (result.data || []).map((note: any) => {
+        let verseNumbers = note.verseNumbers;
+
+        // Se for string, parsear
+        if (typeof verseNumbers === "string") {
+          try {
+            verseNumbers = JSON.parse(verseNumbers);
+            // Se o resultado do parse ainda for string (JSON duplo), parsear novamente
+            if (typeof verseNumbers === "string") {
+              verseNumbers = JSON.parse(verseNumbers);
+            }
+          } catch (e) {
+            console.error("Erro ao parsear verseNumbers:", e, note);
+            verseNumbers = [];
+          }
+        }
+
+        // Se não for array, converter para array
+        if (!Array.isArray(verseNumbers)) {
+          verseNumbers = [verseNumbers];
+        }
+
+        return {
+          ...note,
+          verseNumbers,
+        };
+      });
+
+      return notes;
     } catch (error) {
       console.error("Erro ao buscar anotações:", error);
       return [];
@@ -141,7 +170,36 @@ class NotesService {
         );
       }
 
-      return result.data || [];
+      // Garantir que verseNumbers seja sempre um array
+      const notes = (result.data || []).map((note: any) => {
+        let verseNumbers = note.verseNumbers;
+
+        // Se for string, parsear
+        if (typeof verseNumbers === "string") {
+          try {
+            verseNumbers = JSON.parse(verseNumbers);
+            // Se o resultado do parse ainda for string (JSON duplo), parsear novamente
+            if (typeof verseNumbers === "string") {
+              verseNumbers = JSON.parse(verseNumbers);
+            }
+          } catch (e) {
+            console.error("Erro ao parsear verseNumbers:", e, note);
+            verseNumbers = [];
+          }
+        }
+
+        // Se não for array, converter para array
+        if (!Array.isArray(verseNumbers)) {
+          verseNumbers = [verseNumbers];
+        }
+
+        return {
+          ...note,
+          verseNumbers,
+        };
+      });
+
+      return notes;
     } catch (error) {
       console.error("Erro ao buscar anotações do capítulo:", error);
       return [];
@@ -160,7 +218,7 @@ class NotesService {
   }
 
   // Deletar uma anotação
-  async deleteNote(noteId: number): Promise<void> {
+  async deleteNote(noteId: number | string): Promise<void> {
     try {
       const token = await AuthService.getToken();
       if (!token) {

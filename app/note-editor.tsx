@@ -27,12 +27,14 @@ export default function NoteEditorScreen() {
   const chapterNumber = parseInt(params.chapterNumber as string);
   const verseNumber = parseInt(params.verseNumber as string);
   const verseText = params.verseText as string;
+  const noteId = params.noteId ? (params.noteId as string) : null;
 
   const [noteText, setNoteText] = useState("");
   const [isNotePrivate, setIsNotePrivate] = useState(true);
   const [savingNote, setSavingNote] = useState(false);
   const [isEditingExistingNote, setIsEditingExistingNote] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [currentNoteId, setCurrentNoteId] = useState<string | null>(noteId);
 
   useEffect(() => {
     loadExistingNote();
@@ -40,15 +42,31 @@ export default function NoteEditorScreen() {
 
   const loadExistingNote = async () => {
     try {
-      const existingNote = await NotesService.getNoteByReference(
-        bookId,
-        chapterNumber,
-        [verseNumber],
-      );
+      // Se recebeu noteId específico, buscar essa nota
+      if (noteId) {
+        const allNotes = await NotesService.getAllNotes();
+        const existingNote = allNotes.find((n) => n.id.toString() === noteId);
 
-      if (existingNote) {
-        setNoteText(existingNote.note);
-        setIsEditingExistingNote(true);
+        if (existingNote) {
+          setNoteText(existingNote.note);
+          setIsNotePrivate(existingNote.isPrivate);
+          setIsEditingExistingNote(true);
+          setCurrentNoteId(existingNote.id.toString());
+        }
+      } else {
+        // Senão, buscar por referência (comportamento original)
+        const existingNote = await NotesService.getNoteByReference(
+          bookId,
+          chapterNumber,
+          [verseNumber],
+        );
+
+        if (existingNote) {
+          setNoteText(existingNote.note);
+          setIsNotePrivate(existingNote.isPrivate);
+          setIsEditingExistingNote(true);
+          setCurrentNoteId(existingNote.id.toString());
+        }
       }
     } catch (error) {
       console.error("Error loading note:", error);
@@ -118,22 +136,34 @@ export default function NoteEditorScreen() {
           style: "destructive",
           onPress: async () => {
             try {
-              const notes = await NotesService.getNotesByChapter(
-                bookId,
-                chapterNumber,
-              );
-              const note = notes.find((n) =>
-                n.verseNumbers.includes(verseNumber),
-              );
-
-              if (note) {
-                await NotesService.deleteNote(note.id);
+              if (currentNoteId) {
+                // Se temos o ID da nota, deletar diretamente
+                await NotesService.deleteNote(currentNoteId);
                 Alert.alert("Sucesso", "Anotação excluída com sucesso!", [
                   {
                     text: "OK",
                     onPress: () => router.back(),
                   },
                 ]);
+              } else {
+                // Fallback: buscar a nota por referência
+                const notes = await NotesService.getNotesByChapter(
+                  bookId,
+                  chapterNumber,
+                );
+                const note = notes.find((n) =>
+                  n.verseNumbers.includes(verseNumber),
+                );
+
+                if (note) {
+                  await NotesService.deleteNote(note.id.toString());
+                  Alert.alert("Sucesso", "Anotação excluída com sucesso!", [
+                    {
+                      text: "OK",
+                      onPress: () => router.back(),
+                    },
+                  ]);
+                }
               }
             } catch (error) {
               console.error("Error deleting note:", error);
