@@ -117,10 +117,10 @@ router.get('/queue/books', [QueueController, 'listBooks'])
 
 // Bible Curiosities routes
 router.post('/curiosities/generate', [BibleCuriositiesController, 'generate'])
-router
-  .get('/curiosities/today', [BibleCuriositiesController, 'getToday'])
-  .use(middleware.auth({ guards: ['api'] }))
+// Rota pública para visualizar curiosidade (não requer login)
+router.get('/curiosities/today', [BibleCuriositiesController, 'getToday'])
 router.post('/curiosities/:id/share', [BibleCuriositiesController, 'registerShare'])
+// Rota protegida - requer login para curtir
 router
   .post('/curiosities/:id/favorite', [BibleCuriositiesController, 'toggleFavorite'])
   .use(middleware.auth())
