@@ -48,7 +48,7 @@ export default function HomeScreen() {
   useEffect(() => {
     initializeApp();
 
-    // Verificar conexão de internet
+    // // Verificar conexão de internet
     const unsubscribe = NetInfo.addEventListener((state) => {
       setIsConnected(state.isConnected ?? true);
     });
@@ -585,7 +585,16 @@ export default function HomeScreen() {
         ) : (
           <TouchableOpacity
             style={[styles.loginButton, { backgroundColor: colors.primary }]}
-            onPress={() => router.push("/auth")}
+            onPress={() => {
+              if (isConnected) {
+                router.push("/auth");
+              } else {
+                Alert.alert(
+                  "Sem Conexão",
+                  "Conecte-se à internet para entrar.",
+                );
+              }
+            }}
           >
             <Text style={[styles.loginButtonText, { color: "#FFFFFF" }]}>
               Entrar
@@ -630,7 +639,43 @@ export default function HomeScreen() {
         )}
 
         {/* Plano de Leitura */}
-        {readingPlan && todayReadings.length ? (
+        {!isConnected ? (
+          <View
+            style={[
+              styles.noReadingCard,
+              {
+                backgroundColor: colors.card,
+                shadowOpacity: isDark ? 0.3 : 0.1,
+              },
+            ]}
+          >
+            <Ionicons
+              name="cloud-offline-outline"
+              size={48}
+              color={colors.emptyIcon}
+            />
+            <Text
+              style={[
+                styles.noReadingTitle,
+                { color: colors.textPrimary, fontSize: applyFontScale(18) },
+              ]}
+            >
+              Sem Conexão
+            </Text>
+            <Text
+              style={[
+                styles.noReadingText,
+                {
+                  color: colors.textSecondary,
+                  fontSize: applyFontScale(14),
+                  lineHeight: applyFontScale(20),
+                },
+              ]}
+            >
+              Conecte-se à internet para visualizar o seu plano
+            </Text>
+          </View>
+        ) : readingPlan && todayReadings.length ? (
           <View
             style={[
               styles.todayCard,
@@ -953,42 +998,6 @@ export default function HomeScreen() {
               </Text>
             </TouchableOpacity>
           </View>
-        ) : !isConnected ? (
-          <View
-            style={[
-              styles.noReadingCard,
-              {
-                backgroundColor: colors.card,
-                shadowOpacity: isDark ? 0.3 : 0.1,
-              },
-            ]}
-          >
-            <Ionicons
-              name="cloud-offline-outline"
-              size={48}
-              color={colors.emptyIcon}
-            />
-            <Text
-              style={[
-                styles.noReadingTitle,
-                { color: colors.textPrimary, fontSize: applyFontScale(18) },
-              ]}
-            >
-              Sem Conexão
-            </Text>
-            <Text
-              style={[
-                styles.noReadingText,
-                {
-                  color: colors.textSecondary,
-                  fontSize: applyFontScale(14),
-                  lineHeight: applyFontScale(20),
-                },
-              ]}
-            >
-              Conecte-se à internet para visualizar o seu plano
-            </Text>
-          </View>
         ) : (
           <View
             style={[
@@ -1307,7 +1316,16 @@ export default function HomeScreen() {
                 shadowOpacity: isDark ? 0.25 : 0.1,
               },
             ]}
-            onPress={() => router.push("/bible-manager")}
+            onPress={() => {
+              if (isConnected) {
+                router.push("/bible-manager");
+              } else {
+                Alert.alert(
+                  "Sem Conexão",
+                  "Conecte-se à internet para gerenciar suas Bíblias.",
+                );
+              }
+            }}
           >
             <View
               style={[
@@ -1325,7 +1343,10 @@ export default function HomeScreen() {
               <Text
                 style={[
                   styles.actionTitle,
-                  { color: colors.textPrimary, fontSize: applyFontScale(18) },
+                  {
+                    color: !isConnected ? colors.iconMuted : colors.textPrimary,
+                    fontSize: applyFontScale(18),
+                  },
                 ]}
               >
                 Baixar Bíblias

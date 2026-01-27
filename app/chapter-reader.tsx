@@ -3,22 +3,22 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Modal,
-    Pressable,
-    ScrollView,
-    Share,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Modal,
+  Pressable,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import {
-    SafeAreaView,
-    useSafeAreaInsets,
+  SafeAreaView,
+  useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import AudioPlayer from "../components/AudioPlayer";
 import { IntroductionRenderer } from "../components/IntroductionRenderer";
@@ -30,12 +30,12 @@ import DatabaseService from "../services/DatabaseService";
 import googleDriveService from "../services/GoogleDriveService";
 import NotesService from "../services/NotesService";
 import {
-    Bible,
-    Book,
-    BookIntroduction,
-    DriveFile,
-    SearchResult,
-    Verse,
+  Bible,
+  Book,
+  BookIntroduction,
+  DriveFile,
+  SearchResult,
+  Verse,
 } from "../types";
 
 export default function ChapterReaderScreen() {
@@ -4189,15 +4189,16 @@ ${deepLink}`;
                           { backgroundColor: item.color },
                         ]}
                       >
-                        <Ionicons name="checkmark" size={20} color="#333" />
+                        {/* <Ionicons name="checkmark" size={20} color="#333" /> */}
                       </View>
+
                       <Text
                         style={[
                           styles.colorLabel,
                           { color: isDark ? "#ccc" : "#666" },
                         ]}
                       >
-                        {item.label}
+                        {item.label} {selectedHighlightColor}
                       </Text>
                     </TouchableOpacity>
                   ))}
