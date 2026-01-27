@@ -9,7 +9,7 @@ export default class BibleCuriositiesController {
    */
   async generate({ response }: HttpContext) {
     try {
-      const today = DateTime.now().toFormat('yyyy-MM-dd')
+      const today = DateTime.now().setZone('America/Sao_Paulo').toFormat('yyyy-MM-dd')
 
       // Verificar se já existe curiosidade para hoje
       const existing = await BibleCuriosity.query()
@@ -134,7 +134,7 @@ export default class BibleCuriositiesController {
         auth.user ? `ID ${auth.user.id}` : 'null'
       )
 
-      const today = DateTime.now().toFormat('yyyy-MM-dd')
+      const today = DateTime.now().setZone('America/Sao_Paulo').toFormat('yyyy-MM-dd')
 
       const curiosity = await BibleCuriosity.query()
         .where('date', today)
