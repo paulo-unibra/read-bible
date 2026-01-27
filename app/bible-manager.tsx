@@ -1,15 +1,16 @@
 import { Ionicons } from "@expo/vector-icons";
+import NetInfo from "@react-native-community/netinfo";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Dimensions,
-  FlatList,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    Dimensions,
+    FlatList,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../hooks/theme-context";
@@ -20,7 +21,7 @@ import { Bible, DriveFile } from "../types";
 export default function BibleManagerScreen() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
-  
+
   // Criar compatibilidade com a estrutura theme antiga
   const theme = {
     background: colors.bg,
@@ -30,21 +31,31 @@ export default function BibleManagerScreen() {
     subText: colors.textSecondary,
     primary: colors.primary,
   };
-  
+
   const [availableBibles, setAvailableBibles] = useState<DriveFile[]>([]);
   const [localBibles, setLocalBibles] = useState<Bible[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [isConnected, setIsConnected] = useState(true);
 
   useEffect(() => {
     loadData();
+
+    // Verificar conexão de internet
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      setIsConnected(state.isConnected ?? true);
+    });
+
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   // Recarregar dados sempre que a tela ganhar foco
   useFocusEffect(
     useCallback(() => {
       loadData();
-    }, [])
+    }, []),
   );
 
   const loadData = async () => {
@@ -58,8 +69,19 @@ export default function BibleManagerScreen() {
 
       // Load local bibles
       const localBiblesData = await DatabaseService.getBibles();
-      console.log("Bible-manager loaded bibles:", localBiblesData.length, "bibles found");
-      console.log("Bible-manager bibles list:", localBiblesData.map(b => ({ id: b.id, name: b.name, fileName: b.fileName })));
+      console.log(
+        "Bible-manager loaded bibles:",
+        localBiblesData.length,
+        "bibles found",
+      );
+      console.log(
+        "Bible-manager bibles list:",
+        localBiblesData.map((b) => ({
+          id: b.id,
+          name: b.name,
+          fileName: b.fileName,
+        })),
+      );
       setLocalBibles(localBiblesData);
     } catch (error) {
       console.error("Error loading bible data:", error);
@@ -100,23 +122,20 @@ export default function BibleManagerScreen() {
 
       // Se for a primeira Bíblia, redirecionar para Gênesis 1
       if (isFirstBible) {
-        Alert.alert(
-          "Sucesso",
-          `Bíblia "${bible.name}" baixada com sucesso!`,
-          [
-            {
-              text: "OK",
-              onPress: () => router.push({
+        Alert.alert("Sucesso", `Bíblia "${bible.name}" baixada com sucesso!`, [
+          {
+            text: "OK",
+            onPress: () =>
+              router.push({
                 pathname: "/chapter-reader",
-                params: { 
+                params: {
                   bibleId: bible.id,
-                  bookId: "1", 
-                  chapterNumber: "1" 
-                }
+                  bookId: "1",
+                  chapterNumber: "1",
+                },
               }),
-            },
-          ]
-        );
+          },
+        ]);
       } else {
         Alert.alert("Sucesso", `Bíblia "${bible.name}" baixada com sucesso!`);
       }
@@ -156,7 +175,7 @@ export default function BibleManagerScreen() {
             }
           },
         },
-      ]
+      ],
     );
   };
 
@@ -172,8 +191,12 @@ export default function BibleManagerScreen() {
     return (
       <View style={[styles.bibleCard, { backgroundColor: theme.card }]}>
         <View style={styles.bibleInfo}>
-          <Text style={[styles.bibleName, { color: theme.text }]}>{bibleInfo.name}</Text>
-          <Text style={[styles.bibleDetails, { color: theme.subText }]}>{bibleInfo.abbreviation}</Text>
+          <Text style={[styles.bibleName, { color: theme.text }]}>
+            {bibleInfo.name}
+          </Text>
+          <Text style={[styles.bibleDetails, { color: theme.subText }]}>
+            {bibleInfo.abbreviation}
+          </Text>
           {item.size && (
             <Text style={[styles.bibleSize, { color: theme.subText }]}>
               {(parseInt(item.size) / 1024 / 1024).toFixed(1)} MB
@@ -191,13 +214,24 @@ export default function BibleManagerScreen() {
             <TouchableOpacity
               style={[
                 styles.downloadButton,
-                isDownloadingThis && styles.downloadingButton,
+                (isDownloadingThis || !isConnected) && styles.downloadingButton,
               ]}
-              onPress={() => handleDownloadBible(item)}
-              disabled={isDownloadingThis}
+              onPress={() => {
+                if (!isConnected) {
+                  Alert.alert(
+                    "Sem Conexão",
+                    "Você precisa estar conectado à internet para baixar Bíblias.",
+                  );
+                  return;
+                }
+                handleDownloadBible(item);
+              }}
+              disabled={isDownloadingThis || !isConnected}
             >
               {isDownloadingThis ? (
                 <ActivityIndicator color="#fff" size="small" />
+              ) : !isConnected ? (
+                <Ionicons name="cloud-offline" size={20} color="#fff" />
               ) : (
                 <Ionicons name="download" size={20} color="#fff" />
               )}
@@ -211,7 +245,9 @@ export default function BibleManagerScreen() {
   const renderLocalBible = ({ item }: { item: Bible }) => (
     <View style={[styles.bibleCard, { backgroundColor: theme.card }]}>
       <View style={styles.bibleInfo}>
-        <Text style={[styles.bibleName, { color: theme.text }]}>{item.name}</Text>
+        <Text style={[styles.bibleName, { color: theme.text }]}>
+          {item.name}
+        </Text>
         <Text style={[styles.bibleDetails, { color: theme.subText }]}>
           {item.abbreviation}
         </Text>
@@ -230,34 +266,54 @@ export default function BibleManagerScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-        <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.background }]}
+      >
+        <View
+          style={[
+            styles.header,
+            { backgroundColor: theme.card, borderBottomColor: theme.border },
+          ]}
+        >
           <TouchableOpacity
             onPress={() => router.back()}
             style={styles.backButton}
           >
             <Ionicons name="arrow-back" size={24} color={theme.text} />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: theme.text }]}>Gerenciar Bíblias</Text>
+          <Text style={[styles.headerTitle, { color: theme.text }]}>
+            Gerenciar Bíblias
+          </Text>
         </View>
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color={theme.primary} />
-          <Text style={[styles.loadingText, { color: theme.subText }]}>Carregando...</Text>
+          <Text style={[styles.loadingText, { color: theme.subText }]}>
+            Carregando...
+          </Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: theme.background }]}
+    >
+      <View
+        style={[
+          styles.header,
+          { backgroundColor: theme.card, borderBottomColor: theme.border },
+        ]}
+      >
         <TouchableOpacity
           onPress={() => router.back()}
           style={styles.backButton}
         >
           <Ionicons name="arrow-back" size={24} color={theme.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>Gerenciar Bíblias</Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>
+          Gerenciar Bíblias
+        </Text>
         <TouchableOpacity onPress={loadData} style={styles.refreshButton}>
           <Ionicons name="refresh" size={24} color={theme.text} />
         </TouchableOpacity>
@@ -278,13 +334,25 @@ export default function BibleManagerScreen() {
         ) : (
           <View style={styles.emptyState}>
             <Ionicons name="book-outline" size={48} color={theme.subText} />
-            <Text style={[styles.emptyText, { color: theme.subText }]}>Nenhuma Bíblia baixada</Text>
+            <Text style={[styles.emptyText, { color: theme.subText }]}>
+              Nenhuma Bíblia baixada
+            </Text>
           </View>
         )}
 
         <Text style={[styles.sectionTitle, { color: theme.text }]}>
           Disponíveis para Download ({availableBibles.length})
         </Text>
+        {!isConnected && (
+          <View
+            style={[styles.offlineWarning, { backgroundColor: theme.card }]}
+          >
+            <Ionicons name="cloud-offline" size={24} color="#FF9800" />
+            <Text style={[styles.offlineText, { color: theme.text }]}>
+              Sem conexão com a internet. Conecte-se para baixar Bíblias.
+            </Text>
+          </View>
+        )}
         <FlatList
           data={availableBibles}
           renderItem={renderAvailableBible}
@@ -418,5 +486,19 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     marginTop: 16,
+  },
+  offlineWarning: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    marginBottom: 12,
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: "#FF9800",
+  },
+  offlineText: {
+    flex: 1,
+    fontSize: 14,
+    marginLeft: 12,
   },
 });

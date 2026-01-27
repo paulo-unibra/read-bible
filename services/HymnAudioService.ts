@@ -34,6 +34,7 @@ class HymnAudioService {
   /**
    * Busca todos os áudios disponíveis para um hino específico
    * Primeiro tenta buscar do backend (com sincronização), se falhar busca do Drive
+   * Se offline, busca apenas os áudios em cache local
    */
   async searchHymnAudios(hymnNumber: number): Promise<HymnAudioTrack[]> {
     try {
@@ -108,21 +109,28 @@ class HymnAudioService {
           `[HymnAudioService] HTTP ${response.status} ao buscar áudios:`,
           errorText,
         );
-        return [];
+        
+        // Se offline ou erro de rede, buscar apenas do cache local
+        console.log(`💾 [HymnAudioService] Buscando áudios em cache local...`);
+        return await this.getCachedTracks(hymnNumber);
       }
 
       const data = await response.json();
 
       if (data.error) {
         console.error(`[HymnAudioService] Erro API:`, data.error);
-        return [];
+        // Se erro de API, buscar do cache local
+        console.log(`💾 [HymnAudioService] Buscando áudios em cache local...`);
+        return await this.getCachedTracks(hymnNumber);
       }
 
       if (!data.files || data.files.length === 0) {
         console.log(
           `[HymnAudioService] Nenhum áudio encontrado para hino ${hymnNumber}`,
         );
-        return [];
+        // Se não encontrou no Drive, verificar cache local
+        console.log(`💾 [HymnAudioService] Buscando áudios em cache local...`);
+        return await this.getCachedTracks(hymnNumber);
       }
 
       console.log(`[HymnAudioService] Arquivos encontrados:`, data.files);
@@ -148,6 +156,87 @@ class HymnAudioService {
 
           return {
             instrument,
+            fileId: f.id,
+            downloadUrl,
+            volume: isTeclado ? 0.4 : 1.0,
+            isMuted: false,
+            isLoaded: false,
+            offsetMs: 0, // Sem sincronização
+            displayOrder: 0,
+            hymnNumber, // Adicionar número do hino
+          };
+        });
+
+      console.log(
+        `✅ [HymnAudioService] ${tracks.length} áudios encontrados:`,
+        tracks.map((t) => t.instrument),
+      );
+
+      return tracks;
+    } catch (error) {
+      console.error("[HymnAudioService] Erro ao buscar áudios:", error);
+      // Em caso de erro total, buscar do cache local
+      console.log(`💾 [HymnAudioService] Fallback: buscando áudios em cache local...`);
+      return await this.getCachedTracks(hymnNumber);
+    }
+  }
+
+  /**
+   * Busca áudios disponíveis apenas do cache local (modo offline)
+   */
+  private async getCachedTracks(hymnNumber: number): Promise<HymnAudioTrack[]> {
+    try {
+      console.log(`💾 [HymnAudioService] Verificando cache para hino ${hymnNumber}...`);
+      
+      const cacheDir = hymnCacheService['getCacheDir']();
+      const fileInfo = await hymnCacheService['initialize']();
+      
+      // Ler todos os arquivos do cache
+      const FileSystem = require('expo-file-system/legacy');
+      const dirInfo = await FileSystem.getInfoAsync(cacheDir);
+      if (!dirInfo.exists) {
+        console.log(`📁 [HymnAudioService] Diretório de cache não existe`);
+        return [];
+      }
+      
+      const files = await FileSystem.readDirectoryAsync(cacheDir);
+      const hymnFiles = files.filter((file: string) => 
+        file.startsWith(`hino-${hymnNumber}-`) && file.endsWith('.mp3')
+      );
+      
+      if (hymnFiles.length === 0) {
+        console.log(`📁 [HymnAudioService] Nenhum áudio em cache para hino ${hymnNumber}`);
+        return [];
+      }
+      
+      console.log(`✅ [HymnAudioService] ${hymnFiles.length} áudios encontrados em cache:`, hymnFiles);
+      
+      // Criar tracks baseado nos arquivos em cache
+      const tracks: HymnAudioTrack[] = hymnFiles.map((fileName: string) => {
+        // Extrair instrumento do nome do arquivo: hino-123-voz.mp3
+        const match = fileName.match(/^hino-\d+-(.+)\.mp3$/);
+        const instrument = match ? match[1] : fileName.replace('.mp3', '');
+        const isTeclado = instrument.toLowerCase() === 'teclado';
+        
+        return {
+          instrument,
+          fileId: '', // Não precisa de fileId para cache local
+          downloadUrl: `${cacheDir}${fileName}`, // Usar caminho local
+          volume: isTeclado ? 0.4 : 1.0,
+          isMuted: false,
+          isLoaded: false,
+          offsetMs: 0,
+          displayOrder: 0,
+          hymnNumber,
+        };
+      });
+      
+      return tracks;
+    } catch (error) {
+      console.error(`❌ [HymnAudioService] Erro ao buscar cache:`, error);
+      return [];
+    }
+  }
             fileId: f.id,
             downloadUrl,
             volume: isTeclado ? 0.4 : 1.0,

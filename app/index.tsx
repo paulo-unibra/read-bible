@@ -1,25 +1,26 @@
 import { Ionicons } from "@expo/vector-icons";
+import NetInfo from "@react-native-community/netinfo";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AdBanner from "../components/AdBanner";
 import BibleCuriosityCard from "../components/BibleCuriosityCard";
 import { Logo } from "../components/logo";
 import authService, {
-    ReadingPlan,
-    TodayReading,
+  ReadingPlan,
+  TodayReading,
 } from "../services/AuthService";
 import bibleCuriosityService, {
-    BibleCuriosity,
+  BibleCuriosity,
 } from "../services/BibleCuriosityService";
 import bibleReaderService from "../services/BibleReaderService";
 import DatabaseService from "../services/DatabaseService";
@@ -42,9 +43,19 @@ export default function HomeScreen() {
   const [userName, setUserName] = useState<string>("");
   const [hasLocalPlan, setHasLocalPlan] = useState(false);
   const [markingComplete, setMarkingComplete] = useState(false);
+  const [isConnected, setIsConnected] = useState(true);
 
   useEffect(() => {
     initializeApp();
+
+    // Verificar conexão de internet
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      setIsConnected(state.isConnected ?? true);
+    });
+
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   // Mostrar mensagem se veio dos params
@@ -941,6 +952,42 @@ export default function HomeScreen() {
                 Criar Conta
               </Text>
             </TouchableOpacity>
+          </View>
+        ) : !isConnected ? (
+          <View
+            style={[
+              styles.noReadingCard,
+              {
+                backgroundColor: colors.card,
+                shadowOpacity: isDark ? 0.3 : 0.1,
+              },
+            ]}
+          >
+            <Ionicons
+              name="cloud-offline-outline"
+              size={48}
+              color={colors.emptyIcon}
+            />
+            <Text
+              style={[
+                styles.noReadingTitle,
+                { color: colors.textPrimary, fontSize: applyFontScale(18) },
+              ]}
+            >
+              Sem Conexão
+            </Text>
+            <Text
+              style={[
+                styles.noReadingText,
+                {
+                  color: colors.textSecondary,
+                  fontSize: applyFontScale(14),
+                  lineHeight: applyFontScale(20),
+                },
+              ]}
+            >
+              Conecte-se à internet para visualizar o seu plano
+            </Text>
           </View>
         ) : (
           <View
