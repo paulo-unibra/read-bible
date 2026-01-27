@@ -1,6 +1,7 @@
 import Permission from '#models/permission'
 import Role from '#models/role'
 import User from '#models/user'
+import emailService from '#services/email_service'
 import ReadingPlanConverterService from '#services/reading_plan_converter_service'
 import ReadingPlanRecalculatorService from '#services/reading_plan_recalculator_service'
 import type { HttpContext } from '@adonisjs/core/http'
@@ -20,7 +21,7 @@ export default class AuthController {
 
       if (!user) {
         return response.unauthorized({
-          error: 'Credenciais inválidas'
+          error: 'Credenciais inválidas',
         })
       }
 
@@ -29,7 +30,7 @@ export default class AuthController {
 
       if (!isPasswordValid) {
         return response.unauthorized({
-          error: 'Credenciais inválidas'
+          error: 'Credenciais inválidas',
         })
       }
 
@@ -41,17 +42,17 @@ export default class AuthController {
 
       if (!hasAccess) {
         return response.forbidden({
-          error: 'Você não tem permissão para acessar o painel administrativo'
+          error: 'Você não tem permissão para acessar o painel administrativo',
         })
       }
 
       // Gerar token de acesso
       const token = await User.accessTokens.create(user, ['admin:*'], {
-        expiresIn: '7 days'
+        expiresIn: '7 days',
       })
 
       // Extrair permissões de todas as roles
-      const permissions = user.roles.flatMap(role => role.permissions)
+      const permissions = user.roles.flatMap((role) => role.permissions)
       const uniquePermissions = [...new Set(permissions)]
 
       return response.ok({
@@ -61,18 +62,18 @@ export default class AuthController {
           id: user.id,
           email: user.email,
           fullName: user.fullName,
-          roles: user.roles.map(role => ({
+          roles: user.roles.map((role) => ({
             id: role.id,
             name: role.name,
-            slug: role.slug
+            slug: role.slug,
           })),
-          permissions: uniquePermissions
-        }
+          permissions: uniquePermissions,
+        },
       })
     } catch (error) {
       console.error('Erro no login admin:', error)
       return response.internalServerError({
-        error: 'Erro ao processar login'
+        error: 'Erro ao processar login',
       })
     }
   }
@@ -95,19 +96,19 @@ export default class AuthController {
       const user = auth.getUserOrFail()
       await user.load('roles')
 
-      const permissions = user.roles.flatMap(role => role.permissions)
+      const permissions = user.roles.flatMap((role) => role.permissions)
       const uniquePermissions = [...new Set(permissions)]
 
       return response.ok({
         id: user.id,
         email: user.email,
         fullName: user.fullName,
-        roles: user.roles.map(role => ({
+        roles: user.roles.map((role) => ({
           id: role.id,
           name: role.name,
-          slug: role.slug
+          slug: role.slug,
         })),
-        permissions: uniquePermissions
+        permissions: uniquePermissions,
       })
     } catch (error) {
       return response.unauthorized({ error: 'Não autenticado' })
@@ -217,7 +218,7 @@ export default class AuthController {
         up_to_date: 0,
         late: 0,
         not_started: 0,
-        no_plan: 0
+        no_plan: 0,
       }
 
       // Analisar status de cada usuário
@@ -266,7 +267,79 @@ export default class AuthController {
     } catch (error) {
       console.error('Erro ao buscar estatísticas:', error)
       return response.internalServerError({
-        error: 'Erro ao buscar estatísticas'
+        error: 'Erro ao buscar estatísticas',
+      })
+    }
+  }
+
+  /**
+   * Envia e-mail personalizado para usuários selecionados
+   * POST /admin/users/send-custom-email
+   */
+  async sendCustomEmail({ request, response }: HttpContext) {
+    try {
+      const { userIds, subject, message } = request.only(['userIds', 'subject', 'message'])
+
+      // Validações
+      if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+        return response.badRequest({
+          error: 'É necessário selecionar pelo menos um usuário',
+        })
+      }
+
+      if (!subject || !subject.trim()) {
+        return response.badRequest({
+          error: 'O assunto do e-mail é obrigatório',
+        })
+      }
+
+      if (!message || !message.trim()) {
+        return response.badRequest({
+          error: 'A mensagem do e-mail é obrigatória',
+        })
+      }
+
+      // Buscar usuários
+      const users = await User.query().whereIn('id', userIds)
+
+      if (users.length === 0) {
+        return response.notFound({
+          error: 'Nenhum usuário encontrado',
+        })
+      }
+
+      // Enviar e-mails
+      let sent = 0
+      let failed = 0
+      const errors: string[] = []
+
+      for (const user of users) {
+        try {
+          await emailService.sendCustomEmail(
+            user.email,
+            subject,
+            message,
+            user.fullName || 'Usuário'
+          )
+          sent++
+        } catch (error) {
+          failed++
+          errors.push(`${user.email}: ${error.message}`)
+          console.error(`Erro ao enviar e-mail para ${user.email}:`, error)
+        }
+      }
+
+      return response.ok({
+        success: true,
+        sent,
+        failed,
+        total: users.length,
+        errors: errors.length > 0 ? errors : undefined,
+      })
+    } catch (error) {
+      console.error('Erro ao enviar e-mails personalizados:', error)
+      return response.internalServerError({
+        error: 'Erro ao enviar e-mails',
       })
     }
   }
@@ -282,7 +355,7 @@ export default class AuthController {
     } catch (error) {
       console.error('Erro ao listar permissões:', error)
       return response.internalServerError({
-        error: 'Erro ao listar permissões'
+        error: 'Erro ao listar permissões',
       })
     }
   }
@@ -297,13 +370,13 @@ export default class AuthController {
         'slug',
         'description',
         'category',
-        'isActive'
+        'isActive',
       ])
 
       // Validar campos obrigatórios
       if (!name || !slug) {
         return response.badRequest({
-          error: 'Nome e slug são obrigatórios'
+          error: 'Nome e slug são obrigatórios',
         })
       }
 
@@ -311,7 +384,7 @@ export default class AuthController {
       const existingPermission = await Permission.findBy('slug', slug)
       if (existingPermission) {
         return response.conflict({
-          error: 'Já existe uma permissão com este slug'
+          error: 'Já existe uma permissão com este slug',
         })
       }
 
@@ -321,14 +394,14 @@ export default class AuthController {
         slug,
         description: description || null,
         category: category || 'general',
-        isActive: isActive !== undefined ? isActive : true
+        isActive: isActive !== undefined ? isActive : true,
       })
 
       return response.created(permission)
     } catch (error) {
       console.error('Erro ao criar permissão:', error)
       return response.internalServerError({
-        error: 'Erro ao criar permissão'
+        error: 'Erro ao criar permissão',
       })
     }
   }
@@ -344,7 +417,7 @@ export default class AuthController {
     } catch (error) {
       console.error('Erro ao listar roles:', error)
       return response.internalServerError({
-        error: 'Erro ao listar roles'
+        error: 'Erro ao listar roles',
       })
     }
   }
@@ -359,7 +432,7 @@ export default class AuthController {
 
       if (!permissionSlug) {
         return response.badRequest({
-          error: 'Slug da permissão é obrigatório'
+          error: 'Slug da permissão é obrigatório',
         })
       }
 
@@ -367,7 +440,7 @@ export default class AuthController {
       const role = await Role.find(roleId)
       if (!role) {
         return response.notFound({
-          error: 'Role não encontrada'
+          error: 'Role não encontrada',
         })
       }
 
@@ -375,14 +448,14 @@ export default class AuthController {
       const permission = await Permission.findBy('slug', permissionSlug)
       if (!permission) {
         return response.notFound({
-          error: 'Permissão não encontrada'
+          error: 'Permissão não encontrada',
         })
       }
 
       // Verificar se já tem a permissão
       if (role.permissions.includes(permissionSlug)) {
         return response.conflict({
-          error: 'Role já possui esta permissão'
+          error: 'Role já possui esta permissão',
         })
       }
 
@@ -394,7 +467,7 @@ export default class AuthController {
     } catch (error) {
       console.error('Erro ao adicionar permissão à role:', error)
       return response.internalServerError({
-        error: 'Erro ao adicionar permissão à role'
+        error: 'Erro ao adicionar permissão à role',
       })
     }
   }
@@ -409,7 +482,7 @@ export default class AuthController {
 
       if (!permissionSlug) {
         return response.badRequest({
-          error: 'Slug da permissão é obrigatório'
+          error: 'Slug da permissão é obrigatório',
         })
       }
 
@@ -417,26 +490,26 @@ export default class AuthController {
       const role = await Role.find(roleId)
       if (!role) {
         return response.notFound({
-          error: 'Role não encontrada'
+          error: 'Role não encontrada',
         })
       }
 
       // Verificar se tem a permissão
       if (!role.permissions.includes(permissionSlug)) {
         return response.notFound({
-          error: 'Role não possui esta permissão'
+          error: 'Role não possui esta permissão',
         })
       }
 
       // Remover permissão
-      role.permissions = role.permissions.filter(p => p !== permissionSlug)
+      role.permissions = role.permissions.filter((p) => p !== permissionSlug)
       await role.save()
 
       return response.ok(role)
     } catch (error) {
       console.error('Erro ao remover permissão da role:', error)
       return response.internalServerError({
-        error: 'Erro ao remover permissão da role'
+        error: 'Erro ao remover permissão da role',
       })
     }
   }
@@ -451,7 +524,7 @@ export default class AuthController {
 
       if (!planId) {
         return response.badRequest({
-          error: 'ID do plano é obrigatório'
+          error: 'ID do plano é obrigatório',
         })
       }
 
@@ -471,7 +544,7 @@ export default class AuthController {
       console.error('❌ [Admin] Erro ao converter plano:', error)
       return response.internalServerError({
         error: 'Erro ao converter plano para 365 dias',
-        message: error.message
+        message: error.message,
       })
     }
   }
@@ -486,7 +559,7 @@ export default class AuthController {
       const user = await User.find(userId)
       if (!user) {
         return response.notFound({
-          error: 'Usuário não encontrado'
+          error: 'Usuário não encontrado',
         })
       }
 
@@ -546,9 +619,7 @@ export default class AuthController {
         targetPlanId = activePlan.id
       }
 
-      console.log(
-        `🔄 [Admin] Recalculando livros do plano ${targetPlanId} do usuário ${userId}...`
-      )
+      console.log(`🔄 [Admin] Recalculando livros do plano ${targetPlanId} do usuário ${userId}...`)
 
       const recalculatorService = new ReadingPlanRecalculatorService()
       const result = await recalculatorService.recalculatePlanBooks(targetPlanId)

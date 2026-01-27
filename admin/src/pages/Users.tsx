@@ -88,6 +88,23 @@ const Users: React.FC = () => {
   const [converting, setConverting] = useState(false);
   const [showRecalculateModal, setShowRecalculateModal] = useState(false);
   const [recalculating, setRecalculating] = useState(false);
+  const [selectedUsers, setSelectedUsers] = useState<Set<number>>(new Set());
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailMessage, setEmailMessage] = useState("");
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailProgress, setEmailProgress] = useState({ current: 0, total: 0 });
+  const [filters, setFilters] = useState({
+    id: "",
+    name: "",
+    email: "",
+    role: "",
+    createdAt: "",
+  });
+  const [sortConfig, setSortConfig] = useState<{
+    column: string;
+    direction: "asc" | "desc";
+  } | null>(null);
   const { hasPermission, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -258,11 +275,191 @@ const Users: React.FC = () => {
     }
   };
 
+  const toggleUserSelection = (userId: number) => {
+    const newSelected = new Set(selectedUsers);
+    if (newSelected.has(userId)) {
+      newSelected.delete(userId);
+    } else {
+      newSelected.add(userId);
+    }
+    setSelectedUsers(newSelected);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedUsers.size === users.length && users.length > 0) {
+      setSelectedUsers(new Set());
+    } else {
+      setSelectedUsers(new Set(users.map((u) => u.id)));
+    }
+  };
+
+  const handleOpenEmailModal = () => {
+    if (selectedUsers.size === 0) {
+      setError("Selecione pelo menos um usuário para enviar e-mail");
+      return;
+    }
+    setShowEmailModal(true);
+    setError("");
+  };
+
+  const handleCloseEmailModal = () => {
+    setShowEmailModal(false);
+    setEmailSubject("");
+    setEmailMessage("");
+    setEmailProgress({ current: 0, total: 0 });
+  };
+
+  const handleSendEmail = async () => {
+    if (!emailSubject.trim() || !emailMessage.trim()) {
+      setError("Preencha o assunto e a mensagem do e-mail");
+      return;
+    }
+
+    setSendingEmail(true);
+    setError("");
+    setEmailProgress({ current: 0, total: selectedUsers.size });
+
+    try {
+      const response = await api.post("/admin/users/send-custom-email", {
+        userIds: Array.from(selectedUsers),
+        subject: emailSubject,
+        message: emailMessage,
+      });
+
+      if (response.data.success) {
+        alert(
+          `✅ E-mails enviados com sucesso!\n\n` +
+            `• Enviados: ${response.data.sent}\n` +
+            `• Falhas: ${response.data.failed}`,
+        );
+
+        handleCloseEmailModal();
+        setSelectedUsers(new Set());
+      } else {
+        setError(response.data.message || "Erro ao enviar e-mails");
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.error || "Erro ao enviar e-mails");
+      console.error(err);
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
+  const handleSort = (column: string) => {
+    let direction: "asc" | "desc" = "asc";
+    if (
+      sortConfig &&
+      sortConfig.column === column &&
+      sortConfig.direction === "asc"
+    ) {
+      direction = "desc";
+    }
+    setSortConfig({ column, direction });
+  };
+
+  const handleFilterChange = (field: string, value: string) => {
+    setFilters((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleClearFilters = () => {
+    setFilters({
+      id: "",
+      name: "",
+      email: "",
+      role: "",
+      createdAt: "",
+    });
+    setSortConfig(null);
+  };
+
+  // Aplicar filtros
+  const filteredUsers = users.filter((user) => {
+    const matchId = filters.id ? user.id.toString().includes(filters.id) : true;
+    const matchName = filters.name
+      ? (user.fullName || "").toLowerCase().includes(filters.name.toLowerCase())
+      : true;
+    const matchEmail = filters.email
+      ? user.email.toLowerCase().includes(filters.email.toLowerCase())
+      : true;
+    const matchRole = filters.role
+      ? user.roles.some((role) =>
+          role.name.toLowerCase().includes(filters.role.toLowerCase()),
+        )
+      : true;
+    const matchDate = filters.createdAt
+      ? formatDate(user.createdAt).includes(filters.createdAt)
+      : true;
+
+    return matchId && matchName && matchEmail && matchRole && matchDate;
+  });
+
+  // Aplicar ordenação
+  const sortedUsers = [...filteredUsers].sort((a, b) => {
+    if (!sortConfig) return 0;
+
+    const { column, direction } = sortConfig;
+    const multiplier = direction === "asc" ? 1 : -1;
+
+    switch (column) {
+      case "id":
+        return (a.id - b.id) * multiplier;
+      case "name":
+        return (a.fullName || "").localeCompare(b.fullName || "") * multiplier;
+      case "email":
+        return a.email.localeCompare(b.email) * multiplier;
+      case "createdAt":
+        return (
+          (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) *
+          multiplier
+        );
+      case "status":
+        return (
+          a.readingStatus.status.localeCompare(b.readingStatus.status) *
+          multiplier
+        );
+      default:
+        return 0;
+    }
+  });
+
+  const getSortIcon = (column: string) => {
+    if (!sortConfig || sortConfig.column !== column) {
+      return "⇅";
+    }
+    return sortConfig.direction === "asc" ? "↑" : "↓";
+  };
+
+  const hasActiveFilters =
+    filters.id ||
+    filters.name ||
+    filters.email ||
+    filters.role ||
+    filters.createdAt ||
+    sortConfig !== null;
+
   return (
     <>
       <Sidebar />
       <MainContent>
         <PageTitle>Gerenciamento de Usuários</PageTitle>
+
+        {selectedUsers.size > 0 && (
+          <div className="selection-bar">
+            <span className="selection-count">
+              {selectedUsers.size} usuário(s) selecionado(s)
+            </span>
+            <Button onClick={handleOpenEmailModal}>
+              ✉️ Enviar E-mail Personalizado
+            </Button>
+            <Button
+              onClick={() => setSelectedUsers(new Set())}
+              className="btn-clear"
+            >
+              Limpar Seleção
+            </Button>
+          </div>
+        )}
 
         <FiltersSection>
           <Button
@@ -299,26 +496,145 @@ const Users: React.FC = () => {
 
         {error && <ErrorMessage>{error}</ErrorMessage>}
 
+        {/* Filtros */}
+        <div className="filters-container">
+          <h3>🔍 Filtros</h3>
+          <div className="filters-grid">
+            <div className="filter-item">
+              <label>ID:</label>
+              <input
+                type="text"
+                placeholder="Filtrar por ID"
+                value={filters.id}
+                onChange={(e) => handleFilterChange("id", e.target.value)}
+              />
+            </div>
+            <div className="filter-item">
+              <label>Nome:</label>
+              <input
+                type="text"
+                placeholder="Filtrar por nome"
+                value={filters.name}
+                onChange={(e) => handleFilterChange("name", e.target.value)}
+              />
+            </div>
+            <div className="filter-item">
+              <label>E-mail:</label>
+              <input
+                type="text"
+                placeholder="Filtrar por e-mail"
+                value={filters.email}
+                onChange={(e) => handleFilterChange("email", e.target.value)}
+              />
+            </div>
+            <div className="filter-item">
+              <label>Role:</label>
+              <input
+                type="text"
+                placeholder="Filtrar por role"
+                value={filters.role}
+                onChange={(e) => handleFilterChange("role", e.target.value)}
+              />
+            </div>
+            <div className="filter-item">
+              <label>Criado em:</label>
+              <input
+                type="text"
+                placeholder="dd/mm/aaaa"
+                value={filters.createdAt}
+                onChange={(e) =>
+                  handleFilterChange("createdAt", e.target.value)
+                }
+              />
+            </div>
+          </div>
+          {hasActiveFilters && (
+            <div className="filter-actions">
+              <Button
+                onClick={handleClearFilters}
+                className="btn-clear-filters"
+              >
+                🗑️ Limpar Filtros
+              </Button>
+              <span className="filter-count">
+                {filteredUsers.length} de {users.length} usuário(s)
+              </span>
+            </div>
+          )}
+        </div>
+
         {loading ? (
           <EmptyState>Carregando usuários...</EmptyState>
-        ) : users.length === 0 ? (
-          <EmptyState>Nenhum usuário encontrado</EmptyState>
+        ) : sortedUsers.length === 0 ? (
+          <EmptyState>
+            {users.length === 0
+              ? "Nenhum usuário encontrado"
+              : "Nenhum usuário encontrado com os filtros aplicados"}
+          </EmptyState>
         ) : (
           <Table>
             <Thead>
               <Tr>
-                <Th>ID</Th>
-                <Th>Nome</Th>
-                <Th>E-mail</Th>
+                <Th>
+                  <input
+                    type="checkbox"
+                    checked={
+                      selectedUsers.size === sortedUsers.length &&
+                      sortedUsers.length > 0
+                    }
+                    onChange={toggleSelectAll}
+                    title="Selecionar todos"
+                  />
+                </Th>
+                <Th
+                  className="sortable"
+                  onClick={() => handleSort("id")}
+                  title="Clique para ordenar"
+                >
+                  ID {getSortIcon("id")}
+                </Th>
+                <Th
+                  className="sortable"
+                  onClick={() => handleSort("name")}
+                  title="Clique para ordenar"
+                >
+                  Nome {getSortIcon("name")}
+                </Th>
+                <Th
+                  className="sortable"
+                  onClick={() => handleSort("email")}
+                  title="Clique para ordenar"
+                >
+                  E-mail {getSortIcon("email")}
+                </Th>
                 <Th>Roles</Th>
-                <Th>Status de Leitura</Th>
-                <Th>Criado em</Th>
+                <Th
+                  className="sortable"
+                  onClick={() => handleSort("status")}
+                  title="Clique para ordenar"
+                >
+                  Status de Leitura {getSortIcon("status")}
+                </Th>
+                <Th
+                  className="sortable"
+                  onClick={() => handleSort("createdAt")}
+                  title="Clique para ordenar"
+                >
+                  Criado em {getSortIcon("createdAt")}
+                </Th>
                 <Th>Ações</Th>
               </Tr>
             </Thead>
             <Tbody>
-              {users.map((user) => (
+              {sortedUsers.map((user) => (
                 <Tr key={user.id}>
+                  <Td>
+                    <input
+                      type="checkbox"
+                      checked={selectedUsers.has(user.id)}
+                      onChange={() => toggleUserSelection(user.id)}
+                    />
+                  </Td>
                   <Td>{user.id}</Td>
                   <Td>{user.fullName || "-"}</Td>
                   <Td>{user.email}</Td>
@@ -505,6 +821,107 @@ const Users: React.FC = () => {
                   disabled={!selectedPlan || converting}
                 >
                   {converting ? "Convertendo..." : "Confirmar Conversão"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de E-mail Personalizado */}
+        {showEmailModal && (
+          <div className="modal-overlay" onClick={handleCloseEmailModal}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2>✉️ Enviar E-mail Personalizado</h2>
+                <button className="modal-close" onClick={handleCloseEmailModal}>
+                  ✕
+                </button>
+              </div>
+
+              <div className="modal-body">
+                <p className="modal-info">
+                  <strong>📧 Destinatários:</strong> {selectedUsers.size}{" "}
+                  usuário(s) selecionado(s)
+                </p>
+
+                {error && <div className="error-message">{error}</div>}
+
+                <div className="form-group">
+                  <label htmlFor="email-subject">
+                    <strong>Assunto:</strong>
+                  </label>
+                  <input
+                    id="email-subject"
+                    type="text"
+                    className="form-input"
+                    placeholder="Digite o assunto do e-mail"
+                    value={emailSubject}
+                    onChange={(e) => setEmailSubject(e.target.value)}
+                    disabled={sendingEmail}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="email-message">
+                    <strong>Mensagem:</strong>
+                  </label>
+                  <textarea
+                    id="email-message"
+                    className="form-textarea"
+                    placeholder="Digite a mensagem do e-mail"
+                    value={emailMessage}
+                    onChange={(e) => setEmailMessage(e.target.value)}
+                    rows={10}
+                    disabled={sendingEmail}
+                  />
+                </div>
+
+                <div className="info-box-modal">
+                  <p>
+                    <strong>💡 Dicas:</strong>
+                  </p>
+                  <ul>
+                    <li>Seja claro e objetivo na mensagem</li>
+                    <li>Revise antes de enviar</li>
+                    <li>
+                      O e-mail será enviado individualmente para cada usuário
+                    </li>
+                  </ul>
+                </div>
+
+                {sendingEmail && emailProgress.total > 0 && (
+                  <div className="progress-bar">
+                    <div className="progress-info">
+                      Enviando: {emailProgress.current} de {emailProgress.total}
+                    </div>
+                    <div className="progress-track">
+                      <div
+                        className="progress-fill"
+                        style={{
+                          width: `${(emailProgress.current / emailProgress.total) * 100}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="modal-footer">
+                <button
+                  className="btn-secondary"
+                  onClick={handleCloseEmailModal}
+                  disabled={sendingEmail}
+                >
+                  Cancelar
+                </button>
+                <button
+                  className="btn-primary"
+                  onClick={handleSendEmail}
+                  disabled={
+                    sendingEmail || !emailSubject.trim() || !emailMessage.trim()
+                  }
+                >
+                  {sendingEmail ? "Enviando..." : "Enviar E-mails"}
                 </button>
               </div>
             </div>

@@ -463,6 +463,128 @@ Este é um e-mail automático, por favor não responda.
       throw error
     }
   }
+
+  /**
+   * Envia e-mail personalizado
+   */
+  async sendCustomEmail(
+    recipient: string,
+    subject: string,
+    message: string,
+    userName: string = 'Usuário'
+  ) {
+    const fromEmail = env.get('RESEND_FROM_EMAIL')
+    const fromName = env.get('RESEND_FROM_NAME', 'Bíblia em Foco')
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <style>
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+          }
+          .container {
+            background-color: #ffffff;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+          }
+          .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #2196F3;
+          }
+          .header h1 {
+            color: #2196F3;
+            margin: 0;
+            font-size: 28px;
+          }
+          .content {
+            margin: 20px 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+          }
+          .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            font-size: 14px;
+            color: #666;
+          }
+          .footer a {
+            color: #2196F3;
+            text-decoration: none;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>📖 Bíblia em Foco</h1>
+          </div>
+
+          <p>Olá, <strong>${userName}</strong>!</p>
+
+          <div class="content">
+            ${message.replace(/\n/g, '<br>')}
+          </div>
+
+          <div class="footer">
+            <p>
+              Esta mensagem foi enviada pela equipe do <strong>Bíblia em Foco</strong>.<br>
+              Continue firme em sua jornada de leitura bíblica! 📚
+            </p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `
+
+    const textContent = `
+Bíblia em Foco
+
+Olá, ${userName}!
+
+${message}
+
+---
+Esta mensagem foi enviada pela equipe do Bíblia em Foco.
+Continue firme em sua jornada de leitura bíblica!
+    `
+
+    try {
+      console.log(`📧 Enviando e-mail personalizado para ${recipient}`)
+
+      const { data, error } = await this.resend.emails.send({
+        from: `${fromName} <${fromEmail}>`,
+        to: recipient,
+        subject,
+        html: htmlContent,
+        text: textContent,
+      })
+
+      if (error) {
+        console.error(`❌ Erro ao enviar e-mail personalizado:`, error)
+        throw error
+      }
+
+      console.log(`✅ E-mail personalizado enviado para ${recipient}:`, data?.id)
+      return { success: true, messageId: data?.id, recipient }
+    } catch (error) {
+      console.error(`❌ Erro ao enviar e-mail personalizado:`, error)
+      throw error
+    }
+  }
 }
 
 export default new EmailService()

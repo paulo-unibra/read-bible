@@ -151,6 +151,7 @@ router
       .group(() => {
         router.get('/users', [AdminAuthController, 'listUsers'])
         router.get('/users/stats', [AdminAuthController, 'usersStats'])
+        router.post('/users/send-custom-email', [AdminAuthController, 'sendCustomEmail'])
         router.get('/users/:userId/convertible-plans', [
           AdminAuthController,
           'getUserConvertiblePlans',
