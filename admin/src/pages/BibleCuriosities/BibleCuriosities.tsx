@@ -1,4 +1,21 @@
 import { useEffect, useState } from "react";
+import Sidebar from "../../components/Sidebar";
+import Toast from "../../components/Toast";
+import {
+    ActionButton,
+    Badge,
+    Button,
+    EmptyState,
+    MainContent,
+    PageTitle,
+    Select,
+    Table,
+    Tbody,
+    Td,
+    Th,
+    Thead,
+    Tr,
+} from "../../components/ui/StyledComponents";
 import bibleCuriositiesService from "../../services/bibleCuriositiesService";
 import "./BibleCuriosities.css";
 
@@ -29,6 +46,18 @@ export default function BibleCuriosities() {
   const [generating, setGenerating] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [toast, setToast] = useState<{
+    message: string;
+    type: "success" | "error" | "info";
+  } | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    content: "",
+    theme: "",
+    date: new Date().toISOString().split("T")[0],
+    isActive: false,
+  });
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     loadCuriosities();
@@ -127,27 +156,24 @@ export default function BibleCuriosities() {
   };
 
   const handleGenerate = async () => {
-    if (
-      !confirm(
-        "Gerar uma nova curiosidade bíblica com IA?\n\nA curiosidade será criada INATIVA e precisará ser revisada e ativada manualmente.",
-      )
-    ) {
-      return;
-    }
-
     try {
       setGenerating(true);
       await bibleCuriositiesService.generate();
-      alert(
-        "✅ Curiosidade gerada com sucesso!\n\nA curiosidade foi criada como INATIVA. Revise o conteúdo e ative quando estiver pronta.",
-      );
+      setToast({
+        message:
+          "Curiosidade gerada com sucesso! A curiosidade foi criada como INATIVA.",
+        type: "success",
+      });
       // Recarregar mostrando inativas para ver a nova
       setFilter("inactive");
       setCurrentPage(1);
       await loadCuriosities();
     } catch (error: any) {
       console.error("Erro ao gerar:", error);
-      alert(`Erro ao gerar curiosidade: ${error.message}`);
+      setToast({
+        message: `Erro ao gerar curiosidade: ${error.message}`,
+        type: "error",
+      });
     } finally {
       setGenerating(false);
     }
@@ -199,34 +225,78 @@ export default function BibleCuriosities() {
     }
   };
 
+  const handleCreateManual = async () => {
+    if (!createForm.content.trim()) {
+      setToast({ message: "O conteúdo é obrigatório", type: "error" });
+      return;
+    }
+
+    try {
+      setCreating(true);
+      await bibleCuriositiesService.create(createForm);
+      setToast({
+        message: "Curiosidade criada com sucesso!",
+        type: "success",
+      });
+      setShowCreateModal(false);
+      setCreateForm({
+        content: "",
+        theme: "",
+        date: new Date().toISOString().split("T")[0],
+        isActive: false,
+      });
+      await loadCuriosities();
+    } catch (error: any) {
+      console.error("Erro ao criar curiosidade:", error);
+      setToast({
+        message: `Erro ao criar curiosidade: ${error.message}`,
+        type: "error",
+      });
+    } finally {
+      setCreating(false);
+    }
+  };
+
   return (
-    <div className="bible-curiosities">
-      <header className="bible-curiosities-header">
-        <div className="header-content">
-          <div className="header-title">
-            <div>
-              <h1>📖 Curiosidades Bíblicas</h1>
-              <p className="subtitle">
-                Gerenciar curiosidades geradas por IA e controlar publicação
-              </p>
-            </div>
-            <button
-              className="btn btn-primary btn-generate"
-              onClick={handleGenerate}
-              disabled={generating}
-            >
+    <>
+      <Sidebar />
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
+      <MainContent>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "20px",
+          }}
+        >
+          <div>
+            <PageTitle>📖 Curiosidades Bíblicas</PageTitle>
+            <p style={{ color: "#666", margin: "0" }}>
+              Gerenciar curiosidades geradas por IA e controlar publicação
+            </p>
+          </div>
+          <div style={{ display: "flex", gap: "10px" }}>
+            <Button onClick={() => setShowCreateModal(true)}>
+              ➕ Criar Manual
+            </Button>
+            <Button onClick={handleGenerate} disabled={generating}>
               {generating ? "🔄 Gerando..." : "✨ Gerar com IA"}
-            </button>
+            </Button>
           </div>
         </div>
-      </header>
 
-      <div className="content">
         {/* Filtros */}
         <div className="filters">
           <div className="filter-group">
             <label>Status:</label>
-            <select
+            <Select
               value={filter}
               onChange={(e) => {
                 setFilter(e.target.value as FilterStatus);
@@ -236,7 +306,7 @@ export default function BibleCuriosities() {
               <option value="all">Todas</option>
               <option value="active">Ativas</option>
               <option value="inactive">Inativas</option>
-            </select>
+            </Select>
           </div>
 
           <div className="filter-info">
@@ -249,25 +319,19 @@ export default function BibleCuriosities() {
                 >
                   {selectedIds.length} selecionada(s)
                 </span>
-                <button
-                  className="btn btn-danger btn-sm"
+                <Button
                   onClick={handleBulkDelete}
                   disabled={bulkDeleting}
                   style={{ marginLeft: "10px" }}
                 >
                   {bulkDeleting ? "🔄 Deletando..." : "🗑️ Deletar Selecionadas"}
-                </button>
+                </Button>
               </>
             )}
           </div>
         </div>
 
-        {loading && (
-          <div className="loading">
-            <div className="spinner"></div>
-            <p>Carregando curiosidades...</p>
-          </div>
-        )}
+        {loading && <EmptyState>Carregando curiosidades...</EmptyState>}
 
         {!loading && curiosities.length === 0 && (
           <div className="empty-state">
@@ -282,185 +346,290 @@ export default function BibleCuriosities() {
 
         {!loading && curiosities.length > 0 && (
           <>
-            <div className="table-container">
-              <table className="curiosities-table">
-                <thead>
-                  <tr>
-                    <th style={{ width: "50px" }}>
+            <Table>
+              <Thead>
+                <Tr>
+                  <Th style={{ width: "50px" }}>
+                    <input
+                      type="checkbox"
+                      checked={
+                        selectedIds.length === curiosities.length &&
+                        curiosities.length > 0
+                      }
+                      onChange={(e) => handleSelectAll(e.target.checked)}
+                      disabled={curiosities.length === 0}
+                    />
+                  </Th>
+                  <Th style={{ width: "80px" }}>ID</Th>
+                  <Th style={{ width: "120px" }}>Data</Th>
+                  <Th style={{ width: "150px" }}>Tema</Th>
+                  <Th>Conteúdo</Th>
+                  <Th style={{ width: "100px" }}>Status</Th>
+                  <Th style={{ width: "200px" }}>Ações</Th>
+                </Tr>
+              </Thead>
+              <Tbody>
+                {curiosities.map((curiosity) => (
+                  <Tr key={curiosity.id}>
+                    <Td>
                       <input
                         type="checkbox"
-                        checked={
-                          selectedIds.length === curiosities.length &&
-                          curiosities.length > 0
+                        checked={selectedIds.includes(curiosity.id)}
+                        onChange={(e) =>
+                          handleSelectOne(curiosity.id, e.target.checked)
                         }
-                        onChange={(e) => handleSelectAll(e.target.checked)}
-                        disabled={curiosities.length === 0}
+                        disabled={editingId === curiosity.id}
                       />
-                    </th>
-                    <th style={{ width: "80px" }}>ID</th>
-                    <th style={{ width: "120px" }}>Data</th>
-                    <th style={{ width: "150px" }}>Tema</th>
-                    <th>Conteúdo</th>
-                    <th style={{ width: "100px" }}>Status</th>
-                    <th style={{ width: "200px" }}>Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {curiosities.map((curiosity) => (
-                    <tr key={curiosity.id}>
-                      <td>
+                    </Td>
+                    <Td>{curiosity.id}</Td>
+                    <Td>
+                      {new Date(curiosity.date).toLocaleDateString("pt-BR")}
+                    </Td>
+                    <Td>
+                      {editingId === curiosity.id ? (
                         <input
-                          type="checkbox"
-                          checked={selectedIds.includes(curiosity.id)}
+                          type="text"
+                          value={editForm.theme}
                           onChange={(e) =>
-                            handleSelectOne(curiosity.id, e.target.checked)
+                            setEditForm({
+                              ...editForm,
+                              theme: e.target.value,
+                            })
                           }
-                          disabled={editingId === curiosity.id}
+                          placeholder="Tema"
                         />
-                      </td>
-                      <td>{curiosity.id}</td>
-                      <td>
-                        {new Date(curiosity.date).toLocaleDateString("pt-BR")}
-                      </td>
-                      <td>
-                        {editingId === curiosity.id ? (
-                          <input
-                            type="text"
-                            value={editForm.theme}
-                            onChange={(e) =>
-                              setEditForm({
-                                ...editForm,
-                                theme: e.target.value,
-                              })
-                            }
-                            placeholder="Tema"
-                          />
-                        ) : (
-                          curiosity.theme || "-"
-                        )}
-                      </td>
-                      <td className="content-cell">
-                        {editingId === curiosity.id ? (
-                          <textarea
-                            value={editForm.content}
-                            onChange={(e) =>
-                              setEditForm({
-                                ...editForm,
-                                content: e.target.value,
-                              })
-                            }
-                            rows={4}
-                          />
-                        ) : (
-                          <div className="content-preview">
-                            {curiosity.content}
-                          </div>
-                        )}
-                      </td>
-                      <td>
-                        <span
-                          className={`status-badge ${curiosity.isActive ? "active" : "inactive"}`}
-                        >
-                          {curiosity.isActive ? "✅ Ativa" : "❌ Inativa"}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="actions">
-                          {editingId === curiosity.id ? (
-                            <>
-                              <button
-                                className="btn btn-success btn-sm"
-                                onClick={() => handleSaveEdit(curiosity.id)}
-                                disabled={actionLoading === curiosity.id}
-                              >
-                                {actionLoading === curiosity.id
-                                  ? "..."
-                                  : "💾 Salvar"}
-                              </button>
-                              <button
-                                className="btn btn-secondary btn-sm"
-                                onClick={handleCancelEdit}
-                                disabled={actionLoading === curiosity.id}
-                              >
-                                ✖️ Cancelar
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              <button
-                                className="btn btn-primary btn-sm"
-                                onClick={() => handleEdit(curiosity)}
-                                disabled={actionLoading === curiosity.id}
-                                title="Editar"
-                              >
-                                ✏️
-                              </button>
-                              <button
-                                className={`btn ${curiosity.isActive ? "btn-warning" : "btn-success"} btn-sm`}
-                                onClick={() =>
-                                  handleToggleActive(
-                                    curiosity.id,
-                                    curiosity.isActive,
-                                  )
-                                }
-                                disabled={actionLoading === curiosity.id}
-                                title={
-                                  curiosity.isActive ? "Desativar" : "Ativar"
-                                }
-                              >
-                                {actionLoading === curiosity.id
-                                  ? "..."
-                                  : curiosity.isActive
-                                    ? "⏸️"
-                                    : "▶️"}
-                              </button>
-                              <button
-                                className="btn btn-danger btn-sm"
-                                onClick={() =>
-                                  handleDelete(curiosity.id, curiosity.content)
-                                }
-                                disabled={actionLoading === curiosity.id}
-                                title="Deletar"
-                              >
-                                🗑️
-                              </button>
-                            </>
-                          )}
+                      ) : (
+                        curiosity.theme || "-"
+                      )}
+                    </Td>
+                    <Td className="content-cell">
+                      {editingId === curiosity.id ? (
+                        <textarea
+                          value={editForm.content}
+                          onChange={(e) =>
+                            setEditForm({
+                              ...editForm,
+                              content: e.target.value,
+                            })
+                          }
+                          rows={4}
+                        />
+                      ) : (
+                        <div className="content-preview">
+                          {curiosity.content}
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      )}
+                    </Td>
+                    <Td>
+                      <Badge type={curiosity.isActive ? "success" : "error"}>
+                        {curiosity.isActive ? "✅ Ativa" : "❌ Inativa"}
+                      </Badge>
+                    </Td>
+                    <Td>
+                      <div className="actions">
+                        {editingId === curiosity.id ? (
+                          <>
+                            <ActionButton
+                              onClick={() => handleSaveEdit(curiosity.id)}
+                              disabled={actionLoading === curiosity.id}
+                            >
+                              {actionLoading === curiosity.id
+                                ? "..."
+                                : "💾 Salvar"}
+                            </ActionButton>
+                            <ActionButton
+                              onClick={handleCancelEdit}
+                              disabled={actionLoading === curiosity.id}
+                            >
+                              ✖️ Cancelar
+                            </ActionButton>
+                          </>
+                        ) : (
+                          <>
+                            <ActionButton
+                              onClick={() => handleEdit(curiosity)}
+                              disabled={actionLoading === curiosity.id}
+                              title="Editar"
+                            >
+                              ✏️
+                            </ActionButton>
+                            <ActionButton
+                              onClick={() =>
+                                handleToggleActive(
+                                  curiosity.id,
+                                  curiosity.isActive,
+                                )
+                              }
+                              disabled={actionLoading === curiosity.id}
+                              title={
+                                curiosity.isActive ? "Desativar" : "Ativar"
+                              }
+                            >
+                              {actionLoading === curiosity.id
+                                ? "..."
+                                : curiosity.isActive
+                                  ? "⏸️"
+                                  : "▶️"}
+                            </ActionButton>
+                            <ActionButton
+                              onClick={() =>
+                                handleDelete(curiosity.id, curiosity.content)
+                              }
+                              disabled={actionLoading === curiosity.id}
+                              title="Deletar"
+                            >
+                              🗑️
+                            </ActionButton>
+                          </>
+                        )}
+                      </div>
+                    </Td>
+                  </Tr>
+                ))}
+              </Tbody>
+            </Table>
 
             {/* Paginação */}
             {totalPages > 1 && (
               <div className="pagination">
-                <button
-                  className="btn btn-secondary"
+                <Button
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
                 >
                   ← Anterior
-                </button>
+                </Button>
                 <span className="page-info">
                   Página {currentPage} de {totalPages}
                 </span>
-                <button
-                  className="btn btn-secondary"
+                <Button
                   onClick={() =>
                     setCurrentPage((p) => Math.min(totalPages, p + 1))
                   }
                   disabled={currentPage === totalPages}
                 >
                   Próxima →
-                </button>
+                </Button>
               </div>
             )}
           </>
         )}
-      </div>
-    </div>
+
+        {/* Modal de Criação Manual */}
+        {showCreateModal && (
+          <div
+            className="modal-overlay"
+            onClick={() => setShowCreateModal(false)}
+          >
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2>➕ Criar Curiosidade Bíblica</h2>
+                <button
+                  className="close-button"
+                  onClick={() => setShowCreateModal(false)}
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="modal-body">
+                <div className="form-group">
+                  <label>Conteúdo *</label>
+                  <textarea
+                    value={createForm.content}
+                    onChange={(e) =>
+                      setCreateForm({ ...createForm, content: e.target.value })
+                    }
+                    placeholder="Digite o conteúdo da curiosidade..."
+                    rows={6}
+                    style={{
+                      width: "100%",
+                      padding: "10px",
+                      borderRadius: "6px",
+                      border: "1px solid #ddd",
+                    }}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Tema</label>
+                  <input
+                    type="text"
+                    value={createForm.theme}
+                    onChange={(e) =>
+                      setCreateForm({ ...createForm, theme: e.target.value })
+                    }
+                    placeholder="Ex: Milagres, Parábolas, História..."
+                    style={{
+                      width: "100%",
+                      padding: "10px",
+                      borderRadius: "6px",
+                      border: "1px solid #ddd",
+                    }}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Data</label>
+                  <input
+                    type="date"
+                    value={createForm.date}
+                    onChange={(e) =>
+                      setCreateForm({ ...createForm, date: e.target.value })
+                    }
+                    style={{
+                      width: "100%",
+                      padding: "10px",
+                      borderRadius: "6px",
+                      border: "1px solid #ddd",
+                    }}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={createForm.isActive}
+                      onChange={(e) =>
+                        setCreateForm({
+                          ...createForm,
+                          isActive: e.target.checked,
+                        })
+                      }
+                    />
+                    Ativar imediatamente
+                  </label>
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "10px",
+                    justifyContent: "flex-end",
+                    marginTop: "20px",
+                  }}
+                >
+                  <Button
+                    onClick={() => setShowCreateModal(false)}
+                    disabled={creating}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button onClick={handleCreateManual} disabled={creating}>
+                    {creating ? "🔄 Criando..." : "✅ Criar Curiosidade"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </MainContent>
+    </>
   );
 }

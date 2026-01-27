@@ -1,6 +1,7 @@
 import jsPDF from "jspdf";
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import Sidebar from "../components/Sidebar";
 import { useAuth } from "../contexts/AuthContext";
 import api from "../services/api";
 import "./Reports.css";
@@ -85,7 +86,7 @@ interface PlayStoreStats {
 const Reports: React.FC = () => {
   const [stats, setStats] = useState<GeneralStats | null>(null);
   const [playStoreStats, setPlayStoreStats] = useState<PlayStoreStats | null>(
-    null
+    null,
   );
   const [loading, setLoading] = useState(true);
   const [loadingPlayStore, setLoadingPlayStore] = useState(false);
@@ -94,40 +95,44 @@ const Reports: React.FC = () => {
   const [isExporting, setIsExporting] = useState(false);
   const [playStoreDays, setPlayStoreDays] = useState(7);
   const [appDownloads, setAppDownloads] = useState(0);
-  
+
   // Estado para controlar quais seções incluir no relatório
   const [reportSections, setReportSections] = useState(() => {
-    const saved = localStorage.getItem('reportSections');
-    return saved ? JSON.parse(saved) : {
-      users: true,
-      readingPlans: true,
-      quizzes: true,
-      playStore: true,
-    };
+    const saved = localStorage.getItem("reportSections");
+    return saved
+      ? JSON.parse(saved)
+      : {
+          users: true,
+          readingPlans: true,
+          quizzes: true,
+          playStore: true,
+        };
   });
 
   // Estado para controlar quais cards individuais incluir
   const [selectedCards, setSelectedCards] = useState(() => {
-    const saved = localStorage.getItem('selectedCards');
-    return saved ? JSON.parse(saved) : {
-      // Usuários
-      totalUsers: true,
-      withActivePlan: true,
-      upToDate: true,
-      withCompletedPlan: true,
-      withQuizResults: true,
-      newUsers: true,
-      activeUsers: true,
-      notStarted: true,
-      downloads: true,
-      // Planos
-      totalPlans: true,
-      completedDays: true,
-      plansByType: true,
-      // Quizzes
-      totalQuizResults: true,
-      averageScore: true,
-    };
+    const saved = localStorage.getItem("selectedCards");
+    return saved
+      ? JSON.parse(saved)
+      : {
+          // Usuários
+          totalUsers: true,
+          withActivePlan: true,
+          upToDate: true,
+          withCompletedPlan: true,
+          withQuizResults: true,
+          newUsers: true,
+          activeUsers: true,
+          notStarted: true,
+          downloads: true,
+          // Planos
+          totalPlans: true,
+          completedDays: true,
+          plansByType: true,
+          // Quizzes
+          totalQuizResults: true,
+          averageScore: true,
+        };
   });
 
   const { hasPermission, logout } = useAuth();
@@ -135,12 +140,12 @@ const Reports: React.FC = () => {
 
   // Salvar reportSections no localStorage quando mudar
   useEffect(() => {
-    localStorage.setItem('reportSections', JSON.stringify(reportSections));
+    localStorage.setItem("reportSections", JSON.stringify(reportSections));
   }, [reportSections]);
 
   // Salvar selectedCards no localStorage quando mudar
   useEffect(() => {
-    localStorage.setItem('selectedCards', JSON.stringify(selectedCards));
+    localStorage.setItem("selectedCards", JSON.stringify(selectedCards));
   }, [selectedCards]);
 
   useEffect(() => {
@@ -156,18 +161,21 @@ const Reports: React.FC = () => {
 
   const loadAppDownloads = async () => {
     try {
-      const response = await api.get('/admin/reports/app-downloads');
+      const response = await api.get("/admin/reports/app-downloads");
       setAppDownloads(response.data.downloads || 0);
     } catch (err) {
-      console.error('Erro ao carregar downloads:', err);
+      console.error("Erro ao carregar downloads:", err);
     }
   };
 
   const saveAppDownloads = async (value: number) => {
     try {
-      await api.put('/admin/reports/app-downloads', { downloads: value });
+      await api.put("/admin/reports/app-downloads", { downloads: value });
     } catch (err: any) {
-      alert('Erro ao salvar downloads: ' + (err.response?.data?.error || err.message));
+      alert(
+        "Erro ao salvar downloads: " +
+          (err.response?.data?.error || err.message),
+      );
     }
   };
 
@@ -192,7 +200,7 @@ const Reports: React.FC = () => {
 
     try {
       const response = await api.get(
-        `/admin/reports/play-store/general?days=${days}`
+        `/admin/reports/play-store/general?days=${days}`,
       );
       setPlayStoreStats(response.data.data);
     } catch (err: any) {
@@ -235,7 +243,7 @@ const Reports: React.FC = () => {
         width: number,
         height: number,
         bgColor: number[],
-        borderColor?: number[]
+        borderColor?: number[],
       ) => {
         doc.setFillColor(...(bgColor as [number, number, number]));
         if (borderColor) {
@@ -313,7 +321,7 @@ const Reports: React.FC = () => {
       doc.text(
         `Gerado em: ${new Date(stats.generatedAt).toLocaleString("pt-BR")}`,
         20,
-        y + 30
+        y + 30,
       );
 
       y += 40;
@@ -326,7 +334,7 @@ const Reports: React.FC = () => {
           label: string;
           value: string | number;
           highlight?: boolean;
-        }>
+        }>,
       ) => {
         // Cabeçalho do bloco
         drawBox(15, y, pageWidth - 30, 10, primaryColor);
@@ -366,8 +374,12 @@ const Reports: React.FC = () => {
 
       // Estatísticas de Usuários
       if (reportSections.users) {
-        const userItems: Array<{ label: string; value: string | number; highlight?: boolean }> = [];
-        
+        const userItems: Array<{
+          label: string;
+          value: string | number;
+          highlight?: boolean;
+        }> = [];
+
         if (selectedCards.downloads && appDownloads > 0) {
           userItems.push({
             label: "Downloads do aplicativo",
@@ -375,7 +387,7 @@ const Reports: React.FC = () => {
             highlight: true,
           });
         }
-        
+
         if (selectedCards.totalUsers) {
           userItems.push({
             label: "Total de usuários cadastrados",
@@ -383,32 +395,35 @@ const Reports: React.FC = () => {
             highlight: true,
           });
         }
-        
+
         if (selectedCards.withActivePlan) {
           userItems.push({
             label: "Usuários com plano ativo",
             value: stats.users.withActivePlan,
           });
         }
-        
+
         if (selectedCards.upToDate) {
-          userItems.push({ label: "Usuários com leitura em dia", value: stats.users.upToDate });
+          userItems.push({
+            label: "Usuários com leitura em dia",
+            value: stats.users.upToDate,
+          });
         }
-        
+
         if (selectedCards.withCompletedPlan) {
           userItems.push({
             label: "Usuários que completaram planos",
             value: stats.users.withCompletedPlan,
           });
         }
-        
+
         if (selectedCards.withQuizResults) {
           userItems.push({
             label: "Usuários com questionários respondidos",
             value: stats.users.withQuizResults,
           });
         }
-        
+
         if (selectedCards.newUsers) {
           userItems.push({
             label: "Novos usuários (30 dias)",
@@ -416,7 +431,7 @@ const Reports: React.FC = () => {
             highlight: true,
           });
         }
-        
+
         if (selectedCards.activeUsers) {
           userItems.push({
             label: "Usuários ativos (7 dias)",
@@ -424,14 +439,14 @@ const Reports: React.FC = () => {
             highlight: true,
           });
         }
-        
+
         if (selectedCards.notStarted) {
           userItems.push({
             label: "Ainda não iniciaram a leitura",
             value: stats.users.notStartedReading,
           });
         }
-        
+
         if (userItems.length > 0) {
           drawStatsBlock("Estatísticas de Usuários", "👥", userItems);
         }
@@ -439,44 +454,52 @@ const Reports: React.FC = () => {
 
       // Estatísticas de Planos de Leitura
       if (reportSections.readingPlans) {
-      const planItems: Array<{
-        label: string;
-        value: string | number;
-        highlight?: boolean;
-      }> = [];
-      
-      if (selectedCards.totalPlans) {
-        planItems.push({
-          label: "Total de planos criados",
-          value: stats.readingPlans.total,
-          highlight: true,
-        });
-      }
-      
-      if (selectedCards.completedDays) {
-        planItems.push({
-          label: "Total de dias completados",
-          value: stats.readingPlans.totalCompletedDays,
-        });
-      }
+        const planItems: Array<{
+          label: string;
+          value: string | number;
+          highlight?: boolean;
+        }> = [];
 
-      // Adicionar planos por tipo
-      if (selectedCards.plansByType && Object.keys(stats.readingPlans.byType).length > 0) {
-        Object.entries(stats.readingPlans.byType).forEach(([type, count]) => {
-          const typeName = type === "yearly" ? "Plano de Leitura Anual" : type;
-          planItems.push({ label: `  ${typeName}`, value: count });
-        });
+        if (selectedCards.totalPlans) {
+          planItems.push({
+            label: "Total de planos criados",
+            value: stats.readingPlans.total,
+            highlight: true,
+          });
+        }
+
+        if (selectedCards.completedDays) {
+          planItems.push({
+            label: "Total de dias completados",
+            value: stats.readingPlans.totalCompletedDays,
+          });
+        }
+
+        // Adicionar planos por tipo
+        if (
+          selectedCards.plansByType &&
+          Object.keys(stats.readingPlans.byType).length > 0
+        ) {
+          Object.entries(stats.readingPlans.byType).forEach(([type, count]) => {
+            const typeName =
+              type === "yearly" ? "Plano de Leitura Anual" : type;
+            planItems.push({ label: `  ${typeName}`, value: count });
+          });
+        }
+
+        if (planItems.length > 0) {
+          drawStatsBlock("Planos de Leitura", "📖", planItems);
+        }
       }
-      
-      if (planItems.length > 0) {
-        drawStatsBlock("Planos de Leitura", "📖", planItems);
-      }
-    }
 
       // Estatísticas de Questionários
       if (reportSections.quizzes) {
-        const quizItems: Array<{ label: string; value: string | number; highlight?: boolean }> = [];
-        
+        const quizItems: Array<{
+          label: string;
+          value: string | number;
+          highlight?: boolean;
+        }> = [];
+
         if (selectedCards.totalQuizResults) {
           quizItems.push({
             label: "Total de questionários respondidos",
@@ -484,7 +507,7 @@ const Reports: React.FC = () => {
             highlight: true,
           });
         }
-        
+
         if (selectedCards.averageScore) {
           quizItems.push({
             label: "Média de acertos",
@@ -492,7 +515,7 @@ const Reports: React.FC = () => {
             highlight: true,
           });
         }
-        
+
         if (quizItems.length > 0) {
           drawStatsBlock("Questionários", "📝", quizItems);
         }
@@ -510,7 +533,7 @@ const Reports: React.FC = () => {
         "Bíblia em Foco - Sistema de Gerenciamento",
         pageWidth / 2,
         pageHeight - 12,
-        { align: "center" }
+        { align: "center" },
       );
       doc.text("© 2026 IEADPE - Área 10", pageWidth / 2, pageHeight - 7, {
         align: "center",
@@ -540,544 +563,699 @@ const Reports: React.FC = () => {
   };
 
   return (
-    <div className="reports-page">
-      <div className="reports-header">
-        <div className="header-content">
-          <button
-            onClick={() => navigate("/dashboard")}
-            className="back-button"
-          >
-            ← Voltar
-          </button>
-          <h1>Relatórios</h1>
-        </div>
-        <div className="header-actions">
-          {/* Checkboxes para selecionar seções do relatório */}
-          <div className="report-sections-selector">
-            <label className="section-checkbox">
-              <input
-                type="checkbox"
-                checked={reportSections.users}
-                onChange={(e) => setReportSections({ ...reportSections, users: e.target.checked })}
-              />
-              <span>Usuários</span>
-            </label>
-            <label className="section-checkbox">
-              <input
-                type="checkbox"
-                checked={reportSections.readingPlans}
-                onChange={(e) => setReportSections({ ...reportSections, readingPlans: e.target.checked })}
-              />
-              <span>Planos</span>
-            </label>
-            <label className="section-checkbox">
-              <input
-                type="checkbox"
-                checked={reportSections.quizzes}
-                onChange={(e) => setReportSections({ ...reportSections, quizzes: e.target.checked })}
-              />
-              <span>Quizzes</span>
-            </label>
-            <label className="section-checkbox">
-              <input
-                type="checkbox"
-                checked={reportSections.playStore}
-                onChange={(e) => setReportSections({ ...reportSections, playStore: e.target.checked })}
-              />
-              <span>Play Store</span>
-            </label>
+    <>
+      <Sidebar />
+      <div className="reports-page">
+        <div className="reports-header">
+          <div className="header-content">
+            <button
+              onClick={() => navigate("/dashboard")}
+              className="back-button"
+            >
+              ← Voltar
+            </button>
+            <h1>Relatórios</h1>
           </div>
-          <button
-            onClick={exportToPDF}
-            className="export-button"
-            disabled={loading || !stats || isExporting}
-          >
-            {isExporting ? "📥 Gerando..." : "📥 Exportar PDF"}
-          </button>
-          <button onClick={handleLogout} className="logout-button">
-            Sair
-          </button>
-        </div>
-      </div>
-
-      <div className="reports-content">
-        {error && <div className="error-message">{error}</div>}
-
-        {loading ? (
-          <div className="loading">Carregando estatísticas...</div>
-        ) : stats ? (
-          <>
-            {/* Usuários */}
-            <div className="stats-section">
-              <h2>📊 Estatísticas de Usuários</h2>
-              <div className="stats-grid">
-                <div className="stat-card primary">
-                  <label className="card-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={selectedCards.totalUsers}
-                      onChange={(e) => setSelectedCards({ ...selectedCards, totalUsers: e.target.checked })}
-                    />
-                  </label>
-                  <div className="stat-value">{stats.users.total}</div>
-                  <div className="stat-label">Total de Usuários</div>
-                </div>
-
-                <div className="stat-card success">
-                  <label className="card-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={selectedCards.withActivePlan}
-                      onChange={(e) => setSelectedCards({ ...selectedCards, withActivePlan: e.target.checked })}
-                    />
-                  </label>
-                  <div className="stat-value">{stats.users.withActivePlan}</div>
-                  <div className="stat-label">Com Plano Ativo</div>
-                  <div className="stat-percentage">
-                    {calculatePercentage(
-                      stats.users.withActivePlan,
-                      stats.users.total
-                    )}
-                    % do total
-                  </div>
-                </div>
-
-                <div className="stat-card info">
-                  <label className="card-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={selectedCards.upToDate}
-                      onChange={(e) => setSelectedCards({ ...selectedCards, upToDate: e.target.checked })}
-                    />
-                  </label>
-                  <div className="stat-value">{stats.users.upToDate}</div>
-                  <div className="stat-label">Leitura em Dia</div>
-                  <div className="stat-percentage">
-                    {calculatePercentage(
-                      stats.users.upToDate,
-                      stats.users.withActivePlan
-                    )}
-                    % dos ativos
-                  </div>
-                </div>
-
-                <div className="stat-card warning">
-                  <label className="card-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={selectedCards.withCompletedPlan}
-                      onChange={(e) => setSelectedCards({ ...selectedCards, withCompletedPlan: e.target.checked })}
-                    />
-                  </label>
-                  <div className="stat-value">
-                    {stats.users.withCompletedPlan}
-                  </div>
-                  <div className="stat-label">Completaram Plano</div>
-                  <div className="stat-percentage">
-                    {calculatePercentage(
-                      stats.users.withCompletedPlan,
-                      stats.users.total
-                    )}
-                    % do total
-                  </div>
-                </div>
-
-                <div className="stat-card accent">
-                  <label className="card-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={selectedCards.withQuizResults}
-                      onChange={(e) => setSelectedCards({ ...selectedCards, withQuizResults: e.target.checked })}
-                    />
-                  </label>
-                  <div className="stat-value">
-                    {stats.users.withQuizResults}
-                  </div>
-                  <div className="stat-label">Responderam Questionários</div>
-                  <div className="stat-percentage">
-                    {calculatePercentage(
-                      stats.users.withQuizResults,
-                      stats.users.total
-                    )}
-                    % do total
-                  </div>
-                </div>
-
-                <div className="stat-card new">
-                  <label className="card-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={selectedCards.newUsers}
-                      onChange={(e) => setSelectedCards({ ...selectedCards, newUsers: e.target.checked })}
-                    />
-                  </label>
-                  <div className="stat-value">
-                    {stats.users.newInLast30Days}
-                  </div>
-                  <div className="stat-label">Novos (30 dias)</div>
-                </div>
-
-                <div className="stat-card active">
-                  <label className="card-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={selectedCards.activeUsers}
-                      onChange={(e) => setSelectedCards({ ...selectedCards, activeUsers: e.target.checked })}
-                    />
-                  </label>
-                  <div className="stat-value">
-                    {stats.users.activeInLast7Days}
-                  </div>
-                  <div className="stat-label">Ativos (7 dias)</div>
-                </div>
-
-                <div
-                  className="stat-card"
-                  style={{ backgroundColor: "#f8d7da", borderColor: "#f5c6cb" }}
-                >
-                  <label className="card-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={selectedCards.notStarted}
-                      onChange={(e) => setSelectedCards({ ...selectedCards, notStarted: e.target.checked })}
-                    />
-                  </label>
-                  <div className="stat-value">
-                    {stats.users.notStartedReading}
-                  </div>
-                  <div className="stat-label">
-                    Ainda não iniciaram a leitura
-                  </div>
-                  <div className="stat-percentage">
-                    {calculatePercentage(
-                      stats.users.notStartedReading,
-                      stats.users.withActivePlan
-                    )}
-                    % dos planos ativos
-                  </div>
-                </div>
-
-                <div className="stat-card" style={{ backgroundColor: "#e3f2fd", borderColor: "#90caf9" }}>
-                  <label className="card-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={selectedCards.downloads}
-                      onChange={(e) => setSelectedCards({ ...selectedCards, downloads: e.target.checked })}
-                    />
-                  </label>
-                  <div className="stat-value" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <input
-                      type="number"
-                      value={appDownloads}
-                      onChange={(e) => setAppDownloads(Number(e.target.value))}
-                      onBlur={(e) => saveAppDownloads(Number(e.target.value))}
-                      className="downloads-input"
-                      min="0"
-                      placeholder="0"
-                      style={{
-                        fontSize: "2rem",
-                        fontWeight: "600",
-                        border: "2px solid #90caf9",
-                        borderRadius: "8px",
-                        padding: "8px 12px",
-                        width: "150px",
-                        textAlign: "center"
-                      }}
-                    />
-                  </div>
-                  <div className="stat-label">📥 Downloads do App</div>
-                  <div className="stat-note" style={{ fontSize: "0.75rem", color: "#666", marginTop: "4px" }}>Editável manualmente</div>
-                </div>
-              </div>
+          <div className="header-actions">
+            {/* Checkboxes para selecionar seções do relatório */}
+            <div className="report-sections-selector">
+              <label className="section-checkbox">
+                <input
+                  type="checkbox"
+                  checked={reportSections.users}
+                  onChange={(e) =>
+                    setReportSections({
+                      ...reportSections,
+                      users: e.target.checked,
+                    })
+                  }
+                />
+                <span>Usuários</span>
+              </label>
+              <label className="section-checkbox">
+                <input
+                  type="checkbox"
+                  checked={reportSections.readingPlans}
+                  onChange={(e) =>
+                    setReportSections({
+                      ...reportSections,
+                      readingPlans: e.target.checked,
+                    })
+                  }
+                />
+                <span>Planos</span>
+              </label>
+              <label className="section-checkbox">
+                <input
+                  type="checkbox"
+                  checked={reportSections.quizzes}
+                  onChange={(e) =>
+                    setReportSections({
+                      ...reportSections,
+                      quizzes: e.target.checked,
+                    })
+                  }
+                />
+                <span>Quizzes</span>
+              </label>
+              <label className="section-checkbox">
+                <input
+                  type="checkbox"
+                  checked={reportSections.playStore}
+                  onChange={(e) =>
+                    setReportSections({
+                      ...reportSections,
+                      playStore: e.target.checked,
+                    })
+                  }
+                />
+                <span>Play Store</span>
+              </label>
             </div>
+            <button
+              onClick={exportToPDF}
+              className="export-button"
+              disabled={loading || !stats || isExporting}
+            >
+              {isExporting ? "📥 Gerando..." : "📥 Exportar PDF"}
+            </button>
+            <button onClick={handleLogout} className="logout-button">
+              Sair
+            </button>
+          </div>
+        </div>
 
-            {/* Planos de Leitura */}
-            <div className="stats-section">
-              <h2>📖 Estatísticas de Planos de Leitura</h2>
-              <div className="stats-grid">
-                <div className="stat-card primary">
-                  <label className="card-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={selectedCards.totalPlans}
-                      onChange={(e) => setSelectedCards({ ...selectedCards, totalPlans: e.target.checked })}
-                    />
-                  </label>
-                  <div className="stat-value">{stats.readingPlans.total}</div>
-                  <div className="stat-label">Total de Planos Criados</div>
-                </div>
+        <div className="reports-content">
+          {error && <div className="error-message">{error}</div>}
 
-                <div className="stat-card success">
-                  <label className="card-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={selectedCards.completedDays}
-                      onChange={(e) => setSelectedCards({ ...selectedCards, completedDays: e.target.checked })}
-                    />
-                  </label>
-                  <div className="stat-value">
-                    {stats.readingPlans.totalCompletedDays}
-                  </div>
-                  <div className="stat-label">Dias de Leitura Completados</div>
-                </div>
-              </div>
-
-              {Object.keys(stats.readingPlans.byType).length > 0 && (
-                <div className="subsection">
-                  <h3>
-                    <label className="section-title-checkbox">
+          {loading ? (
+            <div className="loading">Carregando estatísticas...</div>
+          ) : stats ? (
+            <>
+              {/* Usuários */}
+              <div className="stats-section">
+                <h2>📊 Estatísticas de Usuários</h2>
+                <div className="stats-grid">
+                  <div className="stat-card primary">
+                    <label className="card-checkbox">
                       <input
                         type="checkbox"
-                        checked={selectedCards.plansByType}
-                        onChange={(e) => setSelectedCards({ ...selectedCards, plansByType: e.target.checked })}
+                        checked={selectedCards.totalUsers}
+                        onChange={(e) =>
+                          setSelectedCards({
+                            ...selectedCards,
+                            totalUsers: e.target.checked,
+                          })
+                        }
                       />
-                      <span>Planos por Tipo</span>
                     </label>
-                  </h3>
-                  <div className="stats-grid">
-                    {Object.entries(stats.readingPlans.byType).map(
-                      ([type, count]) => {
-                        const typeName =
-                          type === "yearly" ? "Plano de Leitura Anual" : type;
-                        return (
-                          <div key={type} className="stat-card secondary">
-                            <div className="stat-value">{count}</div>
-                            <div className="stat-label">{typeName}</div>
-                          </div>
-                        );
-                      }
-                    )}
+                    <div className="stat-value">{stats.users.total}</div>
+                    <div className="stat-label">Total de Usuários</div>
                   </div>
-                </div>
-              )}
-            </div>
 
-            {/* Questionários */}
-            <div className="stats-section">
-              <h2>📝 Estatísticas de Questionários</h2>
-              <div className="stats-grid">
-                <div className="stat-card primary">
-                  <label className="card-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={selectedCards.totalQuizResults}
-                      onChange={(e) => setSelectedCards({ ...selectedCards, totalQuizResults: e.target.checked })}
-                    />
-                  </label>
-                  <div className="stat-value">{stats.quizzes.totalResults}</div>
-                  <div className="stat-label">Questionários Respondidos</div>
-                </div>
-
-                <div className="stat-card success">
-                  <label className="card-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={selectedCards.averageScore}
-                      onChange={(e) => setSelectedCards({ ...selectedCards, averageScore: e.target.checked })}
-                    />
-                  </label>
-                  <div className="stat-value">
-                    {stats.quizzes.averageScore.toFixed(2)}%
+                  <div className="stat-card success">
+                    <label className="card-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={selectedCards.withActivePlan}
+                        onChange={(e) =>
+                          setSelectedCards({
+                            ...selectedCards,
+                            withActivePlan: e.target.checked,
+                          })
+                        }
+                      />
+                    </label>
+                    <div className="stat-value">
+                      {stats.users.withActivePlan}
+                    </div>
+                    <div className="stat-label">Com Plano Ativo</div>
+                    <div className="stat-percentage">
+                      {calculatePercentage(
+                        stats.users.withActivePlan,
+                        stats.users.total,
+                      )}
+                      % do total
+                    </div>
                   </div>
-                  <div className="stat-label">Média de Acertos</div>
+
+                  <div className="stat-card info">
+                    <label className="card-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={selectedCards.upToDate}
+                        onChange={(e) =>
+                          setSelectedCards({
+                            ...selectedCards,
+                            upToDate: e.target.checked,
+                          })
+                        }
+                      />
+                    </label>
+                    <div className="stat-value">{stats.users.upToDate}</div>
+                    <div className="stat-label">Leitura em Dia</div>
+                    <div className="stat-percentage">
+                      {calculatePercentage(
+                        stats.users.upToDate,
+                        stats.users.withActivePlan,
+                      )}
+                      % dos ativos
+                    </div>
+                  </div>
+
+                  <div className="stat-card warning">
+                    <label className="card-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={selectedCards.withCompletedPlan}
+                        onChange={(e) =>
+                          setSelectedCards({
+                            ...selectedCards,
+                            withCompletedPlan: e.target.checked,
+                          })
+                        }
+                      />
+                    </label>
+                    <div className="stat-value">
+                      {stats.users.withCompletedPlan}
+                    </div>
+                    <div className="stat-label">Completaram Plano</div>
+                    <div className="stat-percentage">
+                      {calculatePercentage(
+                        stats.users.withCompletedPlan,
+                        stats.users.total,
+                      )}
+                      % do total
+                    </div>
+                  </div>
+
+                  <div className="stat-card accent">
+                    <label className="card-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={selectedCards.withQuizResults}
+                        onChange={(e) =>
+                          setSelectedCards({
+                            ...selectedCards,
+                            withQuizResults: e.target.checked,
+                          })
+                        }
+                      />
+                    </label>
+                    <div className="stat-value">
+                      {stats.users.withQuizResults}
+                    </div>
+                    <div className="stat-label">Responderam Questionários</div>
+                    <div className="stat-percentage">
+                      {calculatePercentage(
+                        stats.users.withQuizResults,
+                        stats.users.total,
+                      )}
+                      % do total
+                    </div>
+                  </div>
+
+                  <div className="stat-card new">
+                    <label className="card-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={selectedCards.newUsers}
+                        onChange={(e) =>
+                          setSelectedCards({
+                            ...selectedCards,
+                            newUsers: e.target.checked,
+                          })
+                        }
+                      />
+                    </label>
+                    <div className="stat-value">
+                      {stats.users.newInLast30Days}
+                    </div>
+                    <div className="stat-label">Novos (30 dias)</div>
+                  </div>
+
+                  <div className="stat-card active">
+                    <label className="card-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={selectedCards.activeUsers}
+                        onChange={(e) =>
+                          setSelectedCards({
+                            ...selectedCards,
+                            activeUsers: e.target.checked,
+                          })
+                        }
+                      />
+                    </label>
+                    <div className="stat-value">
+                      {stats.users.activeInLast7Days}
+                    </div>
+                    <div className="stat-label">Ativos (7 dias)</div>
+                  </div>
+
+                  <div
+                    className="stat-card"
+                    style={{
+                      backgroundColor: "#f8d7da",
+                      borderColor: "#f5c6cb",
+                    }}
+                  >
+                    <label className="card-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={selectedCards.notStarted}
+                        onChange={(e) =>
+                          setSelectedCards({
+                            ...selectedCards,
+                            notStarted: e.target.checked,
+                          })
+                        }
+                      />
+                    </label>
+                    <div className="stat-value">
+                      {stats.users.notStartedReading}
+                    </div>
+                    <div className="stat-label">
+                      Ainda não iniciaram a leitura
+                    </div>
+                    <div className="stat-percentage">
+                      {calculatePercentage(
+                        stats.users.notStartedReading,
+                        stats.users.withActivePlan,
+                      )}
+                      % dos planos ativos
+                    </div>
+                  </div>
+
+                  <div
+                    className="stat-card"
+                    style={{
+                      backgroundColor: "#e3f2fd",
+                      borderColor: "#90caf9",
+                    }}
+                  >
+                    <label className="card-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={selectedCards.downloads}
+                        onChange={(e) =>
+                          setSelectedCards({
+                            ...selectedCards,
+                            downloads: e.target.checked,
+                          })
+                        }
+                      />
+                    </label>
+                    <div
+                      className="stat-value"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
+                      }}
+                    >
+                      <input
+                        type="number"
+                        value={appDownloads}
+                        onChange={(e) =>
+                          setAppDownloads(Number(e.target.value))
+                        }
+                        onBlur={(e) => saveAppDownloads(Number(e.target.value))}
+                        className="downloads-input"
+                        min="0"
+                        placeholder="0"
+                        style={{
+                          fontSize: "2rem",
+                          fontWeight: "600",
+                          border: "2px solid #90caf9",
+                          borderRadius: "8px",
+                          padding: "8px 12px",
+                          width: "150px",
+                          textAlign: "center",
+                        }}
+                      />
+                    </div>
+                    <div className="stat-label">📥 Downloads do App</div>
+                    <div
+                      className="stat-note"
+                      style={{
+                        fontSize: "0.75rem",
+                        color: "#666",
+                        marginTop: "4px",
+                      }}
+                    >
+                      Editável manualmente
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Google Play Store Stats */}
-            {playStoreStats && (
+              {/* Planos de Leitura */}
               <div className="stats-section">
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: "20px",
-                  }}
-                >
-                  <h2>📱 Estatísticas do Google Play Store</h2>
-                  <div style={{ display: "flex", gap: "10px" }}>
-                    <button
-                      className={`period-button ${
-                        playStoreDays === 7 ? "active" : ""
-                      }`}
-                      onClick={() => handlePlayStoreDaysChange(7)}
-                    >
-                      7 dias
-                    </button>
-                    <button
-                      className={`period-button ${
-                        playStoreDays === 30 ? "active" : ""
-                      }`}
-                      onClick={() => handlePlayStoreDaysChange(30)}
-                    >
-                      30 dias
-                    </button>
-                    <button
-                      className={`period-button ${
-                        playStoreDays === 90 ? "active" : ""
-                      }`}
-                      onClick={() => handlePlayStoreDaysChange(90)}
-                    >
-                      90 dias
-                    </button>
+                <h2>📖 Estatísticas de Planos de Leitura</h2>
+                <div className="stats-grid">
+                  <div className="stat-card primary">
+                    <label className="card-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={selectedCards.totalPlans}
+                        onChange={(e) =>
+                          setSelectedCards({
+                            ...selectedCards,
+                            totalPlans: e.target.checked,
+                          })
+                        }
+                      />
+                    </label>
+                    <div className="stat-value">{stats.readingPlans.total}</div>
+                    <div className="stat-label">Total de Planos Criados</div>
+                  </div>
+
+                  <div className="stat-card success">
+                    <label className="card-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={selectedCards.completedDays}
+                        onChange={(e) =>
+                          setSelectedCards({
+                            ...selectedCards,
+                            completedDays: e.target.checked,
+                          })
+                        }
+                      />
+                    </label>
+                    <div className="stat-value">
+                      {stats.readingPlans.totalCompletedDays}
+                    </div>
+                    <div className="stat-label">
+                      Dias de Leitura Completados
+                    </div>
                   </div>
                 </div>
 
-                {loadingPlayStore ? (
-                  <div className="loading">
-                    Carregando estatísticas do Play Store...
+                {Object.keys(stats.readingPlans.byType).length > 0 && (
+                  <div className="subsection">
+                    <h3>
+                      <label className="section-title-checkbox">
+                        <input
+                          type="checkbox"
+                          checked={selectedCards.plansByType}
+                          onChange={(e) =>
+                            setSelectedCards({
+                              ...selectedCards,
+                              plansByType: e.target.checked,
+                            })
+                          }
+                        />
+                        <span>Planos por Tipo</span>
+                      </label>
+                    </h3>
+                    <div className="stats-grid">
+                      {Object.entries(stats.readingPlans.byType).map(
+                        ([type, count]) => {
+                          const typeName =
+                            type === "yearly" ? "Plano de Leitura Anual" : type;
+                          return (
+                            <div key={type} className="stat-card secondary">
+                              <div className="stat-value">{count}</div>
+                              <div className="stat-label">{typeName}</div>
+                            </div>
+                          );
+                        },
+                      )}
+                    </div>
                   </div>
-                ) : playStoreStats && (playStoreStats as any)._note ? (
+                )}
+              </div>
+
+              {/* Questionários */}
+              <div className="stats-section">
+                <h2>📝 Estatísticas de Questionários</h2>
+                <div className="stats-grid">
+                  <div className="stat-card primary">
+                    <label className="card-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={selectedCards.totalQuizResults}
+                        onChange={(e) =>
+                          setSelectedCards({
+                            ...selectedCards,
+                            totalQuizResults: e.target.checked,
+                          })
+                        }
+                      />
+                    </label>
+                    <div className="stat-value">
+                      {stats.quizzes.totalResults}
+                    </div>
+                    <div className="stat-label">Questionários Respondidos</div>
+                  </div>
+
+                  <div className="stat-card success">
+                    <label className="card-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={selectedCards.averageScore}
+                        onChange={(e) =>
+                          setSelectedCards({
+                            ...selectedCards,
+                            averageScore: e.target.checked,
+                          })
+                        }
+                      />
+                    </label>
+                    <div className="stat-value">
+                      {stats.quizzes.averageScore.toFixed(2)}%
+                    </div>
+                    <div className="stat-label">Média de Acertos</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Google Play Store Stats */}
+              {playStoreStats && (
+                <div className="stats-section">
                   <div
-                    className="info-message"
                     style={{
-                      padding: "20px",
-                      backgroundColor: "#e3f2fd",
-                      border: "1px solid #2196f3",
-                      borderRadius: "8px",
-                      color: "#0d47a1",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
                       marginBottom: "20px",
                     }}
                   >
-                    <h4 style={{ marginTop: 0 }}>
-                      ℹ️ Dados do Google Play ainda não disponíveis
-                    </h4>
-                    <p>
-                      <strong>App na Play Store:</strong>{" "}
-                      <a 
-                        href="https://play.google.com/store/apps/details?id=com.readbible.app" 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        style={{ color: "#1976d2" }}
+                    <h2>📱 Estatísticas do Google Play Store</h2>
+                    <div style={{ display: "flex", gap: "10px" }}>
+                      <button
+                        className={`period-button ${
+                          playStoreDays === 7 ? "active" : ""
+                        }`}
+                        onClick={() => handlePlayStoreDaysChange(7)}
                       >
-                        Bíblia em Foco
-                      </a>
-                      <br />
-                      <strong>Publicado em:</strong> 25/12/2025 (13 dias atrás)
-                      <br />
-                      <strong>Package:</strong> <code>com.readbible.app</code>
-                      <br />
-                      <strong>Usuários cadastrados:</strong> {stats?.users?.total || 270} (volume suficiente ✓)
-                    </p>
-                    <p>
-                      <strong>Por que os dados não aparecem ainda?</strong>
-                    </p>
-                    <ul style={{ marginBottom: 10 }}>
-                      <li>🎯 <strong>Trilha de produção:</strong> A API só conta usuários da versão de produção pública (não testes internos/fechados)</li>
-                      <li>📊 <strong>Métricas de qualidade:</strong> Só aparecem quando há eventos para reportar (crashes, ANRs, slow rendering)</li>
-                      <li>🔄 <strong>Período de coleta:</strong> Google precisa acumular dados por alguns dias antes de disponibilizar</li>
-                      <li>⏰ <strong>Atraso natural:</strong> Pode haver atraso de 24-48h entre os eventos e sua disponibilização na API</li>
-                    </ul>
-                    <p>
-                      <strong>✅ Configuração correta:</strong>
-                    </p>
-                    <ul style={{ marginBottom: 10 }}>
-                      <li>✓ App publicado na Play Store</li>
-                      <li>✓ Service Account com permissões de Administrador</li>
-                      <li>✓ API do Google Play Developer Reporting habilitada</li>
-                      <li>✓ Tempo suficiente desde publicação (13 dias)</li>
-                    </ul>
-                    <p style={{ marginBottom: 0, fontSize: "0.9em", marginTop: 10 }}>
-                      💡 <strong>Próximo passo:</strong> Os dados aparecerão automaticamente quando o app atingir o volume mínimo de usuários ativos. 
-                      Continue promovendo o app para aumentar as instalações!
-                    </p>
+                        7 dias
+                      </button>
+                      <button
+                        className={`period-button ${
+                          playStoreDays === 30 ? "active" : ""
+                        }`}
+                        onClick={() => handlePlayStoreDaysChange(30)}
+                      >
+                        30 dias
+                      </button>
+                      <button
+                        className={`period-button ${
+                          playStoreDays === 90 ? "active" : ""
+                        }`}
+                        onClick={() => handlePlayStoreDaysChange(90)}
+                      >
+                        90 dias
+                      </button>
+                    </div>
                   </div>
-                ) : (
-                  <>
-                    {/* Instalações */}
-                    <div className="subsection">
-                      <h3>📥 Instalações e Atualizações</h3>
-                      <div
+
+                  {loadingPlayStore ? (
+                    <div className="loading">
+                      Carregando estatísticas do Play Store...
+                    </div>
+                  ) : playStoreStats && (playStoreStats as any)._note ? (
+                    <div
+                      className="info-message"
+                      style={{
+                        padding: "20px",
+                        backgroundColor: "#e3f2fd",
+                        border: "1px solid #2196f3",
+                        borderRadius: "8px",
+                        color: "#0d47a1",
+                        marginBottom: "20px",
+                      }}
+                    >
+                      <h4 style={{ marginTop: 0 }}>
+                        ℹ️ Dados do Google Play ainda não disponíveis
+                      </h4>
+                      <p>
+                        <strong>App na Play Store:</strong>{" "}
+                        <a
+                          href="https://play.google.com/store/apps/details?id=com.readbible.app"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ color: "#1976d2" }}
+                        >
+                          Bíblia em Foco
+                        </a>
+                        <br />
+                        <strong>Publicado em:</strong> 25/12/2025 (13 dias
+                        atrás)
+                        <br />
+                        <strong>Package:</strong> <code>com.readbible.app</code>
+                        <br />
+                        <strong>Usuários cadastrados:</strong>{" "}
+                        {stats?.users?.total || 270} (volume suficiente ✓)
+                      </p>
+                      <p>
+                        <strong>Por que os dados não aparecem ainda?</strong>
+                      </p>
+                      <ul style={{ marginBottom: 10 }}>
+                        <li>
+                          🎯 <strong>Trilha de produção:</strong> A API só conta
+                          usuários da versão de produção pública (não testes
+                          internos/fechados)
+                        </li>
+                        <li>
+                          📊 <strong>Métricas de qualidade:</strong> Só aparecem
+                          quando há eventos para reportar (crashes, ANRs, slow
+                          rendering)
+                        </li>
+                        <li>
+                          🔄 <strong>Período de coleta:</strong> Google precisa
+                          acumular dados por alguns dias antes de disponibilizar
+                        </li>
+                        <li>
+                          ⏰ <strong>Atraso natural:</strong> Pode haver atraso
+                          de 24-48h entre os eventos e sua disponibilização na
+                          API
+                        </li>
+                      </ul>
+                      <p>
+                        <strong>✅ Configuração correta:</strong>
+                      </p>
+                      <ul style={{ marginBottom: 10 }}>
+                        <li>✓ App publicado na Play Store</li>
+                        <li>
+                          ✓ Service Account com permissões de Administrador
+                        </li>
+                        <li>
+                          ✓ API do Google Play Developer Reporting habilitada
+                        </li>
+                        <li>✓ Tempo suficiente desde publicação (13 dias)</li>
+                      </ul>
+                      <p
                         style={{
-                          padding: "15px",
-                          backgroundColor: "#e3f2fd",
-                          border: "1px solid #2196f3",
-                          borderRadius: "8px",
-                          color: "#0d47a1",
-                          marginBottom: "20px",
+                          marginBottom: 0,
+                          fontSize: "0.9em",
+                          marginTop: 10,
                         }}
                       >
-                        <p style={{ margin: 0 }}>
-                          ℹ️ <strong>Nota:</strong> Dados de instalações não
-                          estão disponíveis na API do Google Play Developer
-                          Reporting. Esta API fornece apenas métricas de
-                          qualidade (crashes, ANRs, erros de desempenho).
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Estabilidade */}
-                    <div className="subsection">
-                      <h3>🛡️ Estabilidade do App</h3>
-                      <div className="stats-grid">
-                        <div className="stat-card danger">
-                          <div className="stat-value">
-                            {playStoreStats.crashes.totals.distinctCrashes}
-                          </div>
-                          <div className="stat-label">Crashes Distintos</div>
-                        </div>
-
-                        <div className="stat-card warning">
-                          <div className="stat-value">
-                            {playStoreStats.crashes.averages.crashRatePerUserPercent.toFixed(
-                              3
-                            )}
-                            %
-                          </div>
-                          <div className="stat-label">
-                            Taxa de Crash (Usuários)
-                          </div>
-                        </div>
-
-                        <div className="stat-card danger">
-                          <div className="stat-value">
-                            {playStoreStats.anrs.totals.distinctAnrs}
-                          </div>
-                          <div className="stat-label">ANRs Distintos</div>
-                        </div>
-
-                        <div className="stat-card warning">
-                          <div className="stat-value">
-                            {playStoreStats.anrs.averages.anrRatePerUserPercent.toFixed(
-                              3
-                            )}
-                            %
-                          </div>
-                          <div className="stat-label">
-                            Taxa de ANR (Usuários)
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="report-footer">
-                      <p>
-                        Período:{" "}
-                        {new Date(
-                          playStoreStats.period.startDate
-                        ).toLocaleDateString("pt-BR")}{" "}
-                        -{" "}
-                        {new Date(
-                          playStoreStats.period.endDate
-                        ).toLocaleDateString("pt-BR")}
+                        💡 <strong>Próximo passo:</strong> Os dados aparecerão
+                        automaticamente quando o app atingir o volume mínimo de
+                        usuários ativos. Continue promovendo o app para aumentar
+                        as instalações!
                       </p>
                     </div>
-                  </>
-                )}
-              </div>
-            )}
+                  ) : (
+                    <>
+                      {/* Instalações */}
+                      <div className="subsection">
+                        <h3>📥 Instalações e Atualizações</h3>
+                        <div
+                          style={{
+                            padding: "15px",
+                            backgroundColor: "#e3f2fd",
+                            border: "1px solid #2196f3",
+                            borderRadius: "8px",
+                            color: "#0d47a1",
+                            marginBottom: "20px",
+                          }}
+                        >
+                          <p style={{ margin: 0 }}>
+                            ℹ️ <strong>Nota:</strong> Dados de instalações não
+                            estão disponíveis na API do Google Play Developer
+                            Reporting. Esta API fornece apenas métricas de
+                            qualidade (crashes, ANRs, erros de desempenho).
+                          </p>
+                        </div>
+                      </div>
 
-            <div className="report-footer">
-              <p>
-                Relatório gerado em:{" "}
-                {new Date(stats.generatedAt).toLocaleString("pt-BR")}
-              </p>
-            </div>
-          </>
-        ) : null}
+                      {/* Estabilidade */}
+                      <div className="subsection">
+                        <h3>🛡️ Estabilidade do App</h3>
+                        <div className="stats-grid">
+                          <div className="stat-card danger">
+                            <div className="stat-value">
+                              {playStoreStats.crashes.totals.distinctCrashes}
+                            </div>
+                            <div className="stat-label">Crashes Distintos</div>
+                          </div>
+
+                          <div className="stat-card warning">
+                            <div className="stat-value">
+                              {playStoreStats.crashes.averages.crashRatePerUserPercent.toFixed(
+                                3,
+                              )}
+                              %
+                            </div>
+                            <div className="stat-label">
+                              Taxa de Crash (Usuários)
+                            </div>
+                          </div>
+
+                          <div className="stat-card danger">
+                            <div className="stat-value">
+                              {playStoreStats.anrs.totals.distinctAnrs}
+                            </div>
+                            <div className="stat-label">ANRs Distintos</div>
+                          </div>
+
+                          <div className="stat-card warning">
+                            <div className="stat-value">
+                              {playStoreStats.anrs.averages.anrRatePerUserPercent.toFixed(
+                                3,
+                              )}
+                              %
+                            </div>
+                            <div className="stat-label">
+                              Taxa de ANR (Usuários)
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="report-footer">
+                        <p>
+                          Período:{" "}
+                          {new Date(
+                            playStoreStats.period.startDate,
+                          ).toLocaleDateString("pt-BR")}{" "}
+                          -{" "}
+                          {new Date(
+                            playStoreStats.period.endDate,
+                          ).toLocaleDateString("pt-BR")}
+                        </p>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              <div className="report-footer">
+                <p>
+                  Relatório gerado em:{" "}
+                  {new Date(stats.generatedAt).toLocaleString("pt-BR")}
+                </p>
+              </div>
+            </>
+          ) : null}
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 

@@ -1,10 +1,30 @@
-  import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import JobProgressModal from '../components/JobProgressModal';
-import { BIBLE_BOOKS, getChapterOptions } from '../constants/bibleBooks';
-import { useAuth } from '../contexts/AuthContext';
-import api from '../services/api';
-import './Quizzes.css';
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import JobProgressModal from "../components/JobProgressModal";
+import Sidebar from "../components/Sidebar";
+import {
+    ActionButton,
+    Badge,
+    Button,
+    EmptyState,
+    ErrorMessage,
+    FiltersSection,
+    Input,
+    MainContent,
+    PageTitle,
+    Pagination,
+    Select,
+    Table,
+    Tbody,
+    Td,
+    Th,
+    Thead,
+    Tr,
+} from "../components/ui/StyledComponents";
+import { BIBLE_BOOKS, getChapterOptions } from "../constants/bibleBooks";
+import { useAuth } from "../contexts/AuthContext";
+import api from "../services/api";
+import "./Quizzes.css";
 
 interface Quiz {
   id: number;
@@ -35,43 +55,43 @@ interface QuizDetail extends Quiz {
 const Quizzes: React.FC = () => {
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [search, setSearch] = useState('');
-  const [testament, setTestament] = useState('');
-  const [bibleVersion, setBibleVersion] = useState('');
-  const [bookName, setBookName] = useState('');
+  const [search, setSearch] = useState("");
+  const [testament, setTestament] = useState("");
+  const [bibleVersion, setBibleVersion] = useState("");
+  const [bookName, setBookName] = useState("");
   const [availableBooks, setAvailableBooks] = useState<string[]>([]);
-  
+
   // Modals
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [showJobProgressModal, setShowJobProgressModal] = useState(false);
   const [currentJobId, setCurrentJobId] = useState<number | null>(null);
   const [selectedQuiz, setSelectedQuiz] = useState<QuizDetail | null>(null);
-  const [createMode, setCreateMode] = useState<'manual' | 'ai'>('manual');
+  const [createMode, setCreateMode] = useState<"manual" | "ai">("manual");
   const [isEditingView, setIsEditingView] = useState(false);
   const [editedQuestions, setEditedQuestions] = useState<QuizQuestion[]>([]);
   const [availableChapters, setAvailableChapters] = useState<number[]>([]);
-  
+
   // Form states
   const [formData, setFormData] = useState({
-    bookName: '',
-    chapter: '',
-    bibleVersion: 'NVI',
-    testament: 'new',
-    category: 'geral',
+    bookName: "",
+    chapter: "",
+    bibleVersion: "NVI",
+    testament: "new",
+    category: "geral",
   });
-  const [formError, setFormError] = useState('');
+  const [formError, setFormError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   const { hasPermission, logout } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!hasPermission('gerenciar_questionarios')) {
-      navigate('/dashboard');
+    if (!hasPermission("gerenciar_questionarios")) {
+      navigate("/dashboard");
       return;
     }
 
@@ -81,28 +101,30 @@ const Quizzes: React.FC = () => {
 
   const loadAvailableBooks = async () => {
     try {
-      const response = await api.get('/admin/quizzes?perPage=1000');
-      const booksInDatabase = new Set(response.data.data.map((q: Quiz) => q.bookName));
-      
+      const response = await api.get("/admin/quizzes?perPage=1000");
+      const booksInDatabase = new Set(
+        response.data.data.map((q: Quiz) => q.bookName),
+      );
+
       // Ordenar pelos livros da Bíblia que existem no banco
-      const books = BIBLE_BOOKS
-        .map(book => book.name)
-        .filter(bookName => booksInDatabase.has(bookName));
-      
+      const books = BIBLE_BOOKS.map((book) => book.name).filter((bookName) =>
+        booksInDatabase.has(bookName),
+      );
+
       setAvailableBooks(books);
     } catch (err) {
-      console.error('Erro ao carregar livros disponíveis:', err);
+      console.error("Erro ao carregar livros disponíveis:", err);
     }
   };
 
   const loadQuizzes = async () => {
     setLoading(true);
-    setError('');
-    
+    setError("");
+
     try {
       const params = new URLSearchParams({
         page: page.toString(),
-        perPage: '20',
+        perPage: "20",
         ...(search && { search }),
         ...(bookName && { bookName }),
         ...(testament && { testament }),
@@ -113,7 +135,7 @@ const Quizzes: React.FC = () => {
       setQuizzes(response.data.data);
       setTotalPages(response.data.meta.lastPage || 1);
     } catch (err: any) {
-      setError('Erro ao carregar questionários');
+      setError("Erro ao carregar questionários");
       console.error(err);
     } finally {
       setLoading(false);
@@ -128,21 +150,21 @@ const Quizzes: React.FC = () => {
       setIsEditingView(false);
       setShowViewModal(true);
     } catch (err: any) {
-      setError('Erro ao carregar detalhes do questionário');
+      setError("Erro ao carregar detalhes do questionário");
       console.error(err);
     }
   };
 
   const handleOpenCreateModal = () => {
     setShowCreateModal(true);
-    setCreateMode('manual');
-    setFormError('');
+    setCreateMode("manual");
+    setFormError("");
     setFormData({
-      bookName: '',
-      chapter: '',
-      bibleVersion: 'NVI',
-      testament: 'new',
-      category: 'geral',
+      bookName: "",
+      chapter: "",
+      bibleVersion: "NVI",
+      testament: "new",
+      category: "geral",
     });
   };
 
@@ -150,34 +172,44 @@ const Quizzes: React.FC = () => {
     setShowCreateModal(false);
     setShowViewModal(false);
     setSelectedQuiz(null);
-    setFormError('');
-    setCreateMode('manual');
+    setFormError("");
+    setCreateMode("manual");
     setIsEditingView(false);
     setEditedQuestions([]);
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) => {
     const { name, value } = e.target;
-    
-    if (name === 'bookName') {
+
+    if (name === "bookName") {
       const chapters = getChapterOptions(value);
       setAvailableChapters(chapters);
-      setFormData(prev => ({ ...prev, bookName: value, chapter: '' }));
+      setFormData((prev) => ({ ...prev, bookName: value, chapter: "" }));
     } else {
-      setFormData(prev => ({ ...prev, [name]: value }));
+      setFormData((prev) => ({ ...prev, [name]: value }));
     }
   };
 
-  const handleEditQuestion = (questionIndex: number, field: 'pergunta' | 'respostaCorreta', value: string) => {
-    setEditedQuestions(prev => {
+  const handleEditQuestion = (
+    questionIndex: number,
+    field: "pergunta" | "respostaCorreta",
+    value: string,
+  ) => {
+    setEditedQuestions((prev) => {
       const updated = [...prev];
       updated[questionIndex] = { ...updated[questionIndex], [field]: value };
       return updated;
     });
   };
 
-  const handleEditAlternativa = (questionIndex: number, altIndex: number, value: string) => {
-    setEditedQuestions(prev => {
+  const handleEditAlternativa = (
+    questionIndex: number,
+    altIndex: number,
+    value: string,
+  ) => {
+    setEditedQuestions((prev) => {
       const updated = [...prev];
       const alternativas = [...updated[questionIndex].alternativas];
       alternativas[altIndex] = value;
@@ -187,48 +219,50 @@ const Quizzes: React.FC = () => {
   };
 
   const handleAddAlternativa = (questionIndex: number) => {
-    setEditedQuestions(prev => {
+    setEditedQuestions((prev) => {
       const updated = [...prev];
-      const alternativas = [...updated[questionIndex].alternativas, ''];
+      const alternativas = [...updated[questionIndex].alternativas, ""];
       updated[questionIndex] = { ...updated[questionIndex], alternativas };
       return updated;
     });
   };
 
   const handleRemoveAlternativa = (questionIndex: number, altIndex: number) => {
-    setEditedQuestions(prev => {
+    setEditedQuestions((prev) => {
       const updated = [...prev];
-      const alternativas = updated[questionIndex].alternativas.filter((_, i) => i !== altIndex);
+      const alternativas = updated[questionIndex].alternativas.filter(
+        (_, i) => i !== altIndex,
+      );
       updated[questionIndex] = { ...updated[questionIndex], alternativas };
       return updated;
     });
   };
 
   const handleAddQuestion = () => {
-    setEditedQuestions(prev => [
+    setEditedQuestions((prev) => [
       ...prev,
       {
         questionId: `q${prev.length + 1}`,
-        pergunta: '',
-        alternativas: ['', '', '', ''],
-        respostaCorreta: '',
-      }
+        pergunta: "",
+        alternativas: ["", "", "", ""],
+        respostaCorreta: "",
+      },
     ]);
   };
 
   const handleRemoveQuestion = (questionIndex: number) => {
     if (editedQuestions.length <= 1) {
-      setFormError('O questionário deve ter pelo menos 1 questão.');
+      setFormError("O questionário deve ter pelo menos 1 questão.");
       return;
     }
-    setEditedQuestions(prev => prev.filter((_, i) => i !== questionIndex));
+    setEditedQuestions((prev) => prev.filter((_, i) => i !== questionIndex));
   };
 
   const handleSaveEdits = async () => {
     if (!selectedQuiz) return;
-    
+
     setIsSubmitting(true);
-    setFormError('');
+    setFormError("");
 
     try {
       await api.put(`/admin/quizzes/${selectedQuiz.id}`, {
@@ -242,16 +276,16 @@ const Quizzes: React.FC = () => {
           questionId: q.questionId || `q${idx + 1}`,
         })),
       });
-      
+
       setIsEditingView(false);
       loadQuizzes();
-      
+
       // Recarregar detalhes
       const response = await api.get(`/admin/quizzes/${selectedQuiz.id}`);
       setSelectedQuiz(response.data);
       setEditedQuestions(response.data.questions);
     } catch (err: any) {
-      setFormError(err.response?.data?.error || 'Erro ao salvar alterações');
+      setFormError(err.response?.data?.error || "Erro ao salvar alterações");
     } finally {
       setIsSubmitting(false);
     }
@@ -259,7 +293,7 @@ const Quizzes: React.FC = () => {
 
   const handleAISubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setFormError('');
+    setFormError("");
     setIsSubmitting(true);
 
     try {
@@ -267,20 +301,22 @@ const Quizzes: React.FC = () => {
         bookName: formData.bookName,
         bibleVersion: formData.bibleVersion,
       };
-      
+
       // Só adiciona chapter se foi informado (senão gera para o livro todo)
       if (formData.chapter) {
         payload.chapter = formData.chapter;
       }
-      
-      const response = await api.post('/admin/quizzes/generate-ai', payload);
-      
+
+      const response = await api.post("/admin/quizzes/generate-ai", payload);
+
       // Fechar modal de criação e abrir modal de progresso
       setShowCreateModal(false);
       setCurrentJobId(response.data.jobId);
       setShowJobProgressModal(true);
     } catch (err: any) {
-      setFormError(err.response?.data?.error || 'Erro ao gerar questionário com IA');
+      setFormError(
+        err.response?.data?.error || "Erro ao gerar questionário com IA",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -291,7 +327,7 @@ const Quizzes: React.FC = () => {
   };
 
   const handleDelete = async (id: number) => {
-    if (!window.confirm('Tem certeza que deseja deletar este questionário?')) {
+    if (!window.confirm("Tem certeza que deseja deletar este questionário?")) {
       return;
     }
 
@@ -299,438 +335,555 @@ const Quizzes: React.FC = () => {
       await api.delete(`/admin/quizzes/${id}`);
       loadQuizzes();
     } catch (err: any) {
-      setError('Erro ao deletar questionário');
+      setError("Erro ao deletar questionário");
       console.error(err);
     }
   };
 
   const handleLogout = async () => {
     await logout();
-    navigate('/login');
+    navigate("/login");
   };
 
   return (
-    <div className="quizzes-page">
-      <div className="quizzes-header">
-        <div className="header-content">
-          <button onClick={() => navigate('/dashboard')} className="back-button">
-            ← Voltar
-          </button>
-          <h1>Gerenciamento de Questionários</h1>
-        </div>
-        <div className="header-actions">
-          <button onClick={handleOpenCreateModal} className="create-button">
-            + Criar Questionário
-          </button>
-          <button onClick={handleLogout} className="logout-button">
-            Sair
-          </button>
-        </div>
-      </div>
+    <>
+      <Sidebar />
+      <MainContent>
+        <PageTitle>Gerenciamento de Questionários</PageTitle>
 
-      <div className="quizzes-content">
-        {/* Filters */}
-        <div className="filters-section">
-          <input
+        <Button
+          onClick={handleOpenCreateModal}
+          style={{ marginBottom: "20px" }}
+        >
+          + Criar Questionário
+        </Button>
+
+        <FiltersSection>
+          <Input
             type="text"
             placeholder="Buscar por livro..."
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
-              setBookName('');
+              setBookName("");
             }}
-            className="search-input"
           />
 
-          <select 
-            value={bookName} 
+          <Select
+            value={bookName}
             onChange={(e) => {
               setBookName(e.target.value);
-              setSearch('');
-            }} 
-            className="filter-select"
+              setSearch("");
+            }}
           >
             <option value="">Selecionar Livro</option>
-            {availableBooks.map(book => (
-              <option key={book} value={book}>{book}</option>
+            {availableBooks.map((book) => (
+              <option key={book} value={book}>
+                {book}
+              </option>
             ))}
-          </select>
-          
-          <select value={testament} onChange={(e) => setTestament(e.target.value)} className="filter-select">
+          </Select>
+
+          <Select
+            value={testament}
+            onChange={(e) => setTestament(e.target.value)}
+          >
             <option value="">Todos os Testamentos</option>
             <option value="old">Antigo Testamento</option>
             <option value="new">Novo Testamento</option>
-          </select>
+          </Select>
 
-          <select value={bibleVersion} onChange={(e) => setBibleVersion(e.target.value)} className="filter-select">
+          <Select
+            value={bibleVersion}
+            onChange={(e) => setBibleVersion(e.target.value)}
+          >
             <option value="">Todas as Versões</option>
             <option value="NVI">NVI</option>
             <option value="ARC">ARC</option>
             <option value="ARA">ARA</option>
             <option value="NVT">NVT</option>
-          </select>
-        </div>
+          </Select>
+        </FiltersSection>
 
-        {error && <div className="error-message">{error}</div>}
+        {error && <ErrorMessage>{error}</ErrorMessage>}
 
         {loading ? (
-          <div className="loading">Carregando questionários...</div>
+          <EmptyState>Carregando questionários...</EmptyState>
+        ) : quizzes.length === 0 ? (
+          <EmptyState>Nenhum questionário encontrado</EmptyState>
         ) : (
           <>
-            <div className="quizzes-table">
-              <table>
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>Livro</th>
-                    <th>Capítulo</th>
-                    <th>Versão</th>
-                    <th>Testamento</th>
-                    <th>Questões</th>
-                    <th>Criado em</th>
-                    <th>Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {quizzes.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="no-data">Nenhum questionário encontrado</td>
-                    </tr>
-                  ) : (
-                    quizzes.map(quiz => (
-                      <tr key={quiz.id}>
-                        <td>{quiz.id}</td>
-                        <td>{quiz.bookName}</td>
-                        <td>{quiz.chapter}</td>
-                        <td><span className="version-badge">{quiz.bibleVersion}</span></td>
-                        <td>
-                          <span className={`testament-badge ${quiz.testament}`}>
-                            {quiz.testament === 'old' ? 'AT' : 'NT'}
-                          </span>
-                        </td>
-                        <td>{quiz.questionsCount}</td>
-                        <td>{new Date(quiz.createdAt).toLocaleDateString('pt-BR')}</td>
-                        <td className="actions">
-                          <button onClick={() => loadQuizDetail(quiz.id)} className="view-btn" title="Visualizar">
-                            👁️
-                          </button>
-                          <button onClick={() => handleDelete(quiz.id)} className="delete-btn" title="Deletar">
-                            🗑️
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+            <Table>
+              <Thead>
+                <Tr>
+                  <Th>ID</Th>
+                  <Th>Livro</Th>
+                  <Th>Capítulo</Th>
+                  <Th>Versão</Th>
+                  <Th>Testamento</Th>
+                  <Th>Questões</Th>
+                  <Th>Criado em</Th>
+                  <Th>Ações</Th>
+                </Tr>
+              </Thead>
+              <Tbody>
+                {quizzes.map((quiz) => (
+                  <Tr key={quiz.id}>
+                    <Td>{quiz.id}</Td>
+                    <Td>{quiz.bookName}</Td>
+                    <Td>{quiz.chapter}</Td>
+                    <Td>
+                      <Badge type="info">{quiz.bibleVersion}</Badge>
+                    </Td>
+                    <Td>
+                      <Badge
+                        type={quiz.testament === "old" ? "warning" : "success"}
+                      >
+                        {quiz.testament === "old" ? "AT" : "NT"}
+                      </Badge>
+                    </Td>
+                    <Td>{quiz.questionsCount}</Td>
+                    <Td>
+                      {new Date(quiz.createdAt).toLocaleDateString("pt-BR")}
+                    </Td>
+                    <Td>
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        <ActionButton
+                          onClick={() => loadQuizDetail(quiz.id)}
+                          title="Visualizar"
+                        >
+                          👁️
+                        </ActionButton>
+                        <ActionButton
+                          onClick={() => handleDelete(quiz.id)}
+                          title="Deletar"
+                        >
+                          🗑️
+                        </ActionButton>
+                      </div>
+                    </Td>
+                  </Tr>
+                ))}
+              </Tbody>
+            </Table>
 
-            {/* Pagination */}
             {totalPages > 1 && (
-              <div className="pagination">
-                <button 
-                  onClick={() => setPage(p => Math.max(1, p - 1))} 
+              <Pagination>
+                <Button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page === 1}
                 >
                   ← Anterior
-                </button>
-                <span>Página {page} de {totalPages}</span>
-                <button 
-                  onClick={() => setPage(p => Math.min(totalPages, p + 1))} 
+                </Button>
+                <span>
+                  Página {page} de {totalPages}
+                </span>
+                <Button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   disabled={page === totalPages}
                 >
                   Próxima →
-                </button>
-              </div>
+                </Button>
+              </Pagination>
             )}
           </>
         )}
-      </div>
 
-      {/* Modal de Criação */}
-      {showCreateModal && (
-        <div className="modal-overlay" onClick={handleCloseModals}>
-          <div className="modal-content modal-small" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>+ Criar Questionário</h2>
-              <button className="close-button" onClick={handleCloseModals}>×</button>
-            </div>
-
-            <div className="quiz-form">
-              {formError && <div className="form-error">{formError}</div>}
-
-              {/* Seleção de Modo */}
-              <div className="mode-selection">
-                <button
-                  type="button"
-                  className={`mode-button ${createMode === 'manual' ? 'active' : ''}`}
-                  onClick={() => setCreateMode('manual')}
-                >
-                  ✍️ Manual
-                </button>
-                <button
-                  type="button"
-                  className={`mode-button ${createMode === 'ai' ? 'active' : ''}`}
-                  onClick={() => setCreateMode('ai')}
-                >
-                  🤖 Gerar com IA
+        {/* Modal de Criação */}
+        {showCreateModal && (
+          <div className="modal-overlay" onClick={handleCloseModals}>
+            <div
+              className="modal-content modal-small"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="modal-header">
+                <h2>+ Criar Questionário</h2>
+                <button className="close-button" onClick={handleCloseModals}>
+                  ×
                 </button>
               </div>
 
-              {createMode === 'ai' ? (
-                <form onSubmit={handleAISubmit}>
-                  <div className="form-group">
-                    <label>Livro da Bíblia *</label>
-                    <select
-                      name="bookName"
-                      value={formData.bookName}
-                      onChange={handleInputChange}
-                      required
-                    >
-                      <option value="">Selecione um livro</option>
-                      <optgroup label="Antigo Testamento">
-                        {BIBLE_BOOKS.filter(b => b.testament === 'old').map(book => (
-                          <option key={book.name} value={book.name}>{book.name}</option>
-                        ))}
-                      </optgroup>
-                      <optgroup label="Novo Testamento">
-                        {BIBLE_BOOKS.filter(b => b.testament === 'new').map(book => (
-                          <option key={book.name} value={book.name}>{book.name}</option>
-                        ))}
-                      </optgroup>
-                    </select>
-                  </div>
+              <div className="quiz-form">
+                {formError && <div className="form-error">{formError}</div>}
 
-                  <div className="form-group">
-                    <label>Capítulo (opcional)</label>
-                    <select
-                      name="chapter"
-                      value={formData.chapter}
-                      onChange={handleInputChange}
-                      disabled={!formData.bookName}
-                    >
-                      <option value="">Livro completo (todos os capítulos)</option>
-                      {availableChapters.map(num => (
-                        <option key={num} value={num}>Capítulo {num}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label>Versão da Bíblia *</label>
-                    <select name="bibleVersion" value={formData.bibleVersion} onChange={handleInputChange} required>
-                      <option value="NVI">NVI - Nova Versão Internacional</option>
-                      <option value="ARC">ARC - Almeida Revista e Corrigida</option>
-                      <option value="ARA">ARA - Almeida Revista e Atualizada</option>
-                      <option value="NVT">NVT - Nova Versão Transformadora</option>
-                    </select>
-                  </div>
-
-                  <div className="info-box">
-                    <p>💡 A IA irá gerar automaticamente 10 questões de múltipla escolha com 4 alternativas cada.</p>
-                    <p><strong>Dica:</strong> Se não informar o capítulo, a IA criará questionários para todo o livro!</p>
-                  </div>
-
-                  <div className="modal-footer">
-                    <button type="button" onClick={handleCloseModals} className="cancel-button" disabled={isSubmitting}>
-                      Cancelar
-                    </button>
-                    <button type="submit" className="submit-button" disabled={isSubmitting}>
-                      {isSubmitting ? '🤖 Gerando...' : '🤖 Gerar com IA'}
-                    </button>
-                  </div>
-                </form>
-              ) : (
-                <div className="manual-mode-message">
-                  <div className="info-box">
-                    <p>📝 A criação manual de questionários será implementada em breve.</p>
-                    <p>Por enquanto, utilize a opção "Gerar com IA" para criar questionários automaticamente.</p>
-                  </div>
-                  <div className="modal-footer">
-                    <button type="button" onClick={handleCloseModals} className="cancel-button">
-                      Fechar
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de Visualização */}
-      {showViewModal && selectedQuiz && (
-        <div className="modal-overlay" onClick={handleCloseModals}>
-          <div className="modal-content modal-large" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>📋 {selectedQuiz.bookName} {selectedQuiz.chapter}</h2>
-              <div className="modal-header-actions">
-                {!isEditingView ? (
-                  <button 
-                    className="edit-mode-button" 
-                    onClick={() => setIsEditingView(true)}
-                  >
-                    ✏️ Editar
-                  </button>
-                ) : (
-                  <>
-                    <button 
-                      className="cancel-edit-button" 
-                      onClick={() => {
-                        setIsEditingView(false);
-                        setEditedQuestions(selectedQuiz.questions);
-                        setFormError('');
-                      }}
-                      disabled={isSubmitting}
-                    >
-                      Cancelar
-                    </button>
-                    <button 
-                      className="save-edit-button" 
-                      onClick={handleSaveEdits}
-                      disabled={isSubmitting}
-                    >
-                      {isSubmitting ? 'Salvando...' : '💾 Salvar'}
-                    </button>
-                  </>
-                )}
-                <button className="close-button" onClick={handleCloseModals}>×</button>
-              </div>
-            </div>
-
-            <div className="quiz-view-body">
-              {formError && <div className="form-error">{formError}</div>}
-              
-              <div className="quiz-meta">
-                <span><strong>Versão:</strong> {selectedQuiz.bibleVersion}</span>
-                <span><strong>Testamento:</strong> {selectedQuiz.testament === 'old' ? 'Antigo' : 'Novo'}</span>
-                <span><strong>Categoria:</strong> {selectedQuiz.category}</span>
-                <span><strong>Questões:</strong> {editedQuestions.length}</span>
-              </div>
-
-              <div className="questions-list">
-                {editedQuestions.map((q, idx) => (
-                  <div key={idx} className={`question-view ${isEditingView ? 'editing' : ''}`}>
-                    <h4>Questão {idx + 1}</h4>
-                    
-                    {isEditingView ? (
-                      <div className="question-edit-form">
-                        <div className="form-group">
-                          <label>Pergunta:</label>
-                          <textarea
-                            value={q.pergunta}
-                            onChange={(e) => handleEditQuestion(idx, 'pergunta', e.target.value)}
-                            className="question-textarea"
-                            rows={3}
-                          />
-                        </div>
-
-                        <div className="form-group">
-                          <label>Alternativas:</label>
-                          {q.alternativas.map((alt, altIdx) => (
-                            <div key={altIdx} className="alternative-input-group">
-                              <span className="alternative-letter">{String.fromCharCode(65 + altIdx)})</span>
-                              <input
-                                type="text"
-                                value={alt}
-                                onChange={(e) => handleEditAlternativa(idx, altIdx, e.target.value)}
-                                className="alternative-input"
-                                placeholder={`Alternativa ${String.fromCharCode(65 + altIdx)}`}
-                              />
-                              {q.alternativas.length > 2 && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveAlternativa(idx, altIdx)}
-                                  className="remove-alt-button"
-                                  title="Remover alternativa"
-                                >
-                                  🗑️
-                                </button>
-                              )}
-                            </div>
-                          ))}
-                          <button
-                            type="button"
-                            onClick={() => handleAddAlternativa(idx)}
-                            className="add-alt-button"
-                          >
-                            + Adicionar Alternativa
-                          </button>
-                        </div>
-
-                        <div className="form-group">
-                          <label>Resposta Correta:</label>
-                          <select
-                            value={q.respostaCorreta}
-                            onChange={(e) => handleEditQuestion(idx, 'respostaCorreta', e.target.value)}
-                            className="correct-answer-select"
-                          >
-                            <option value="">Selecione a resposta correta</option>
-                            {q.alternativas.map((alt, altIdx) => (
-                              <option key={altIdx} value={alt}>
-                                {String.fromCharCode(65 + altIdx)}) {alt}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        {editedQuestions.length > 1 && (
-                          <div className="question-actions">
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveQuestion(idx)}
-                              className="remove-question-button"
-                            >
-                              🗑️ Remover Questão
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <>
-                        <p className="question-text">{q.pergunta}</p>
-                        <ul className="alternatives-list">
-                          {q.alternativas.map((alt, altIdx) => (
-                            <li key={altIdx} className={alt === q.respostaCorreta ? 'correct' : ''}>
-                              {String.fromCharCode(65 + altIdx)}) {alt}
-                              {alt === q.respostaCorreta && <span className="correct-badge">✓ Correta</span>}
-                            </li>
-                          ))}
-                        </ul>
-                      </>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {isEditingView && (
-                <div className="add-question-section">
+                {/* Seleção de Modo */}
+                <div className="mode-selection">
                   <button
                     type="button"
-                    onClick={handleAddQuestion}
-                    className="add-question-button"
+                    className={`mode-button ${createMode === "manual" ? "active" : ""}`}
+                    onClick={() => setCreateMode("manual")}
                   >
-                    + Adicionar Nova Questão
+                    ✍️ Manual
+                  </button>
+                  <button
+                    type="button"
+                    className={`mode-button ${createMode === "ai" ? "active" : ""}`}
+                    onClick={() => setCreateMode("ai")}
+                  >
+                    🤖 Gerar com IA
                   </button>
                 </div>
-              )}
+
+                {createMode === "ai" ? (
+                  <form onSubmit={handleAISubmit}>
+                    <div className="form-group">
+                      <label>Livro da Bíblia *</label>
+                      <select
+                        name="bookName"
+                        value={formData.bookName}
+                        onChange={handleInputChange}
+                        required
+                      >
+                        <option value="">Selecione um livro</option>
+                        <optgroup label="Antigo Testamento">
+                          {BIBLE_BOOKS.filter((b) => b.testament === "old").map(
+                            (book) => (
+                              <option key={book.name} value={book.name}>
+                                {book.name}
+                              </option>
+                            ),
+                          )}
+                        </optgroup>
+                        <optgroup label="Novo Testamento">
+                          {BIBLE_BOOKS.filter((b) => b.testament === "new").map(
+                            (book) => (
+                              <option key={book.name} value={book.name}>
+                                {book.name}
+                              </option>
+                            ),
+                          )}
+                        </optgroup>
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label>Capítulo (opcional)</label>
+                      <select
+                        name="chapter"
+                        value={formData.chapter}
+                        onChange={handleInputChange}
+                        disabled={!formData.bookName}
+                      >
+                        <option value="">
+                          Livro completo (todos os capítulos)
+                        </option>
+                        {availableChapters.map((num) => (
+                          <option key={num} value={num}>
+                            Capítulo {num}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label>Versão da Bíblia *</label>
+                      <select
+                        name="bibleVersion"
+                        value={formData.bibleVersion}
+                        onChange={handleInputChange}
+                        required
+                      >
+                        <option value="NVI">
+                          NVI - Nova Versão Internacional
+                        </option>
+                        <option value="ARC">
+                          ARC - Almeida Revista e Corrigida
+                        </option>
+                        <option value="ARA">
+                          ARA - Almeida Revista e Atualizada
+                        </option>
+                        <option value="NVT">
+                          NVT - Nova Versão Transformadora
+                        </option>
+                      </select>
+                    </div>
+
+                    <div className="info-box">
+                      <p>
+                        💡 A IA irá gerar automaticamente 10 questões de
+                        múltipla escolha com 4 alternativas cada.
+                      </p>
+                      <p>
+                        <strong>Dica:</strong> Se não informar o capítulo, a IA
+                        criará questionários para todo o livro!
+                      </p>
+                    </div>
+
+                    <div className="modal-footer">
+                      <button
+                        type="button"
+                        onClick={handleCloseModals}
+                        className="cancel-button"
+                        disabled={isSubmitting}
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="submit"
+                        className="submit-button"
+                        disabled={isSubmitting}
+                      >
+                        {isSubmitting ? "🤖 Gerando..." : "🤖 Gerar com IA"}
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="manual-mode-message">
+                    <div className="info-box">
+                      <p>
+                        📝 A criação manual de questionários será implementada
+                        em breve.
+                      </p>
+                      <p>
+                        Por enquanto, utilize a opção "Gerar com IA" para criar
+                        questionários automaticamente.
+                      </p>
+                    </div>
+                    <div className="modal-footer">
+                      <button
+                        type="button"
+                        onClick={handleCloseModals}
+                        className="cancel-button"
+                      >
+                        Fechar
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Modal de Progresso do Job */}
-      {showJobProgressModal && currentJobId && (
-        <JobProgressModal
-          jobId={currentJobId}
-          onClose={() => {
-            setShowJobProgressModal(false);
-            setCurrentJobId(null);
-          }}
-          onComplete={handleJobComplete}
-        />
-      )}
-    </div>
+        {/* Modal de Visualização */}
+        {showViewModal && selectedQuiz && (
+          <div className="modal-overlay" onClick={handleCloseModals}>
+            <div
+              className="modal-content modal-large"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="modal-header">
+                <h2>
+                  📋 {selectedQuiz.bookName} {selectedQuiz.chapter}
+                </h2>
+                <div className="modal-header-actions">
+                  {!isEditingView ? (
+                    <button
+                      className="edit-mode-button"
+                      onClick={() => setIsEditingView(true)}
+                    >
+                      ✏️ Editar
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        className="cancel-edit-button"
+                        onClick={() => {
+                          setIsEditingView(false);
+                          setEditedQuestions(selectedQuiz.questions);
+                          setFormError("");
+                        }}
+                        disabled={isSubmitting}
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        className="save-edit-button"
+                        onClick={handleSaveEdits}
+                        disabled={isSubmitting}
+                      >
+                        {isSubmitting ? "Salvando..." : "💾 Salvar"}
+                      </button>
+                    </>
+                  )}
+                  <button className="close-button" onClick={handleCloseModals}>
+                    ×
+                  </button>
+                </div>
+              </div>
+
+              <div className="quiz-view-body">
+                {formError && <div className="form-error">{formError}</div>}
+
+                <div className="quiz-meta">
+                  <span>
+                    <strong>Versão:</strong> {selectedQuiz.bibleVersion}
+                  </span>
+                  <span>
+                    <strong>Testamento:</strong>{" "}
+                    {selectedQuiz.testament === "old" ? "Antigo" : "Novo"}
+                  </span>
+                  <span>
+                    <strong>Categoria:</strong> {selectedQuiz.category}
+                  </span>
+                  <span>
+                    <strong>Questões:</strong> {editedQuestions.length}
+                  </span>
+                </div>
+
+                <div className="questions-list">
+                  {editedQuestions.map((q, idx) => (
+                    <div
+                      key={idx}
+                      className={`question-view ${isEditingView ? "editing" : ""}`}
+                    >
+                      <h4>Questão {idx + 1}</h4>
+
+                      {isEditingView ? (
+                        <div className="question-edit-form">
+                          <div className="form-group">
+                            <label>Pergunta:</label>
+                            <textarea
+                              value={q.pergunta}
+                              onChange={(e) =>
+                                handleEditQuestion(
+                                  idx,
+                                  "pergunta",
+                                  e.target.value,
+                                )
+                              }
+                              className="question-textarea"
+                              rows={3}
+                            />
+                          </div>
+
+                          <div className="form-group">
+                            <label>Alternativas:</label>
+                            {q.alternativas.map((alt, altIdx) => (
+                              <div
+                                key={altIdx}
+                                className="alternative-input-group"
+                              >
+                                <span className="alternative-letter">
+                                  {String.fromCharCode(65 + altIdx)})
+                                </span>
+                                <input
+                                  type="text"
+                                  value={alt}
+                                  onChange={(e) =>
+                                    handleEditAlternativa(
+                                      idx,
+                                      altIdx,
+                                      e.target.value,
+                                    )
+                                  }
+                                  className="alternative-input"
+                                  placeholder={`Alternativa ${String.fromCharCode(65 + altIdx)}`}
+                                />
+                                {q.alternativas.length > 2 && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleRemoveAlternativa(idx, altIdx)
+                                    }
+                                    className="remove-alt-button"
+                                    title="Remover alternativa"
+                                  >
+                                    🗑️
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                            <button
+                              type="button"
+                              onClick={() => handleAddAlternativa(idx)}
+                              className="add-alt-button"
+                            >
+                              + Adicionar Alternativa
+                            </button>
+                          </div>
+
+                          <div className="form-group">
+                            <label>Resposta Correta:</label>
+                            <select
+                              value={q.respostaCorreta}
+                              onChange={(e) =>
+                                handleEditQuestion(
+                                  idx,
+                                  "respostaCorreta",
+                                  e.target.value,
+                                )
+                              }
+                              className="correct-answer-select"
+                            >
+                              <option value="">
+                                Selecione a resposta correta
+                              </option>
+                              {q.alternativas.map((alt, altIdx) => (
+                                <option key={altIdx} value={alt}>
+                                  {String.fromCharCode(65 + altIdx)}) {alt}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {editedQuestions.length > 1 && (
+                            <div className="question-actions">
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveQuestion(idx)}
+                                className="remove-question-button"
+                              >
+                                🗑️ Remover Questão
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <>
+                          <p className="question-text">{q.pergunta}</p>
+                          <ul className="alternatives-list">
+                            {q.alternativas.map((alt, altIdx) => (
+                              <li
+                                key={altIdx}
+                                className={
+                                  alt === q.respostaCorreta ? "correct" : ""
+                                }
+                              >
+                                {String.fromCharCode(65 + altIdx)}) {alt}
+                                {alt === q.respostaCorreta && (
+                                  <span className="correct-badge">
+                                    ✓ Correta
+                                  </span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {isEditingView && (
+                  <div className="add-question-section">
+                    <button
+                      type="button"
+                      onClick={handleAddQuestion}
+                      className="add-question-button"
+                    >
+                      + Adicionar Nova Questão
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Progresso do Job */}
+        {showJobProgressModal && currentJobId && (
+          <JobProgressModal
+            jobId={currentJobId}
+            onClose={() => {
+              setShowJobProgressModal(false);
+              setCurrentJobId(null);
+            }}
+            onComplete={handleJobComplete}
+          />
+        )}
+      </MainContent>
+    </>
   );
 };
 

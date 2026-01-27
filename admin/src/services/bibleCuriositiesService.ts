@@ -30,12 +30,22 @@ class BibleCuriositiesService {
     limit: number = 20,
     isActive?: string,
   ): Promise<ListResponse> {
-    const params: any = { page, limit };
+    const params: any = { page, limit, orderBy: "id", order: "desc" };
     if (isActive !== undefined) {
       params.isActive = isActive;
     }
 
     const response = await api.get("/admin/curiosities", { params });
+    return response.data.data;
+  }
+
+  async create(data: {
+    content: string;
+    theme?: string;
+    date: string;
+    isActive: boolean;
+  }): Promise<BibleCuriosity> {
+    const response = await api.post("/admin/curiosities", data);
     return response.data.data;
   }
 

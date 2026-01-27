@@ -1,8 +1,25 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import api from '../services/api';
-import './Users.css';
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import Sidebar from "../components/Sidebar";
+import {
+    ActionButton,
+    Badge,
+    Button,
+    EmptyState,
+    ErrorMessage,
+    FiltersSection,
+    MainContent,
+    PageTitle,
+    Table,
+    Tbody,
+    Td,
+    Th,
+    Thead,
+    Tr,
+} from "../components/ui/StyledComponents";
+import { useAuth } from "../contexts/AuthContext";
+import api from "../services/api";
+import "./Users.css";
 
 interface Role {
   id: number;
@@ -11,7 +28,7 @@ interface Role {
 }
 
 interface ReadingStatus {
-  status: 'no_plan' | 'not_started' | 'late' | 'up_to_date';
+  status: "no_plan" | "not_started" | "late" | "up_to_date";
   currentDay: number;
   totalDays: number;
   completedDays: number;
@@ -55,15 +72,19 @@ const Users: React.FC = () => {
     up_to_date: 0,
     late: 0,
     not_started: 0,
-    no_plan: 0
+    no_plan: 0,
   });
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [error, setError] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showConvertModal, setShowConvertModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [convertiblePlans, setConvertiblePlans] = useState<ConvertiblePlan[]>([]);
-  const [selectedPlan, setSelectedPlan] = useState<ConvertiblePlan | null>(null);
+  const [convertiblePlans, setConvertiblePlans] = useState<ConvertiblePlan[]>(
+    [],
+  );
+  const [selectedPlan, setSelectedPlan] = useState<ConvertiblePlan | null>(
+    null,
+  );
   const [converting, setConverting] = useState(false);
   const [showRecalculateModal, setShowRecalculateModal] = useState(false);
   const [recalculating, setRecalculating] = useState(false);
@@ -71,8 +92,8 @@ const Users: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!hasPermission('gerenciar_usuarios')) {
-      navigate('/dashboard');
+    if (!hasPermission("gerenciar_usuarios")) {
+      navigate("/dashboard");
       return;
     }
 
@@ -82,14 +103,15 @@ const Users: React.FC = () => {
 
   const loadUsers = async () => {
     setLoading(true);
-    setError('');
-    
+    setError("");
+
     try {
-      const params = statusFilter !== 'all' ? { readingStatus: statusFilter } : {};
-      const response = await api.get('/admin/users', { params });
+      const params =
+        statusFilter !== "all" ? { readingStatus: statusFilter } : {};
+      const response = await api.get("/admin/users", { params });
       setUsers(response.data);
     } catch (err: any) {
-      setError('Erro ao carregar usuários');
+      setError("Erro ao carregar usuários");
       console.error(err);
     } finally {
       setLoading(false);
@@ -98,42 +120,44 @@ const Users: React.FC = () => {
 
   const loadStats = async () => {
     try {
-      const response = await api.get('/admin/users/stats');
+      const response = await api.get("/admin/users/stats");
       setStats(response.data);
     } catch (err: any) {
-      console.error('Erro ao carregar estatísticas:', err);
+      console.error("Erro ao carregar estatísticas:", err);
     }
   };
 
   const handleLogout = async () => {
     await logout();
-    navigate('/login');
+    navigate("/login");
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
+    return new Date(dateString).toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
     });
   };
 
   const handleOpenConvertModal = async (user: User) => {
     setSelectedUser(user);
-    setError('');
-    
+    setError("");
+
     try {
-      const response = await api.get(`/admin/users/${user.id}/convertible-plans`);
+      const response = await api.get(
+        `/admin/users/${user.id}/convertible-plans`,
+      );
       setConvertiblePlans(response.data.convertiblePlans);
-      
+
       if (response.data.convertiblePlans.length === 0) {
-        setError('Este usuário não possui planos com mais de 365 dias.');
+        setError("Este usuário não possui planos com mais de 365 dias.");
         return;
       }
-      
+
       setShowConvertModal(true);
     } catch (err: any) {
-      setError('Erro ao buscar planos convertíveis');
+      setError("Erro ao buscar planos convertíveis");
       console.error(err);
     }
   };
@@ -150,27 +174,32 @@ const Users: React.FC = () => {
     if (!selectedUser || !selectedPlan) return;
 
     setConverting(true);
-    setError('');
+    setError("");
 
     try {
-      const response = await api.post(`/admin/users/${selectedUser.id}/convert-plan`, {
-        planId: selectedPlan.id
-      });
+      const response = await api.post(
+        `/admin/users/${selectedUser.id}/convert-plan`,
+        {
+          planId: selectedPlan.id,
+        },
+      );
 
       if (response.data.success) {
-        alert(`✅ Plano convertido com sucesso!\n\n` +
-          `• Dias anteriores: ${response.data.oldTotalDays}\n` +
-          `• Novos dias: ${response.data.newTotalDays}\n` +
-          `• Progresso mantido: ${response.data.progressMaintained} leituras`);
-        
+        alert(
+          `✅ Plano convertido com sucesso!\n\n` +
+            `• Dias anteriores: ${response.data.oldTotalDays}\n` +
+            `• Novos dias: ${response.data.newTotalDays}\n` +
+            `• Progresso mantido: ${response.data.progressMaintained} leituras`,
+        );
+
         handleCloseConvertModal();
         loadUsers();
         loadStats();
       } else {
-        setError(response.data.message || 'Erro ao converter plano');
+        setError(response.data.message || "Erro ao converter plano");
       }
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Erro ao converter plano');
+      setError(err.response?.data?.error || "Erro ao converter plano");
       console.error(err);
     } finally {
       setConverting(false);
@@ -179,14 +208,14 @@ const Users: React.FC = () => {
 
   const handleOpenRecalculateModal = async (user: User) => {
     setSelectedUser(user);
-    setError('');
-    
+    setError("");
+
     // Para recalcular, usamos o plano ativo do usuário
     if (!user.readingStatus.planName) {
-      setError('Este usuário não possui um plano ativo.');
+      setError("Este usuário não possui um plano ativo.");
       return;
     }
-    
+
     setShowRecalculateModal(true);
   };
 
@@ -200,25 +229,29 @@ const Users: React.FC = () => {
     if (!selectedUser) return;
 
     setRecalculating(true);
-    setError('');
+    setError("");
 
     try {
       // O backend busca automaticamente o plano ativo se não enviarmos planId
-      const response = await api.post(`/admin/users/${selectedUser.id}/recalculate-plan`);
+      const response = await api.post(
+        `/admin/users/${selectedUser.id}/recalculate-plan`,
+      );
 
       if (response.data.success) {
-        alert(`✅ Plano recalculado com sucesso!\n\n` +
-          `• Leituras corrigidas: ${response.data.correctedReadings}\n` +
-          `• Progresso mantido: ${response.data.progressMaintained} dias`);
-        
+        alert(
+          `✅ Plano recalculado com sucesso!\n\n` +
+            `• Leituras corrigidas: ${response.data.correctedReadings}\n` +
+            `• Progresso mantido: ${response.data.progressMaintained} dias`,
+        );
+
         handleCloseRecalculateModal();
         loadUsers();
         loadStats();
       } else {
-        setError(response.data.message || 'Erro ao recalcular plano');
+        setError(response.data.message || "Erro ao recalcular plano");
       }
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Erro ao recalcular plano');
+      setError(err.response?.data?.error || "Erro ao recalcular plano");
       console.error(err);
     } finally {
       setRecalculating(false);
@@ -226,183 +259,130 @@ const Users: React.FC = () => {
   };
 
   return (
-    <div className="users-page">
-      <div className="users-header">
-        <div className="header-content">
-          <button onClick={() => navigate('/dashboard')} className="back-button">
-            ← Voltar
-          </button>
-          <h1>Gerenciamento de Usuários</h1>
-        </div>
-        <button onClick={handleLogout} className="logout-button">
-          Sair
-        </button>
-      </div>
+    <>
+      <Sidebar />
+      <MainContent>
+        <PageTitle>Gerenciamento de Usuários</PageTitle>
 
-      <div className="users-content">
-        <div className="users-actions">
-          <button className="btn-primary" disabled>
-            + Novo Usuário
-          </button>
-          <div className="search-box">
-            <input 
-              type="text" 
-              placeholder="Buscar usuários..." 
-              disabled
-            />
-          </div>
-        </div>
+        <FiltersSection>
+          <Button
+            className={statusFilter === "all" ? "active" : ""}
+            onClick={() => setStatusFilter("all")}
+          >
+            📊 Todos ({stats.all})
+          </Button>
+          <Button
+            className={statusFilter === "up_to_date" ? "active" : ""}
+            onClick={() => setStatusFilter("up_to_date")}
+          >
+            ✅ Em dia ({stats.up_to_date})
+          </Button>
+          <Button
+            className={statusFilter === "late" ? "active" : ""}
+            onClick={() => setStatusFilter("late")}
+          >
+            ⚠️ Atrasados ({stats.late})
+          </Button>
+          <Button
+            className={statusFilter === "not_started" ? "active" : ""}
+            onClick={() => setStatusFilter("not_started")}
+          >
+            ⏸️ Não iniciaram ({stats.not_started})
+          </Button>
+          <Button
+            className={statusFilter === "no_plan" ? "active" : ""}
+            onClick={() => setStatusFilter("no_plan")}
+          >
+            📝 Sem plano ({stats.no_plan})
+          </Button>
+        </FiltersSection>
 
-        <div className="filter-section">
-          <label>Filtrar por status de leitura:</label>
-          <div className="filter-buttons">
-            <button 
-              className={statusFilter === 'all' ? 'filter-btn active' : 'filter-btn'}
-              onClick={() => setStatusFilter('all')}
-            >
-              📊 Todos ({stats.all})
-            </button>
-            <button 
-              className={statusFilter === 'up_to_date' ? 'filter-btn active' : 'filter-btn'}
-              onClick={() => setStatusFilter('up_to_date')}
-            >
-              ✅ Em dia ({stats.up_to_date})
-            </button>
-            <button 
-              className={statusFilter === 'late' ? 'filter-btn active' : 'filter-btn'}
-              onClick={() => setStatusFilter('late')}
-            >
-              ⚠️ Atrasados ({stats.late})
-            </button>
-            <button 
-              className={statusFilter === 'not_started' ? 'filter-btn active' : 'filter-btn'}
-              onClick={() => setStatusFilter('not_started')}
-            >
-              ⏸️ Não iniciaram ({stats.not_started})
-            </button>
-            <button 
-              className={statusFilter === 'no_plan' ? 'filter-btn active' : 'filter-btn'}
-              onClick={() => setStatusFilter('no_plan')}
-            >
-              📝 Sem plano ({stats.no_plan})
-            </button>
-          </div>
-        </div>
-
-        {error && (
-          <div className="error-message">
-            {error}
-          </div>
-        )}
+        {error && <ErrorMessage>{error}</ErrorMessage>}
 
         {loading ? (
-          <div className="loading">
-            Carregando usuários...
-          </div>
+          <EmptyState>Carregando usuários...</EmptyState>
+        ) : users.length === 0 ? (
+          <EmptyState>Nenhum usuário encontrado</EmptyState>
         ) : (
-          <div className="users-table-container">
-            <table className="users-table">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Nome</th>
-                  <th>E-mail</th>
-                  <th>Roles</th>
-                  <th>Status de Leitura</th>
-                  <th>Criado em</th>
-                  <th>Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="no-data">
-                      Nenhum usuário encontrado
-                    </td>
-                  </tr>
-                ) : (
-                  users.map(user => (
-                    <tr key={user.id}>
-                      <td>{user.id}</td>
-                      <td>{user.fullName || '-'}</td>
-                      <td>{user.email}</td>
-                      <td>
-                        <div className="roles-cell">
-                          {user.roles.map(role => (
-                            <span key={role.id} className="role-badge">
-                              {role.name}
-                            </span>
-                          ))}
-                        </div>
-                      </td>
-                      <td>
-                        <div className="status-cell">
-                          {user.readingStatus.status === 'up_to_date' && (
-                            <span className="status-badge status-up-to-date">
-                              ✅ Em dia ({user.readingStatus.currentDay}/{user.readingStatus.totalDays})
-                            </span>
-                          )}
-                          {user.readingStatus.status === 'late' && (
-                            <span className="status-badge status-late">
-                              ⚠️ Atrasado ({user.readingStatus.daysLate} {user.readingStatus.daysLate === 1 ? 'dia' : 'dias'})
-                            </span>
-                          )}
-                          {user.readingStatus.status === 'not_started' && (
-                            <span className="status-badge status-not-started">
-                              ⏸️ Não iniciou
-                            </span>
-                          )}
-                          {user.readingStatus.status === 'no_plan' && (
-                            <span className="status-badge status-no-plan">
-                              📝 Sem plano
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td>{formatDate(user.createdAt)}</td>
-                      <td>
-                        <div className="action-buttons">
-                          {user.readingStatus.planName && (
-                            <button 
-                              className="btn-recalculate" 
-                              onClick={() => handleOpenRecalculateModal(user)}
-                              title="Recalcular livros do plano"
-                            >
-                              📚
-                            </button>
-                          )}
-                          {user.readingStatus.totalDays > 365 && (
-                            <button 
-                              className="btn-convert" 
-                              onClick={() => handleOpenConvertModal(user)}
-                              title="Converter plano para 365 dias"
-                            >
-                              🔄
-                            </button>
-                          )}
-                          <button className="btn-edit" disabled title="Em breve">
-                            ✏️
-                          </button>
-                          <button className="btn-delete" disabled title="Em breve">
-                            🗑️
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+          <Table>
+            <Thead>
+              <Tr>
+                <Th>ID</Th>
+                <Th>Nome</Th>
+                <Th>E-mail</Th>
+                <Th>Roles</Th>
+                <Th>Status de Leitura</Th>
+                <Th>Criado em</Th>
+                <Th>Ações</Th>
+              </Tr>
+            </Thead>
+            <Tbody>
+              {users.map((user) => (
+                <Tr key={user.id}>
+                  <Td>{user.id}</Td>
+                  <Td>{user.fullName || "-"}</Td>
+                  <Td>{user.email}</Td>
+                  <Td>
+                    <div className="roles-cell">
+                      {user.roles.map((role) => (
+                        <Badge key={role.id} type="info">
+                          {role.name}
+                        </Badge>
+                      ))}
+                    </div>
+                  </Td>
+                  <Td>
+                    {user.readingStatus.status === "up_to_date" && (
+                      <Badge type="success">
+                        ✅ Em dia ({user.readingStatus.currentDay}/
+                        {user.readingStatus.totalDays})
+                      </Badge>
+                    )}
+                    {user.readingStatus.status === "late" && (
+                      <Badge type="warning">
+                        ⚠️ Atrasado ({user.readingStatus.daysLate}{" "}
+                        {user.readingStatus.daysLate === 1 ? "dia" : "dias"})
+                      </Badge>
+                    )}
+                    {user.readingStatus.status === "not_started" && (
+                      <Badge type="info">⏸️ Não iniciou</Badge>
+                    )}
+                    {user.readingStatus.status === "no_plan" && (
+                      <Badge>📝 Sem plano</Badge>
+                    )}
+                  </Td>
+                  <Td>{formatDate(user.createdAt)}</Td>
+                  <Td>
+                    <div className="action-buttons">
+                      {user.readingStatus.planName && (
+                        <ActionButton
+                          onClick={() => handleOpenRecalculateModal(user)}
+                          title="Recalcular livros do plano"
+                        >
+                          📚
+                        </ActionButton>
+                      )}
+                      {user.readingStatus.totalDays > 365 && (
+                        <ActionButton
+                          onClick={() => handleOpenConvertModal(user)}
+                          title="Converter plano para 365 dias"
+                        >
+                          🔄
+                        </ActionButton>
+                      )}
+                    </div>
+                  </Td>
+                </Tr>
+              ))}
+            </Tbody>
+          </Table>
         )}
 
         <div className="info-box">
           <p>
             <strong>ℹ️ Funcionalidade em desenvolvimento</strong>
           </p>
-          <p>
-            As seguintes ações serão implementadas em breve:
-          </p>
+          <p>As seguintes ações serão implementadas em breve:</p>
           <ul>
             <li>Criar novos usuários</li>
             <li>Editar informações de usuários</li>
@@ -412,183 +392,211 @@ const Users: React.FC = () => {
             <li>Paginação</li>
           </ul>
         </div>
-      </div>
 
-      {/* Modal de Conversão */}
-      {showConvertModal && (
-        <div className="modal-overlay" onClick={handleCloseConvertModal}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>🔄 Converter Plano para 365 Dias</h2>
-              <button className="modal-close" onClick={handleCloseConvertModal}>
-                ✕
-              </button>
-            </div>
-            
-            <div className="modal-body">
-              <p className="modal-user-info">
-                <strong>Usuário:</strong> {selectedUser?.fullName || selectedUser?.email}
-              </p>
+        {/* Modal de Conversão */}
+        {showConvertModal && (
+          <div className="modal-overlay" onClick={handleCloseConvertModal}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2>🔄 Converter Plano para 365 Dias</h2>
+                <button
+                  className="modal-close"
+                  onClick={handleCloseConvertModal}
+                >
+                  ✕
+                </button>
+              </div>
 
-              {error && (
-                <div className="error-message">
-                  {error}
-                </div>
-              )}
+              <div className="modal-body">
+                <p className="modal-user-info">
+                  <strong>Usuário:</strong>{" "}
+                  {selectedUser?.fullName || selectedUser?.email}
+                </p>
 
-              {convertiblePlans.length === 0 ? (
-                <p>Carregando planos...</p>
-              ) : (
-                <>
-                  <p className="modal-description">
-                    Este usuário possui {convertiblePlans.length} plano(s) com mais de 365 dias.
-                    Selecione qual plano deseja converter:
-                  </p>
+                {error && <div className="error-message">{error}</div>}
 
-                  <div className="plans-list">
-                    {convertiblePlans.map(plan => (
-                      <div 
-                        key={plan.id} 
-                        className={`plan-item ${selectedPlan?.id === plan.id ? 'selected' : ''}`}
-                        onClick={() => setSelectedPlan(plan)}
-                      >
-                        <div className="plan-info">
-                          <h3>{plan.name}</h3>
-                          <p className="plan-stats">
-                            📊 {plan.totalDays} dias (será convertido para 365)
-                          </p>
-                          <p className="plan-stats">
-                            📖 Dia atual: {plan.currentDay} | Capítulos lidos: {plan.completedChapters}
-                          </p>
-                          <p className="plan-dates">
-                            📅 {formatDate(plan.startDate)} → {formatDate(plan.endDate)}
-                          </p>
-                          {plan.isActive && (
-                            <span className="plan-badge">Ativo</span>
-                          )}
+                {convertiblePlans.length === 0 ? (
+                  <p>Carregando planos...</p>
+                ) : (
+                  <>
+                    <p className="modal-description">
+                      Este usuário possui {convertiblePlans.length} plano(s) com
+                      mais de 365 dias. Selecione qual plano deseja converter:
+                    </p>
+
+                    <div className="plans-list">
+                      {convertiblePlans.map((plan) => (
+                        <div
+                          key={plan.id}
+                          className={`plan-item ${selectedPlan?.id === plan.id ? "selected" : ""}`}
+                          onClick={() => setSelectedPlan(plan)}
+                        >
+                          <div className="plan-info">
+                            <h3>{plan.name}</h3>
+                            <p className="plan-stats">
+                              📊 {plan.totalDays} dias (será convertido para
+                              365)
+                            </p>
+                            <p className="plan-stats">
+                              📖 Dia atual: {plan.currentDay} | Capítulos lidos:{" "}
+                              {plan.completedChapters}
+                            </p>
+                            <p className="plan-dates">
+                              📅 {formatDate(plan.startDate)} →{" "}
+                              {formatDate(plan.endDate)}
+                            </p>
+                            {plan.isActive && (
+                              <span className="plan-badge">Ativo</span>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {selectedPlan && (
-                    <div className="warning-box">
-                      <h4>⚠️ Atenção!</h4>
-                      <p>
-                        Esta ação irá redistribuir as leituras do plano "<strong>{selectedPlan.name}</strong>" 
-                        para caber em 365 dias, mantendo todo o progresso já realizado.
-                      </p>
-                      <p>
-                        <strong>O que será feito:</strong>
-                      </p>
-                      <ul>
-                        <li>✅ Progresso mantido (leituras completadas não serão perdidas)</li>
-                        <li>🔄 Leituras redistribuídas proporcionalmente em 365 dias</li>
-                        <li>📅 Data de início ajustada para 1º de janeiro do ano atual</li>
-                        <li>📅 Data de término ajustada para 31 de dezembro do ano atual</li>
-                      </ul>
-                      <p className="warning-text">
-                        <strong>Esta ação não pode ser desfeita!</strong>
-                      </p>
+                      ))}
                     </div>
-                  )}
-                </>
-              )}
-            </div>
 
-            <div className="modal-footer">
-              <button 
-                className="btn-secondary" 
-                onClick={handleCloseConvertModal}
-                disabled={converting}
-              >
-                Cancelar
-              </button>
-              <button 
-                className="btn-danger" 
-                onClick={handleConfirmConvert}
-                disabled={!selectedPlan || converting}
-              >
-                {converting ? 'Convertendo...' : 'Confirmar Conversão'}
-              </button>
+                    {selectedPlan && (
+                      <div className="warning-box">
+                        <h4>⚠️ Atenção!</h4>
+                        <p>
+                          Esta ação irá redistribuir as leituras do plano "
+                          <strong>{selectedPlan.name}</strong>" para caber em
+                          365 dias, mantendo todo o progresso já realizado.
+                        </p>
+                        <p>
+                          <strong>O que será feito:</strong>
+                        </p>
+                        <ul>
+                          <li>
+                            ✅ Progresso mantido (leituras completadas não serão
+                            perdidas)
+                          </li>
+                          <li>
+                            🔄 Leituras redistribuídas proporcionalmente em 365
+                            dias
+                          </li>
+                          <li>
+                            📅 Data de início ajustada para 1º de janeiro do ano
+                            atual
+                          </li>
+                          <li>
+                            📅 Data de término ajustada para 31 de dezembro do
+                            ano atual
+                          </li>
+                        </ul>
+                        <p className="warning-text">
+                          <strong>Esta ação não pode ser desfeita!</strong>
+                        </p>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              <div className="modal-footer">
+                <button
+                  className="btn-secondary"
+                  onClick={handleCloseConvertModal}
+                  disabled={converting}
+                >
+                  Cancelar
+                </button>
+                <button
+                  className="btn-danger"
+                  onClick={handleConfirmConvert}
+                  disabled={!selectedPlan || converting}
+                >
+                  {converting ? "Convertendo..." : "Confirmar Conversão"}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Modal de Recálculo */}
-      {showRecalculateModal && (
-        <div className="modal-overlay" onClick={handleCloseRecalculateModal}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>📚 Recalcular Livros do Plano</h2>
-              <button className="modal-close" onClick={handleCloseRecalculateModal}>
-                ✕
-              </button>
-            </div>
-            
-            <div className="modal-body">
-              <p className="modal-user-info">
-                <strong>Usuário:</strong> {selectedUser?.fullName || selectedUser?.email}
-              </p>
-              <p className="modal-user-info">
-                <strong>Plano:</strong> {selectedUser?.readingStatus.planName}
-              </p>
+        {/* Modal de Recálculo */}
+        {showRecalculateModal && (
+          <div className="modal-overlay" onClick={handleCloseRecalculateModal}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2>📚 Recalcular Livros do Plano</h2>
+                <button
+                  className="modal-close"
+                  onClick={handleCloseRecalculateModal}
+                >
+                  ✕
+                </button>
+              </div>
 
-              {error && (
-                <div className="error-message">
-                  {error}
+              <div className="modal-body">
+                <p className="modal-user-info">
+                  <strong>Usuário:</strong>{" "}
+                  {selectedUser?.fullName || selectedUser?.email}
+                </p>
+                <p className="modal-user-info">
+                  <strong>Plano:</strong> {selectedUser?.readingStatus.planName}
+                </p>
+
+                {error && <div className="error-message">{error}</div>}
+
+                <div className="info-box-modal">
+                  <h4>ℹ️ Sobre esta operação</h4>
+                  <p>
+                    Esta funcionalidade corrige um erro antigo onde o mesmo
+                    livro aparecia múltiplas vezes no mesmo dia (exemplo:
+                    Gênesis 49-50 e Gênesis 1-2 em vez de Gênesis 49-50 e Êxodo
+                    1-2).
+                  </p>
+                  <p>
+                    <strong>O que será feito:</strong>
+                  </p>
+                  <ul>
+                    <li>
+                      ✅ Recalcula todas as leituras do plano sequencialmente
+                    </li>
+                    <li>
+                      ✅ Mantém o progresso (dias já lidos permanecem marcados)
+                    </li>
+                    <li>✅ Corrige os nomes dos livros nas leituras</li>
+                    <li>
+                      📖 Distribui os capítulos corretamente entre os livros
+                    </li>
+                  </ul>
                 </div>
-              )}
 
-              <div className="info-box-modal">
-                <h4>ℹ️ Sobre esta operação</h4>
-                <p>
-                  Esta funcionalidade corrige um erro antigo onde o mesmo livro aparecia múltiplas 
-                  vezes no mesmo dia (exemplo: Gênesis 49-50 e Gênesis 1-2 em vez de Gênesis 49-50 e Êxodo 1-2).
-                </p>
-                <p>
-                  <strong>O que será feito:</strong>
-                </p>
-                <ul>
-                  <li>✅ Recalcula todas as leituras do plano sequencialmente</li>
-                  <li>✅ Mantém o progresso (dias já lidos permanecem marcados)</li>
-                  <li>✅ Corrige os nomes dos livros nas leituras</li>
-                  <li>📖 Distribui os capítulos corretamente entre os livros</li>
-                </ul>
+                <div className="warning-box">
+                  <h4>⚠️ Atenção!</h4>
+                  <p>
+                    Esta ação recalculará todos os livros do plano ativo do
+                    usuário.
+                  </p>
+                  <p className="warning-text">
+                    <strong>
+                      O progresso será mantido, mas a distribuição dos livros
+                      será refeita!
+                    </strong>
+                  </p>
+                </div>
               </div>
 
-              <div className="warning-box">
-                <h4>⚠️ Atenção!</h4>
-                <p>
-                  Esta ação recalculará todos os livros do plano ativo do usuário.
-                </p>
-                <p className="warning-text">
-                  <strong>O progresso será mantido, mas a distribuição dos livros será refeita!</strong>
-                </p>
+              <div className="modal-footer">
+                <button
+                  className="btn-secondary"
+                  onClick={handleCloseRecalculateModal}
+                  disabled={recalculating}
+                >
+                  Cancelar
+                </button>
+                <button
+                  className="btn-danger"
+                  onClick={handleConfirmRecalculate}
+                  disabled={recalculating}
+                >
+                  {recalculating ? "Recalculando..." : "Confirmar Recálculo"}
+                </button>
               </div>
-            </div>
-
-            <div className="modal-footer">
-              <button 
-                className="btn-secondary" 
-                onClick={handleCloseRecalculateModal}
-                disabled={recalculating}
-              >
-                Cancelar
-              </button>
-              <button 
-                className="btn-danger" 
-                onClick={handleConfirmRecalculate}
-                disabled={recalculating}
-              >
-                {recalculating ? 'Recalculando...' : 'Confirmar Recálculo'}
-              </button>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </MainContent>
+    </>
   );
 };
 

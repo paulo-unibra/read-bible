@@ -248,6 +248,7 @@ router
 
         // Bible Curiosities management
         router.get('/curiosities', [BibleCuriositiesController, 'listAll'])
+        router.post('/curiosities', [BibleCuriositiesController, 'store'])
         router.put('/curiosities/:id', [BibleCuriositiesController, 'update'])
         router.patch('/curiosities/:id/toggle', [BibleCuriositiesController, 'toggleActive'])
         router.delete('/curiosities/:id', [BibleCuriositiesController, 'delete'])

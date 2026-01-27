@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import Sidebar from "../../components/Sidebar";
 import api from "../../services/api";
 import "./AudioSync.css";
 
@@ -198,179 +199,185 @@ const AudioSync: React.FC = () => {
   );
 
   return (
-    <div className="audio-sync-container">
-      <div className="audio-sync-header">
-        <button className="back-button" onClick={() => navigate("/dashboard")}>
-          ← Voltar
-        </button>
-        <h1>Sincronização de Áudio Bíblico</h1>
-      </div>
-
-      <div className="sync-layout">
-        {/* Painel de controle */}
-        <div className="control-panel">
-          <div className="chapter-selector">
-            <div className="input-group">
-              <label>Livro (ID):</label>
-              <input
-                type="number"
-                value={bookId}
-                onChange={(e) => setBookId(parseInt(e.target.value))}
-                min="1"
-                max="66"
-              />
-            </div>
-            <div className="input-group">
-              <label>Capítulo:</label>
-              <input
-                type="number"
-                value={chapterNumber}
-                onChange={(e) => setChapterNumber(parseInt(e.target.value))}
-                min="1"
-              />
-            </div>
-            {isSynced && <span className="synced-badge">✓ Sincronizado</span>}
-          </div>
-
-          <div className="audio-player">
-            <audio
-              ref={audioRef}
-              src={audioUrl}
-              onTimeUpdate={handleTimeUpdate}
-              onLoadedMetadata={handleLoadedMetadata}
-              onEnded={() => setIsPlaying(false)}
-            />
-
-            <div className="player-controls">
-              <button onClick={togglePlayPause} className="play-button">
-                {isPlaying ? "⏸" : "▶"}
-              </button>
-              <span className="time-display">
-                {formatTime(currentTime)} / {formatTime(duration)}
-              </span>
-            </div>
-
-            <input
-              type="range"
-              min="0"
-              max={duration}
-              value={currentTime}
-              onChange={handleSeek}
-              className="seek-bar"
-            />
-          </div>
-
-          <div className="sync-info">
-            <p>
-              <strong>Progresso:</strong> {syncedCount} / {verses.length}{" "}
-              versículos
-            </p>
-            <div className="progress-bar">
-              <div
-                className="progress-fill"
-                style={{ width: `${(syncedCount / verses.length) * 100}%` }}
-              />
-            </div>
-          </div>
-
-          <div className="action-buttons">
-            <button
-              onClick={saveTimestamps}
-              disabled={loading || syncedCount === 0}
-              className="save-button"
-            >
-              {loading ? "Salvando..." : "Salvar Sincronização"}
-            </button>
-            {saveMessage && <p className="save-message">{saveMessage}</p>}
-          </div>
-
-          <div className="instructions">
-            <h3>Instruções:</h3>
-            <ol>
-              <li>Reproduza o áudio</li>
-              <li>
-                Quando ouvir um versículo, clique em "Marcar" ao lado dele
-              </li>
-              <li>O timestamp atual será gravado</li>
-              <li>Repita para todos os versículos</li>
-              <li>Clique em "Salvar Sincronização"</li>
-            </ol>
-          </div>
+    <>
+      <Sidebar />
+      <div className="audio-sync-container">
+        <div className="audio-sync-header">
+          <button
+            className="back-button"
+            onClick={() => navigate("/dashboard")}
+          >
+            ← Voltar
+          </button>
+          <h1>Sincronização de Áudio Bíblico</h1>
         </div>
 
-        {/* Lista de versículos */}
-        <div className="verses-panel">
-          <h2>Versículos</h2>
-          {loading ? (
-            <p>Carregando...</p>
-          ) : (
-            <div className="verses-list">
-              {verses.map((verse, index) => (
+        <div className="sync-layout">
+          {/* Painel de controle */}
+          <div className="control-panel">
+            <div className="chapter-selector">
+              <div className="input-group">
+                <label>Livro (ID):</label>
+                <input
+                  type="number"
+                  value={bookId}
+                  onChange={(e) => setBookId(parseInt(e.target.value))}
+                  min="1"
+                  max="66"
+                />
+              </div>
+              <div className="input-group">
+                <label>Capítulo:</label>
+                <input
+                  type="number"
+                  value={chapterNumber}
+                  onChange={(e) => setChapterNumber(parseInt(e.target.value))}
+                  min="1"
+                />
+              </div>
+              {isSynced && <span className="synced-badge">✓ Sincronizado</span>}
+            </div>
+
+            <div className="audio-player">
+              <audio
+                ref={audioRef}
+                src={audioUrl}
+                onTimeUpdate={handleTimeUpdate}
+                onLoadedMetadata={handleLoadedMetadata}
+                onEnded={() => setIsPlaying(false)}
+              />
+
+              <div className="player-controls">
+                <button onClick={togglePlayPause} className="play-button">
+                  {isPlaying ? "⏸" : "▶"}
+                </button>
+                <span className="time-display">
+                  {formatTime(currentTime)} / {formatTime(duration)}
+                </span>
+              </div>
+
+              <input
+                type="range"
+                min="0"
+                max={duration}
+                value={currentTime}
+                onChange={handleSeek}
+                className="seek-bar"
+              />
+            </div>
+
+            <div className="sync-info">
+              <p>
+                <strong>Progresso:</strong> {syncedCount} / {verses.length}{" "}
+                versículos
+              </p>
+              <div className="progress-bar">
                 <div
-                  key={verse.verseNumber}
-                  className={`verse-item ${selectedVerseIndex === index ? "selected" : ""} ${verse.timestampMs ? "synced" : ""}`}
-                >
-                  <div className="verse-number">{verse.verseNumber}</div>
-                  <div className="verse-content">
-                    <div className="verse-text">{verse.text}</div>
-                    {verse.timestampMs !== undefined && (
-                      <div className="verse-timestamp">
-                        {formatTime(verse.timestampMs)}
-                      </div>
-                    )}
-                  </div>
-                  <div className="verse-actions">
-                    {verse.timestampMs === undefined ? (
-                      <button
-                        onClick={() => markCurrentTime(index)}
-                        className="mark-button"
-                      >
-                        Marcar
-                      </button>
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => jumpToTimestamp(verse.timestampMs)}
-                          className="jump-button"
-                        >
-                          Ir
-                        </button>
-                        <button
-                          onClick={() => clearTimestamp(index)}
-                          className="clear-button"
-                        >
-                          Limpar
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              ))}
+                  className="progress-fill"
+                  style={{ width: `${(syncedCount / verses.length) * 100}%` }}
+                />
+              </div>
             </div>
-          )}
-        </div>
-      </div>
 
-      {/* Lista de capítulos sincronizados */}
-      <div className="synced-chapters-panel">
-        <h2>Capítulos Sincronizados ({syncedChapters.length})</h2>
-        <div className="synced-chapters-list">
-          {syncedChapters.map((chapter) => (
-            <div
-              key={`${chapter.bookId}-${chapter.chapterNumber}`}
-              className="synced-chapter-item"
-              onClick={() => {
-                setBookId(chapter.bookId);
-                setChapterNumber(chapter.chapterNumber);
-              }}
-            >
-              Livro {chapter.bookId}, Cap. {chapter.chapterNumber} (
-              {chapter.totalVerses} versículos)
+            <div className="action-buttons">
+              <button
+                onClick={saveTimestamps}
+                disabled={loading || syncedCount === 0}
+                className="save-button"
+              >
+                {loading ? "Salvando..." : "Salvar Sincronização"}
+              </button>
+              {saveMessage && <p className="save-message">{saveMessage}</p>}
             </div>
-          ))}
+
+            <div className="instructions">
+              <h3>Instruções:</h3>
+              <ol>
+                <li>Reproduza o áudio</li>
+                <li>
+                  Quando ouvir um versículo, clique em "Marcar" ao lado dele
+                </li>
+                <li>O timestamp atual será gravado</li>
+                <li>Repita para todos os versículos</li>
+                <li>Clique em "Salvar Sincronização"</li>
+              </ol>
+            </div>
+          </div>
+
+          {/* Lista de versículos */}
+          <div className="verses-panel">
+            <h2>Versículos</h2>
+            {loading ? (
+              <p>Carregando...</p>
+            ) : (
+              <div className="verses-list">
+                {verses.map((verse, index) => (
+                  <div
+                    key={verse.verseNumber}
+                    className={`verse-item ${selectedVerseIndex === index ? "selected" : ""} ${verse.timestampMs ? "synced" : ""}`}
+                  >
+                    <div className="verse-number">{verse.verseNumber}</div>
+                    <div className="verse-content">
+                      <div className="verse-text">{verse.text}</div>
+                      {verse.timestampMs !== undefined && (
+                        <div className="verse-timestamp">
+                          {formatTime(verse.timestampMs)}
+                        </div>
+                      )}
+                    </div>
+                    <div className="verse-actions">
+                      {verse.timestampMs === undefined ? (
+                        <button
+                          onClick={() => markCurrentTime(index)}
+                          className="mark-button"
+                        >
+                          Marcar
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => jumpToTimestamp(verse.timestampMs)}
+                            className="jump-button"
+                          >
+                            Ir
+                          </button>
+                          <button
+                            onClick={() => clearTimestamp(index)}
+                            className="clear-button"
+                          >
+                            Limpar
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Lista de capítulos sincronizados */}
+        <div className="synced-chapters-panel">
+          <h2>Capítulos Sincronizados ({syncedChapters.length})</h2>
+          <div className="synced-chapters-list">
+            {syncedChapters.map((chapter) => (
+              <div
+                key={`${chapter.bookId}-${chapter.chapterNumber}`}
+                className="synced-chapter-item"
+                onClick={() => {
+                  setBookId(chapter.bookId);
+                  setChapterNumber(chapter.chapterNumber);
+                }}
+              >
+                Livro {chapter.bookId}, Cap. {chapter.chapterNumber} (
+                {chapter.totalVerses} versículos)
+              </div>
+            ))}
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 

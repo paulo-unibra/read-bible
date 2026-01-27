@@ -126,7 +126,7 @@ function App() {
               </ProtectedRoute>
             }
           />
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/" element={<Navigate to="/active-plans" replace />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

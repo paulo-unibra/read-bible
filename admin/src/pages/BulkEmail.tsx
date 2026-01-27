@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import Sidebar from "../components/Sidebar";
 import { useAuth } from "../contexts/AuthContext";
 import api from "../services/api";
 import "./BulkEmail.css";
@@ -143,167 +144,176 @@ function BulkEmail() {
   const currentStatus = statusOptions.find((s) => s.value === selectedStatus)!;
 
   return (
-    <div className="bulk-email-page">
-      <div className="bulk-email-header">
-        <div>
-          <button
-            onClick={() => navigate("/dashboard")}
-            className="back-button"
-          >
-            ← Voltar
-          </button>
-          <h1>📧 Envio de E-mails em Lote</h1>
-          <p className="subtitle">
-            Envie e-mails personalizados baseados no status de leitura dos
-            usuários
-          </p>
-        </div>
-      </div>
-
-      {/* Modo de desenvolvimento aviso */}
-      {import.meta.env.MODE === "development" && (
-        <div className="dev-warning">
-          ⚠️ <strong>Modo Desenvolvimento:</strong> Todos os e-mails serão
-          enviados para o e-mail de teste configurado
-        </div>
-      )}
-
-      {/* Filtros de Status */}
-      <div className="filter-section">
-        <h2>Selecione o Público-Alvo</h2>
-        <div className="status-filters">
-          {statusOptions.map((status) => (
+    <>
+      <Sidebar />
+      <div className="bulk-email-page">
+        <div className="bulk-email-header">
+          <div>
             <button
-              key={status.value}
-              className={`status-filter ${selectedStatus === status.value ? "active" : ""}`}
-              style={
-                selectedStatus === status.value
-                  ? {
-                      borderColor: status.color,
-                      backgroundColor: `${status.color}15`,
-                    }
-                  : {}
-              }
-              onClick={() => setSelectedStatus(status.value)}
+              onClick={() => navigate("/dashboard")}
+              className="back-button"
             >
-              <span
-                style={{
-                  color: status.color,
-                  fontSize: "24px",
-                  marginRight: "8px",
-                }}
-              >
-                {status.label.split(" ")[0]}
-              </span>
-              <span>
-                {status.label.substring(status.label.indexOf(" ") + 1)}
-              </span>
+              ← Voltar
             </button>
-          ))}
+            <h1>📧 Envio de E-mails em Lote</h1>
+            <p className="subtitle">
+              Envie e-mails personalizados baseados no status de leitura dos
+              usuários
+            </p>
+          </div>
         </div>
-      </div>
 
-      {/* Mensagens */}
-      {message.text && (
-        <div className={`message ${message.type}`}>
-          {message.text}
-          <button onClick={() => setMessage({ type: "", text: "" })}>×</button>
-        </div>
-      )}
+        {/* Modo de desenvolvimento aviso */}
+        {import.meta.env.MODE === "development" && (
+          <div className="dev-warning">
+            ⚠️ <strong>Modo Desenvolvimento:</strong> Todos os e-mails serão
+            enviados para o e-mail de teste configurado
+          </div>
+        )}
 
-      {/* Lista de Usuários */}
-      <div className="users-section">
-        <div className="users-header">
-          <h2 style={{ color: currentStatus.color }}>
-            {currentStatus.label} ({users.length} usuários)
-          </h2>
-          {users.length > 0 && (
-            <div className="bulk-actions">
-              <button onClick={toggleSelectAll} className="select-all-btn">
-                {selectedUsers.size === users.length
-                  ? "☐ Desmarcar Todos"
-                  : "☑ Selecionar Todos"}
-              </button>
+        {/* Filtros de Status */}
+        <div className="filter-section">
+          <h2>Selecione o Público-Alvo</h2>
+          <div className="status-filters">
+            {statusOptions.map((status) => (
               <button
-                onClick={sendEmails}
-                disabled={selectedUsers.size === 0 || sending}
-                className="send-btn"
-                style={{ backgroundColor: currentStatus.color }}
+                key={status.value}
+                className={`status-filter ${selectedStatus === status.value ? "active" : ""}`}
+                style={
+                  selectedStatus === status.value
+                    ? {
+                        borderColor: status.color,
+                        backgroundColor: `${status.color}15`,
+                      }
+                    : {}
+                }
+                onClick={() => setSelectedStatus(status.value)}
               >
-                {sending
-                  ? `Enviando... (${sendProgress.current}/${sendProgress.total})`
-                  : `✉️ Enviar para ${selectedUsers.size} selecionados`}
+                <span
+                  style={{
+                    color: status.color,
+                    fontSize: "24px",
+                    marginRight: "8px",
+                  }}
+                >
+                  {status.label.split(" ")[0]}
+                </span>
+                <span>
+                  {status.label.substring(status.label.indexOf(" ") + 1)}
+                </span>
               </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Mensagens */}
+        {message.text && (
+          <div className={`message ${message.type}`}>
+            {message.text}
+            <button onClick={() => setMessage({ type: "", text: "" })}>
+              ×
+            </button>
+          </div>
+        )}
+
+        {/* Lista de Usuários */}
+        <div className="users-section">
+          <div className="users-header">
+            <h2 style={{ color: currentStatus.color }}>
+              {currentStatus.label} ({users.length} usuários)
+            </h2>
+            {users.length > 0 && (
+              <div className="bulk-actions">
+                <button onClick={toggleSelectAll} className="select-all-btn">
+                  {selectedUsers.size === users.length
+                    ? "☐ Desmarcar Todos"
+                    : "☑ Selecionar Todos"}
+                </button>
+                <button
+                  onClick={sendEmails}
+                  disabled={selectedUsers.size === 0 || sending}
+                  className="send-btn"
+                  style={{ backgroundColor: currentStatus.color }}
+                >
+                  {sending
+                    ? `Enviando... (${sendProgress.current}/${sendProgress.total})`
+                    : `✉️ Enviar para ${selectedUsers.size} selecionados`}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {loading ? (
+            <div className="loading">Carregando usuários...</div>
+          ) : users.length === 0 ? (
+            <div className="no-users">
+              <p>
+                Nenhum usuário encontrado com status "{currentStatus.label}"
+              </p>
+            </div>
+          ) : (
+            <div className="users-grid">
+              {users.map((user) => (
+                <div
+                  key={user.id}
+                  className={`user-card ${selectedUsers.has(user.id) ? "selected" : ""}`}
+                  onClick={() => toggleUserSelection(user.id)}
+                >
+                  <div className="user-card-header">
+                    <input
+                      type="checkbox"
+                      checked={selectedUsers.has(user.id)}
+                      onChange={() => {}}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <div className="user-info">
+                      <h3>{user.fullName}</h3>
+                      <p className="user-email">{user.email}</p>
+                    </div>
+                  </div>
+
+                  <div className="plan-info">
+                    <h4>{user.plan.name}</h4>
+                    <div className="progress-stats">
+                      <div className="stat">
+                        <span className="stat-label">Lidos:</span>
+                        <span className="stat-value">
+                          {user.plan.daysCompleted}
+                        </span>
+                      </div>
+                      <div className="stat">
+                        <span className="stat-label">Esperados:</span>
+                        <span className="stat-value">
+                          {user.plan.expectedDays}
+                        </span>
+                      </div>
+                      <div className="stat">
+                        <span className="stat-label">Total:</span>
+                        <span className="stat-value">
+                          {user.plan.totalDays}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="progress-bar">
+                      <div
+                        className="progress-fill"
+                        style={{
+                          width: `${Math.min(user.plan.percentComplete, 100)}%`,
+                          backgroundColor: currentStatus.color,
+                        }}
+                      >
+                        {Math.round(user.plan.percentComplete)}%
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
-
-        {loading ? (
-          <div className="loading">Carregando usuários...</div>
-        ) : users.length === 0 ? (
-          <div className="no-users">
-            <p>Nenhum usuário encontrado com status "{currentStatus.label}"</p>
-          </div>
-        ) : (
-          <div className="users-grid">
-            {users.map((user) => (
-              <div
-                key={user.id}
-                className={`user-card ${selectedUsers.has(user.id) ? "selected" : ""}`}
-                onClick={() => toggleUserSelection(user.id)}
-              >
-                <div className="user-card-header">
-                  <input
-                    type="checkbox"
-                    checked={selectedUsers.has(user.id)}
-                    onChange={() => {}}
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                  <div className="user-info">
-                    <h3>{user.fullName}</h3>
-                    <p className="user-email">{user.email}</p>
-                  </div>
-                </div>
-
-                <div className="plan-info">
-                  <h4>{user.plan.name}</h4>
-                  <div className="progress-stats">
-                    <div className="stat">
-                      <span className="stat-label">Lidos:</span>
-                      <span className="stat-value">
-                        {user.plan.daysCompleted}
-                      </span>
-                    </div>
-                    <div className="stat">
-                      <span className="stat-label">Esperados:</span>
-                      <span className="stat-value">
-                        {user.plan.expectedDays}
-                      </span>
-                    </div>
-                    <div className="stat">
-                      <span className="stat-label">Total:</span>
-                      <span className="stat-value">{user.plan.totalDays}</span>
-                    </div>
-                  </div>
-
-                  <div className="progress-bar">
-                    <div
-                      className="progress-fill"
-                      style={{
-                        width: `${Math.min(user.plan.percentComplete, 100)}%`,
-                        backgroundColor: currentStatus.color,
-                      }}
-                    >
-                      {Math.round(user.plan.percentComplete)}%
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
-    </div>
+    </>
   );
 }
 

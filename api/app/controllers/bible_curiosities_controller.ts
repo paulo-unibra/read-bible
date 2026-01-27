@@ -352,8 +352,10 @@ export default class BibleCuriositiesController {
       const page = request.input('page', 1)
       const limit = request.input('limit', 20)
       const isActive = request.input('isActive') // 'true', 'false', ou undefined (todos)
+      const orderBy = request.input('orderBy', 'id')
+      const order = request.input('order', 'desc')
 
-      const query = BibleCuriosity.query().orderBy('date', 'desc')
+      const query = BibleCuriosity.query().orderBy(orderBy, order)
 
       if (isActive !== undefined) {
         query.where('isActive', isActive === 'true')
@@ -370,7 +372,7 @@ export default class BibleCuriositiesController {
             theme: c.theme,
             date: c.date.toFormat('yyyy-MM-dd'),
             isActive: c.isActive,
-            createdAt: c.createdAt.toISO(),
+            createdAt: c.createdAt ? c.createdAt.toISO() : null,
           })),
           meta: curiosities.getMeta(),
         },
@@ -380,6 +382,54 @@ export default class BibleCuriositiesController {
       return response.badRequest({
         success: false,
         message: 'Erro ao listar curiosidades',
+      })
+    }
+  }
+
+  /**
+   * Criar nova curiosidade manualmente (admin)
+   */
+  async store({ request, response }: HttpContext) {
+    try {
+      const { content, theme, date, isActive } = request.only([
+        'content',
+        'theme',
+        'date',
+        'isActive',
+      ])
+
+      if (!content || !date) {
+        return response.badRequest({
+          success: false,
+          message: 'Conteúdo e data são obrigatórios',
+        })
+      }
+
+      const curiosity = await BibleCuriosity.create({
+        content,
+        theme: theme || null,
+        date: DateTime.fromFormat(date, 'yyyy-MM-dd'),
+        isActive: isActive !== undefined ? isActive : true,
+        likesCount: 0,
+        sharesCount: 0,
+      })
+
+      return response.created({
+        success: true,
+        message: 'Curiosidade criada com sucesso',
+        data: {
+          id: curiosity.id,
+          content: curiosity.content,
+          theme: curiosity.theme,
+          date: curiosity.date.toFormat('yyyy-MM-dd'),
+          isActive: curiosity.isActive,
+        },
+      })
+    } catch (error) {
+      console.error('Erro ao criar curiosidade:', error)
+      return response.badRequest({
+        success: false,
+        message: 'Erro ao criar curiosidade',
       })
     }
   }

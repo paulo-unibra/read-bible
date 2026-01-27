@@ -1,5 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import Sidebar from "../components/Sidebar";
+import {
+    Button,
+    EmptyState,
+    ErrorMessage,
+    MainContent,
+    PageTitle,
+} from "../components/ui/StyledComponents";
 import { BIBLE_BOOKS } from "../constants/bibleBooks";
 import { useAuth } from "../contexts/AuthContext";
 import api from "../services/api";
@@ -445,35 +453,20 @@ const ReadingPlanTemplates: React.FC = () => {
   };
 
   return (
-    <div className="templates-page">
-      <div className="templates-header">
-        <div className="header-content">
-          <button
-            onClick={() => navigate("/dashboard")}
-            className="back-button"
-          >
-            ← Voltar
-          </button>
-          <h1>Planos de Leitura</h1>
-        </div>
-        <div className="header-actions">
-          <button onClick={() => setShowAIModal(true)} className="ai-button">
-            🤖 Pedir para IA
-          </button>
-          <button onClick={() => handleOpenModal()} className="create-button">
-            + Criar Plano
-          </button>
-          <button onClick={handleLogout} className="logout-button">
-            Sair
-          </button>
-        </div>
-      </div>
+    <>
+      <Sidebar />
+      <MainContent>
+        <PageTitle>Planos de Leitura</PageTitle>
 
-      <div className="templates-content">
-        {error && <div className="error-message">{error}</div>}
+        <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
+          <Button onClick={() => setShowAIModal(true)}>🤖 Pedir para IA</Button>
+          <Button onClick={() => handleOpenModal()}>+ Criar Plano</Button>
+        </div>
+
+        {error && <ErrorMessage>{error}</ErrorMessage>}
 
         {loading ? (
-          <div className="loading">Carregando planos...</div>
+          <EmptyState>Carregando planos...</EmptyState>
         ) : (
           <>
             {/* Seção de Tipos de Planos Padrão */}
@@ -590,137 +583,138 @@ const ReadingPlanTemplates: React.FC = () => {
             </div>
           </>
         )}
-      </div>
 
-      {/* Modal de IA */}
-      {showAIModal && (
-        <div
-          className="modal-overlay"
-          onClick={() => !isGenerating && setShowAIModal(false)}
-        >
+        {/* Modal de IA */}
+        {showAIModal && (
           <div
-            className="modal-content modal-ai"
-            onClick={(e) => e.stopPropagation()}
+            className="modal-overlay"
+            onClick={() => !isGenerating && setShowAIModal(false)}
           >
-            <div className="modal-header">
-              <h2>🤖 Gerar Plano com IA</h2>
-              {!isGenerating && (
-                <button
-                  className="close-button"
-                  onClick={() => setShowAIModal(false)}
-                >
-                  ×
-                </button>
-              )}
-            </div>
+            <div
+              className="modal-content modal-ai"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="modal-header">
+                <h2>🤖 Gerar Plano com IA</h2>
+                {!isGenerating && (
+                  <button
+                    className="close-button"
+                    onClick={() => setShowAIModal(false)}
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
 
-            <div className="ai-modal-body">
-              {formError && <div className="form-error">{formError}</div>}
+              <div className="ai-modal-body">
+                {formError && <div className="form-error">{formError}</div>}
 
-              {!isGenerating ? (
-                <>
-                  <div className="ai-instructions">
-                    <p>
-                      💡 <strong>Dica:</strong> Seja específico sobre o que
-                      deseja. Exemplos:
+                {!isGenerating ? (
+                  <>
+                    <div className="ai-instructions">
+                      <p>
+                        💡 <strong>Dica:</strong> Seja específico sobre o que
+                        deseja. Exemplos:
+                      </p>
+                      <ul>
+                        <li>"Criar plano de 30 dias lendo os Salmos"</li>
+                        <li>"Plano de 90 dias lendo os Evangelhos e Atos"</li>
+                        <li>"Leitura do Novo Testamento em 100 dias"</li>
+                        <li>
+                          "Plano de 1 ano lendo toda a Bíblia sequencialmente"
+                        </li>
+                      </ul>
+                    </div>
+
+                    <div className="form-group">
+                      <label>Descreva o plano que deseja criar:</label>
+                      <textarea
+                        value={aiPrompt}
+                        onChange={(e) => setAiPrompt(e.target.value)}
+                        placeholder="Ex: Criar um plano de 30 dias focado nos livros proféticos do Antigo Testamento, começando por Isaías e terminando em Malaquias..."
+                        rows={6}
+                        className="ai-textarea"
+                      />
+                    </div>
+
+                    <div className="modal-footer">
+                      <button
+                        type="button"
+                        onClick={() => setShowAIModal(false)}
+                        className="cancel-button"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleGenerateWithAI}
+                        className="ai-generate-button"
+                        disabled={!aiPrompt.trim()}
+                      >
+                        ✨ Gerar Plano
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="ai-generating">
+                    <div className="ai-loader">
+                      <div className="ai-spinner"></div>
+                      <div className="ai-brain">🧠</div>
+                    </div>
+                    <p className="ai-progress-text">{generationProgress}</p>
+                    <p className="ai-wait-text">
+                      Isso pode levar alguns segundos...
                     </p>
-                    <ul>
-                      <li>"Criar plano de 30 dias lendo os Salmos"</li>
-                      <li>"Plano de 90 dias lendo os Evangelhos e Atos"</li>
-                      <li>"Leitura do Novo Testamento em 100 dias"</li>
-                      <li>
-                        "Plano de 1 ano lendo toda a Bíblia sequencialmente"
-                      </li>
-                    </ul>
                   </div>
-
-                  <div className="form-group">
-                    <label>Descreva o plano que deseja criar:</label>
-                    <textarea
-                      value={aiPrompt}
-                      onChange={(e) => setAiPrompt(e.target.value)}
-                      placeholder="Ex: Criar um plano de 30 dias focado nos livros proféticos do Antigo Testamento, começando por Isaías e terminando em Malaquias..."
-                      rows={6}
-                      className="ai-textarea"
-                    />
-                  </div>
-
-                  <div className="modal-footer">
-                    <button
-                      type="button"
-                      onClick={() => setShowAIModal(false)}
-                      className="cancel-button"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleGenerateWithAI}
-                      className="ai-generate-button"
-                      disabled={!aiPrompt.trim()}
-                    >
-                      ✨ Gerar Plano
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <div className="ai-generating">
-                  <div className="ai-loader">
-                    <div className="ai-spinner"></div>
-                    <div className="ai-brain">🧠</div>
-                  </div>
-                  <p className="ai-progress-text">{generationProgress}</p>
-                  <p className="ai-wait-text">
-                    Isso pode levar alguns segundos...
-                  </p>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Modal de Criação/Edição */}
-      {showModal && (
-        <div className="modal-overlay" onClick={handleCloseModal}>
-          <div
-            className="modal-content modal-large"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="modal-header">
-              <h2>{editingTemplate ? "✏️ Editar Plano" : "➕ Criar Plano"}</h2>
-              <button className="close-button" onClick={handleCloseModal}>
-                ×
-              </button>
-            </div>
+        {/* Modal de Criação/Edição */}
+        {showModal && (
+          <div className="modal-overlay" onClick={handleCloseModal}>
+            <div
+              className="modal-content modal-large"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="modal-header">
+                <h2>
+                  {editingTemplate ? "✏️ Editar Plano" : "➕ Criar Plano"}
+                </h2>
+                <button className="close-button" onClick={handleCloseModal}>
+                  ×
+                </button>
+              </div>
 
-            <form onSubmit={handleSubmit} className="template-form">
-              {formError && <div className="form-error">{formError}</div>}
-              {importSuccess && (
-                <div className="form-success">{importSuccess}</div>
-              )}
+              <form onSubmit={handleSubmit} className="template-form">
+                {formError && <div className="form-error">{formError}</div>}
+                {importSuccess && (
+                  <div className="form-success">{importSuccess}</div>
+                )}
 
-              {/* Botão de Importar JSON */}
-              <div className="import-section">
-                <div>
-                  <label htmlFor="json-import" className="import-button">
-                    📥 Importar JSON
-                    <input
-                      id="json-import"
-                      type="file"
-                      accept=".json"
-                      onChange={handleImportJson}
-                      style={{ display: "none" }}
-                    />
-                  </label>
-                  <span className="import-hint">
-                    Importar plano de leitura a partir de arquivo JSON
-                  </span>
-                </div>
-                <details className="json-example">
-                  <summary>Ver exemplo de estrutura JSON</summary>
-                  <pre className="json-code">
-                    {`{
+                {/* Botão de Importar JSON */}
+                <div className="import-section">
+                  <div>
+                    <label htmlFor="json-import" className="import-button">
+                      📥 Importar JSON
+                      <input
+                        id="json-import"
+                        type="file"
+                        accept=".json"
+                        onChange={handleImportJson}
+                        style={{ display: "none" }}
+                      />
+                    </label>
+                    <span className="import-hint">
+                      Importar plano de leitura a partir de arquivo JSON
+                    </span>
+                  </div>
+                  <details className="json-example">
+                    <summary>Ver exemplo de estrutura JSON</summary>
+                    <pre className="json-code">
+                      {`{
   "name": "Plano Exemplo",
   "description": "Descrição do plano",
   "type": "custom",
@@ -755,285 +749,298 @@ const ReadingPlanTemplates: React.FC = () => {
     }
   ]
 }`}
-                  </pre>
-                </details>
-              </div>
+                    </pre>
+                  </details>
+                </div>
 
-              <div className="form-row">
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Nome do Plano *</label>
+                    <input
+                      type="text"
+                      name="name"
+                      value={formData.name}
+                      onChange={handleInputChange}
+                      placeholder="Ex: Leitura Anual da Bíblia"
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Tipo *</label>
+                    <select
+                      name="type"
+                      value={formData.type}
+                      onChange={handleInputChange}
+                      required
+                    >
+                      <option value="annual">Anual</option>
+                      <option value="custom">Personalizado</option>
+                      <option value="sequential">Sequencial</option>
+                      <option value="thematic">Temático</option>
+                    </select>
+                  </div>
+                </div>
+
                 <div className="form-group">
-                  <label>Nome do Plano *</label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
+                  <label>Descrição *</label>
+                  <textarea
+                    name="description"
+                    value={formData.description}
                     onChange={handleInputChange}
-                    placeholder="Ex: Leitura Anual da Bíblia"
+                    placeholder="Descreva o plano de leitura..."
+                    rows={3}
                     required
                   />
                 </div>
 
-                <div className="form-group">
-                  <label>Tipo *</label>
-                  <select
-                    name="type"
-                    value={formData.type}
-                    onChange={handleInputChange}
-                    required
-                  >
-                    <option value="annual">Anual</option>
-                    <option value="custom">Personalizado</option>
-                    <option value="sequential">Sequencial</option>
-                    <option value="thematic">Temático</option>
-                  </select>
-                </div>
-              </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Duração (dias) *</label>
+                    <input
+                      type="number"
+                      name="duration"
+                      value={formData.duration}
+                      onChange={handleInputChange}
+                      placeholder="365"
+                      min="1"
+                      required
+                    />
+                  </div>
 
-              <div className="form-group">
-                <label>Descrição *</label>
-                <textarea
-                  name="description"
-                  value={formData.description}
-                  onChange={handleInputChange}
-                  placeholder="Descreva o plano de leitura..."
-                  rows={3}
-                  required
-                />
-              </div>
+                  <div className="form-group">
+                    <label>Testamento *</label>
+                    <select
+                      name="testament"
+                      value={formData.testament}
+                      onChange={handleInputChange}
+                      required
+                    >
+                      <option value="both">Ambos</option>
+                      <option value="old">Antigo Testamento</option>
+                      <option value="new">Novo Testamento</option>
+                    </select>
+                  </div>
 
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Duração (dias) *</label>
-                  <input
-                    type="number"
-                    name="duration"
-                    value={formData.duration}
-                    onChange={handleInputChange}
-                    placeholder="365"
-                    min="1"
-                    required
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Testamento *</label>
-                  <select
-                    name="testament"
-                    value={formData.testament}
-                    onChange={handleInputChange}
-                    required
-                  >
-                    <option value="both">Ambos</option>
-                    <option value="old">Antigo Testamento</option>
-                    <option value="new">Novo Testamento</option>
-                  </select>
+                  <div className="form-group">
+                    <label>Ordem</label>
+                    <input
+                      type="number"
+                      name="order"
+                      value={formData.order}
+                      onChange={handleInputChange}
+                      placeholder="0"
+                      min="0"
+                    />
+                  </div>
                 </div>
 
-                <div className="form-group">
-                  <label>Ordem</label>
-                  <input
-                    type="number"
-                    name="order"
-                    value={formData.order}
-                    onChange={handleInputChange}
-                    placeholder="0"
-                    min="0"
-                  />
+                <div className="form-group checkbox-group">
+                  <label>
+                    <input
+                      type="checkbox"
+                      name="isActive"
+                      checked={formData.isActive}
+                      onChange={handleInputChange}
+                    />
+                    <span>Ativo (visível no app)</span>
+                  </label>
                 </div>
-              </div>
 
-              <div className="form-group checkbox-group">
-                <label>
-                  <input
-                    type="checkbox"
-                    name="isActive"
-                    checked={formData.isActive}
-                    onChange={handleInputChange}
-                  />
-                  <span>Ativo (visível no app)</span>
-                </label>
-              </div>
+                <div className="readings-section">
+                  <div className="readings-header">
+                    <h3>📚 Leituras Diárias ({readings.length})</h3>
+                    <button
+                      type="button"
+                      onClick={handleAddReading}
+                      className="add-reading-btn"
+                    >
+                      + Adicionar Dia
+                    </button>
+                  </div>
 
-              <div className="readings-section">
-                <div className="readings-header">
-                  <h3>📚 Leituras Diárias ({readings.length})</h3>
+                  <div className="readings-list">
+                    {readings.length === 0 ? (
+                      <div className="no-readings">
+                        <p>Nenhuma leitura adicionada ainda.</p>
+                        <button
+                          type="button"
+                          onClick={handleAddReading}
+                          className="add-first-reading"
+                        >
+                          + Adicionar Primeira Leitura
+                        </button>
+                      </div>
+                    ) : (
+                      readings.map((reading, idx) => (
+                        <div key={idx} className="reading-item">
+                          <div className="reading-header">
+                            <span className="reading-day">
+                              Dia {reading.day}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveReading(idx)}
+                              className="remove-reading-btn"
+                            >
+                              🗑️
+                            </button>
+                          </div>
+
+                          <div className="book-readings-list">
+                            {reading.bookReadings.map(
+                              (bookReading, bookIdx) => (
+                                <div
+                                  key={bookIdx}
+                                  className="book-reading-item"
+                                >
+                                  <div className="book-reading-header">
+                                    <span className="book-reading-label">
+                                      📖 Leitura {bookIdx + 1}
+                                    </span>
+                                    {reading.bookReadings.length > 1 && (
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          handleRemoveBookFromReading(
+                                            idx,
+                                            bookIdx,
+                                          )
+                                        }
+                                        className="remove-book-btn"
+                                        title="Remover livro"
+                                      >
+                                        ✕
+                                      </button>
+                                    )}
+                                  </div>
+                                  <div className="book-reading-fields">
+                                    <div className="form-group">
+                                      <label>Livro</label>
+                                      <select
+                                        value={bookReading.book}
+                                        onChange={(e) =>
+                                          handleBookReadingChange(
+                                            idx,
+                                            bookIdx,
+                                            "book",
+                                            e.target.value,
+                                          )
+                                        }
+                                      >
+                                        <option value="">
+                                          Selecione um livro
+                                        </option>
+                                        <optgroup label="Antigo Testamento">
+                                          {BIBLE_BOOKS.filter(
+                                            (b) => b.testament === "old",
+                                          ).map((book) => (
+                                            <option
+                                              key={book.name}
+                                              value={book.name}
+                                            >
+                                              {book.name}
+                                            </option>
+                                          ))}
+                                        </optgroup>
+                                        <optgroup label="Novo Testamento">
+                                          {BIBLE_BOOKS.filter(
+                                            (b) => b.testament === "new",
+                                          ).map((book) => (
+                                            <option
+                                              key={book.name}
+                                              value={book.name}
+                                            >
+                                              {book.name}
+                                            </option>
+                                          ))}
+                                        </optgroup>
+                                      </select>
+                                    </div>
+
+                                    <div className="form-group">
+                                      <label>
+                                        Capítulos (separados por vírgula)
+                                      </label>
+                                      <input
+                                        type="text"
+                                        value={bookReading.chapters.join(", ")}
+                                        onChange={(e) => {
+                                          const chapters = e.target.value
+                                            .split(",")
+                                            .map((c) => parseInt(c.trim()))
+                                            .filter((c) => !isNaN(c));
+                                          handleBookReadingChange(
+                                            idx,
+                                            bookIdx,
+                                            "chapters",
+                                            chapters,
+                                          );
+                                        }}
+                                        placeholder="Ex: 1, 2, 3"
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              ),
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleAddBookToReading(idx)}
+                              className="add-book-btn"
+                            >
+                              + Adicionar Livro ao Dia
+                            </button>
+                          </div>
+
+                          <div className="form-group full-width reading-description">
+                            <label>Descrição do dia (opcional)</label>
+                            <input
+                              type="text"
+                              value={reading.description || ""}
+                              onChange={(e) =>
+                                handleReadingChange(
+                                  idx,
+                                  "description",
+                                  e.target.value,
+                                )
+                              }
+                              placeholder="Ex: A criação do mundo e início da história"
+                            />
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                <div className="modal-footer">
                   <button
                     type="button"
-                    onClick={handleAddReading}
-                    className="add-reading-btn"
+                    onClick={handleCloseModal}
+                    className="cancel-button"
+                    disabled={isSubmitting}
                   >
-                    + Adicionar Dia
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="submit-button"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting
+                      ? "Salvando..."
+                      : editingTemplate
+                        ? "💾 Salvar"
+                        : "➕ Criar"}
                   </button>
                 </div>
-
-                <div className="readings-list">
-                  {readings.length === 0 ? (
-                    <div className="no-readings">
-                      <p>Nenhuma leitura adicionada ainda.</p>
-                      <button
-                        type="button"
-                        onClick={handleAddReading}
-                        className="add-first-reading"
-                      >
-                        + Adicionar Primeira Leitura
-                      </button>
-                    </div>
-                  ) : (
-                    readings.map((reading, idx) => (
-                      <div key={idx} className="reading-item">
-                        <div className="reading-header">
-                          <span className="reading-day">Dia {reading.day}</span>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveReading(idx)}
-                            className="remove-reading-btn"
-                          >
-                            🗑️
-                          </button>
-                        </div>
-
-                        <div className="book-readings-list">
-                          {reading.bookReadings.map((bookReading, bookIdx) => (
-                            <div key={bookIdx} className="book-reading-item">
-                              <div className="book-reading-header">
-                                <span className="book-reading-label">
-                                  📖 Leitura {bookIdx + 1}
-                                </span>
-                                {reading.bookReadings.length > 1 && (
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      handleRemoveBookFromReading(idx, bookIdx)
-                                    }
-                                    className="remove-book-btn"
-                                    title="Remover livro"
-                                  >
-                                    ✕
-                                  </button>
-                                )}
-                              </div>
-                              <div className="book-reading-fields">
-                                <div className="form-group">
-                                  <label>Livro</label>
-                                  <select
-                                    value={bookReading.book}
-                                    onChange={(e) =>
-                                      handleBookReadingChange(
-                                        idx,
-                                        bookIdx,
-                                        "book",
-                                        e.target.value,
-                                      )
-                                    }
-                                  >
-                                    <option value="">Selecione um livro</option>
-                                    <optgroup label="Antigo Testamento">
-                                      {BIBLE_BOOKS.filter(
-                                        (b) => b.testament === "old",
-                                      ).map((book) => (
-                                        <option
-                                          key={book.name}
-                                          value={book.name}
-                                        >
-                                          {book.name}
-                                        </option>
-                                      ))}
-                                    </optgroup>
-                                    <optgroup label="Novo Testamento">
-                                      {BIBLE_BOOKS.filter(
-                                        (b) => b.testament === "new",
-                                      ).map((book) => (
-                                        <option
-                                          key={book.name}
-                                          value={book.name}
-                                        >
-                                          {book.name}
-                                        </option>
-                                      ))}
-                                    </optgroup>
-                                  </select>
-                                </div>
-
-                                <div className="form-group">
-                                  <label>
-                                    Capítulos (separados por vírgula)
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={bookReading.chapters.join(", ")}
-                                    onChange={(e) => {
-                                      const chapters = e.target.value
-                                        .split(",")
-                                        .map((c) => parseInt(c.trim()))
-                                        .filter((c) => !isNaN(c));
-                                      handleBookReadingChange(
-                                        idx,
-                                        bookIdx,
-                                        "chapters",
-                                        chapters,
-                                      );
-                                    }}
-                                    placeholder="Ex: 1, 2, 3"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                          <button
-                            type="button"
-                            onClick={() => handleAddBookToReading(idx)}
-                            className="add-book-btn"
-                          >
-                            + Adicionar Livro ao Dia
-                          </button>
-                        </div>
-
-                        <div className="form-group full-width reading-description">
-                          <label>Descrição do dia (opcional)</label>
-                          <input
-                            type="text"
-                            value={reading.description || ""}
-                            onChange={(e) =>
-                              handleReadingChange(
-                                idx,
-                                "description",
-                                e.target.value,
-                              )
-                            }
-                            placeholder="Ex: A criação do mundo e início da história"
-                          />
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              <div className="modal-footer">
-                <button
-                  type="button"
-                  onClick={handleCloseModal}
-                  className="cancel-button"
-                  disabled={isSubmitting}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="submit-button"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting
-                    ? "Salvando..."
-                    : editingTemplate
-                      ? "💾 Salvar"
-                      : "➕ Criar"}
-                </button>
-              </div>
-            </form>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </MainContent>
+    </>
   );
 };
 
