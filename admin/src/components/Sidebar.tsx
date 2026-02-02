@@ -151,7 +151,12 @@ const Sidebar: React.FC = () => {
     },
     {
       path: "/bulk-email",
-      label: "📧 E-mails",
+      label: "📧 E-mails em Massa",
+      permission: "gerenciar_usuarios",
+    },
+    {
+      path: "/email-logs",
+      label: "📬 Logs de E-mails",
       permission: "gerenciar_usuarios",
     },
     {

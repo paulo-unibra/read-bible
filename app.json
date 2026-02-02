@@ -2,7 +2,7 @@
   "expo": {
     "name": "Bíblia em Foco",
     "slug": "ReadBible",
-    "version": "1.0.6",
+    "version": "1.0.30",
     "orientation": "portrait",
     "icon": "./assets/images/icon-v2.png",
     "scheme": "readbible",
@@ -10,7 +10,14 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.readbible.app"
+      "bundleIdentifier": "com.readbible.app",
+      "config": {
+        "googleMobileAdsAppId": "ca-app-pub-5942901200629242~1274274321"
+      },
+      "infoPlist": {
+        "NSUserTrackingUsageDescription": "Este identificador será usado para entregar anúncios personalizados para você.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.readbible.app",

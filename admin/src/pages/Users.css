@@ -651,7 +651,7 @@ input[type="checkbox"] {
 .filter-item input:focus {
   outline: none;
   border-color: #2196F3;
-  box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+  /* box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1); */
 }
 
 .filter-item input::placeholder {
@@ -696,7 +696,7 @@ input[type="checkbox"] {
 }
 
 .sortable:hover {
-  background-color: rgba(33, 150, 243, 0.1);
+  /* background-color: rgba(33, 150, 243, 0.1); */
 }
 
 .sortable:active {

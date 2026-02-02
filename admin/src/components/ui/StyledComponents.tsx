@@ -100,7 +100,7 @@ export const Tr = styled.tr`
   }
 
   &:hover {
-    background: #f9f9f9;
+    // background: #f9f9f9;
   }
 `;
 

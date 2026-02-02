@@ -6,6 +6,7 @@ import AudioSync from "./pages/AudioSync";
 import BibleCuriosities from "./pages/BibleCuriosities/BibleCuriosities";
 import BulkEmail from "./pages/BulkEmail";
 import Dashboard from "./pages/Dashboard";
+import EmailLogs from "./pages/EmailLogs";
 import HymnAudioList from "./pages/HymnAudioList/HymnAudioList";
 import HymnAudioManager from "./pages/HymnAudioManager/HymnAudioManager";
 import IncorrectPlans from "./pages/IncorrectPlans/IncorrectPlans";
@@ -115,6 +116,14 @@ function App() {
             element={
               <ProtectedRoute permission="gerenciar_usuarios">
                 <BulkEmail />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/email-logs"
+            element={
+              <ProtectedRoute permission="gerenciar_usuarios">
+                <EmailLogs />
               </ProtectedRoute>
             }
           />

@@ -1,3 +1,4 @@
+import EmailLog from '#models/email_log'
 import Permission from '#models/permission'
 import Role from '#models/role'
 import User from '#models/user'
@@ -6,6 +7,7 @@ import ReadingPlanConverterService from '#services/reading_plan_converter_servic
 import ReadingPlanRecalculatorService from '#services/reading_plan_recalculator_service'
 import type { HttpContext } from '@adonisjs/core/http'
 import hash from '@adonisjs/core/services/hash'
+import { DateTime } from 'luxon'
 
 export default class AuthController {
   /**
@@ -322,10 +324,33 @@ export default class AuthController {
             user.fullName || 'Usuário'
           )
           sent++
+
+          // Registrar sucesso no log
+          await EmailLog.create({
+            userId: user.id,
+            email: user.email,
+            subject: subject.trim(),
+            message: message.trim(),
+            status: 'success',
+            errorMessage: null,
+            sentAt: DateTime.now(),
+          })
         } catch (error) {
           failed++
-          errors.push(`${user.email}: ${error.message}`)
+          const errorMsg = error.message || 'Erro desconhecido'
+          errors.push(`${user.email}: ${errorMsg}`)
           console.error(`Erro ao enviar e-mail para ${user.email}:`, error)
+
+          // Registrar falha no log
+          await EmailLog.create({
+            userId: user.id,
+            email: user.email,
+            subject: subject.trim(),
+            message: message.trim(),
+            status: 'failed',
+            errorMessage: errorMsg,
+            sentAt: null,
+          })
         }
       }
 
@@ -655,6 +680,163 @@ export default class AuthController {
       console.error('❌ [Admin] Erro ao verificar duplicatas:', error)
       return response.internalServerError({
         error: 'Erro ao verificar duplicatas no plano',
+      })
+    }
+  }
+
+  /**
+   * Lista logs de envio de e-mails com filtros
+   * GET /admin/email-logs
+   */
+  async listEmailLogs({ request, response }: HttpContext) {
+    try {
+      const { status, page = 1, limit = 50 } = request.qs()
+
+      const query = EmailLog.query().preload('user').orderBy('created_at', 'desc')
+
+      // Filtrar por status se especificado
+      if (status && ['success', 'failed'].includes(status)) {
+        query.where('status', status)
+      }
+
+      // Paginação
+      const logs = await query.paginate(page, limit)
+
+      return response.ok({
+        data: logs.all().map((log) => ({
+          id: log.id,
+          userId: log.userId,
+          email: log.email,
+          subject: log.subject,
+          message: log.message,
+          status: log.status,
+          errorMessage: log.errorMessage,
+          sentAt: log.sentAt?.toISO(),
+          createdAt: log.createdAt.toISO(),
+          user: log.user
+            ? {
+                id: log.user.id,
+                fullName: log.user.fullName,
+                email: log.user.email,
+              }
+            : null,
+        })),
+        meta: logs.getMeta(),
+      })
+    } catch (error) {
+      console.error('Erro ao listar logs de e-mail:', error)
+      return response.internalServerError({
+        error: 'Erro ao listar logs de e-mail',
+      })
+    }
+  }
+
+  /**
+   * Reenvia e-mails que falharam anteriormente
+   * POST /admin/email-logs/retry
+   */
+  async retryFailedEmails({ request, response }: HttpContext) {
+    try {
+      const { logIds } = request.only(['logIds'])
+
+      if (!logIds || !Array.isArray(logIds) || logIds.length === 0) {
+        return response.badRequest({
+          error: 'É necessário selecionar pelo menos um log',
+        })
+      }
+
+      // Buscar logs de e-mails falhados
+      const logs = await EmailLog.query()
+        .whereIn('id', logIds)
+        .where('status', 'failed')
+        .preload('user')
+
+      if (logs.length === 0) {
+        return response.notFound({
+          error: 'Nenhum log de falha encontrado',
+        })
+      }
+
+      let sent = 0
+      let failed = 0
+      const errors: string[] = []
+
+      for (const log of logs) {
+        try {
+          // Tentar reenviar e-mail
+          await emailService.sendCustomEmail(
+            log.email,
+            log.subject,
+            log.message,
+            log.user?.fullName || 'Usuário'
+          )
+          sent++
+
+          // Criar novo log de sucesso
+          await EmailLog.create({
+            userId: log.userId,
+            email: log.email,
+            subject: log.subject,
+            message: log.message,
+            status: 'success',
+            errorMessage: null,
+            sentAt: DateTime.now(),
+          })
+        } catch (error) {
+          failed++
+          const errorMsg = error.message || 'Erro desconhecido'
+          errors.push(`${log.email}: ${errorMsg}`)
+          console.error(`Erro ao reenviar e-mail para ${log.email}:`, error)
+
+          // Criar novo log de falha
+          await EmailLog.create({
+            userId: log.userId,
+            email: log.email,
+            subject: log.subject,
+            message: log.message,
+            status: 'failed',
+            errorMessage: errorMsg,
+            sentAt: null,
+          })
+        }
+      }
+
+      return response.ok({
+        success: true,
+        sent,
+        failed,
+        total: logs.length,
+        errors: errors.length > 0 ? errors : undefined,
+      })
+    } catch (error) {
+      console.error('Erro ao reenviar e-mails:', error)
+      return response.internalServerError({
+        error: 'Erro ao reenviar e-mails',
+      })
+    }
+  }
+
+  /**
+   * Obtém estatísticas de envio de e-mails
+   * GET /admin/email-logs/stats
+   */
+  async getEmailStats({ response }: HttpContext) {
+    try {
+      const [successCount, failedCount, totalCount] = await Promise.all([
+        EmailLog.query().where('status', 'success').count('* as total'),
+        EmailLog.query().where('status', 'failed').count('* as total'),
+        EmailLog.query().count('* as total'),
+      ])
+
+      return response.ok({
+        success: Number(successCount[0].$extras.total),
+        failed: Number(failedCount[0].$extras.total),
+        total: Number(totalCount[0].$extras.total),
+      })
+    } catch (error) {
+      console.error('Erro ao buscar estatísticas de e-mail:', error)
+      return response.internalServerError({
+        error: 'Erro ao buscar estatísticas',
       })
     }
   }

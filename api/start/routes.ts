@@ -168,6 +168,12 @@ router
           AdminAuthController,
           'checkUserPlanForDuplicates',
         ])
+
+        // Email logs
+        router.get('/email-logs', [AdminAuthController, 'listEmailLogs'])
+        router.post('/email-logs/retry', [AdminAuthController, 'retryFailedEmails'])
+        router.get('/email-logs/stats', [AdminAuthController, 'getEmailStats'])
+
         router.get('/permissions', [AdminAuthController, 'listPermissions'])
         router.post('/permissions', [AdminAuthController, 'createPermission'])
         router.get('/roles', [AdminAuthController, 'listRoles'])

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
+import Toast from "../components/Toast";
 import {
     ActionButton,
     Badge,
@@ -94,6 +95,10 @@ const Users: React.FC = () => {
   const [emailMessage, setEmailMessage] = useState("");
   const [sendingEmail, setSendingEmail] = useState(false);
   const [emailProgress, setEmailProgress] = useState({ current: 0, total: 0 });
+  const [toast, setToast] = useState<{
+    message: string;
+    type: "success" | "error" | "info";
+  } | null>(null);
   const [filters, setFilters] = useState({
     id: "",
     name: "",
@@ -327,11 +332,15 @@ const Users: React.FC = () => {
       });
 
       if (response.data.success) {
-        alert(
-          `✅ E-mails enviados com sucesso!\n\n` +
-            `• Enviados: ${response.data.sent}\n` +
-            `• Falhas: ${response.data.failed}`,
-        );
+        const successMessage =
+          response.data.failed > 0
+            ? `E-mails enviados: ${response.data.sent} com sucesso, ${response.data.failed} falharam`
+            : `${response.data.sent} e-mail(s) enviado(s) com sucesso!`;
+
+        setToast({
+          message: successMessage,
+          type: response.data.failed > 0 ? "info" : "success",
+        });
 
         handleCloseEmailModal();
         setSelectedUsers(new Set());
@@ -1013,6 +1022,16 @@ const Users: React.FC = () => {
           </div>
         )}
       </MainContent>
+
+      {/* Toast de notificação */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+          duration={5000}
+        />
+      )}
     </>
   );
 };
