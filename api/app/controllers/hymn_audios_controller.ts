@@ -1,6 +1,9 @@
 import HymnAudioSync from '#models/hymn_audio_sync'
 import type { HttpContext } from '@adonisjs/core/http'
-import { listAllHymnsWithAudioInDrive, searchHymnAudiosInDrive } from '../services/google_drive_service.js'
+import {
+  listAllHymnsWithAudioInDrive,
+  searchHymnAudiosInDrive,
+} from '../services/google_drive_service.js'
 
 export default class HymnAudiosController {
   /**
@@ -60,7 +63,7 @@ export default class HymnAudiosController {
       const env = (await import('#start/env')).default
       const apiKey = env.get('GOOGLE_API_KEY')
 
-      const audiosWithUrl = audios.map(audio => {
+      const audiosWithUrl = audios.map((audio) => {
         const downloadUrl = useDirect
           ? `https://www.googleapis.com/drive/v3/files/${audio.fileId}?alt=media&key=${apiKey}`
           : (() => {
@@ -289,7 +292,6 @@ export default class HymnAudiosController {
 
       // Retornar o stream
       return response.stream(fileStream.data)
-
     } catch (error) {
       console.error('[HymnAudiosController] Erro ao fazer stream:', error)
       return response.internalServerError({

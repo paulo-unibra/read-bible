@@ -312,7 +312,12 @@ export default function ChapterReaderScreen() {
       }
     } catch (error) {
       console.error("Error loading chapter content:", error);
-      Alert.alert("Erro", "Falha ao carregar conteúdo do capítulo");
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      Alert.alert(
+        "Erro",
+        `Falha ao carregar conteúdo do capítulo: ${errorMessage}`,
+      );
     }
   }, [bibleId, currentBookId, currentChapter]);
 
@@ -526,7 +531,9 @@ export default function ChapterReaderScreen() {
       });
     } catch (error) {
       console.error("Error initializing reader:", error);
-      Alert.alert("Erro", "Falha ao carregar capítulo");
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      Alert.alert("Erro", `Falha ao carregar capítulo: ${errorMessage}`);
       router.back();
     } finally {
       setLoading(false);

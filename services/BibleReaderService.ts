@@ -1,4 +1,5 @@
 import * as SQLite from 'expo-sqlite';
+import * as FileSystem from 'expo-file-system/legacy';
 import { Book, BookIntroduction, Chapter, SearchResult, Verse } from '../types';
 import googleDriveService from './GoogleDriveService';
 
@@ -212,14 +213,222 @@ export class BibleReaderService {
         this.bibleConnections.set(bibleId, null as any);
         return;
       }
-      const localPath = await googleDriveService.getLocalBiblePath(fileName);
+      let localPath = await googleDriveService.getLocalBiblePath(fileName);
       if (!localPath) {
         throw new Error('Bible file not found locally');
       }
-      const db = await SQLite.openDatabaseAsync(localPath);
-      this.bibleConnections.set(bibleId, db);
-    } catch (error) {
-      console.error('Error opening Bible:', error);
+      
+      // Remove file:// prefix if present
+      localPath = localPath.replace(/^file:\/\//, '');
+      
+      // Copy the Bible file to the SQLite directory
+      // expo-sqlite works best with files in its own directory
+      const sqliteDir = `${FileSystem.documentDirectory}SQLite/`;
+      const sqliteDirInfo = await FileSystem.getInfoAsync(sqliteDir);
+      if (!sqliteDirInfo.exists) {
+        await FileSystem.makeDirectoryAsync(sqliteDir, { intermediates: true });
+      }
+      
+      const sqlitePath = `${sqliteDir}${fileName}`;
+      
+      // Validate source file before copying
+      const sourceFileInfo = await FileSystem.getInfoAsync(localPath);
+      if (!sourceFileInfo.exists) {
+        throw new Error(
+          'O arquivo da Bíblia não foi encontrado. Por favor, faça o download novamente.'
+        );
+      }
+      
+      // Check file size - should be at least 50KB for a valid Bible database
+      // Lowered minimum to accommodate iOS file system differences
+      const minSize = 50000; // 50KB
+      if (sourceFileInfo.size && sourceFileInfo.size < minSize) {
+        console.error(`File size too small: ${sourceFileInfo.size} bytes`);
+        // Delete the corrupted file
+        await FileSystem.deleteAsync(localPath, { idempotent: true });
+        throw new Error(
+          'O arquivo da Bíblia está incompleto ou corrompido. ' +
+          'O arquivo foi excluído automaticamente. Por favor, faça o download novamente.'
+        );
+      }
+      
+      // Check if file already exists in SQLite directory, if not copy it
+      const sqliteFileInfo = await FileSystem.getInfoAsync(sqlitePath);
+      if (!sqliteFileInfo.exists) {
+        console.log('Copying Bible file to SQLite directory:', sqlitePath);
+        try {
+          await FileSystem.copyAsync({
+            from: localPath,
+            to: sqlitePath
+          });
+        } catch (copyError) {
+          console.error('Error copying file:', copyError);
+          throw new Error(
+            'Erro ao copiar o arquivo da Bíblia. Por favor, tente novamente.'
+          );
+        }
+      }
+      
+      console.log('Opening Bible from SQLite directory:', fileName);
+      let db: SQLite.SQLiteDatabase | null = null;
+      
+      try {
+        // Use just the filename - expo-sqlite will look in its SQLite directory
+        db = await SQLite.openDatabaseAsync(fileName);
+        console.log('✅ Database opened successfully');
+        
+        // List all tables to help debug
+        let allTables;
+        try {
+          allTables = await db.getAllAsync(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+          );
+          console.log('✅ Available tables in database:', JSON.stringify(allTables));
+        } catch (tableListError) {
+          console.error('❌ Error listing tables:', tableListError);
+          throw new Error(
+            'Não foi possível ler a estrutura do banco de dados. ' +
+            'O arquivo pode estar corrompido.'
+          );
+        }
+        
+        // Validate database structure - check for 'Bible' table
+        const tables = await db.getAllAsync(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='Bible'"
+        );
+        console.log('✅ Bible table check result:', JSON.stringify(tables));
+        
+        if (!tables || tables.length === 0) {
+          const tableNames = allTables && Array.isArray(allTables) 
+            ? allTables.map((t: any) => t.name).join(', ')
+            : 'nenhuma';
+          
+          // Database is invalid - close it and delete both copies
+          if (db) {
+            await db.closeAsync();
+            db = null;
+          }
+          
+          console.error('❌ Invalid database structure. Deleting corrupted files...');
+          await FileSystem.deleteAsync(localPath, { idempotent: true });
+          await FileSystem.deleteAsync(sqlitePath, { idempotent: true });
+          
+          throw new Error(
+            `O arquivo da Bíblia tem estrutura inválida e foi excluído automaticamente.\n\n` +
+            `Estrutura esperada: Tabela 'Bible'\n` +
+            `Tabelas encontradas: ${tableNames}\n\n` +
+            `Por favor, verifique se o arquivo correto foi compartilhado no Google Drive e faça o download novamente.`
+          );
+        }
+        
+        // Validate table structure - check for required columns
+        let columns;
+        let columnNames: string[] = [];
+        
+        try {
+          columns = await db.getAllAsync("PRAGMA table_info(Bible)");
+          console.log('✅ Column info retrieved:', JSON.stringify(columns));
+          columnNames = Array.isArray(columns) ? columns.map((col: any) => col.name) : [];
+        } catch (columnError) {
+          console.error('❌ Error getting column info:', columnError);
+          // Continue without strict column validation on error
+          console.warn('⚠️ Skipping column validation due to error');
+        }
+        
+        if (columnNames.length > 0) {
+          const requiredColumns = ['Book', 'Chapter', 'Verse', 'Scripture'];
+          const missingColumns = requiredColumns.filter(col => !columnNames.includes(col));
+          
+          if (missingColumns.length > 0) {
+            if (db) {
+              await db.closeAsync();
+              db = null;
+            }
+            
+            console.error('❌ Missing required columns:', missingColumns);
+            await FileSystem.deleteAsync(localPath, { idempotent: true });
+            await FileSystem.deleteAsync(sqlitePath, { idempotent: true });
+            
+            throw new Error(
+              `O arquivo da Bíblia não possui as colunas necessárias e foi excluído automaticamente.\n\n` +
+              `Colunas esperadas: ${requiredColumns.join(', ')}\n` +
+              `Colunas encontradas: ${columnNames.join(', ')}\n` +
+              `Colunas faltando: ${missingColumns.join(', ')}\n\n` +
+              `Por favor, faça o download novamente.`
+            );
+          }
+          console.log('✅ All required columns present');
+        }
+        
+        // Check if table has data
+        let rowCount: { count: number } | null = null;
+        
+        try {
+          rowCount = await db.getFirstAsync(
+            "SELECT COUNT(*) as count FROM Bible"
+          ) as { count: number };
+          console.log('✅ Row count retrieved:', JSON.stringify(rowCount));
+        } catch (countError) {
+          console.error('❌ Error counting rows:', countError);
+          // Try alternative query
+          try {
+            const testRow = await db.getFirstAsync("SELECT * FROM Bible LIMIT 1");
+            console.log('✅ Test row retrieved, database has data');
+            rowCount = { count: 1 }; // Assume has data if we can read a row
+          } catch (altError) {
+            console.error('❌ Alternative query also failed:', altError);
+          }
+        }
+        
+        if (!rowCount || rowCount.count === 0) {
+          if (db) {
+            await db.closeAsync();
+            db = null;
+          }
+          
+          console.error('❌ Bible table is empty');
+          await FileSystem.deleteAsync(localPath, { idempotent: true });
+          await FileSystem.deleteAsync(sqlitePath, { idempotent: true });
+          
+          throw new Error(
+            'O arquivo da Bíblia está vazio e foi excluído automaticamente.\n\n' +
+            'Por favor, faça o download novamente.'
+          );
+        }
+        
+        console.log(`✅✅✅ Bible database validated successfully: ${rowCount.count} verses found ✅✅✅`);
+        
+        // Only set connection if all validations passed
+        this.bibleConnections.set(bibleId, db);
+        console.log(`✅ Bible connection stored for bibleId: ${bibleId}`);
+      } catch (validationError: any) {
+        // Close database if it was opened
+        if (db) {
+          try {
+            await db.closeAsync();
+            console.log('Database closed after validation error');
+          } catch (closeError) {
+            console.warn('Error closing database after validation failure:', closeError);
+          }
+        }
+        
+        // Log detailed error information for iOS debugging
+        console.error('❌ Validation error details:', {
+          message: validationError?.message,
+          stack: validationError?.stack,
+          name: validationError?.name,
+        });
+        
+        throw validationError;
+      }
+    } catch (error: any) {
+      console.error('❌ Error opening Bible:', {
+        message: error?.message,
+        stack: error?.stack,
+        name: error?.name,
+        bibleId,
+        fileName,
+      });
       throw error;
     }
   }

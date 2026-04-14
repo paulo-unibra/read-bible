@@ -5,11 +5,13 @@ O erro indica que a Google Drive API não está habilitada no projeto do Google 
 ## Passo 1: Acesse o Console do Google Cloud
 
 Abra o link fornecido no erro:
+
 ```
 https://console.developers.google.com/apis/api/drive.googleapis.com/overview?project=137706116480
 ```
 
 **OU** acesse manualmente:
+
 1. Vá para https://console.cloud.google.com/
 2. Selecione o projeto "nutotia" (ID: 137706116480)
 3. No menu lateral, clique em "APIs e Serviços" > "Biblioteca"
@@ -48,6 +50,7 @@ curl -X POST http://localhost:3333/generate-quiz \
 ## Outras APIs que Podem Ser Necessárias
 
 Se houver outros erros, você também pode precisar habilitar:
+
 - Google Sheets API (se usar planilhas no futuro)
 - Cloud Storage API (se usar buckets)
 

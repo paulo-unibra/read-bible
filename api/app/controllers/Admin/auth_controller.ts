@@ -3,6 +3,7 @@ import Permission from '#models/permission'
 import Role from '#models/role'
 import User from '#models/user'
 import emailService from '#services/email_service'
+import emailQueueService from '#services/email_queue_service'
 import ReadingPlanConverterService from '#services/reading_plan_converter_service'
 import ReadingPlanRecalculatorService from '#services/reading_plan_recalculator_service'
 import type { HttpContext } from '@adonisjs/core/http'
@@ -310,56 +311,24 @@ export default class AuthController {
         })
       }
 
-      // Enviar e-mails
-      let sent = 0
-      let failed = 0
-      const errors: string[] = []
+      // Adicionar e-mails à fila para envio controlado
+      const emailJobs = users.map((user) => ({
+        userId: user.id,
+        email: user.email,
+        subject: subject.trim(),
+        message: message.trim(),
+        userName: user.fullName || 'Usuário',
+      }))
 
-      for (const user of users) {
-        try {
-          await emailService.sendCustomEmail(
-            user.email,
-            subject,
-            message,
-            user.fullName || 'Usuário'
-          )
-          sent++
+      // Adicionar à fila (processamento assíncrono com rate limit)
+      emailQueueService.addToQueue(emailJobs)
 
-          // Registrar sucesso no log
-          await EmailLog.create({
-            userId: user.id,
-            email: user.email,
-            subject: subject.trim(),
-            message: message.trim(),
-            status: 'success',
-            errorMessage: null,
-            sentAt: DateTime.now(),
-          })
-        } catch (error) {
-          failed++
-          const errorMsg = error.message || 'Erro desconhecido'
-          errors.push(`${user.email}: ${errorMsg}`)
-          console.error(`Erro ao enviar e-mail para ${user.email}:`, error)
-
-          // Registrar falha no log
-          await EmailLog.create({
-            userId: user.id,
-            email: user.email,
-            subject: subject.trim(),
-            message: message.trim(),
-            status: 'failed',
-            errorMessage: errorMsg,
-            sentAt: null,
-          })
-        }
-      }
-
+      // Retornar resposta imediata informando que os e-mails foram enfileirados
       return response.ok({
         success: true,
-        sent,
-        failed,
-        total: users.length,
-        errors: errors.length > 0 ? errors : undefined,
+        message: `${users.length} e-mail(s) adicionado(s) à fila de envio`,
+        queued: users.length,
+        note: 'Os e-mails serão enviados gradualmente para respeitar o limite de taxa. Verifique os logs para acompanhar o progresso.',
       })
     } catch (error) {
       console.error('Erro ao enviar e-mails personalizados:', error)
@@ -757,56 +726,24 @@ export default class AuthController {
         })
       }
 
-      let sent = 0
-      let failed = 0
-      const errors: string[] = []
+      // Adicionar e-mails à fila para reenvio controlado
+      const emailJobs = logs.map((log) => ({
+        userId: log.userId,
+        email: log.email,
+        subject: log.subject,
+        message: log.message,
+        userName: log.user?.fullName || 'Usuário',
+      }))
 
-      for (const log of logs) {
-        try {
-          // Tentar reenviar e-mail
-          await emailService.sendCustomEmail(
-            log.email,
-            log.subject,
-            log.message,
-            log.user?.fullName || 'Usuário'
-          )
-          sent++
+      // Adicionar à fila (processamento assíncrono com rate limit)
+      emailQueueService.addToQueue(emailJobs)
 
-          // Criar novo log de sucesso
-          await EmailLog.create({
-            userId: log.userId,
-            email: log.email,
-            subject: log.subject,
-            message: log.message,
-            status: 'success',
-            errorMessage: null,
-            sentAt: DateTime.now(),
-          })
-        } catch (error) {
-          failed++
-          const errorMsg = error.message || 'Erro desconhecido'
-          errors.push(`${log.email}: ${errorMsg}`)
-          console.error(`Erro ao reenviar e-mail para ${log.email}:`, error)
-
-          // Criar novo log de falha
-          await EmailLog.create({
-            userId: log.userId,
-            email: log.email,
-            subject: log.subject,
-            message: log.message,
-            status: 'failed',
-            errorMessage: errorMsg,
-            sentAt: null,
-          })
-        }
-      }
-
+      // Retornar resposta imediata informando que os e-mails foram enfileirados
       return response.ok({
         success: true,
-        sent,
-        failed,
-        total: logs.length,
-        errors: errors.length > 0 ? errors : undefined,
+        message: `${logs.length} e-mail(s) adicionado(s) à fila de reenvio`,
+        queued: logs.length,
+        note: 'Os e-mails serão reenviados gradualmente para respeitar o limite de taxa. Verifique os logs para acompanhar o progresso.',
       })
     } catch (error) {
       console.error('Erro ao reenviar e-mails:', error)

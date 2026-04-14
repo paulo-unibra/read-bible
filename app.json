@@ -2,7 +2,7 @@
   "expo": {
     "name": "Bíblia em Foco",
     "slug": "ReadBible",
-    "version": "1.0.30",
+    "version": "1.0.31",
     "orientation": "portrait",
     "icon": "./assets/images/icon-v2.png",
     "scheme": "readbible",
@@ -15,7 +15,6 @@
         "googleMobileAdsAppId": "ca-app-pub-5942901200629242~1274274321"
       },
       "infoPlist": {
-        "NSUserTrackingUsageDescription": "Este identificador será usado para entregar anúncios personalizados para você.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },

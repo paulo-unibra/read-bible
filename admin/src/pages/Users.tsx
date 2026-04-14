@@ -332,14 +332,12 @@ const Users: React.FC = () => {
       });
 
       if (response.data.success) {
-        const successMessage =
-          response.data.failed > 0
-            ? `E-mails enviados: ${response.data.sent} com sucesso, ${response.data.failed} falharam`
-            : `${response.data.sent} e-mail(s) enviado(s) com sucesso!`;
+        const successMessage = response.data.message || 
+          `${response.data.queued} e-mail(s) adicionado(s) à fila de envio`;
 
         setToast({
-          message: successMessage,
-          type: response.data.failed > 0 ? "info" : "success",
+          message: `${successMessage}. Os e-mails serão enviados gradualmente. Verifique a página "Logs de E-mails" para acompanhar.`,
+          type: "success",
         });
 
         handleCloseEmailModal();

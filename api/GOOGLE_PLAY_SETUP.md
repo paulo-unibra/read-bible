@@ -76,12 +76,15 @@ npm install googleapis
 ## Endpoints Disponíveis
 
 ### GET /admin/reports/play-store/general
+
 Retorna estatísticas gerais (instalações, crashes, ANRs) para um período
 
 **Query Params:**
+
 - `days` (opcional, padrão: 30): Número de dias para buscar estatísticas
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -125,35 +128,43 @@ Retorna estatísticas gerais (instalações, crashes, ANRs) para um período
 ```
 
 ### GET /admin/reports/play-store/installs
+
 Retorna apenas métricas de instalações
 
 **Query Params:**
+
 - `startDate` (obrigatório): Data inicial no formato YYYY-MM-DD
 - `endDate` (obrigatório): Data final no formato YYYY-MM-DD
 
 ### GET /admin/reports/play-store/crashes
+
 Retorna apenas métricas de crashes
 
 **Query Params:**
+
 - `startDate` (obrigatório): Data inicial no formato YYYY-MM-DD
 - `endDate` (obrigatório): Data final no formato YYYY-MM-DD
 
 ### GET /admin/reports/play-store/anrs
+
 Retorna apenas métricas de ANRs
 
 **Query Params:**
+
 - `startDate` (obrigatório): Data inicial no formato YYYY-MM-DD
 - `endDate` (obrigatório): Data final no formato YYYY-MM-DD
 
 ## Métricas Disponíveis
 
 ### Instalações
+
 - **Instalações**: Número total de instalações do app
 - **Desinstalações**: Número total de desinstalações
 - **Atualizações**: Número total de atualizações
 - **Instalações Líquidas**: Instalações - Desinstalações
 
 ### Estabilidade
+
 - **Crashes Distintos**: Número de crashes únicos reportados
 - **Taxa de Crash**: Porcentagem de sessões que resultaram em crash
 - **ANRs Distintos**: Número de ANRs (Application Not Responding) únicos
@@ -174,14 +185,17 @@ No painel admin, acesse **Relatórios** e visualize:
 ## Troubleshooting
 
 ### Erro "403 Forbidden"
+
 - Verifique se o service account tem permissões no Google Play Console
 - Confirme se a API está habilitada no Google Cloud Console
 
 ### Erro "Invalid credentials"
+
 - Verifique se o JSON das credenciais está correto no `.env`
 - Confirme se não há quebras de linha indevidas no JSON
 
 ### Dados não aparecem
+
 - O Google Play pode ter delay de até 48h para disponibilizar dados
 - Verifique se o package name está correto
 - Confirme se há dados suficientes no período selecionado

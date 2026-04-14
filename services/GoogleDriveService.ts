@@ -49,7 +49,15 @@ export class GoogleDriveService {
         await FileSystem.makeDirectoryAsync(biblesDir, { intermediates: true });
       }
 
+      // Delete existing file if present to ensure fresh download
+      const existingFileInfo = await FileSystem.getInfoAsync(localPath);
+      if (existingFileInfo.exists) {
+        console.log('Removing existing file before download:', fileName);
+        await FileSystem.deleteAsync(localPath, { idempotent: true });
+      }
+      
       // Download the file
+      console.log('Starting download:', fileName);
       const downloadResult = await FileSystem.downloadAsync(
         driveFile.webContentLink,
         localPath
@@ -57,10 +65,34 @@ export class GoogleDriveService {
 
       if (downloadResult.status !== 200) {
         throw new Error(
-          `Download failed with status: ${downloadResult.status}`
+          `Download falhou com status: ${downloadResult.status}`
+        );
+      }
+      
+      // Verify file was actually downloaded and has content
+      const fileInfo = await FileSystem.getInfoAsync(localPath);
+      if (!fileInfo.exists) {
+        throw new Error('Download completado mas arquivo não encontrado');
+      }
+      
+      if (!fileInfo.size || fileInfo.size === 0) {
+        await FileSystem.deleteAsync(localPath, { idempotent: true });
+        throw new Error('Arquivo baixado está vazio');
+      }
+      
+      // Check minimum file size (at least 50KB for a valid Bible database)
+      // Lowered minimum to accommodate potential iOS compression differences
+      const minSize = 50000; // 50KB
+      if (fileInfo.size < minSize) {
+        await FileSystem.deleteAsync(localPath, { idempotent: true });
+        throw new Error(
+          `Arquivo muito pequeno (${Math.round(fileInfo.size / 1024)}KB). ` +
+          `Um banco de dados de Bíblia válido deve ter pelo menos ${Math.round(minSize / 1024)}KB. ` +
+          `O arquivo pode estar corrompido ou incompleto.`
         );
       }
 
+      console.log(`Bible downloaded successfully: ${fileName} (${Math.round(fileInfo.size / 1024)}KB)`);
       return localPath;
     } catch (error) {
       console.error("Error downloading Bible:", error);
@@ -74,8 +106,19 @@ export class GoogleDriveService {
       const fileInfo = await FileSystem.getInfoAsync(localPath);
 
       if (fileInfo.exists) {
-        await FileSystem.deleteAsync(localPath);
+        await FileSystem.deleteAsync(localPath, { idempotent: true });
       }
+      
+      // Also delete from SQLite directory if exists
+      const sqliteDir = FileSystem.documentDirectory! + 'SQLite/';
+      const sqlitePath = `${sqliteDir}${fileName}`;
+      const sqliteFileInfo = await FileSystem.getInfoAsync(sqlitePath);
+      
+      if (sqliteFileInfo.exists) {
+        await FileSystem.deleteAsync(sqlitePath, { idempotent: true });
+      }
+      
+      console.log(`Bible file deleted: ${fileName}`);
     } catch (error) {
       console.error("Error deleting Bible file:", error);
       throw error;

@@ -41,6 +41,7 @@ GET /admin/users/:userId/convertible-plans
 ```
 
 **Resposta:**
+
 ```json
 {
   "userId": 123,
@@ -68,6 +69,7 @@ POST /admin/users/:userId/convert-plan
 ```
 
 **Body:**
+
 ```json
 {
   "planId": 456
@@ -75,6 +77,7 @@ POST /admin/users/:userId/convert-plan
 ```
 
 **Resposta:**
+
 ```json
 {
   "success": true,
@@ -95,6 +98,7 @@ node ace plan:list-convertible
 ```
 
 **Saída:**
+
 ```
 🔍 Buscando planos com mais de 365 dias...
 
@@ -119,6 +123,7 @@ node ace plan:convert-to-365 12
 ```
 
 **Interação:**
+
 ```
 🔄 Iniciando conversão do plano para 365 dias...
 📋 Plano encontrado: "Plano Sequencial 2026"
@@ -149,7 +154,7 @@ node ace plan:convert-to-365 12
    newDay = Math.ceil(oldDay * compressionRatio)
    ```
 4. **Agrupamento**: Leituras do mesmo novo dia são agrupadas
-5. **Redistribuição**: 
+5. **Redistribuição**:
    - Leituras são redistribuídas nos novos dias
    - Status de completude é mantido
    - Data de conclusão é preservada
@@ -162,6 +167,7 @@ node ace plan:convert-to-365 12
 ### Exemplo Prático
 
 **Antes:**
+
 - Início: 15 de novembro de 2025
 - Fim: 30 de dezembro de 2026
 - Total: 380 dias
@@ -169,6 +175,7 @@ node ace plan:convert-to-365 12
 - Dia 101 pendente
 
 **Depois (executado em 2026):**
+
 - **Início: 1º de janeiro de 2026**
 - **Fim: 31 de dezembro de 2026**
 - Total: 365 dias
@@ -212,14 +219,17 @@ Todos os passos da conversão são logados no console:
 ## 🐛 Troubleshooting
 
 ### "O plano já tem X dias"
+
 - Apenas planos com **mais de 365 dias** podem ser convertidos
 - Planos com exatamente 365 dias ou menos não precisam de conversão
 
 ### "Erro ao converter plano"
+
 - Verifique se o plano existe no banco de dados
 - Confirme que há leituras associadas ao plano
 - Verifique os logs do servidor para detalhes
 
 ### "Usuário não possui planos convertíveis"
+
 - O usuário não tem nenhum plano com mais de 365 dias
 - Verifique a data de criação e tipo do plano

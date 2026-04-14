@@ -25,6 +25,7 @@ O app `com.readbible.app` **está publicado** na Play Store, mas a API retorna e
 3. No menu suspenso, clique em **"Acesso à API"**
 
 Ou acesse diretamente:
+
 ```
 https://play.google.com/console/developers/YOUR_DEVELOPER_ID/api-access
 ```

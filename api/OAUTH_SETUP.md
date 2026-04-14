@@ -35,12 +35,14 @@ Como Service Accounts não funcionam com contas Gmail pessoais (não têm quota 
 ## Passo 2: Obter Refresh Token
 
 1. Edite o arquivo `scripts/get-oauth-token.js`:
+
    ```javascript
    const CLIENT_ID = 'cole-seu-client-id-aqui'
    const CLIENT_SECRET = 'cole-seu-client-secret-aqui'
    ```
 
 2. Execute o script:
+
    ```bash
    node scripts/get-oauth-token.js
    ```
@@ -72,6 +74,7 @@ GOOGLE_DRIVE_FOLDER_ID=12CZeaVlNKMfO3gT5PpOFdVgvY7fEQ0Yq
 ```
 
 **REMOVA** estas linhas antigas:
+
 ```env
 GOOGLE_DRIVE_CREDENTIALS=...
 GOOGLE_DRIVE_SHARED_FOLDER_ID=...
@@ -97,10 +100,13 @@ O arquivo será criado automaticamente na sua pasta do Google Drive! 🎉
 ## Troubleshooting
 
 **Erro: "invalid_grant"**
+
 - O refresh token expirou. Gere um novo executando o Passo 2 novamente.
 
 **Erro: "Access blocked"**
+
 - Certifique-se de ter adicionado seu email como "Test user" na tela de consentimento.
 
 **Erro: "insufficient permissions"**
+
 - Verifique se o scope `drive.file` foi adicionado na tela de consentimento.

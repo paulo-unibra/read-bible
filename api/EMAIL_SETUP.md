@@ -20,6 +20,7 @@ O sistema de envio de e-mails está configurado e testado com sucesso.
 ## 📝 Template do E-mail
 
 O e-mail enviado inclui:
+
 - ✅ Cabeçalho com logo/nome do app
 - ✅ Saudação personalizada com nome do usuário
 - ✅ Token destacado em fonte grande e monoespaçada
@@ -38,6 +39,7 @@ node ace test:email
 ```
 
 Este comando:
+
 1. Verifica a conexão SMTP
 2. Envia um e-mail de teste para pr1999ricardo@gmail.com
 3. Mostra o resultado no console
@@ -65,22 +67,25 @@ SMTP_FROM_NAME=Bíblia em Foco
 ## 🔄 Fluxo Completo
 
 ### 1. Solicitar Reset
+
 ```
 POST /password/forgot
 Body: { "email": "usuario@exemplo.com" }
 ```
 
 ### 2. Verificar Token
+
 ```
 POST /password/verify
 Body: { "email": "usuario@exemplo.com", "token": "123456" }
 ```
 
 ### 3. Redefinir Senha
+
 ```
 POST /password/reset
-Body: { 
-  "email": "usuario@exemplo.com", 
+Body: {
+  "email": "usuario@exemplo.com",
   "token": "123456",
   "newPassword": "novaSenha123"
 }

@@ -21,13 +21,13 @@ export default class QuizQuestion extends BaseModel {
     consume: (value: string) => {
       if (typeof value === 'string') {
         try {
-          return JSON.parse(value);
+          return JSON.parse(value)
         } catch (error) {
-          console.error('[QuizQuestion] Erro ao parsear alternativas:', value);
-          return [];
+          console.error('[QuizQuestion] Erro ao parsear alternativas:', value)
+          return []
         }
       }
-      return Array.isArray(value) ? value : [];
+      return Array.isArray(value) ? value : []
     },
   })
   declare alternativas: string[]

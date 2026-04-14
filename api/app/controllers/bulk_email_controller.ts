@@ -1,6 +1,7 @@
 import ReadingPlan from '#models/reading_plan'
 import User from '#models/user'
 import emailService from '#services/email_service'
+import emailQueueService from '#services/email_queue_service'
 import type { HttpContext } from '@adonisjs/core/http'
 import db from '@adonisjs/lucid/services/db'
 import { DateTime } from 'luxon'

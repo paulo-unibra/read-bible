@@ -15,7 +15,7 @@ export default class AuthController {
       if (existingUser) {
         return response.conflict({
           success: false,
-          message: 'Email já cadastrado'
+          message: 'Email já cadastrado',
         })
       }
 
@@ -23,7 +23,7 @@ export default class AuthController {
       const user = await User.create({
         fullName: data.name,
         email: data.email,
-        password: data.password
+        password: data.password,
       })
 
       // Gerar token de acesso
@@ -36,16 +36,16 @@ export default class AuthController {
           user: {
             id: user.id,
             name: user.fullName,
-            email: user.email
+            email: user.email,
           },
-          token: token.value!.release()
-        }
+          token: token.value!.release(),
+        },
       })
     } catch (error) {
       return response.badRequest({
         success: false,
         message: 'Erro ao cadastrar usuário',
-        error: error.messages || error.message
+        error: error.messages || error.message,
       })
     }
   }
@@ -70,15 +70,15 @@ export default class AuthController {
           user: {
             id: user.id,
             name: user.fullName,
-            email: user.email
+            email: user.email,
           },
-          token: token.value!.release()
-        }
+          token: token.value!.release(),
+        },
       })
     } catch (error) {
       return response.unauthorized({
         success: false,
-        message: 'Email ou senha incorretos'
+        message: 'Email ou senha incorretos',
       })
     }
   }
@@ -93,12 +93,12 @@ export default class AuthController {
 
       return response.ok({
         success: true,
-        message: 'Logout realizado com sucesso'
+        message: 'Logout realizado com sucesso',
       })
     } catch (error) {
       return response.badRequest({
         success: false,
-        message: 'Erro ao fazer logout'
+        message: 'Erro ao fazer logout',
       })
     }
   }
@@ -115,13 +115,13 @@ export default class AuthController {
         data: {
           id: user.id,
           name: user.fullName,
-          email: user.email
-        }
+          email: user.email,
+        },
       })
     } catch (error) {
       return response.unauthorized({
         success: false,
-        message: 'Não autenticado'
+        message: 'Não autenticado',
       })
     }
   }
@@ -137,7 +137,7 @@ export default class AuthController {
       await user.load('readingPlans')
 
       // Buscar plano ativo
-      const activePlan = user.readingPlans.find(plan => plan.isActive)
+      const activePlan = user.readingPlans.find((plan) => plan.isActive)
 
       let stats = {
         totalChaptersRead: 0,
@@ -191,8 +191,8 @@ export default class AuthController {
         )
 
         const expectedDayByDate = Math.min(daysPassed + 1, totalDays)
-        const isLate = completedDays < (expectedDayByDate - 1)
-        const daysLate = isLate ? (expectedDayByDate - 1 - completedDays) : 0
+        const isLate = completedDays < expectedDayByDate - 1
+        const daysLate = isLate ? expectedDayByDate - 1 - completedDays : 0
 
         stats = {
           totalChaptersRead,
@@ -219,13 +219,13 @@ export default class AuthController {
 
       return response.ok({
         success: true,
-        data: stats
+        data: stats,
       })
     } catch (error) {
       console.error('Erro ao buscar estatísticas:', error)
       return response.badRequest({
         success: false,
-        message: 'Erro ao buscar estatísticas do usuário'
+        message: 'Erro ao buscar estatísticas do usuário',
       })
     }
   }
@@ -301,13 +301,13 @@ export default class AuthController {
         data: {
           id: user.id,
           name: user.fullName,
-          email: user.email
-        }
+          email: user.email,
+        },
       })
     } catch (error) {
       return response.badRequest({
         success: false,
-        message: 'Erro ao atualizar perfil'
+        message: 'Erro ao atualizar perfil',
       })
     }
   }

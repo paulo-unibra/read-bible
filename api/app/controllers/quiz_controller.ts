@@ -41,7 +41,7 @@ export default class QuizController {
           quiz: {
             name: `${bookName} ${chapter}`,
             category: existingQuiz.category,
-            questions: existingQuiz.questions.map(q => ({
+            questions: existingQuiz.questions.map((q) => ({
               id: q.questionId,
               pergunta: q.pergunta,
               alternativas: q.alternativas,
@@ -109,13 +109,45 @@ export default class QuizController {
    */
   private getTestament(bookName: string): string {
     const oldTestamentBooks = [
-      'Gênesis', 'Êxodo', 'Levítico', 'Números', 'Deuteronômio',
-      'Josué', 'Juízes', 'Rute', '1 Samuel', '2 Samuel', '1 Reis', '2 Reis',
-      '1 Crônicas', '2 Crônicas', 'Esdras', 'Neemias', 'Ester',
-      'Jó', 'Salmos', 'Provérbios', 'Eclesiastes', 'Cantares',
-      'Isaías', 'Jeremias', 'Lamentações', 'Ezequiel', 'Daniel',
-      'Oséias', 'Joel', 'Amós', 'Obadias', 'Jonas', 'Miquéias',
-      'Naum', 'Habacuque', 'Sofonias', 'Ageu', 'Zacarias', 'Malaquias'
+      'Gênesis',
+      'Êxodo',
+      'Levítico',
+      'Números',
+      'Deuteronômio',
+      'Josué',
+      'Juízes',
+      'Rute',
+      '1 Samuel',
+      '2 Samuel',
+      '1 Reis',
+      '2 Reis',
+      '1 Crônicas',
+      '2 Crônicas',
+      'Esdras',
+      'Neemias',
+      'Ester',
+      'Jó',
+      'Salmos',
+      'Provérbios',
+      'Eclesiastes',
+      'Cantares',
+      'Isaías',
+      'Jeremias',
+      'Lamentações',
+      'Ezequiel',
+      'Daniel',
+      'Oséias',
+      'Joel',
+      'Amós',
+      'Obadias',
+      'Jonas',
+      'Miquéias',
+      'Naum',
+      'Habacuque',
+      'Sofonias',
+      'Ageu',
+      'Zacarias',
+      'Malaquias',
     ]
 
     return oldTestamentBooks.includes(bookName) ? 'old' : 'new'
@@ -146,7 +178,7 @@ export default class QuizController {
 
       return response.ok({
         success: true,
-        quizzes: quizzes.map(quiz => ({
+        quizzes: quizzes.map((quiz) => ({
           id: quiz.id,
           bookName: quiz.bookName,
           chapter: quiz.chapter,
@@ -186,7 +218,7 @@ export default class QuizController {
           bibleVersion: quiz.bibleVersion,
           testament: quiz.testament,
           category: quiz.category,
-          questions: quiz.questions.map(q => ({
+          questions: quiz.questions.map((q) => ({
             id: q.questionId,
             pergunta: q.pergunta,
             alternativas: q.alternativas,

@@ -1,7 +1,9 @@
 # Comandos cURL para testar Google Play API no Insomnia
 
 ## ⚠️ Importante
+
 A autenticação do Google Play usa OAuth2 com Service Account, que requer:
+
 1. Gerar um JWT (JSON Web Token) assinado
 2. Trocar o JWT por um Access Token
 3. Usar o Access Token nas requisições
@@ -42,6 +44,7 @@ Você precisa extrair do `GOOGLE_PLAY_CREDENTIALS`:
 ```
 
 **No Insomnia:**
+
 - **Token URL:** `https://oauth2.googleapis.com/token`
 - **Client Email:** `play-store-reporting@nutotia.iam.gserviceaccount.com`
 - **Private Key:** Cole a chave privada completa (com `-----BEGIN PRIVATE KEY-----` e `-----END PRIVATE KEY-----`)
@@ -91,42 +94,47 @@ node ace test:play-console
 ## 🚀 Endpoints Disponíveis
 
 ### 1. **Crash Rate (Taxa de Crashes)**
+
 ```
 POST https://playdeveloperreporting.googleapis.com/v1beta1/apps/com.readbible.app/crashRateMetricSet:query
 ```
 
 **Body:**
+
 ```json
 {
   "dimensions": ["DATE"],
   "metrics": ["CRASH_RATE", "CRASH_RATE_PER_USER_PERCENT", "DISTINCT_CRASHES"],
   "timelineSpec": {
     "aggregationPeriod": "DAILY",
-    "startTime": {"year": 2026, "month": 1, "day": 1},
-    "endTime": {"year": 2026, "month": 1, "day": 5}
+    "startTime": { "year": 2026, "month": 1, "day": 1 },
+    "endTime": { "year": 2026, "month": 1, "day": 5 }
   }
 }
 ```
 
 ### 2. **ANR Rate (Application Not Responding)**
+
 ```
 POST https://playdeveloperreporting.googleapis.com/v1beta1/apps/com.readbible.app/anrRateMetricSet:query
 ```
 
 **Body:**
+
 ```json
 {
   "dimensions": ["DATE"],
   "metrics": ["ANR_RATE", "ANR_RATE_PER_USER_PERCENT", "DISTINCT_ANRS"],
   "timelineSpec": {
     "aggregationPeriod": "DAILY",
-    "startTime": {"year": 2026, "month": 1, "day": 1},
-    "endTime": {"year": 2026, "month": 1, "day": 5}
+    "startTime": { "year": 2026, "month": 1, "day": 1 },
+    "endTime": { "year": 2026, "month": 1, "day": 5 }
   }
 }
 ```
 
 ### 3. **Search Apps (Pesquisar apps acessíveis)**
+
 ```
 GET https://playdeveloperreporting.googleapis.com/v1beta1/apps:search
 ```
@@ -144,19 +152,22 @@ Se o Insomnia não funcionar, você pode gerar o token manualmente:
 Isso é complexo pois requer assinar com a chave privada. Use este script Node.js:
 
 ```javascript
-const { google } = require('googleapis');
-const credentials = JSON.parse(process.env.GOOGLE_PLAY_CREDENTIALS);
+const { google } = require('googleapis')
+const credentials = JSON.parse(process.env.GOOGLE_PLAY_CREDENTIALS)
 
 const auth = new google.auth.GoogleAuth({
   credentials,
   scopes: ['https://www.googleapis.com/auth/playdeveloperreporting'],
-});
+})
 
-auth.getAccessToken().then(token => {
-  console.log('Access Token:', token);
-}).catch(err => {
-  console.error('Erro:', err);
-});
+auth
+  .getAccessToken()
+  .then((token) => {
+    console.log('Access Token:', token)
+  })
+  .catch((err) => {
+    console.error('Erro:', err)
+  })
 ```
 
 ### Passo 2: Usar o token no cURL
@@ -182,6 +193,7 @@ curl -X POST \
 ## 🎯 Resposta Esperada
 
 ### Sucesso (200):
+
 ```json
 {
   "rows": [
@@ -198,6 +210,7 @@ curl -X POST \
 ```
 
 ### Erro 404:
+
 ```json
 {
   "error": {
@@ -224,14 +237,16 @@ Se receber 404, significa que o app ainda não está disponível na API (não pu
 ## 📞 Troubleshooting
 
 **Erro "invalid_grant":**
+
 - Chave privada incorreta ou malformada
 - Verifique se copiou o `-----BEGIN` e `-----END` completos
 
 **Erro 403 "Permission denied":**
+
 - Service Account sem permissão no Play Console
 - Vá em: Play Console → Configurações → Acesso à API
 
 **Erro 404 "Not found":**
+
 - App não publicado ou não visível para a API
 - Permissões ainda propagando (aguarde até 48h)
-

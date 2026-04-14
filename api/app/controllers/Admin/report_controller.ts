@@ -177,7 +177,7 @@ export default class ReportController {
         {
           key: 'app_downloads',
           value: String(downloads),
-          description: 'Número total de downloads do aplicativo'
+          description: 'Número total de downloads do aplicativo',
         }
       )
 

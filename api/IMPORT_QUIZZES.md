@@ -39,13 +39,15 @@ Os arquivos JSON devem estar na pasta `quizzes/` e seguir o formato de nome:
 **Formato**: `versao-livro-capitulo.json`
 
 ### Exemplos reais:
+
 - `arc-gênesis-1.json`
 - `arc-êxodo-1.json`
 - `arc-1-samuel-1.json` (livros com número)
 - `arc-2-crônicas-1.json`
 - `arc-salmos-1.json`
 
-**Importante**: 
+**Importante**:
+
 - Aceita acentos nos nomes (gênesis, êxodo, etc)
 - Aceita URL encoding (%C3%AA para ê)
 - Suporta livros com números (1 Samuel, 2 Reis, etc)
@@ -60,12 +62,7 @@ Os arquivos JSON devem estar na pasta `quizzes/` e seguir o formato de nome:
     {
       "id": "q1",
       "pergunta": "Qual foi o primeiro dia da criação?",
-      "alternativas": [
-        "a) Luz",
-        "b) Terra",
-        "c) Água",
-        "d) Plantas"
-      ],
+      "alternativas": ["a) Luz", "b) Terra", "c) Água", "d) Plantas"],
       "respostaCorreta": "a"
     }
   ]
@@ -81,6 +78,7 @@ Os arquivos JSON devem estar na pasta `quizzes/` e seguir o formato de nome:
 ## Saída
 
 O comando exibe:
+
 - 📄 Total de arquivos encontrados
 - 📖 Processamento de cada arquivo
 - ✅ Quizzes importados com sucesso
@@ -122,6 +120,7 @@ $ node ace import:quizzes
 ## APIs disponíveis após importação
 
 ### Listar quizzes
+
 ```bash
 GET /quizzes
 GET /quizzes?testament=old
@@ -130,11 +129,13 @@ GET /quizzes?bibleVersion=NVI
 ```
 
 ### Buscar quiz específico
+
 ```bash
 GET /quizzes/:id
 ```
 
 ### Gerar novo quiz
+
 ```bash
 POST /generate-quiz
 {
@@ -147,14 +148,18 @@ POST /generate-quiz
 ## Troubleshooting
 
 ### Erro: Credenciais não configuradas
+
 Configure `GCS_CREDENTIALS` e `GCS_BUCKET_NAME` no `.env`
 
 ### Erro: Formato de arquivo inválido
+
 Os arquivos devem estar na pasta `quizzes/` e seguir o formato:
+
 - `versao-livro-capitulo.json` (ex: `arc-gênesis-1.json`)
 - `versao-numero-livro-capitulo.json` (ex: `arc-1-samuel-1.json`)
 
 Aceita acentos e URL encoding automaticamente.
 
 ### Erro: JSON inválido
+
 Valide o conteúdo do arquivo JSON em https://jsonlint.com/

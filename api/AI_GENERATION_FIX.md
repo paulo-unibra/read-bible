@@ -1,4 +1,4 @@
-  # Fix: AI Generation - JSON Parsing Error
+# Fix: AI Generation - JSON Parsing Error
 
 ## Problem Identified
 
@@ -15,6 +15,7 @@
 ```
 
 The response ended without closing:
+
 - The `chapters` array
 - The current book reading object
 - The day 70 object
@@ -27,38 +28,46 @@ This happened because the AI reached its **token limit** while generating the 10
 ## Solution Implemented
 
 ### 1. Increased Token Limit
+
 ```typescript
-max_tokens: 8000  // Added to API request (was using default ~4000)
+max_tokens: 8000 // Added to API request (was using default ~4000)
 ```
 
 This allows the AI to generate much longer responses, supporting plans up to ~120-150 days.
 
 ### 2. Truncation Detection
+
 Added check before parsing:
-```typescript
+
+````typescript
 const isTruncated = !aiContent.trim().endsWith('}') && !aiContent.trim().endsWith('```')
 
 if (isTruncated) {
   return response.badRequest({
-    error: 'A IA não conseguiu gerar o plano completo. Tente criar um plano com menos dias (ex: 30-50 dias) ou simplifique sua instrução.'
+    error:
+      'A IA não conseguiu gerar o plano completo. Tente criar um plano com menos dias (ex: 30-50 dias) ou simplifique sua instrução.',
   })
 }
-```
+````
 
 This prevents parsing attempts on incomplete JSON and provides clear user feedback.
 
 ### 3. Better Markdown Handling
+
 Improved JSON extraction to properly remove markdown code blocks:
-```typescript
+
+````typescript
 if (jsonContent.startsWith('```json')) {
   jsonContent = jsonContent.replace(/^```json\n/, '').replace(/\n```$/, '')
 } else if (jsonContent.startsWith('```')) {
   jsonContent = jsonContent.replace(/^```\n/, '').replace(/\n```$/, '')
 }
-```
+````
 
 ### 4. Optimized System Prompt
+
 Added instruction to use shorter descriptions for long plans:
+
 ```
 6. Para planos longos (50+ dias), use descrições muito curtas (2-4 palavras) para economizar tokens
 7. Retorne SOMENTE o JSON válido, sem texto adicional ou markdown
@@ -67,7 +76,9 @@ Added instruction to use shorter descriptions for long plans:
 This helps the AI stay within token limits by being more concise.
 
 ### 5. Enhanced Logging
+
 Added response length tracking:
+
 ```typescript
 console.log(`📏 Tamanho da resposta: ${aiContent.length} caracteres`)
 ```
@@ -75,6 +86,7 @@ console.log(`📏 Tamanho da resposta: ${aiContent.length} caracteres`)
 This helps debug future token limit issues.
 
 ### 6. **Plan Completeness Validation** ⭐ NEW
+
 Added automatic validation to detect incomplete plans:
 
 ```typescript
@@ -82,12 +94,14 @@ const validation = this.validatePlanCompleteness(plan, prompt)
 ```
 
 **Validates:**
+
 - ✅ **NT Plans**: Checks if all 27 books are included (260 chapters)
 - ✅ **Gospel Plans**: Verifies all 4 gospels are present
 - ✅ **Large Plans**: 50+ day plans must have at least 10 different books
 - ✅ **Chapter Coverage**: NT plans must cover at least 85% of chapters (220+)
 
 **If validation fails**, the API returns a clear error:
+
 ```
 O plano gerado está incompleto. Faltam 14 livros do NT: Gálatas, Efésios...
 
@@ -98,6 +112,7 @@ Tente:
 ```
 
 **Example validation output:**
+
 ```json
 {
   "error": "Plano incompleto: Faltam 14 livros do NT: Gálatas, Efésios, Filipenses...",
@@ -117,6 +132,7 @@ This prevents accepting incomplete plans from the AI!
 ## Testing Instructions
 
 1. **Restart the API server** to load the new code:
+
    ```bash
    cd api
    # Stop current server (Ctrl+C)
@@ -143,7 +159,7 @@ This prevents accepting incomplete plans from the AI!
 ## Token Limits Reference
 
 | Plan Size | Approx Tokens | Status with 8000 limit |
-|-----------|---------------|------------------------|
+| --------- | ------------- | ---------------------- |
 | 7 days    | ~800 tokens   | ✅ Safe                |
 | 30 days   | ~3000 tokens  | ✅ Safe                |
 | 50 days   | ~5000 tokens  | ✅ Safe                |
@@ -165,6 +181,7 @@ This prevents accepting incomplete plans from the AI!
 ## Verification
 
 Build completed successfully:
+
 ```bash
 ✅ npm run build -- --ignore-ts-errors
 ✅ TypeScript errors resolved for AI controller

@@ -30,13 +30,13 @@ export default class Role extends BaseModel {
         }
       }
       return []
-    }
+    },
   })
   declare permissions: string[]
 
   @manyToMany(() => User, {
     pivotTable: 'user_roles',
-    pivotTimestamps: true
+    pivotTimestamps: true,
   })
   declare users: ManyToMany<typeof User>
 

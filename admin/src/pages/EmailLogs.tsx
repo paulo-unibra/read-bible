@@ -157,19 +157,20 @@ const EmailLogs: React.FC = () => {
       });
 
       if (response.data.success) {
-        const successMessage =
-          response.data.failed > 0
-            ? `${response.data.sent} e-mail(s) reenviado(s), ${response.data.failed} falharam novamente`
-            : `${response.data.sent} e-mail(s) reenviado(s) com sucesso!`;
+        const successMessage = response.data.message ||
+          `${response.data.queued} e-mail(s) adicionado(s) à fila de reenvio`;
 
         setToast({
-          message: successMessage,
-          type: response.data.failed > 0 ? "info" : "success",
+          message: `${successMessage}. Os e-mails serão reenviados gradualmente. Atualize a página em alguns instantes para ver o resultado.`,
+          type: "success",
         });
 
         setSelectedLogs(new Set());
-        loadLogs();
-        loadStats();
+        // Aguardar um pouco antes de recarregar para dar tempo da fila processar
+        setTimeout(() => {
+          loadLogs();
+          loadStats();
+        }, 2000);
       } else {
         setError(response.data.message || "Erro ao reenviar e-mails");
       }

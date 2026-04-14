@@ -36,12 +36,12 @@ export default class User extends compose(BaseModel, AuthFinder) {
 
   @manyToMany(() => Role, {
     pivotTable: 'user_roles',
-    pivotTimestamps: true
+    pivotTimestamps: true,
   })
   declare roles: ManyToMany<typeof Role>
 
   @hasMany(() => ReadingPlan, {
-    foreignKey: 'userId'
+    foreignKey: 'userId',
   })
   declare readingPlans: HasMany<typeof ReadingPlan>
 
@@ -50,9 +50,7 @@ export default class User extends compose(BaseModel, AuthFinder) {
    */
   async hasPermission(permission: string): Promise<boolean> {
     await this.load('roles' as any)
-    return this.roles.some(role =>
-      role.permissions.includes(permission)
-    )
+    return this.roles.some((role) => role.permissions.includes(permission))
   }
 
   /**
@@ -60,9 +58,7 @@ export default class User extends compose(BaseModel, AuthFinder) {
    */
   async hasAnyPermission(permissions: string[]): Promise<boolean> {
     await this.load('roles' as any)
-    return this.roles.some(role =>
-      role.permissions.some(p => permissions.includes(p))
-    )
+    return this.roles.some((role) => role.permissions.some((p) => permissions.includes(p)))
   }
 
   /**
@@ -70,8 +66,8 @@ export default class User extends compose(BaseModel, AuthFinder) {
    */
   async hasAllPermissions(permissions: string[]): Promise<boolean> {
     await this.load('roles' as any)
-    const userPermissions = this.roles.flatMap(role => role.permissions)
-    return permissions.every(p => userPermissions.includes(p))
+    const userPermissions = this.roles.flatMap((role) => role.permissions)
+    return permissions.every((p) => userPermissions.includes(p))
   }
 
   @column.dateTime({ autoCreate: true })
