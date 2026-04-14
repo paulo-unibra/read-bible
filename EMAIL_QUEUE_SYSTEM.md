@@ -25,9 +25,11 @@ Criado um serviço de fila (`EmailQueueService`) que:
 ## Arquivos Criados/Modificados
 
 ### 1. Novo Serviço: `EmailQueueService`
+
 **Arquivo**: `api/app/services/email_queue_service.ts`
 
 **Características**:
+
 - Singleton pattern (instância única)
 - Fila em memória
 - Delay de 600ms entre envios (seguro para 2 req/s)
@@ -35,6 +37,7 @@ Criado um serviço de fila (`EmailQueueService`) que:
 - Processamento automático em background
 
 **Métodos**:
+
 - `addToQueue(emails)`: Adiciona e-mails à fila
 - `processQueue()`: Processa fila com delay
 - `getStats()`: Retorna estatísticas da fila
@@ -42,15 +45,18 @@ Criado um serviço de fila (`EmailQueueService`) que:
 ### 2. Controllers Atualizados
 
 #### `AdminAuthController`
+
 **Arquivo**: `api/app/controllers/Admin/auth_controller.ts`
 
 **Mudanças**:
 
 ##### `sendCustomEmail()`:
+
 - ❌ **ANTES**: Loop síncrono com envio imediato
 - ✅ **AGORA**: Adiciona à fila e retorna imediatamente
 
 **Resposta antiga**:
+
 ```json
 {
   "success": true,
@@ -61,6 +67,7 @@ Criado um serviço de fila (`EmailQueueService`) que:
 ```
 
 **Resposta nova**:
+
 ```json
 {
   "success": true,
@@ -71,12 +78,14 @@ Criado um serviço de fila (`EmailQueueService`) que:
 ```
 
 ##### `retryFailedEmails()`:
+
 - Mesma lógica de fila aplicada ao reenvio
 - Também retorna resposta imediata
 
 ### 3. Frontend Atualizado
 
 #### `Users.tsx`
+
 **Mudança**: Atualizada mensagem de sucesso para informar sobre fila
 
 ```typescript
@@ -84,13 +93,15 @@ Criado um serviço de fila (`EmailQueueService`) que:
 "50 e-mail(s) enviado(s) com sucesso!"
 
 // AGORA
-"52 e-mail(s) adicionado(s) à fila de envio. 
-Os e-mails serão enviados gradualmente. 
+"52 e-mail(s) adicionado(s) à fila de envio.
+Os e-mails serão enviados gradualmente.
 Verifique a página 'Logs de E-mails' para acompanhar."
 ```
 
 #### `EmailLogs.tsx`
-**Mudança**: 
+
+**Mudança**:
+
 - Mensagem atualizada para reenvio
 - Auto-reload após 2 segundos para ver resultado
 
@@ -154,6 +165,7 @@ private readonly RATE_LIMIT_DELAY = 600 // 600ms
 ```
 
 **Cálculo**:
+
 - Limite: 2 req/s
 - Intervalo mínimo: 500ms
 - **Configurado**: 600ms (margem de segurança de 100ms)
@@ -161,6 +173,7 @@ private readonly RATE_LIMIT_DELAY = 600 // 600ms
 ### Para Ajustar:
 
 Se o limite mudar, edite a constante:
+
 ```typescript
 // Para 3 req/s:
 private readonly RATE_LIMIT_DELAY = 400 // 1000ms / 3 = 333ms + margem
@@ -171,15 +184,18 @@ private readonly RATE_LIMIT_DELAY = 1100 // 1000ms + margem
 
 ## Limitações Atuais
 
-⚠️ **Fila em memória**: 
+⚠️ **Fila em memória**:
+
 - Se o servidor reiniciar, e-mails na fila são perdidos
 - Para produção, considere usar Redis ou banco de dados
 
 ⚠️ **Sem prioridade**:
+
 - Todos os e-mails são processados por ordem de chegada
 - Não há diferenciação entre tipos de e-mail
 
 ⚠️ **Sem retry automático**:
+
 - E-mails que falharem ficam marcados como 'failed'
 - É necessário reenviar manualmente pela interface
 

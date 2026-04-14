@@ -9,12 +9,14 @@ O erro "O arquivo da Bíblia está corrompido ou tem estrutura inválida. Tabela
 ### 1. Validação no Download (GoogleDriveService)
 
 #### Verificações Implementadas:
+
 - **Tamanho Mínimo**: Arquivo deve ter pelo menos 100KB
 - **Assinatura SQLite**: Verifica se o arquivo começa com "SQLite format 3"
 - **Limpeza Automática**: Remove arquivos existentes antes de baixar novamente
 - **Verificação de Integridade**: Confirma que o arquivo foi baixado completamente
 
 #### Benefícios:
+
 - Detecta problemas no momento do download
 - Previne que arquivos corrompidos sejam salvos
 - Mensagens de erro mais claras e acionáveis
@@ -24,26 +26,31 @@ O erro "O arquivo da Bíblia está corrompido ou tem estrutura inválida. Tabela
 #### Verificações em 4 Níveis:
 
 **Nível 1: Validação de Arquivo**
+
 - Verifica se o arquivo existe
 - Valida tamanho mínimo (100KB)
 - Remove automaticamente arquivos muito pequenos
 
 **Nível 2: Validação de Estrutura**
+
 - Verifica se existe a tabela 'Bible'
 - Lista todas as tabelas disponíveis para diagnóstico
 - Remove arquivo e exibe estrutura esperada se falhar
 
 **Nível 3: Validação de Colunas**
+
 - Verifica colunas obrigatórias: `Book`, `Chapter`, `Verse`, `Scripture`
 - Identifica colunas faltantes
 - Remove arquivo e mostra diferenças
 
 **Nível 4: Validação de Dados**
+
 - Verifica se a tabela contém dados (não está vazia)
 - Conta o número de versículos
 - Remove arquivo se estiver vazio
 
 #### Benefícios:
+
 - Diagnóstico detalhado de problemas
 - Auto-recuperação (remove arquivos inválidos)
 - Mensagens de erro em português com instruções claras
@@ -63,12 +70,12 @@ CREATE TABLE Bible (
 
 ### Descrição dos Campos:
 
-| Campo | Tipo | Descrição | Exemplo |
-|-------|------|-----------|---------|
-| `Book` | INTEGER | ID do livro (1-66) | `1` (Gênesis) |
-| `Chapter` | INTEGER | Número do capítulo | `1` |
-| `Verse` | INTEGER | Número do versículo | `1` |
-| `Scripture` | TEXT | Texto do versículo (pode conter HTML) | `No princípio...` |
+| Campo       | Tipo    | Descrição                             | Exemplo           |
+| ----------- | ------- | ------------------------------------- | ----------------- |
+| `Book`      | INTEGER | ID do livro (1-66)                    | `1` (Gênesis)     |
+| `Chapter`   | INTEGER | Número do capítulo                    | `1`               |
+| `Verse`     | INTEGER | Número do versículo                   | `1`               |
+| `Scripture` | TEXT    | Texto do versículo (pode conter HTML) | `No princípio...` |
 
 ### Exemplo de Dados:
 
@@ -82,6 +89,7 @@ INSERT INTO Bible (Book, Chapter, Verse, Scripture) VALUES
 ## Mapeamento de Livros
 
 ### Antigo Testamento (1-39)
+
 - 1: Gênesis
 - 2: Êxodo
 - 3: Levítico
@@ -93,6 +101,7 @@ INSERT INTO Bible (Book, Chapter, Verse, Scripture) VALUES
 - ... (até 39: Malaquias)
 
 ### Novo Testamento (40-66)
+
 - 40: Mateus
 - 41: Marcos
 - 42: Lucas
@@ -171,7 +180,7 @@ cursor.execute('''
 # Carregar dados de JSON (exemplo)
 with open('biblia.json', 'r', encoding='utf-8') as f:
     data = json.load(f)
-    
+
 # Inserir dados
 for livro in data['livros']:
     book_id = livro['id']
@@ -229,6 +238,7 @@ PRAGMA integrity_check;
 ### Validações Mínimas
 
 Um banco de dados válido deve:
+
 1. ✓ Ter tamanho >= 100KB
 2. ✓ Começar com "SQLite format 3"
 3. ✓ Conter tabela 'Bible'
@@ -242,6 +252,7 @@ Um banco de dados válido deve:
 **Causa**: O arquivo não é um banco de dados SQLite válido ou está vazio.
 
 **Solução**:
+
 1. O app remove automaticamente o arquivo corrompido
 2. Faça o download novamente do Google Drive
 3. Verifique se o arquivo correto foi compartilhado
@@ -251,6 +262,7 @@ Um banco de dados válido deve:
 **Causa**: A tabela Bible existe mas não tem as colunas esperadas.
 
 **Solução**:
+
 1. O app remove automaticamente o arquivo inválido
 2. Verifique a estrutura do banco de dados no Google Drive
 3. Recrie o banco seguindo a estrutura documentada acima
@@ -260,6 +272,7 @@ Um banco de dados válido deve:
 **Causa**: O download foi interrompido ou o arquivo está incompleto.
 
 **Solução**:
+
 1. O app remove automaticamente o arquivo
 2. Verifique sua conexão com a internet
 3. Tente fazer o download novamente
@@ -269,6 +282,7 @@ Um banco de dados válido deve:
 **Causa**: O arquivo tem extensão .db mas não é SQLite.
 
 **Solução**:
+
 1. O app remove automaticamente o arquivo
 2. Verifique se o arquivo correto foi carregado no Google Drive
 3. Certifique-se de usar um arquivo .db SQLite válido
@@ -292,6 +306,7 @@ ReadBible (Pasta Pública)
 ### Tamanho dos Arquivos
 
 Traduções típicas:
+
 - Bíblia completa: 2-5 MB
 - Novo Testamento apenas: 500KB - 1MB
 - Bíblia com notas/recursos: 5-20 MB

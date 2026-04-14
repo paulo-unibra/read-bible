@@ -3,6 +3,7 @@
 ## Problema Original
 
 No Android funcionava normalmente, mas no iOS apresentava erro:
+
 ```
 Erro
 Falha ao carregar capítulo: O arquivo da Bíblia tem estrutura inválida e foi excluído automaticamente.
@@ -16,6 +17,7 @@ Por favor, verifique se o arquivo correto foi compartilhado no Google Drive e fa
 ## Causa Raiz
 
 Diferenças entre iOS e Android no tratamento de:
+
 1. **Validação de assinatura SQLite** - `FileSystem.readAsStringAsync` com `length` e `position` não funciona corretamente no iOS
 2. **Tamanho mínimo de arquivo** - iOS pode comprimir arquivos de forma diferente
 3. **Formato de resposta de queries** - `getAllAsync` pode retornar formatos ligeiramente diferentes
@@ -25,6 +27,7 @@ Diferenças entre iOS e Android no tratamento de:
 ### 1. Removida Validação de Assinatura SQLite (GoogleDriveService.ts)
 
 **Antes:**
+
 ```typescript
 // Verificava assinatura "SQLite format 3" lendo bytes do arquivo
 const fileContent = await FileSystem.readAsStringAsync(localPath, {
@@ -35,6 +38,7 @@ const fileContent = await FileSystem.readAsStringAsync(localPath, {
 ```
 
 **Depois:**
+
 ```typescript
 // Removida completamente - causava falha no iOS
 // Confia na validação estrutural completa ao abrir o banco
@@ -43,11 +47,13 @@ const fileContent = await FileSystem.readAsStringAsync(localPath, {
 ### 2. Reduzido Tamanho Mínimo de Arquivo
 
 **Antes:**
+
 ```typescript
 const minSize = 100000; // 100KB
 ```
 
 **Depois:**
+
 ```typescript
 const minSize = 50000; // 50KB - acomoda diferenças do iOS
 ```
@@ -60,12 +66,12 @@ const minSize = 50000; // 50KB - acomoda diferenças do iOS
 let allTables;
 try {
   allTables = await db.getAllAsync(
-    "SELECT name FROM sqlite_master WHERE type='table'"
+    "SELECT name FROM sqlite_master WHERE type='table'",
   );
-  console.log('✅ Available tables:', JSON.stringify(allTables));
+  console.log("✅ Available tables:", JSON.stringify(allTables));
 } catch (tableListError) {
-  console.error('❌ Error listing tables:', tableListError);
-  throw new Error('Não foi possível ler a estrutura do banco de dados.');
+  console.error("❌ Error listing tables:", tableListError);
+  throw new Error("Não foi possível ler a estrutura do banco de dados.");
 }
 ```
 
@@ -73,9 +79,10 @@ try {
 
 ```typescript
 if (!tables || tables.length === 0) {
-  const tableNames = allTables && Array.isArray(allTables) 
-    ? allTables.map((t: any) => t.name).join(', ')
-    : 'nenhuma';
+  const tableNames =
+    allTables && Array.isArray(allTables)
+      ? allTables.map((t: any) => t.name).join(", ")
+      : "nenhuma";
   // ...lança erro com detalhes
 }
 ```
@@ -85,11 +92,13 @@ if (!tables || tables.length === 0) {
 ```typescript
 try {
   columns = await db.getAllAsync("PRAGMA table_info(Bible)");
-  console.log('✅ Column info retrieved:', JSON.stringify(columns));
-  columnNames = Array.isArray(columns) ? columns.map((col: any) => col.name) : [];
+  console.log("✅ Column info retrieved:", JSON.stringify(columns));
+  columnNames = Array.isArray(columns)
+    ? columns.map((col: any) => col.name)
+    : [];
 } catch (columnError) {
-  console.error('❌ Error getting column info:', columnError);
-  console.warn('⚠️ Skipping column validation due to error');
+  console.error("❌ Error getting column info:", columnError);
+  console.warn("⚠️ Skipping column validation due to error");
   // Continua sem validação estrita
 }
 ```
@@ -100,14 +109,14 @@ try {
 try {
   rowCount = await db.getFirstAsync("SELECT COUNT(*) as count FROM Bible");
 } catch (countError) {
-  console.error('❌ Error counting rows:', countError);
+  console.error("❌ Error counting rows:", countError);
   // Tenta query alternativa mais simples
   try {
     const testRow = await db.getFirstAsync("SELECT * FROM Bible LIMIT 1");
-    console.log('✅ Test row retrieved, database has data');
+    console.log("✅ Test row retrieved, database has data");
     rowCount = { count: 1 }; // Assume que tem dados se conseguiu ler
   } catch (altError) {
-    console.error('❌ Alternative query also failed:', altError);
+    console.error("❌ Alternative query also failed:", altError);
   }
 }
 ```
@@ -117,18 +126,18 @@ try {
 Adicionados emojis e logs estruturados:
 
 ```typescript
-console.log('✅ Database opened successfully');
-console.log('✅ Available tables:', JSON.stringify(allTables));
-console.log('✅ Bible table check result:', JSON.stringify(tables));
-console.log('✅ Column info retrieved:', JSON.stringify(columns));
-console.log('✅ All required columns present');
-console.log('✅✅✅ Bible database validated successfully ✅✅✅');
+console.log("✅ Database opened successfully");
+console.log("✅ Available tables:", JSON.stringify(allTables));
+console.log("✅ Bible table check result:", JSON.stringify(tables));
+console.log("✅ Column info retrieved:", JSON.stringify(columns));
+console.log("✅ All required columns present");
+console.log("✅✅✅ Bible database validated successfully ✅✅✅");
 ```
 
 Logs de erro mais detalhados:
 
 ```typescript
-console.error('❌ Error opening Bible:', {
+console.error("❌ Error opening Bible:", {
   message: error?.message,
   stack: error?.stack,
   name: error?.name,
@@ -173,6 +182,7 @@ xcrun simctl spawn booted log stream --predicate 'processImagePath contains "Rea
 ```
 
 Procurar por:
+
 - ✅ Logs de sucesso com emojis verdes
 - ❌ Logs de erro com emojis vermelhos
 - JSON dumps de tabelas e colunas
@@ -189,6 +199,7 @@ Procurar por:
 ### 5. Testar com Arquivo Válido
 
 Garantir que o arquivo no Google Drive:
+
 - É um arquivo .db SQLite válido
 - Tem pelo menos 50KB (idealmente 2-5MB)
 - Contém tabela `Bible` com colunas corretas
@@ -223,6 +234,7 @@ CREATE TABLE Bible (
 ```
 
 Exemplo de dados:
+
 ```sql
 sqlite> SELECT * FROM Bible LIMIT 3;
 Book|Chapter|Verse|Scripture
@@ -245,33 +257,36 @@ Ao encontrar o erro no iOS, verificar:
 
 ## Diferenças iOS vs Android
 
-| Aspecto | Android | iOS |
-|---------|---------|-----|
-| FileSystem.readAsStringAsync | Funciona com `length` e `position` | Pode falhar |
-| Tamanho mínimo | 100KB ok | Reduzido para 50KB |
-| Query response | Array padrão | Pode ter formato diferente |
-| Validação de assinatura | Funciona | Removida |
-| Logs | Console normal | Requer Xcode/simctl |
+| Aspecto                      | Android                            | iOS                        |
+| ---------------------------- | ---------------------------------- | -------------------------- |
+| FileSystem.readAsStringAsync | Funciona com `length` e `position` | Pode falhar                |
+| Tamanho mínimo               | 100KB ok                           | Reduzido para 50KB         |
+| Query response               | Array padrão                       | Pode ter formato diferente |
+| Validação de assinatura      | Funciona                           | Removida                   |
+| Logs                         | Console normal                     | Requer Xcode/simctl        |
 
 ## Próximos Passos se Erro Persistir
 
 1. **Adicionar modo de desenvolvimento**
+
    ```typescript
-   const __DEV__ = process.env.NODE_ENV === 'development';
+   const __DEV__ = process.env.NODE_ENV === "development";
    if (__DEV__) {
      // Pular algumas validações
    }
    ```
 
 2. **Tentar abrir sem validação estrita**
+
    ```typescript
    // Modo permissivo para debug
-   if (Platform.OS === 'ios') {
+   if (Platform.OS === "ios") {
      // Validação mais relaxada no iOS
    }
    ```
 
 3. **Verificar versão do expo-sqlite**
+
    ```bash
    npm list expo-sqlite
    # Atualizar se necessário
@@ -286,7 +301,7 @@ Ao encontrar o erro no iOS, verificar:
    ```typescript
    // Adicionar log temporário
    const fileUri = await FileSystem.getInfoAsync(localPath);
-   console.log('File on iOS:', fileUri);
+   console.log("File on iOS:", fileUri);
    ```
 
 ## Arquivos Modificados

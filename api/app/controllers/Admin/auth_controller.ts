@@ -2,13 +2,11 @@ import EmailLog from '#models/email_log'
 import Permission from '#models/permission'
 import Role from '#models/role'
 import User from '#models/user'
-import emailService from '#services/email_service'
 import emailQueueService from '#services/email_queue_service'
 import ReadingPlanConverterService from '#services/reading_plan_converter_service'
 import ReadingPlanRecalculatorService from '#services/reading_plan_recalculator_service'
 import type { HttpContext } from '@adonisjs/core/http'
 import hash from '@adonisjs/core/services/hash'
-import { DateTime } from 'luxon'
 
 export default class AuthController {
   /**

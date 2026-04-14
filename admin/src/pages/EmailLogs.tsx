@@ -157,7 +157,8 @@ const EmailLogs: React.FC = () => {
       });
 
       if (response.data.success) {
-        const successMessage = response.data.message ||
+        const successMessage =
+          response.data.message ||
           `${response.data.queued} e-mail(s) adicionado(s) à fila de reenvio`;
 
         setToast({
