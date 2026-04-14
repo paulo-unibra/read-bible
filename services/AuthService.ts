@@ -10,6 +10,7 @@ export interface User {
   id: number;
   name: string;
   email: string;
+  profilePicture?: string | null;
 }
 
 export interface AuthResponse {
@@ -235,6 +236,80 @@ class AuthService {
     } catch (error) {
       console.error("Erro ao atualizar nome:", error);
       throw error;
+    }
+  }
+
+  /**
+   * Upload de foto de perfil
+   */
+  async uploadProfilePicture(imageUri: string, mimeType: string, fileName: string): Promise<{ success: boolean; profilePicture?: string; message?: string }> {
+    try {
+      if (!this.token) {
+        throw new Error("Usuário não autenticado");
+      }
+
+      const formData = new FormData();
+      formData.append("image", {
+        uri: imageUri,
+        type: mimeType,
+        name: fileName,
+      } as any);
+
+      const response = await fetch(`${API_URL}/auth/profile/picture`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.token}`,
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.data?.profilePicture && this.user) {
+        this.user.profilePicture = data.data.profilePicture;
+        await AsyncStorage.setItem("@auth_user", JSON.stringify(this.user));
+      }
+
+      return data;
+    } catch (error) {
+      console.error("Erro ao fazer upload da foto de perfil:", error);
+      return {
+        success: false,
+        message: "Erro ao enviar a imagem",
+      };
+    }
+  }
+
+  /**
+   * Remover foto de perfil
+   */
+  async removeProfilePicture(): Promise<{ success: boolean; message?: string }> {
+    try {
+      if (!this.token) {
+        throw new Error("Usuário não autenticado");
+      }
+
+      const response = await fetch(`${API_URL}/auth/profile/picture`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${this.token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success && this.user) {
+        this.user.profilePicture = null;
+        await AsyncStorage.setItem("@auth_user", JSON.stringify(this.user));
+      }
+
+      return data;
+    } catch (error) {
+      console.error("Erro ao remover foto de perfil:", error);
+      return {
+        success: false,
+        message: "Erro ao remover a imagem",
+      };
     }
   }
 

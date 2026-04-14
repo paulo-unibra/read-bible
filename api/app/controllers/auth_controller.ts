@@ -1,6 +1,11 @@
 import User from '#models/user'
 import { loginValidator, registerValidator } from '#validators/auth'
 import type { HttpContext } from '@adonisjs/core/http'
+import { cuid } from '@adonisjs/core/helpers'
+import app from '@adonisjs/core/services/app'
+import { unlink } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
+import path from 'node:path'
 
 export default class AuthController {
   /**
@@ -116,6 +121,7 @@ export default class AuthController {
           id: user.id,
           name: user.fullName,
           email: user.email,
+          profilePicture: user.profilePicture || null,
         },
       })
     } catch (error) {
@@ -302,12 +308,108 @@ export default class AuthController {
           id: user.id,
           name: user.fullName,
           email: user.email,
+          profilePicture: user.profilePicture || null,
         },
       })
     } catch (error) {
       return response.badRequest({
         success: false,
         message: 'Erro ao atualizar perfil',
+      })
+    }
+  }
+
+  /**
+   * Upload de foto de perfil
+   */
+  async uploadProfilePicture({ auth, request, response }: HttpContext) {
+    try {
+      const user = auth.user!
+
+      const image = request.file('image', {
+        size: '5mb',
+        extnames: ['jpg', 'jpeg', 'png', 'webp'],
+      })
+
+      if (!image) {
+        return response.badRequest({
+          success: false,
+          message: 'Nenhuma imagem enviada',
+        })
+      }
+
+      if (!image.isValid) {
+        return response.badRequest({
+          success: false,
+          message: image.errors.map((e) => e.message).join(', '),
+        })
+      }
+
+      // Remover imagem anterior se existir
+      if (user.profilePicture) {
+        const oldFileName = path.basename(user.profilePicture)
+        const oldFilePath = app.publicPath(`uploads/profile-pictures/${oldFileName}`)
+        if (existsSync(oldFilePath)) {
+          await unlink(oldFilePath)
+        }
+      }
+
+      // Gerar nome único para o arquivo
+      const fileName = `${cuid()}.${image.extname}`
+
+      // Mover o arquivo para o diretório de uploads
+      await image.move(app.publicPath('uploads/profile-pictures'), {
+        name: fileName,
+        overwrite: true,
+      })
+
+      // Salvar o caminho relativo no banco
+      const relativePath = `/uploads/profile-pictures/${fileName}`
+      user.profilePicture = relativePath
+      await user.save()
+
+      return response.ok({
+        success: true,
+        message: 'Foto de perfil atualizada com sucesso',
+        data: {
+          profilePicture: relativePath,
+        },
+      })
+    } catch (error) {
+      console.error('Erro ao fazer upload da foto de perfil:', error)
+      return response.badRequest({
+        success: false,
+        message: 'Erro ao fazer upload da imagem',
+      })
+    }
+  }
+
+  /**
+   * Remover foto de perfil
+   */
+  async removeProfilePicture({ auth, response }: HttpContext) {
+    try {
+      const user = auth.user!
+
+      if (user.profilePicture) {
+        const oldFileName = path.basename(user.profilePicture)
+        const oldFilePath = app.publicPath(`uploads/profile-pictures/${oldFileName}`)
+        if (existsSync(oldFilePath)) {
+          await unlink(oldFilePath)
+        }
+        user.profilePicture = null
+        await user.save()
+      }
+
+      return response.ok({
+        success: true,
+        message: 'Foto de perfil removida com sucesso',
+      })
+    } catch (error) {
+      console.error('Erro ao remover foto de perfil:', error)
+      return response.badRequest({
+        success: false,
+        message: 'Erro ao remover a foto de perfil',
       })
     }
   }

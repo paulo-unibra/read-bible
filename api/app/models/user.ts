@@ -27,6 +27,9 @@ export default class User extends compose(BaseModel, AuthFinder) {
   @column({ serializeAs: null })
   declare password: string
 
+  @column()
+  declare profilePicture: string | null
+
   @manyToMany(() => BibleCuriosity, {
     pivotTable: 'bible_curiosity_favorites',
     pivotForeignKey: 'user_id',

@@ -44,6 +44,8 @@ router.post('/auth/logout', [AuthController, 'logout']).use(middleware.auth())
 router.get('/auth/me', [AuthController, 'me']).use(middleware.auth())
 router.get('/auth/stats', [AuthController, 'stats']).use(middleware.auth())
 router.put('/auth/profile', [AuthController, 'updateProfile']).use(middleware.auth())
+router.post('/auth/profile/picture', [AuthController, 'uploadProfilePicture']).use(middleware.auth())
+router.delete('/auth/profile/picture', [AuthController, 'removeProfilePicture']).use(middleware.auth())
 
 // Password Reset routes (public)
 router.post('/password/forgot', [PasswordResetController, 'requestReset'])
