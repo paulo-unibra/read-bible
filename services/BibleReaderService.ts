@@ -408,8 +408,10 @@ export class BibleReaderService {
         throw new Error("Bible file not found locally");
       }
 
-      // Remove file:// prefix if present
-      localPath = localPath.replace(/^file:\/\//, "");
+      // expo-file-system expects file URIs; keep/normalize scheme instead of removing it
+      if (!localPath.startsWith("file://")) {
+        localPath = `file://${localPath}`;
+      }
 
       // Copy the Bible file to the SQLite directory
       // expo-sqlite works best with files in its own directory
@@ -422,7 +424,16 @@ export class BibleReaderService {
       const sqlitePath = `${sqliteDir}${fileName}`;
 
       // Validate source file before copying
-      const sourceFileInfo = await FileSystem.getInfoAsync(localPath);
+      let sourceFileInfo = await FileSystem.getInfoAsync(localPath);
+      // Fallback for environments that may persist plain absolute paths
+      if (!sourceFileInfo.exists && localPath.startsWith("file://")) {
+        const pathWithoutScheme = localPath.replace(/^file:\/\//, "");
+        const fallbackInfo = await FileSystem.getInfoAsync(pathWithoutScheme);
+        if (fallbackInfo.exists) {
+          localPath = pathWithoutScheme;
+          sourceFileInfo = fallbackInfo;
+        }
+      }
       if (!sourceFileInfo.exists) {
         throw new Error(
           "O arquivo da Bíblia não foi encontrado. Por favor, faça o download novamente.",

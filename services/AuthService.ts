@@ -248,29 +248,106 @@ class AuthService {
         throw new Error("Usuário não autenticado");
       }
 
-      const formData = new FormData();
-      formData.append("image", {
-        uri: imageUri,
-        type: mimeType,
-        name: fileName,
-      } as any);
-
-      const response = await fetch(`${API_URL}/auth/profile/picture`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${this.token}`,
+      const endpoints: Array<{
+        url: string;
+        method: "POST" | "PUT";
+        fieldName: string;
+      }> = [
+        {
+          url: `${API_URL}/auth/profile/picture`,
+          method: "POST",
+          fieldName: "image",
         },
-        body: formData,
-      });
+        {
+          url: `${API_URL}/auth/profile-picture`,
+          method: "POST",
+          fieldName: "image",
+        },
+        {
+          url: `${API_URL}/auth/profile`,
+          method: "PUT",
+          fieldName: "profilePicture",
+        },
+      ];
 
-      const data = await response.json();
+      let routeMissing = false;
+      let lastMessage = "";
 
-      if (data.success && data.data?.profilePicture && this.user) {
-        this.user.profilePicture = data.data.profilePicture;
-        await AsyncStorage.setItem("@auth_user", JSON.stringify(this.user));
+      for (const endpoint of endpoints) {
+        const formData = new FormData();
+        formData.append(endpoint.fieldName, {
+          uri: imageUri,
+          type: mimeType,
+          name: fileName,
+        } as any);
+
+        const response = await fetch(endpoint.url, {
+          method: endpoint.method,
+          headers: {
+            Authorization: `Bearer ${this.token}`,
+          },
+          body: formData,
+        });
+
+        const rawText = await response.text();
+        let data: any = {};
+        try {
+          data = rawText ? JSON.parse(rawText) : {};
+        } catch {
+          data = { message: rawText };
+        }
+
+        const message =
+          data?.message || data?.error?.message || data?.errors?.[0]?.message;
+        if (message) {
+          lastMessage = message;
+        }
+
+        if (response.status === 404) {
+          routeMissing = true;
+          continue;
+        }
+
+        if (data?.success) {
+          const profilePicture =
+            data?.profilePicture || data?.data?.profilePicture || imageUri;
+
+          if (this.user) {
+            this.user.profilePicture = profilePicture;
+            await AsyncStorage.setItem("@auth_user", JSON.stringify(this.user));
+          }
+
+          return {
+            success: true,
+            profilePicture,
+            message: data?.message || "Foto de perfil atualizada com sucesso",
+          };
+        }
+
+        return {
+          success: false,
+          message: lastMessage || "Não foi possível atualizar a foto de perfil",
+        };
       }
 
-      return data;
+      if (routeMissing) {
+        if (this.user) {
+          this.user.profilePicture = imageUri;
+          await AsyncStorage.setItem("@auth_user", JSON.stringify(this.user));
+        }
+
+        return {
+          success: true,
+          profilePicture: imageUri,
+          message:
+            "O servidor atual não suporta upload de foto. A imagem foi salva localmente neste aparelho.",
+        };
+      }
+
+      return {
+        success: false,
+        message: lastMessage || "Não foi possível atualizar a foto de perfil",
+      };
     } catch (error) {
       console.error("Erro ao fazer upload da foto de perfil:", error);
       return {
@@ -289,21 +366,76 @@ class AuthService {
         throw new Error("Usuário não autenticado");
       }
 
-      const response = await fetch(`${API_URL}/auth/profile/picture`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${this.token}`,
-        },
-      });
+      const endpoints = [
+        `${API_URL}/auth/profile/picture`,
+        `${API_URL}/auth/profile-picture`,
+      ];
 
-      const data = await response.json();
+      let routeMissing = false;
+      let lastMessage = "";
 
-      if (data.success && this.user) {
-        this.user.profilePicture = null;
-        await AsyncStorage.setItem("@auth_user", JSON.stringify(this.user));
+      for (const endpoint of endpoints) {
+        const response = await fetch(endpoint, {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${this.token}`,
+          },
+        });
+
+        const rawText = await response.text();
+        let data: any = {};
+        try {
+          data = rawText ? JSON.parse(rawText) : {};
+        } catch {
+          data = { message: rawText };
+        }
+
+        const message =
+          data?.message || data?.error?.message || data?.errors?.[0]?.message;
+        if (message) {
+          lastMessage = message;
+        }
+
+        if (response.status === 404) {
+          routeMissing = true;
+          continue;
+        }
+
+        if (data?.success || response.ok) {
+          if (this.user) {
+            this.user.profilePicture = null;
+            await AsyncStorage.setItem("@auth_user", JSON.stringify(this.user));
+          }
+
+          return {
+            success: true,
+            message: data?.message || "Foto de perfil removida com sucesso",
+          };
+        }
+
+        return {
+          success: false,
+          message: lastMessage || "Não foi possível remover a foto de perfil",
+        };
       }
 
-      return data;
+      if (routeMissing) {
+        if (this.user) {
+          this.user.profilePicture = null;
+          await AsyncStorage.setItem("@auth_user", JSON.stringify(this.user));
+        }
+
+        return {
+          success: true,
+          message:
+            "O servidor atual não suporta remoção de foto. A imagem foi removida localmente neste aparelho.",
+        };
+      }
+
+      return {
+        success: false,
+        message: lastMessage || "Não foi possível remover a foto de perfil",
+      };
     } catch (error) {
       console.error("Erro ao remover foto de perfil:", error);
       return {

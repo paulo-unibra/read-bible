@@ -335,7 +335,10 @@ export default function ProfileScreen() {
 
       if (result.success && result.profilePicture) {
         setUserProfilePicture(result.profilePicture);
-        Alert.alert("Sucesso", "Foto de perfil atualizada!");
+        Alert.alert(
+          "Sucesso",
+          result.message || "Foto de perfil atualizada!",
+        );
       } else {
         Alert.alert("Erro", result.message || "Não foi possível atualizar a foto");
       }
@@ -353,7 +356,7 @@ export default function ProfileScreen() {
       const result = await authService.removeProfilePicture();
       if (result.success) {
         setUserProfilePicture(null);
-        Alert.alert("Sucesso", "Foto de perfil removida!");
+        Alert.alert("Sucesso", result.message || "Foto de perfil removida!");
       } else {
         Alert.alert("Erro", result.message || "Não foi possível remover a foto");
       }
