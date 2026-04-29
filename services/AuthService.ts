@@ -272,6 +272,7 @@ class AuthService {
 
       let routeMissing = false;
       let hadNetworkError = false;
+      let hadServerError = false;
       let lastMessage = "";
 
       for (const endpoint of endpoints) {
@@ -340,30 +341,25 @@ class AuthService {
           };
         }
 
-        return {
-          success: false,
-          message: lastMessage || "Não foi possível atualizar a foto de perfil",
-        };
+        hadServerError = true;
+        continue;
       }
 
-      if (routeMissing || hadNetworkError) {
-        if (this.user) {
-          this.user.profilePicture = imageUri;
-          await AsyncStorage.setItem("@auth_user", JSON.stringify(this.user));
-        }
-
-        return {
-          success: true,
-          profilePicture: imageUri,
-          message: hadNetworkError
-            ? "Sem conexão com o servidor para upload. A foto foi salva localmente neste aparelho."
-            : "O servidor atual não suporta upload de foto. A imagem foi salva localmente neste aparelho.",
-        };
+      if (this.user) {
+        this.user.profilePicture = imageUri;
+        await AsyncStorage.setItem("@auth_user", JSON.stringify(this.user));
       }
 
       return {
-        success: false,
-        message: lastMessage || "Não foi possível atualizar a foto de perfil",
+        success: true,
+        profilePicture: imageUri,
+        message: hadNetworkError
+          ? "Sem conexão com o servidor para upload. A foto foi salva localmente neste aparelho."
+          : routeMissing
+            ? "O servidor atual não suporta upload de foto. A imagem foi salva localmente neste aparelho."
+            : hadServerError
+              ? `Não foi possível sincronizar a foto no servidor (${lastMessage || "erro no servidor"}). A imagem foi salva localmente neste aparelho.`
+              : "A foto foi salva localmente neste aparelho.",
       };
     } catch (error) {
       console.error("Erro ao fazer upload da foto de perfil:", error);
@@ -390,6 +386,7 @@ class AuthService {
 
       let routeMissing = false;
       let hadNetworkError = false;
+      let hadServerError = false;
       let lastMessage = "";
 
       for (const endpoint of endpoints) {
@@ -446,29 +443,24 @@ class AuthService {
           };
         }
 
-        return {
-          success: false,
-          message: lastMessage || "Não foi possível remover a foto de perfil",
-        };
+        hadServerError = true;
+        continue;
       }
 
-      if (routeMissing || hadNetworkError) {
-        if (this.user) {
-          this.user.profilePicture = null;
-          await AsyncStorage.setItem("@auth_user", JSON.stringify(this.user));
-        }
-
-        return {
-          success: true,
-          message: hadNetworkError
-            ? "Sem conexão com o servidor para remover a foto. A imagem foi removida localmente neste aparelho."
-            : "O servidor atual não suporta remoção de foto. A imagem foi removida localmente neste aparelho.",
-        };
+      if (this.user) {
+        this.user.profilePicture = null;
+        await AsyncStorage.setItem("@auth_user", JSON.stringify(this.user));
       }
 
       return {
-        success: false,
-        message: lastMessage || "Não foi possível remover a foto de perfil",
+        success: true,
+        message: hadNetworkError
+          ? "Sem conexão com o servidor para remover a foto. A imagem foi removida localmente neste aparelho."
+          : routeMissing
+            ? "O servidor atual não suporta remoção de foto. A imagem foi removida localmente neste aparelho."
+            : hadServerError
+              ? `Não foi possível sincronizar a remoção no servidor (${lastMessage || "erro no servidor"}). A imagem foi removida localmente neste aparelho.`
+              : "A imagem foi removida localmente neste aparelho.",
       };
     } catch (error) {
       console.error("Erro ao remover foto de perfil:", error);

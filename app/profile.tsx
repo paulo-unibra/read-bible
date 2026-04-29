@@ -44,6 +44,7 @@ export default function ProfileScreen() {
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [profileImageLoadError, setProfileImageLoadError] = useState(false);
+  const [profileImageUrlIndex, setProfileImageUrlIndex] = useState(0);
   const [fontSizePref, setFontSizePref] = useState<
     "small" | "medium" | "large"
   >("medium");
@@ -54,6 +55,7 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     setProfileImageLoadError(false);
+    setProfileImageUrlIndex(0);
   }, [userProfilePicture]);
 
   const loadProfile = async () => {
@@ -405,8 +407,8 @@ export default function ProfileScreen() {
     [fontSizePref],
   );
 
-  const getProfilePictureUrl = () => {
-    if (!userProfilePicture) return null;
+  const getProfilePictureUrls = () => {
+    if (!userProfilePicture) return [] as string[];
 
     if (
       userProfilePicture.startsWith("http") ||
@@ -415,14 +417,25 @@ export default function ProfileScreen() {
       userProfilePicture.startsWith("asset://") ||
       userProfilePicture.startsWith("data:image")
     ) {
-      return userProfilePicture;
+      return [userProfilePicture];
     }
 
-    const baseUrl = API_URL.replace(/\/+$/, "");
+    const apiBaseUrl = API_URL.replace(/\/+$/, "");
+    const originBaseUrl = apiBaseUrl.replace(/\/api$/, "");
     const path = userProfilePicture.startsWith("/")
       ? userProfilePicture
       : `/${userProfilePicture}`;
-    return `${baseUrl}${path}`;
+    const normalizedPath = path.replace(/^\/api\//, "/");
+
+    if (normalizedPath.startsWith("/uploads/")) {
+      const urls = [
+        `${apiBaseUrl}${normalizedPath}`,
+        `${originBaseUrl}${normalizedPath}`,
+      ];
+      return Array.from(new Set(urls));
+    }
+
+    return [`${apiBaseUrl}${path}`];
   };
 
   const isDark = theme === "dark";
@@ -453,7 +466,8 @@ export default function ProfileScreen() {
     );
   }
 
-  const profilePictureUrl = getProfilePictureUrl();
+  const profilePictureUrls = getProfilePictureUrls();
+  const profilePictureUrl = profilePictureUrls[profileImageUrlIndex] || null;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
@@ -504,7 +518,13 @@ export default function ProfileScreen() {
               <Image
                 source={{ uri: profilePictureUrl }}
                 style={[styles.avatarImage, { backgroundColor: colors.surfaceAlt }]}
-                onError={() => setProfileImageLoadError(true)}
+                onError={() => {
+                  if (profileImageUrlIndex < profilePictureUrls.length - 1) {
+                    setProfileImageUrlIndex((prev) => prev + 1);
+                    return;
+                  }
+                  setProfileImageLoadError(true);
+                }}
               />
             ) : (
               <View

@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -16,6 +17,7 @@ import AdBanner from "../components/AdBanner";
 import BibleCuriosityCard from "../components/BibleCuriosityCard";
 import { Logo } from "../components/logo";
 import authService, {
+  API_URL,
   ReadingPlan,
   TodayReading,
 } from "../services/AuthService";
@@ -41,9 +43,19 @@ export default function HomeScreen() {
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userName, setUserName] = useState<string>("");
+  const [userProfilePicture, setUserProfilePicture] = useState<string | null>(
+    null,
+  );
+  const [profileImageLoadError, setProfileImageLoadError] = useState(false);
+  const [headerImageUrlIndex, setHeaderImageUrlIndex] = useState(0);
   const [hasLocalPlan, setHasLocalPlan] = useState(false);
   const [markingComplete, setMarkingComplete] = useState(false);
   const [isConnected, setIsConnected] = useState(true);
+
+  useEffect(() => {
+    setProfileImageLoadError(false);
+    setHeaderImageUrlIndex(0);
+  }, [userProfilePicture]);
 
   useEffect(() => {
     initializeApp();
@@ -83,6 +95,18 @@ export default function HomeScreen() {
           if (mounted) {
             if (userFont) setFontSizePref(userFont);
             if (userTheme) setTheme(userTheme);
+
+            const authenticated = authService.isAuthenticated();
+            const user = authService.getUser();
+            setIsAuthenticated(authenticated);
+            if (authenticated && user) {
+              if (user.name) setUserName(user.name.split(" ")[0]);
+              setUserProfilePicture(user.profilePicture || null);
+            } else {
+              setUserName("");
+              setUserProfilePicture(null);
+            }
+
             // Recarregar plano de leitura
             loadReadingPlan();
           }
@@ -109,6 +133,7 @@ export default function HomeScreen() {
         if (user?.name) {
           setUserName(user.name.split(" ")[0]);
         }
+        setUserProfilePicture(user?.profilePicture || null);
         await loadReadingPlan();
       }
 
@@ -316,6 +341,7 @@ export default function HomeScreen() {
           await authService.logout();
           setIsAuthenticated(false);
           setUserName("");
+          setUserProfilePicture(null);
           setReadingPlan(null);
           setTodayReadings([]);
           Alert.alert("Sucesso", "Você saiu da sua conta.");
@@ -512,6 +538,37 @@ export default function HomeScreen() {
     }
   };
 
+  const getHeaderProfilePictureUrls = () => {
+    if (!userProfilePicture) return [] as string[];
+
+    if (
+      userProfilePicture.startsWith("http") ||
+      userProfilePicture.startsWith("file://") ||
+      userProfilePicture.startsWith("content://") ||
+      userProfilePicture.startsWith("asset://") ||
+      userProfilePicture.startsWith("data:image")
+    ) {
+      return [userProfilePicture];
+    }
+
+    const apiBaseUrl = API_URL.replace(/\/+$/, "");
+    const originBaseUrl = apiBaseUrl.replace(/\/api$/, "");
+    const path = userProfilePicture.startsWith("/")
+      ? userProfilePicture
+      : `/${userProfilePicture}`;
+    const normalizedPath = path.replace(/^\/api\//, "/");
+
+    if (normalizedPath.startsWith("/uploads/")) {
+      const urls = [
+        `${apiBaseUrl}${normalizedPath}`,
+        `${originBaseUrl}${normalizedPath}`,
+      ];
+      return Array.from(new Set(urls));
+    }
+
+    return [`${apiBaseUrl}${path}`];
+  };
+
   const isDark = theme === "dark";
   const colors = {
     bg: isDark ? "#121212" : "#f5f5f5",
@@ -530,6 +587,10 @@ export default function HomeScreen() {
     iconForward: isDark ? "#888" : "#999",
     emptyIcon: isDark ? "#555" : "#ccc",
   } as const;
+
+  const headerProfilePictureUrls = getHeaderProfilePictureUrls();
+  const headerProfilePictureUrl =
+    headerProfilePictureUrls[headerImageUrlIndex] || null;
 
   if (loading) {
     return (
@@ -566,13 +627,30 @@ export default function HomeScreen() {
             style={styles.userGreeting}
             onPress={() => router.push("/profile")}
           >
-            <Ionicons
-              name="person-circle-outline"
-              size={20}
-              color={colors.iconMuted}
-              style={styles.userIcon}
-            />
-            <Text style={[styles.greetingText, { color: colors.textPrimary }]}>
+            {headerProfilePictureUrl && !profileImageLoadError ? (
+              <Image
+                source={{ uri: headerProfilePictureUrl }}
+                style={[
+                  styles.userAvatar,
+                  { backgroundColor: colors.surfaceAlt },
+                ]}
+                onError={() => {
+                  if (headerImageUrlIndex < headerProfilePictureUrls.length - 1) {
+                    setHeaderImageUrlIndex((prev) => prev + 1);
+                    return;
+                  }
+                  setProfileImageLoadError(true);
+                }}
+              />
+            ) : (
+              <Ionicons
+                name="person-circle-outline"
+                size={20}
+                color={colors.iconMuted}
+                style={styles.userIcon}
+              />
+            )}
+            <Text style={[styles.greetingText, { color: colors.textPrimary }]}> 
               Olá, {userName}
             </Text>
             <Ionicons
@@ -1391,6 +1469,12 @@ const styles = StyleSheet.create({
   headerActions: { flexDirection: "row", alignItems: "center", gap: 12 },
   userGreeting: { flexDirection: "row", alignItems: "center", gap: 6 },
   userIcon: { marginRight: 2 },
+  userAvatar: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    marginRight: 2,
+  },
   greetingText: { fontSize: 16, fontWeight: "500" },
   logoutButton: { marginLeft: 4, padding: 4 },
   loginButton: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },

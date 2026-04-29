@@ -4,7 +4,7 @@ import type { HttpContext } from '@adonisjs/core/http'
 import { cuid } from '@adonisjs/core/helpers'
 import app from '@adonisjs/core/services/app'
 import { unlink } from 'node:fs/promises'
-import { existsSync } from 'node:fs'
+import { createReadStream, existsSync } from 'node:fs'
 import path from 'node:path'
 
 export default class AuthController {
@@ -380,6 +380,52 @@ export default class AuthController {
       return response.badRequest({
         success: false,
         message: 'Erro ao fazer upload da imagem',
+      })
+    }
+  }
+
+  /**
+   * Servir foto de perfil publicamente
+   */
+  async getProfilePicture({ params, response }: HttpContext) {
+    try {
+      const fileName = String(params.fileName || '').trim()
+
+      if (!fileName || !/^[a-z0-9_-]+\.(jpg|jpeg|png|webp)$/i.test(fileName)) {
+        return response.badRequest({
+          success: false,
+          message: 'Nome de arquivo inválido',
+        })
+      }
+
+      const filePath = app.publicPath(`uploads/profile-pictures/${fileName}`)
+      if (!existsSync(filePath)) {
+        return response.notFound({
+          success: false,
+          message: 'Imagem não encontrada',
+        })
+      }
+
+      const ext = path.extname(fileName).toLowerCase()
+      const contentTypeByExt: Record<string, string> = {
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.png': 'image/png',
+        '.webp': 'image/webp',
+      }
+
+      response.header(
+        'Content-Type',
+        contentTypeByExt[ext] || 'application/octet-stream'
+      )
+      response.header('Cache-Control', 'public, max-age=86400')
+
+      return response.stream(createReadStream(filePath))
+    } catch (error) {
+      console.error('Erro ao servir foto de perfil:', error)
+      return response.status(500).send({
+        success: false,
+        message: 'Erro ao carregar imagem de perfil',
       })
     }
   }
