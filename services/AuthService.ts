@@ -271,6 +271,7 @@ class AuthService {
       ];
 
       let routeMissing = false;
+      let hadNetworkError = false;
       let lastMessage = "";
 
       for (const endpoint of endpoints) {
@@ -281,13 +282,28 @@ class AuthService {
           name: fileName,
         } as any);
 
-        const response = await fetch(endpoint.url, {
-          method: endpoint.method,
-          headers: {
-            Authorization: `Bearer ${this.token}`,
-          },
-          body: formData,
-        });
+        let response: Response;
+        try {
+          response = await fetch(endpoint.url, {
+            method: endpoint.method,
+            headers: {
+              Authorization: `Bearer ${this.token}`,
+            },
+            body: formData,
+          });
+        } catch (fetchError) {
+          hadNetworkError = true;
+          const networkMessage =
+            fetchError instanceof Error
+              ? fetchError.message
+              : "Falha de conexão ao enviar imagem";
+          lastMessage = networkMessage;
+          console.warn(
+            `[AuthService] Falha de rede em ${endpoint.method} ${endpoint.url}:`,
+            fetchError,
+          );
+          continue;
+        }
 
         const rawText = await response.text();
         let data: any = {};
@@ -330,7 +346,7 @@ class AuthService {
         };
       }
 
-      if (routeMissing) {
+      if (routeMissing || hadNetworkError) {
         if (this.user) {
           this.user.profilePicture = imageUri;
           await AsyncStorage.setItem("@auth_user", JSON.stringify(this.user));
@@ -339,8 +355,9 @@ class AuthService {
         return {
           success: true,
           profilePicture: imageUri,
-          message:
-            "O servidor atual não suporta upload de foto. A imagem foi salva localmente neste aparelho.",
+          message: hadNetworkError
+            ? "Sem conexão com o servidor para upload. A foto foi salva localmente neste aparelho."
+            : "O servidor atual não suporta upload de foto. A imagem foi salva localmente neste aparelho.",
         };
       }
 
@@ -372,15 +389,31 @@ class AuthService {
       ];
 
       let routeMissing = false;
+      let hadNetworkError = false;
       let lastMessage = "";
 
       for (const endpoint of endpoints) {
-        const response = await fetch(endpoint, {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${this.token}`,
-          },
-        });
+        let response: Response;
+        try {
+          response = await fetch(endpoint, {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${this.token}`,
+            },
+          });
+        } catch (fetchError) {
+          hadNetworkError = true;
+          const networkMessage =
+            fetchError instanceof Error
+              ? fetchError.message
+              : "Falha de conexão ao remover imagem";
+          lastMessage = networkMessage;
+          console.warn(
+            `[AuthService] Falha de rede em DELETE ${endpoint}:`,
+            fetchError,
+          );
+          continue;
+        }
 
         const rawText = await response.text();
         let data: any = {};
@@ -419,7 +452,7 @@ class AuthService {
         };
       }
 
-      if (routeMissing) {
+      if (routeMissing || hadNetworkError) {
         if (this.user) {
           this.user.profilePicture = null;
           await AsyncStorage.setItem("@auth_user", JSON.stringify(this.user));
@@ -427,8 +460,9 @@ class AuthService {
 
         return {
           success: true,
-          message:
-            "O servidor atual não suporta remoção de foto. A imagem foi removida localmente neste aparelho.",
+          message: hadNetworkError
+            ? "Sem conexão com o servidor para remover a foto. A imagem foi removida localmente neste aparelho."
+            : "O servidor atual não suporta remoção de foto. A imagem foi removida localmente neste aparelho.",
         };
       }
 

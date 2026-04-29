@@ -43,6 +43,7 @@ export default function ProfileScreen() {
   const [newName, setNewName] = useState("");
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [profileImageLoadError, setProfileImageLoadError] = useState(false);
   const [fontSizePref, setFontSizePref] = useState<
     "small" | "medium" | "large"
   >("medium");
@@ -50,6 +51,10 @@ export default function ProfileScreen() {
   useEffect(() => {
     loadProfile();
   }, []);
+
+  useEffect(() => {
+    setProfileImageLoadError(false);
+  }, [userProfilePicture]);
 
   const loadProfile = async () => {
     try {
@@ -335,6 +340,10 @@ export default function ProfileScreen() {
 
       if (result.success && result.profilePicture) {
         setUserProfilePicture(result.profilePicture);
+        const authUser = authService.getUser();
+        if (authUser?.profilePicture) {
+          setUserProfilePicture(authUser.profilePicture);
+        }
         Alert.alert(
           "Sucesso",
           result.message || "Foto de perfil atualizada!",
@@ -398,8 +407,22 @@ export default function ProfileScreen() {
 
   const getProfilePictureUrl = () => {
     if (!userProfilePicture) return null;
-    if (userProfilePicture.startsWith("http")) return userProfilePicture;
-    return `${API_URL}${userProfilePicture}`;
+
+    if (
+      userProfilePicture.startsWith("http") ||
+      userProfilePicture.startsWith("file://") ||
+      userProfilePicture.startsWith("content://") ||
+      userProfilePicture.startsWith("asset://") ||
+      userProfilePicture.startsWith("data:image")
+    ) {
+      return userProfilePicture;
+    }
+
+    const baseUrl = API_URL.replace(/\/+$/, "");
+    const path = userProfilePicture.startsWith("/")
+      ? userProfilePicture
+      : `/${userProfilePicture}`;
+    return `${baseUrl}${path}`;
   };
 
   const isDark = theme === "dark";
@@ -477,10 +500,11 @@ export default function ProfileScreen() {
               >
                 <ActivityIndicator size="small" color={colors.accent} />
               </View>
-            ) : profilePictureUrl ? (
+            ) : profilePictureUrl && !profileImageLoadError ? (
               <Image
                 source={{ uri: profilePictureUrl }}
-                style={styles.avatarImage}
+                style={[styles.avatarImage, { backgroundColor: colors.surfaceAlt }]}
+                onError={() => setProfileImageLoadError(true)}
               />
             ) : (
               <View
