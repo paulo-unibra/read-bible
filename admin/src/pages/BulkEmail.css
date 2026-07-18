@@ -1,7 +1,7 @@
 .bulk-email-page {
-  padding: 24px;
+  padding: 24px 32px;
   max-width: 1400px;
-  margin: 0 auto;
+  margin-left: var(--sidebar-width);
 }
 
 .bulk-email-header {
@@ -12,20 +12,21 @@
 }
 
 .bulk-email-header h1 {
-  font-size: 32px;
-  color: #1a1a1a;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--color-text);
   margin-bottom: 8px;
 }
 
 .subtitle {
-  color: #666;
+  color: var(--color-text-secondary);
   font-size: 16px;
 }
 
 .back-button {
   background: none;
   border: none;
-  color: #2196f3;
+  color: var(--color-info);
   font-size: 16px;
   cursor: pointer;
   padding: 8px 0;
@@ -40,9 +41,9 @@
 }
 
 .dev-warning {
-  background-color: #fff3cd;
-  border: 1px solid #ffc107;
-  color: #856404;
+  background-color: var(--color-warning-bg);
+  border: 1px solid var(--color-warning);
+  color: var(--color-warning);
   padding: 16px;
   border-radius: 8px;
   margin-bottom: 24px;
@@ -60,7 +61,7 @@
 .filter-section h2 {
   font-size: 20px;
   margin-bottom: 16px;
-  color: #1a1a1a;
+  color: var(--color-text);
 }
 
 .status-filters {
@@ -74,7 +75,7 @@
   align-items: center;
   justify-content: center;
   padding: 20px;
-  border: 2px solid #e0e0e0;
+  border: 2px solid var(--color-border);
   border-radius: 12px;
   background: white;
   cursor: pointer;
@@ -104,15 +105,15 @@
 }
 
 .message.success {
-  background-color: #d4edda;
+  background-color: var(--color-success-bg);
   border: 1px solid #c3e6cb;
-  color: #155724;
+  color: var(--color-success);
 }
 
 .message.error {
-  background-color: #f8d7da;
-  border: 1px solid #f5c6cb;
-  color: #721c24;
+  background-color: var(--color-danger-bg);
+  border: 1px solid var(--color-danger);
+  color: var(--color-danger);
 }
 
 .message button {
@@ -156,9 +157,9 @@
 
 .select-all-btn {
   padding: 10px 20px;
-  border: 2px solid #666;
+  border: 2px solid var(--color-text-secondary);
   background: white;
-  color: #666;
+  color: var(--color-text-secondary);
   border-radius: 8px;
   cursor: pointer;
   font-weight: 500;
@@ -166,9 +167,9 @@
 }
 
 .select-all-btn:hover {
-  background: #f5f5f5;
-  border-color: #333;
-  color: #333;
+  background: var(--color-bg);
+  border-color: var(--color-text);
+  color: var(--color-text);
 }
 
 .send-btn {
@@ -198,17 +199,17 @@
 .loading {
   text-align: center;
   padding: 40px;
-  color: #666;
+  color: var(--color-text-secondary);
   font-size: 18px;
 }
 
-.no-users {
+.bulk-email-page .no-users {
   text-align: center;
   padding: 60px 20px;
-  color: #999;
+  color: var(--color-text-muted);
 }
 
-.no-users p {
+.bulk-email-page .no-users p {
   font-size: 18px;
 }
 
@@ -219,7 +220,7 @@
 }
 
 .user-card {
-  border: 2px solid #e0e0e0;
+  border: 2px solid var(--color-border);
   border-radius: 12px;
   padding: 20px;
   cursor: pointer;
@@ -228,13 +229,13 @@
 }
 
 .user-card:hover {
-  border-color: #2196f3;
+  border-color: var(--color-info);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   transform: translateY(-2px);
 }
 
 .user-card.selected {
-  border-color: #4caf50;
+  border-color: var(--color-success);
   background: #f1f8f4;
   box-shadow: 0 4px 12px rgba(76, 175, 80, 0.2);
 }
@@ -245,7 +246,7 @@
   gap: 12px;
   margin-bottom: 16px;
   padding-bottom: 16px;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .user-card-header input[type="checkbox"] {
@@ -258,13 +259,13 @@
 
 .user-info h3 {
   font-size: 18px;
-  color: #1a1a1a;
+  color: var(--color-text);
   margin: 0 0 4px 0;
   font-weight: 600;
 }
 
-.user-email {
-  color: #666;
+.bulk-email-page .user-email {
+  color: var(--color-text-secondary);
   font-size: 14px;
   margin: 0;
   word-break: break-all;
@@ -272,7 +273,7 @@
 
 .plan-info h4 {
   font-size: 16px;
-  color: #333;
+  color: var(--color-text);
   margin: 0 0 12px 0;
   font-weight: 500;
 }
@@ -289,27 +290,27 @@
   align-items: center;
 }
 
-.stat-label {
+.bulk-email-page .stat-label {
   font-size: 12px;
-  color: #666;
+  color: var(--color-text-secondary);
   margin-bottom: 4px;
 }
 
-.stat-value {
+.bulk-email-page .stat-value {
   font-size: 18px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: var(--color-text);
 }
 
-.progress-bar {
-  background: #e0e0e0;
+.bulk-email-page .progress-bar {
+  background: var(--color-border);
   border-radius: 8px;
   height: 24px;
   overflow: hidden;
   position: relative;
 }
 
-.progress-fill {
+.bulk-email-page .progress-fill {
   height: 100%;
   display: flex;
   align-items: center;

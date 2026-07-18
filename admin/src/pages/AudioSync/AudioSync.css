@@ -1,7 +1,7 @@
 .audio-sync-container {
-  padding: 24px;
+  padding: 24px 32px;
   max-width: 1400px;
-  margin: 0 auto;
+  margin-left: var(--sidebar-width);
 }
 
 .audio-sync-header {
@@ -13,16 +13,17 @@
 
 .back-button {
   padding: 8px 16px;
-  background: #6c757d;
-  color: white;
-  border: none;
-  border-radius: 4px;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   font-size: 14px;
 }
 
 .back-button:hover {
-  background: #5a6268;
+  background: var(--color-surface-hover);
+  border-color: var(--color-text-muted);
 }
 
 .sync-layout {
@@ -55,19 +56,19 @@
 .input-group label {
   font-size: 12px;
   font-weight: 600;
-  color: #555;
+  color: var(--color-text-secondary);
 }
 
 .input-group input {
   padding: 8px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--color-border-strong);
   border-radius: 4px;
   width: 80px;
 }
 
 .synced-badge {
   padding: 4px 8px;
-  background: #28a745;
+  background: var(--color-success);
   color: white;
   border-radius: 4px;
   font-size: 12px;
@@ -75,7 +76,7 @@
 }
 
 .audio-player {
-  background: #f8f9fa;
+  background: var(--color-bg);
   padding: 16px;
   border-radius: 8px;
   margin-bottom: 24px;
@@ -92,7 +93,7 @@
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background: #007bff;
+  background: var(--color-info);
   color: white;
   border: none;
   font-size: 20px;
@@ -109,14 +110,14 @@
 .time-display {
   font-size: 14px;
   font-weight: 600;
-  color: #333;
+  color: var(--color-text);
 }
 
 .seek-bar {
   width: 100%;
   height: 6px;
   border-radius: 3px;
-  background: #ddd;
+  background: var(--color-border-strong);
   outline: none;
   -webkit-appearance: none;
 }
@@ -126,7 +127,7 @@
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #007bff;
+  background: var(--color-info);
   cursor: pointer;
 }
 
@@ -141,14 +142,14 @@
 
 .progress-bar {
   height: 8px;
-  background: #e9ecef;
+  background: var(--color-border);
   border-radius: 4px;
   overflow: hidden;
 }
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #28a745, #20c997);
+  background: linear-gradient(90deg, var(--color-success), #20c997);
   transition: width 0.3s ease;
 }
 
@@ -159,7 +160,7 @@
 .save-button {
   width: 100%;
   padding: 12px;
-  background: #28a745;
+  background: var(--color-success);
   color: white;
   border: none;
   border-radius: 4px;
@@ -174,7 +175,7 @@
 }
 
 .save-button:disabled {
-  background: #6c757d;
+  background: var(--color-text-secondary);
   cursor: not-allowed;
 }
 
@@ -189,7 +190,7 @@
   background: #e7f3ff;
   padding: 16px;
   border-radius: 8px;
-  border-left: 4px solid #007bff;
+  border-left: 4px solid var(--color-info);
 }
 
 .instructions h3 {
@@ -207,7 +208,7 @@
 .instructions li {
   margin-bottom: 8px;
   font-size: 13px;
-  color: #333;
+  color: var(--color-text);
 }
 
 .verses-panel {
@@ -235,25 +236,25 @@
   display: flex;
   gap: 12px;
   padding: 12px;
-  border: 1px solid #e9ecef;
+  border: 1px solid var(--color-border);
   border-radius: 6px;
   transition: all 0.2s;
 }
 
 .verse-item.selected {
-  background: #fff3cd;
-  border-color: #ffc107;
+  background: var(--color-warning-bg);
+  border-color: var(--color-warning);
 }
 
 .verse-item.synced {
-  background: #d4edda;
-  border-color: #28a745;
+  background: var(--color-success-bg);
+  border-color: var(--color-success);
 }
 
 .verse-number {
   font-weight: 700;
   font-size: 16px;
-  color: #007bff;
+  color: var(--color-info);
   min-width: 30px;
 }
 
@@ -263,14 +264,14 @@
 
 .verse-text {
   font-size: 14px;
-  color: #333;
+  color: var(--color-text);
   margin-bottom: 4px;
 }
 
 .verse-timestamp {
   font-size: 12px;
   font-weight: 600;
-  color: #28a745;
+  color: var(--color-success);
 }
 
 .verse-actions {
@@ -291,7 +292,7 @@
 }
 
 .mark-button {
-  background: #007bff;
+  background: var(--color-info);
   color: white;
 }
 
@@ -300,8 +301,8 @@
 }
 
 .jump-button {
-  background: #ffc107;
-  color: #333;
+  background: var(--color-warning);
+  color: var(--color-text);
 }
 
 .jump-button:hover {
@@ -309,12 +310,12 @@
 }
 
 .clear-button {
-  background: #dc3545;
+  background: var(--color-danger);
   color: white;
 }
 
 .clear-button:hover {
-  background: #c82333;
+  background: var(--color-danger-hover);
 }
 
 .synced-chapters-panel {

@@ -328,7 +328,7 @@ const EmailLogs: React.FC = () => {
                         {log.user?.fullName || "Usuário removido"}
                       </strong>
                     </div>
-                    <div style={{ fontSize: "0.9em", color: "#666" }}>
+                    <div style={{ fontSize: "0.9em", color: "var(--color-text-secondary)" }}>
                       {log.email}
                     </div>
                   </Td>

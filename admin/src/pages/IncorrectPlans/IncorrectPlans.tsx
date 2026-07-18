@@ -104,7 +104,7 @@ export default function IncorrectPlans() {
       <Sidebar />
       <MainContent>
         <PageTitle>⚠️ Planos de Leitura Incorretos</PageTitle>
-        <p style={{ color: "#666", marginBottom: "20px" }}>
+        <p style={{ color: "var(--color-text-secondary)", marginBottom: "20px" }}>
           Identificar e corrigir planos com cálculo incorreto de dias
         </p>
 

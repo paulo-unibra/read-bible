@@ -205,7 +205,7 @@ const ActivePlans = () => {
                       <div>
                         <strong>{plan.user.name}</strong>
                         <br />
-                        <small style={{ color: "#666" }}>
+                        <small style={{ color: "var(--color-text-secondary)" }}>
                           {plan.user.email}
                         </small>
                       </div>
@@ -218,7 +218,7 @@ const ActivePlans = () => {
                       {formatDate(plan.startDate)} até{" "}
                       {formatDate(plan.endDate)}
                       <br />
-                      <small style={{ color: "#666" }}>
+                      <small style={{ color: "var(--color-text-secondary)" }}>
                         Dia {plan.currentDay} de {plan.totalDays}
                       </small>
                     </Td>
@@ -226,11 +226,11 @@ const ActivePlans = () => {
                       <div>
                         <strong>{plan.stats.completionPercentage}%</strong>
                         <br />
-                        <small style={{ color: "#666" }}>
+                        <small style={{ color: "var(--color-text-secondary)" }}>
                           {plan.stats.completedDays}/{plan.totalDays} dias
                         </small>
                         <br />
-                        <small style={{ color: "#666" }}>
+                        <small style={{ color: "var(--color-text-secondary)" }}>
                           {plan.completedChapters}/{plan.totalChapters} caps
                         </small>
                       </div>

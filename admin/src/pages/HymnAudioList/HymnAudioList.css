@@ -1,27 +1,28 @@
 /* ========== Layout ========== */
 .hymn-audio-list {
   min-height: 100vh;
-  background: #f8f9fa;
+  background: var(--color-bg);
+  margin-left: var(--sidebar-width);
 }
 
 /* ========== Header ========== */
 .hymn-audio-list-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 32px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  background: var(--color-surface);
+  color: var(--color-text);
+  padding: 24px 32px;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .header-content h1 {
-  margin: 0 0 8px 0;
-  font-size: 32px;
-  font-weight: 700;
+  margin: 0 0 4px 0;
+  font-size: 22px;
+  font-weight: 600;
 }
 
 .subtitle {
   margin: 0;
-  font-size: 16px;
-  opacity: 0.95;
+  font-size: 14px;
+  color: var(--color-text-secondary);
   font-weight: 400;
 }
 
@@ -44,7 +45,7 @@
 .card-title {
   margin: 0 0 20px 0;
   font-size: 20px;
-  color: #333;
+  color: var(--color-text);
   font-weight: 600;
 }
 
@@ -57,7 +58,7 @@
 .search-input {
   flex: 1;
   padding: 12px 16px;
-  border: 2px solid #e0e0e0;
+  border: 2px solid var(--color-border);
   border-radius: 8px;
   font-size: 15px;
   transition: all 0.2s;
@@ -65,13 +66,13 @@
 
 .search-input:focus {
   outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
 }
 
 .search-button {
   padding: 12px 28px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--color-primary);
   color: white;
   border: none;
   border-radius: 8px;
@@ -79,12 +80,12 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
 }
 
 .search-button:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 6px 20px rgba(79, 70, 229, 0.4);
 }
 
 .search-button:active {
@@ -104,8 +105,8 @@
 .loading-spinner {
   width: 48px;
   height: 48px;
-  border: 4px solid #e0e0e0;
-  border-top-color: #667eea;
+  border: 4px solid var(--color-border);
+  border-top-color: var(--color-primary);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
   margin: 0 auto 16px;
@@ -117,7 +118,7 @@
 
 .loading-card p {
   margin: 0;
-  color: #666;
+  color: var(--color-text-secondary);
   font-size: 16px;
 }
 
@@ -129,7 +130,7 @@
   margin-bottom: 32px;
 }
 
-.stat-card {
+.hymn-audio-list .stat-card {
   background: white;
   padding: 32px;
   border-radius: 12px;
@@ -138,56 +139,53 @@
   transition: all 0.2s;
 }
 
-.stat-card:hover {
+.hymn-audio-list .stat-card:hover {
   transform: translateY(-4px);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
 }
 
-.stat-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+.hymn-audio-list .stat-primary {
+  background: var(--color-primary);
   color: white;
 }
 
-.stat-secondary {
-  border: 2px solid #e0e0e0;
+.hymn-audio-list .stat-secondary {
+  border: 2px solid var(--color-border);
 }
 
-.stat-icon {
+.hymn-audio-list .stat-icon {
   font-size: 48px;
   margin-bottom: 16px;
   opacity: 0.9;
 }
 
-.stat-value {
+.hymn-audio-list .stat-value {
   margin: 0;
   font-size: 56px;
   font-weight: 700;
   line-height: 1;
 }
 
-.stat-primary .stat-value {
+.hymn-audio-list .stat-primary .stat-value {
   color: white;
 }
 
-.stat-secondary .stat-value {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+.hymn-audio-list .stat-secondary .stat-value {
+  color: var(--color-primary);
 }
 
-.stat-label {
+.hymn-audio-list .stat-label {
   margin: 12px 0 0 0;
   font-size: 15px;
   font-weight: 500;
 }
 
-.stat-primary .stat-label {
+.hymn-audio-list .stat-primary .stat-label {
   color: rgba(255, 255, 255, 0.9);
 }
 
-.stat-secondary .stat-label {
-  color: #666;
+.hymn-audio-list .stat-secondary .stat-label {
+  color: var(--color-text-secondary);
 }
 
 /* ========== Hymns Card ========== */
@@ -205,8 +203,8 @@
 }
 
 .hymn-item {
-  background: #f8f9fa;
-  border: 2px solid #e0e0e0;
+  background: var(--color-bg);
+  border: 2px solid var(--color-border);
   border-radius: 12px;
   padding: 24px;
   cursor: pointer;
@@ -216,31 +214,28 @@
 
 .hymn-item:hover {
   background: white;
-  border-color: #667eea;
-  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.2);
+  border-color: var(--color-primary);
+  box-shadow: 0 8px 20px rgba(79, 70, 229, 0.2);
   transform: translateY(-4px);
 }
 
 .hymn-number {
   font-size: 36px;
   font-weight: 700;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--color-primary);
   margin-bottom: 8px;
 }
 
 .hymn-title {
   font-size: 15px;
-  color: #333;
+  color: var(--color-text);
   margin-bottom: 12px;
   font-weight: 500;
 }
 
 .hymn-action {
   font-size: 14px;
-  color: #667eea;
+  color: var(--color-primary);
   font-weight: 600;
 }
 
@@ -261,14 +256,14 @@
 
 .empty-card h3 {
   margin: 0 0 12px 0;
-  color: #333;
+  color: var(--color-text);
   font-size: 24px;
   font-weight: 600;
 }
 
 .empty-card p {
   margin: 0;
-  color: #666;
+  color: var(--color-text-secondary);
   font-size: 16px;
 }
 

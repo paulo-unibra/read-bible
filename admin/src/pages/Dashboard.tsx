@@ -1,35 +1,19 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
+import { MainContent, PageTitle } from "../components/ui/StyledComponents";
 import { useAuth } from "../contexts/AuthContext";
 import "./Dashboard.css";
 
 const Dashboard: React.FC = () => {
-  const { user, logout, hasPermission } = useAuth();
+  const { user, hasPermission } = useAuth();
   const navigate = useNavigate();
-
-  const handleLogout = async () => {
-    try {
-      await logout();
-      navigate("/login");
-    } catch (error) {
-      console.error("Erro ao fazer logout:", error);
-    }
-  };
 
   return (
     <>
       <Sidebar />
-      <div className="dashboard">
-        <header className="dashboard-header">
-          <h1>Painel Administrativo</h1>
-          <div className="user-info">
-            <span className="user-name">{user?.fullName || user?.email}</span>
-            <button onClick={handleLogout} className="logout-button">
-              Sair
-            </button>
-          </div>
-        </header>
+      <MainContent className="dashboard">
+        <PageTitle>Dashboard</PageTitle>
 
         <main className="dashboard-content">
           <div className="welcome-card">
@@ -117,7 +101,7 @@ const Dashboard: React.FC = () => {
             </div>
 
             <div className="dashboard-card">
-              <h3>� Planos Ativos</h3>
+              <h3>📋 Planos Ativos</h3>
               <p>Gerenciar e desabilitar planos ativos</p>
               <button
                 className="card-button"
@@ -131,7 +115,7 @@ const Dashboard: React.FC = () => {
             </div>
 
             <div className="dashboard-card">
-              <h3>�🔑 Permissões</h3>
+              <h3>🔑 Permissões</h3>
               <p>Visualizar e gerenciar permissões</p>
               <button
                 className="card-button"
@@ -213,7 +197,7 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
         </main>
-      </div>
+      </MainContent>
     </>
   );
 };

@@ -110,7 +110,7 @@ const Users: React.FC = () => {
     column: string;
     direction: "asc" | "desc";
   } | null>(null);
-  const { hasPermission, logout } = useAuth();
+  const { hasPermission } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -147,11 +147,6 @@ const Users: React.FC = () => {
     } catch (err: any) {
       console.error("Erro ao carregar estatísticas:", err);
     }
-  };
-
-  const handleLogout = async () => {
-    await logout();
-    navigate("/login");
   };
 
   const formatDate = (dateString: string) => {

@@ -86,7 +86,7 @@ const Quizzes: React.FC = () => {
   const [formError, setFormError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { hasPermission, logout } = useAuth();
+  const { hasPermission } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -340,10 +340,7 @@ const Quizzes: React.FC = () => {
     }
   };
 
-  const handleLogout = async () => {
-    await logout();
-    navigate("/login");
-  };
+
 
   return (
     <>

@@ -4,87 +4,189 @@ import styled from "styled-components";
 import { useAuth } from "../contexts/AuthContext";
 
 const SidebarContainer = styled.aside`
-  width: 250px;
-  background-color: #1a1a2e;
-  color: white;
+  width: var(--sidebar-width);
+  background-color: var(--sidebar-bg);
+  color: var(--sidebar-text);
   height: 100vh;
   position: fixed;
   left: 0;
   top: 0;
   overflow-y: auto;
-  padding: 20px 0;
+  display: flex;
+  flex-direction: column;
+  z-index: 100;
 `;
 
 const Logo = styled.div`
-  padding: 0 20px 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 22px 20px;
+  border-bottom: 1px solid var(--sidebar-border);
+  flex-shrink: 0;
+
+  .mark {
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+    background: var(--color-primary);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
 
   h2 {
     margin: 0;
-    font-size: 20px;
-    color: #4ecca3;
+    font-size: 15px;
+    font-weight: 600;
+    color: #fff;
+    line-height: 1.3;
+  }
+
+  span {
+    display: block;
+    font-size: 11px;
+    color: var(--sidebar-text);
   }
 `;
 
 const Nav = styled.nav`
   display: flex;
   flex-direction: column;
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 12px;
 `;
 
-const NavItem = styled.button<{ active?: boolean }>`
-  padding: 12px 20px;
+const SectionLabel = styled.p`
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6b7280;
+  margin: 16px 8px 6px;
+
+  &:first-child {
+    margin-top: 0;
+  }
+`;
+
+const NavItem = styled.button<{ $active?: boolean }>`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  margin-bottom: 2px;
   background: ${(props) =>
-    props.active ? "rgba(78, 204, 163, 0.2)" : "transparent"};
+    props.$active ? "rgba(79, 70, 229, 0.16)" : "transparent"};
   border: none;
-  border-left: 3px solid
-    ${(props) => (props.active ? "#4ecca3" : "transparent")};
-  color: white;
+  border-radius: var(--radius-sm);
+  color: ${(props) => (props.$active ? "#ffffff" : "var(--sidebar-text)")};
   text-align: left;
   cursor: pointer;
-  transition: all 0.3s;
-  font-size: 14px;
+  transition: background 0.15s, color 0.15s;
+  font-size: 13.5px;
+  font-weight: ${(props) => (props.$active ? 600 : 500)};
 
-  &:hover {
-    background: rgba(78, 204, 163, 0.1);
+  .icon {
+    font-size: 15px;
+    width: 18px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  .label {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .lock {
+    font-size: 11px;
+    opacity: 0.6;
+  }
+
+  &:hover:not(:disabled) {
+    background: ${(props) =>
+      props.$active ? "rgba(79, 70, 229, 0.22)" : "var(--sidebar-bg-hover)"};
+    color: #ffffff;
   }
 
   &:disabled {
-    opacity: 0.4;
+    opacity: 0.35;
     cursor: not-allowed;
   }
 `;
 
 const UserSection = styled.div`
-  padding: 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  margin-top: auto;
+  padding: 14px;
+  border-top: 1px solid var(--sidebar-border);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+`;
 
-  p {
-    margin: 0 0 10px;
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.7);
-  }
+const Avatar = styled.div`
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+  text-transform: uppercase;
+`;
+
+const UserMeta = styled.div`
+  flex: 1;
+  min-width: 0;
 
   strong {
-    color: white;
-    font-size: 14px;
+    display: block;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  span {
+    font-size: 12px;
+    color: var(--sidebar-text);
   }
 `;
 
 const LogoutButton = styled.button`
-  width: 100%;
-  padding: 10px;
-  background: #dc3545;
-  color: white;
-  border: none;
-  border-radius: 4px;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--sidebar-text);
+  border: 1px solid var(--sidebar-border);
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  margin-top: 10px;
   font-size: 14px;
+  transition: all 0.15s;
 
   &:hover {
-    background: #c82333;
+    background: var(--color-danger-bg);
+    border-color: var(--color-danger);
+    color: var(--color-danger);
   }
 `;
 
@@ -102,93 +204,145 @@ const Sidebar: React.FC = () => {
     }
   };
 
-  const menuItems = [
+  const menuSections = [
     {
-      path: "/dashboard",
-      label: "🏠 Dashboard",
-      permission: "acessar_painel_administrativo",
-    },
-    { path: "/users", label: "👥 Usuários", permission: "gerenciar_usuarios" },
-    {
-      path: "/permissions",
-      label: "🔑 Permissões",
-      permission: "gerenciar_roles",
-    },
-    {
-      path: "/quizzes",
-      label: "📝 Questionários",
-      permission: "gerenciar_questionarios",
+      label: "Geral",
+      items: [
+        {
+          path: "/dashboard",
+          icon: "🏠",
+          label: "Dashboard",
+          permission: "acessar_painel_administrativo",
+        },
+      ],
     },
     {
-      path: "/reading-plans",
-      label: "📖 Templates de Planos",
-      permission: "gerenciar_conteudo",
+      label: "Conteúdo",
+      items: [
+        {
+          path: "/quizzes",
+          icon: "📝",
+          label: "Questionários",
+          permission: "gerenciar_questionarios",
+        },
+        {
+          path: "/reading-plans",
+          icon: "📖",
+          label: "Templates de Planos",
+          permission: "gerenciar_conteudo",
+        },
+        {
+          path: "/active-plans",
+          icon: "📋",
+          label: "Planos Ativos",
+          permission: "gerenciar_conteudo",
+        },
+        {
+          path: "/incorrect-plans",
+          icon: "⚠️",
+          label: "Planos Incorretos",
+          permission: "gerenciar_conteudo",
+        },
+        {
+          path: "/bible-curiosities",
+          icon: "📚",
+          label: "Curiosidades",
+          permission: "gerenciar_conteudo",
+        },
+        {
+          path: "/admin/hymn-audios",
+          icon: "🎵",
+          label: "Áudios de Hinos",
+          permission: "gerenciar_conteudo",
+        },
+        {
+          path: "/audio-sync",
+          icon: "🔊",
+          label: "Sync Áudio",
+          permission: "gerenciar_conteudo",
+        },
+      ],
     },
     {
-      path: "/active-plans",
-      label: "📋 Planos Ativos",
-      permission: "gerenciar_conteudo",
+      label: "Usuários & Acesso",
+      items: [
+        { path: "/users", icon: "👥", label: "Usuários", permission: "gerenciar_usuarios" },
+        {
+          path: "/permissions",
+          icon: "🔑",
+          label: "Permissões",
+          permission: "gerenciar_roles",
+        },
+      ],
     },
     {
-      path: "/incorrect-plans",
-      label: "⚠️ Planos Incorretos",
-      permission: "gerenciar_conteudo",
-    },
-    {
-      path: "/bible-curiosities",
-      label: "📚 Curiosidades",
-      permission: "gerenciar_conteudo",
-    },
-    {
-      path: "/admin/hymn-audios",
-      label: "🎵 Áudios de Hinos",
-      permission: "gerenciar_conteudo",
-    },
-    {
-      path: "/audio-sync",
-      label: "🔊 Sync Áudio",
-      permission: "gerenciar_conteudo",
-    },
-    {
-      path: "/bulk-email",
-      label: "📧 E-mails em Massa",
-      permission: "gerenciar_usuarios",
-    },
-    {
-      path: "/email-logs",
-      label: "📬 Logs de E-mails",
-      permission: "gerenciar_usuarios",
-    },
-    {
-      path: "/reports",
-      label: "📊 Relatórios",
-      permission: "visualizar_relatorios",
+      label: "Comunicação & Relatórios",
+      items: [
+        {
+          path: "/bulk-email",
+          icon: "📧",
+          label: "E-mails em Massa",
+          permission: "gerenciar_usuarios",
+        },
+        {
+          path: "/email-logs",
+          icon: "📬",
+          label: "Logs de E-mails",
+          permission: "gerenciar_usuarios",
+        },
+        {
+          path: "/reports",
+          icon: "📊",
+          label: "Relatórios",
+          permission: "visualizar_relatorios",
+        },
+      ],
     },
   ];
+
+  const displayName = user?.fullName || user?.email || "";
+  const initial = displayName.trim().charAt(0) || "?";
 
   return (
     <SidebarContainer>
       <Logo>
-        <h2>ReadBible Admin</h2>
+        <div className="mark">📖</div>
+        <div>
+          <h2>ReadBible</h2>
+          <span>Painel Administrativo</span>
+        </div>
       </Logo>
 
       <Nav>
-        {menuItems.map((item) => (
-          <NavItem
-            key={item.path}
-            active={location.pathname === item.path}
-            disabled={!hasPermission(item.permission)}
-            onClick={() => navigate(item.path)}
-          >
-            {item.label} {!hasPermission(item.permission) && "🔒"}
-          </NavItem>
+        {menuSections.map((section) => (
+          <React.Fragment key={section.label}>
+            <SectionLabel>{section.label}</SectionLabel>
+            {section.items.map((item) => (
+              <NavItem
+                key={item.path}
+                $active={location.pathname === item.path}
+                disabled={!hasPermission(item.permission)}
+                onClick={() => navigate(item.path)}
+                title={item.label}
+              >
+                <span className="icon">{item.icon}</span>
+                <span className="label">{item.label}</span>
+                {!hasPermission(item.permission) && <span className="lock">🔒</span>}
+              </NavItem>
+            ))}
+          </React.Fragment>
         ))}
       </Nav>
 
       <UserSection>
-        <p>Logado como</p>
-        <strong>{user?.fullName || user?.email}</strong>
-        <LogoutButton onClick={handleLogout}>Sair</LogoutButton>
+        <Avatar>{initial}</Avatar>
+        <UserMeta>
+          <strong title={displayName}>{displayName}</strong>
+          <span>Logado</span>
+        </UserMeta>
+        <LogoutButton onClick={handleLogout} title="Sair">
+          ⏻
+        </LogoutButton>
       </UserSection>
     </SidebarContainer>
   );

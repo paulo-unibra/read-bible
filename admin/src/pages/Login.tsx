@@ -32,7 +32,7 @@ const Login: React.FC = () => {
   return (
     <div className="login-container">
       <div className="login-card">
-        <h1>Painel Administr3ativo</h1>
+        <h1>Painel Administrativo</h1>
         <p className="subtitle">Bíblia em Foco</p>
 
         {error && (

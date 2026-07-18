@@ -1,16 +1,17 @@
 .quizzes-page {
   min-height: 100vh;
-  background-color: #f5f5f5;
+  background-color: var(--color-bg);
+  margin-left: var(--sidebar-width);
 }
 
 .quizzes-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 24px 32px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  padding: 20px 32px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .header-content {
@@ -26,46 +27,58 @@
 }
 
 .back-button,
-.logout-button,
-.create-button,
-.ai-button {
-  background-color: rgba(255, 255, 255, 0.2);
-  color: white;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+.logout-button {
+  background-color: var(--color-surface);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border-strong);
   padding: 8px 16px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   font-size: 14px;
   font-weight: 500;
-  transition: all 0.2s;
+  transition: all 0.15s;
 }
 
 .create-button,
 .ai-button {
-  background-color: rgba(255, 255, 255, 0.95);
-  color: #667eea;
   border: none;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.15s;
+}
+
+.create-button {
+  background-color: var(--color-primary);
+  color: white;
 }
 
 .ai-button {
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-  color: white;
+  background-color: var(--color-primary-light);
+  color: var(--color-primary-text);
+  border: 1px solid var(--color-primary);
 }
 
 .back-button:hover,
 .logout-button:hover {
-  background-color: rgba(255, 255, 255, 0.3);
+  background-color: var(--color-surface-hover);
+  border-color: var(--color-text-muted);
 }
 
-.create-button:hover,
+.create-button:hover {
+  background-color: var(--color-primary-hover);
+}
+
 .ai-button:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  background-color: var(--color-primary);
+  color: white;
 }
 
 .quizzes-header h1 {
   margin: 0;
-  font-size: 24px;
+  font-size: 21px;
   font-weight: 600;
 }
 
@@ -85,7 +98,7 @@
 .search-input,
 .filter-select {
   padding: 10px 12px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--color-border-strong);
   border-radius: 6px;
   font-size: 14px;
   transition: border-color 0.2s;
@@ -102,8 +115,8 @@
 .search-input:focus,
 .filter-select:focus {
   outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
 }
 
 /* Table */
@@ -120,30 +133,30 @@
 }
 
 .quizzes-table th {
-  background-color: #f8f9fa;
+  background-color: var(--color-bg);
   padding: 16px;
   text-align: left;
   font-weight: 600;
-  color: #333;
+  color: var(--color-text);
   font-size: 14px;
-  border-bottom: 2px solid #e0e0e0;
+  border-bottom: 2px solid var(--color-border);
 }
 
 .quizzes-table td {
   padding: 16px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--color-surface-hover);
   font-size: 14px;
-  color: #555;
+  color: var(--color-text-secondary);
 }
 
 .quizzes-table tbody tr:hover {
-  background-color: #f8f9fa;
+  background-color: var(--color-bg);
 }
 
 .no-data {
   text-align: center;
   padding: 40px;
-  color: #999;
+  color: var(--color-text-muted);
   font-style: italic;
 }
 
@@ -151,8 +164,8 @@
 .version-badge {
   display: inline-block;
   padding: 4px 8px;
-  background-color: #e3f2fd;
-  color: #1976d2;
+  background-color: var(--color-info-bg);
+  color: var(--color-info);
   border-radius: 4px;
   font-size: 12px;
   font-weight: 600;
@@ -195,7 +208,7 @@
 }
 
 .view-btn:hover {
-  background-color: #e3f2fd;
+  background-color: var(--color-info-bg);
 }
 
 .edit-btn:hover {
@@ -203,7 +216,7 @@
 }
 
 .delete-btn:hover {
-  background-color: #ffebee;
+  background-color: var(--color-danger-bg);
 }
 
 /* Pagination */
@@ -217,7 +230,7 @@
 
 .pagination button {
   padding: 8px 16px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--color-border-strong);
   background: white;
   border-radius: 6px;
   cursor: pointer;
@@ -226,8 +239,8 @@
 }
 
 .pagination button:hover:not(:disabled) {
-  background-color: #f8f9fa;
-  border-color: #667eea;
+  background-color: var(--color-bg);
+  border-color: var(--color-primary);
 }
 
 .pagination button:disabled {
@@ -237,7 +250,7 @@
 
 .pagination span {
   font-size: 14px;
-  color: #666;
+  color: var(--color-text-secondary);
 }
 
 /* Modals */
@@ -277,13 +290,13 @@
   justify-content: space-between;
   align-items: center;
   padding: 20px 24px;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .modal-header h2 {
   margin: 0;
   font-size: 20px;
-  color: #333;
+  color: var(--color-text);
   flex: 1;
 }
 
@@ -306,27 +319,27 @@
 }
 
 .edit-mode-button {
-  background-color: #667eea;
+  background-color: var(--color-primary);
   color: white;
 }
 
 .edit-mode-button:hover {
   background-color: #5568d3;
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
 }
 
 .cancel-edit-button {
-  background-color: #f5f5f5;
-  color: #666;
+  background-color: var(--color-bg);
+  color: var(--color-text-secondary);
 }
 
 .cancel-edit-button:hover:not(:disabled) {
-  background-color: #e0e0e0;
+  background-color: var(--color-border);
 }
 
 .save-edit-button {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  background: linear-gradient(135deg, var(--color-success) 0%, var(--color-success) 100%);
   color: white;
 }
 
@@ -345,7 +358,7 @@
   background: none;
   border: none;
   font-size: 32px;
-  color: #999;
+  color: var(--color-text-muted);
   cursor: pointer;
   padding: 0;
   width: 32px;
@@ -358,8 +371,8 @@
 }
 
 .close-button:hover {
-  background-color: #f5f5f5;
-  color: #666;
+  background-color: var(--color-bg);
+  color: var(--color-text-secondary);
 }
 
 /* Forms */
@@ -375,7 +388,7 @@
   display: block;
   margin-bottom: 8px;
   font-weight: 600;
-  color: #333;
+  color: var(--color-text);
   font-size: 14px;
 }
 
@@ -384,7 +397,7 @@
 .form-group textarea {
   width: 100%;
   padding: 10px 12px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--color-border-strong);
   border-radius: 6px;
   font-size: 14px;
   font-family: inherit;
@@ -395,12 +408,12 @@
 .form-group select:focus,
 .form-group textarea:focus {
   outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
 }
 
 .form-error {
-  background-color: #ffebee;
+  background-color: var(--color-danger-bg);
   color: #c62828;
   padding: 12px;
   border-radius: 6px;
@@ -410,13 +423,13 @@
 }
 
 .info-box {
-  background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
+  background: linear-gradient(135deg, var(--color-info-bg) 0%, #f3e5f5 100%);
   border: 1px solid #bbdefb;
   border-radius: 8px;
   padding: 16px;
   margin: 20px 0;
   font-size: 14px;
-  color: #333;
+  color: var(--color-text);
 }
 
 /* Mode Selection */
@@ -424,7 +437,7 @@
   display: flex;
   gap: 12px;
   margin-bottom: 24px;
-  background-color: #f8f9fa;
+  background-color: var(--color-bg);
   padding: 8px;
   border-radius: 8px;
 }
@@ -438,20 +451,20 @@
   font-weight: 600;
   cursor: pointer;
   background-color: white;
-  color: #666;
+  color: var(--color-text-secondary);
   transition: all 0.2s;
 }
 
 .mode-button.active {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--color-primary);
   color: white;
-  border-color: #667eea;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  border-color: var(--color-primary);
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
 }
 
 .mode-button:hover:not(.active) {
-  background-color: #f0f0f0;
-  border-color: #ddd;
+  background-color: var(--color-surface-hover);
+  border-color: var(--color-border-strong);
 }
 
 .manual-mode-message {
@@ -468,7 +481,7 @@
   justify-content: flex-end;
   gap: 12px;
   padding-top: 20px;
-  border-top: 1px solid #e0e0e0;
+  border-top: 1px solid var(--color-border);
   margin-top: 24px;
 }
 
@@ -484,22 +497,22 @@
 }
 
 .cancel-button {
-  background-color: #f5f5f5;
-  color: #666;
+  background-color: var(--color-bg);
+  color: var(--color-text-secondary);
 }
 
 .cancel-button:hover:not(:disabled) {
-  background-color: #e0e0e0;
+  background-color: var(--color-border);
 }
 
 .submit-button {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--color-primary);
   color: white;
 }
 
 .submit-button:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4);
 }
 
 .cancel-button:disabled,
@@ -517,18 +530,18 @@
   display: flex;
   gap: 24px;
   padding: 16px;
-  background-color: #f8f9fa;
+  background-color: var(--color-bg);
   border-radius: 8px;
   margin-bottom: 24px;
 }
 
 .quiz-meta span {
   font-size: 14px;
-  color: #666;
+  color: var(--color-text-secondary);
 }
 
 .quiz-meta strong {
-  color: #333;
+  color: var(--color-text);
 }
 
 .questions-list {
@@ -539,20 +552,20 @@
 
 .question-view {
   background: white;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   padding: 20px;
   transition: all 0.2s;
 }
 
 .question-view.editing {
-  border-color: #667eea;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+  border-color: var(--color-primary);
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.1);
 }
 
 .question-view h4 {
   margin: 0 0 12px 0;
-  color: #667eea;
+  color: var(--color-primary);
   font-size: 16px;
 }
 
@@ -570,14 +583,14 @@
   display: block;
   margin-bottom: 8px;
   font-weight: 600;
-  color: #333;
+  color: var(--color-text);
   font-size: 14px;
 }
 
 .question-textarea {
   width: 100%;
   padding: 12px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--color-border-strong);
   border-radius: 6px;
   font-size: 14px;
   font-family: inherit;
@@ -587,8 +600,8 @@
 
 .question-textarea:focus {
   outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
 }
 
 .alternative-input-group {
@@ -600,14 +613,14 @@
 
 .alternative-letter {
   font-weight: 600;
-  color: #667eea;
+  color: var(--color-primary);
   min-width: 24px;
 }
 
 .alternative-input {
   flex: 1;
   padding: 10px 12px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--color-border-strong);
   border-radius: 6px;
   font-size: 14px;
   transition: border-color 0.2s;
@@ -615,14 +628,14 @@
 
 .alternative-input:focus {
   outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
 }
 
 .remove-alt-button {
   padding: 8px 12px;
-  background-color: #fee;
-  color: #c33;
+  background-color: var(--color-danger-bg);
+  color: var(--color-danger);
   border: none;
   border-radius: 6px;
   cursor: pointer;
@@ -631,14 +644,14 @@
 }
 
 .remove-alt-button:hover {
-  background-color: #fcc;
+  background-color: var(--color-danger);
 }
 
 .add-alt-button {
   padding: 10px 16px;
-  background-color: #f0f0f0;
-  color: #667eea;
-  border: 2px dashed #ddd;
+  background-color: var(--color-surface-hover);
+  color: var(--color-primary);
+  border: 2px dashed var(--color-border-strong);
   border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
@@ -649,13 +662,13 @@
 
 .add-alt-button:hover {
   background-color: #e8e8f7;
-  border-color: #667eea;
+  border-color: var(--color-primary);
 }
 
 .correct-answer-select {
   width: 100%;
   padding: 10px 12px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--color-border-strong);
   border-radius: 6px;
   font-size: 14px;
   background-color: white;
@@ -665,23 +678,23 @@
 
 .correct-answer-select:focus {
   outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
 }
 
 .question-actions {
   margin-top: 16px;
   padding-top: 16px;
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid var(--color-surface-hover);
   display: flex;
   justify-content: flex-end;
 }
 
 .remove-question-button {
   padding: 8px 16px;
-  background-color: #fee;
-  color: #c33;
-  border: 1px solid #fcc;
+  background-color: var(--color-danger-bg);
+  color: var(--color-danger);
+  border: 1px solid var(--color-danger);
   border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
@@ -690,21 +703,21 @@
 }
 
 .remove-question-button:hover {
-  background-color: #fcc;
-  border-color: #c33;
+  background-color: var(--color-danger);
+  border-color: var(--color-danger);
 }
 
 .add-question-section {
   margin-top: 24px;
   padding-top: 24px;
-  border-top: 2px solid #e0e0e0;
+  border-top: 2px solid var(--color-border);
   display: flex;
   justify-content: center;
 }
 
 .add-question-button {
   padding: 12px 24px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--color-primary);
   color: white;
   border: none;
   border-radius: 8px;
@@ -712,18 +725,18 @@
   font-size: 15px;
   font-weight: 600;
   transition: all 0.2s;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
 }
 
 .add-question-button:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4);
 }
 
 .question-text {
   margin: 0 0 16px 0;
   font-size: 15px;
-  color: #333;
+  color: var(--color-text);
   font-weight: 500;
   line-height: 1.6;
 }
@@ -737,23 +750,23 @@
 .alternatives-list li {
   padding: 12px;
   margin-bottom: 8px;
-  background-color: #f8f9fa;
+  background-color: var(--color-bg);
   border-radius: 6px;
   font-size: 14px;
-  color: #555;
+  color: var(--color-text-secondary);
   transition: all 0.2s;
 }
 
 .alternatives-list li.correct {
   background-color: #e8f5e9;
-  border: 2px solid #4caf50;
+  border: 2px solid var(--color-success);
   font-weight: 600;
   color: #2e7d32;
 }
 
 .correct-badge {
   float: right;
-  background-color: #4caf50;
+  background-color: var(--color-success);
   color: white;
   padding: 2px 8px;
   border-radius: 12px;
@@ -770,7 +783,7 @@
 }
 
 .error-message {
-  background-color: #ffebee;
+  background-color: var(--color-danger-bg);
   color: #c62828;
   border-radius: 8px;
   margin-bottom: 20px;

@@ -278,7 +278,7 @@ export default function BibleCuriosities() {
         >
           <div>
             <PageTitle>📖 Curiosidades Bíblicas</PageTitle>
-            <p style={{ color: "#666", margin: "0" }}>
+            <p style={{ color: "var(--color-text-secondary)", margin: "0" }}>
               Gerenciar curiosidades geradas por IA e controlar publicação
             </p>
           </div>

@@ -75,7 +75,7 @@ const ReadingPlanTemplates: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState("");
 
-  const { hasPermission, logout } = useAuth();
+  const { hasPermission } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -287,10 +287,7 @@ const ReadingPlanTemplates: React.FC = () => {
     }
   };
 
-  const handleLogout = async () => {
-    await logout();
-    navigate("/login");
-  };
+
 
   const handleGenerateWithAI = async () => {
     if (!aiPrompt.trim()) {

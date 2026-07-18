@@ -900,7 +900,7 @@ const Reports: React.FC = () => {
                       className="stat-note"
                       style={{
                         fontSize: "0.75rem",
-                        color: "#666",
+                        color: "var(--color-text-secondary)",
                         marginTop: "4px",
                       }}
                     >
@@ -1097,7 +1097,7 @@ const Reports: React.FC = () => {
                           href="https://play.google.com/store/apps/details?id=com.readbible.app"
                           target="_blank"
                           rel="noopener noreferrer"
-                          style={{ color: "#1976d2" }}
+                          style={{ color: "var(--color-info)" }}
                         >
                           Bíblia em Foco
                         </a>
