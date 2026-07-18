@@ -619,6 +619,8 @@
 .offset-input:focus {
   outline: none;
   border-color: #764ba2;
+}
+
 /* ========== Responsive ========== */
 @media (max-width: 768px) {
   .hymn-audio-header {
@@ -638,7 +640,11 @@
 
   .hymn-audio-header h1 {
     font-size: 20px;
-  }order-left: 4px solid #ffc107;
+  }
+}
+
+.track-notes {
+  border-left: 4px solid #ffc107;
   border-radius: 6px;
   font-size: 14px;
   color: #856404;
