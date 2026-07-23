@@ -1138,6 +1138,38 @@ export default function HymnViewerScreen() {
           </>
         )}
 
+        <TouchableOpacity
+          style={[
+            styles.studioButton,
+            { backgroundColor: colors.card, borderColor: colors.border },
+          ]}
+          onPress={() =>
+            router.push({
+              pathname: "/hymn-studio",
+              params: { hymnNumber: hymn.number },
+            })
+          }
+          activeOpacity={0.85}
+        >
+          <View style={styles.studioButtonLeft}>
+            <Ionicons name="radio" size={24} color={colors.accent} />
+            <View>
+              <Text style={[styles.studioButtonTitle, { color: colors.textPrimary }]}>
+                Estudio
+              </Text>
+              <Text
+                style={[
+                  styles.studioButtonSubtitle,
+                  { color: colors.textSecondary },
+                ]}
+              >
+                Gravacao, bases e mixagem em uma tela dedicada
+              </Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={22} color={colors.textSecondary} />
+        </TouchableOpacity>
+
         {/* Verses */}
         <View style={styles.versesContent}>
           {hymn.verses.map((verse, index) => renderVerse(verse, index))}
@@ -1389,5 +1421,34 @@ const styles = StyleSheet.create({
     fontSize: 12,
     minWidth: 40,
     textAlign: "center",
+  },
+  studioButton: {
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 3,
+  },
+  studioButtonLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+  },
+  studioButtonTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    marginBottom: 2,
+  },
+  studioButtonSubtitle: {
+    fontSize: 13,
   },
 });

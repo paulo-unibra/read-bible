@@ -261,6 +261,26 @@ class HymnAudioService {
     try {
       console.log(`📥 [HymnAudioService] Carregando: ${track.instrument}...`);
 
+      const isLocalUri =
+        track.downloadUrl.startsWith("file://") ||
+        track.downloadUrl.startsWith("content://");
+
+      if (isLocalUri) {
+        const { sound } = await Audio.Sound.createAsync(
+          { uri: track.downloadUrl },
+          {
+            shouldPlay: false,
+            volume: track.volume,
+            progressUpdateIntervalMillis: 100,
+          },
+        );
+
+        console.log(
+          `✅ [HymnAudioService] ${track.instrument} carregado de arquivo local`,
+        );
+        return sound;
+      }
+
       // PRIORIDADE 1: Verificar se existe em cache local
       if (track.hymnNumber) {
         const cacheStatus = await hymnCacheService.isCached(

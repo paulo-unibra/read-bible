@@ -2,7 +2,7 @@
   "expo": {
     "name": "Bíblia em Foco",
     "slug": "ReadBible",
-    "version": "1.0.31",
+    "version": "1.0.32",
     "orientation": "portrait",
     "icon": "./assets/images/icon-v2.png",
     "scheme": "readbible",
@@ -15,7 +15,8 @@
         "googleMobileAdsAppId": "ca-app-pub-5942901200629242~1274274321"
       },
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSMicrophoneUsageDescription": "Permitir o uso do microfone para gravar sua voz nos hinos da Harpa."
       }
     },
     "android": {
@@ -34,6 +35,7 @@
       "permissions": [
         "INTERNET",
         "MODIFY_AUDIO_SETTINGS",
+        "RECORD_AUDIO",
         "READ_CALENDAR",
         "READ_MEDIA_AUDIO",
         "SYSTEM_ALERT_WINDOW",
@@ -46,7 +48,6 @@
         "READ_MEDIA_IMAGES",
         "READ_MEDIA_VIDEO",
         "READ_MEDIA_VISUAL_USER_SELECTED",
-        "RECORD_AUDIO",
         "CAMERA"
       ]
     },

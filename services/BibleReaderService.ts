@@ -453,29 +453,33 @@ export class BibleReaderService {
         );
       }
 
-      // Check if file already exists in SQLite directory, if not copy it
+      // Always re-copy the file to ensure a fresh, valid copy
+      // This avoids issues on iOS where FileSystem.documentDirectory differs
+      // from expo-sqlite's defaultDatabaseDirectory in Expo Go
       const sqliteFileInfo = await FileSystem.getInfoAsync(sqlitePath);
-      if (!sqliteFileInfo.exists) {
-        console.log("Copying Bible file to SQLite directory:", sqlitePath);
-        try {
-          await FileSystem.copyAsync({
-            from: localPath,
-            to: sqlitePath,
-          });
-        } catch (copyError) {
-          console.error("Error copying file:", copyError);
-          throw new Error(
-            "Erro ao copiar o arquivo da Bíblia. Por favor, tente novamente.",
-          );
-        }
+      if (sqliteFileInfo.exists) {
+        await FileSystem.deleteAsync(sqlitePath, { idempotent: true });
+      }
+      console.log("Copying Bible file to SQLite directory:", sqlitePath);
+      try {
+        await FileSystem.copyAsync({
+          from: localPath,
+          to: sqlitePath,
+        });
+      } catch (copyError) {
+        console.error("Error copying file:", copyError);
+        throw new Error(
+          "Erro ao copiar o arquivo da Bíblia. Por favor, tente novamente.",
+        );
       }
 
       console.log("Opening Bible from SQLite directory:", fileName);
       let db: SQLite.SQLiteDatabase | null = null;
 
       try {
-        // Use just the filename - expo-sqlite will look in its SQLite directory
-        db = await SQLite.openDatabaseAsync(fileName);
+        // Pass sqliteDir to ensure expo-sqlite opens from the same location
+        // where we copied the file (especially important on iOS in Expo Go)
+        db = await SQLite.openDatabaseAsync(fileName, undefined, sqliteDir);
         console.log("✅ Database opened successfully");
 
         // List all tables to help debug
