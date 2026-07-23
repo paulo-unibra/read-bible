@@ -298,11 +298,23 @@ class DatabaseService {
 
         console.log("✅ Migração de schema concluída!");
       } else {
-        console.log("✅ Schema já está atualizado");
+        console.log("✅ Schema já está atualizado (reading_plans)");
+      }
+
+      const biblesInfo = (await db.getAllAsync(
+        "PRAGMA table_info(bibles)",
+      )) as any[];
+      const hasSourceColumn = biblesInfo.some((col: any) => col.name === "source");
+
+      if (!hasSourceColumn) {
+        console.log("⚠️ Migrando tabela bibles: adicionando coluna source...");
+        await db.execAsync("ALTER TABLE bibles ADD COLUMN source TEXT DEFAULT 'google_drive'");
+        console.log("✅ Migração da tabela bibles concluída!");
+      } else {
+        console.log("✅ Schema já está atualizado (bibles)");
       }
     } catch (error) {
       console.error("❌ Erro ao migrar schema:", error);
-      // Não lançar erro para não quebrar a inicialização
     }
   }
 
@@ -618,7 +630,7 @@ class DatabaseService {
         );
 
         await this.db.runAsync(
-          "INSERT OR REPLACE INTO bibles (id, name, abbreviation, fileName, isDownloaded, downloadDate, size) VALUES (?, ?, ?, ?, ?, ?, ?)",
+          "INSERT OR REPLACE INTO bibles (id, name, abbreviation, fileName, isDownloaded, downloadDate, size, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
           [
             bible.id,
             bible.name,
@@ -627,6 +639,7 @@ class DatabaseService {
             bible.isDownloaded ? 1 : 0,
             bible.downloadDate || null,
             bible.size || null,
+            bible.source || 'google_drive',
           ],
         );
         console.log("🔥 INSERT OR REPLACE completed successfully");
@@ -669,6 +682,7 @@ class DatabaseService {
           isDownloaded: Boolean(row.isDownloaded),
           downloadDate: row.downloadDate as string | undefined,
           size: row.size as number | undefined,
+          source: row.source as string | undefined,
         };
       });
       this.biblesCache = { data: mapped, updatedAt: Date.now() };

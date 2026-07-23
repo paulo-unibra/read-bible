@@ -28,6 +28,8 @@ const ReadingPlanTemplateController = () => import('#controllers/reading_plan_te
 const PlanTypesController = () => import('#controllers/plan_types_controller')
 const HymnAudiosController = () => import('#controllers/hymn_audios_controller')
 const AudioSyncTimestampsController = () => import('#controllers/audio_sync_timestamps_controller')
+const BibleBrainController = () => import('#controllers/bible_brain_controller')
+const AdminBibleBrainController = () => import('#controllers/Admin/bible_brain_controller')
 import router from '@adonisjs/core/services/router'
 import { middleware } from './kernel.js'
 
@@ -138,6 +140,20 @@ router.get('/hymn-audios/:hymnNumber', [HymnAudiosController, 'getByHymnNumber']
 
 // Audio Sync Timestamps routes (public para o app)
 router.get('/audio-sync/:bookId/:chapterNumber', [AudioSyncTimestampsController, 'show'])
+
+// BibleBrain routes (público para o app) — acréscimo em paralelo ao fluxo do Google Drive
+// IMPORTANTE: rotas específicas ANTES da rota com parâmetro
+router.get('/bible-brain/bibles', [BibleBrainController, 'index'])
+router.get('/bible-brain/video-bibles', [BibleBrainController, 'videoBibles'])
+router.get('/bible-brain/bibles/:bibleId/package/download', [BibleBrainController, 'download'])
+router.get('/bible-brain/video-proxy/:filesetId/:bookId/:chapterNumber/*', [BibleBrainController, 'videoProxyPlaylist'])
+router.get('/bible-brain/video-proxy/:filesetId/:bookId/:chapterNumber', [BibleBrainController, 'videoProxyPlaylist'])
+router.get('/bible-brain/bibles/:bibleId/video/:bookId/:chapterNumber', [BibleBrainController, 'videoChapter'])
+router.get('/bible-brain/bibles/:bibleId/audio/:bookId/:chapterNumber', [BibleBrainController, 'audioChapter'])
+router.get('/bible-brain/bibles/:bibleId/audio-timestamps/:bookId/:chapterNumber', [BibleBrainController, 'audioTimestamps'])
+router.get('/bible-brain/bibles/:bibleId/package', [BibleBrainController, 'packageStatus'])
+router.post('/bible-brain/bibles/:bibleId/package', [BibleBrainController, 'requestPackage'])
+router.get('/bible-brain/bibles/:bibleId', [BibleBrainController, 'show'])
 
 // Admin routes
 router
@@ -273,6 +289,14 @@ router
         router.post('/audio-sync', [AudioSyncTimestampsController, 'store'])
         router.get('/audio-sync/list', [AudioSyncTimestampsController, 'list'])
         router.get('/audio-sync/:bookId/:chapterNumber', [AudioSyncTimestampsController, 'show'])
+
+        // BibleBrain management (sincronização + habilitação de bíblias)
+        router.get('/bible-brain/languages', [AdminBibleBrainController, 'languages'])
+        router.post('/bible-brain/sync', [AdminBibleBrainController, 'sync'])
+        router.get('/bible-brain/sync/status', [AdminBibleBrainController, 'syncStatus'])
+        router.get('/bible-brain/bibles', [AdminBibleBrainController, 'index'])
+        router.patch('/bible-brain/bibles/:id/toggle', [AdminBibleBrainController, 'toggle'])
+        router.post('/bible-brain/bibles/:id/package', [AdminBibleBrainController, 'requestPackage'])
       })
       .use(middleware.auth({ guards: ['api'] }))
   })

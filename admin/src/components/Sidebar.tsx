@@ -244,6 +244,12 @@ const Sidebar: React.FC = () => {
           permission: "gerenciar_conteudo",
         },
         {
+          path: "/bible-brain",
+          icon: "🧠",
+          label: "BibleBrain",
+          permission: "gerenciar_conteudo",
+        },
+        {
           path: "/bible-curiosities",
           icon: "📚",
           label: "Curiosidades",

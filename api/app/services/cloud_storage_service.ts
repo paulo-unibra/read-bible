@@ -75,4 +75,30 @@ export default class CloudStorageService {
       throw new Error(`Falha no upload para Cloud Storage: ${error.message}`)
     }
   }
+
+  /**
+   * Upload genérico de um arquivo (a partir de um caminho local) para o bucket,
+   * retornando a URL pública e o tamanho em bytes do arquivo enviado.
+   */
+  async uploadFile(
+    localFilePath: string,
+    destinationPath: string,
+    contentType: string
+  ): Promise<{ url: string; size: number }> {
+    const bucket = this.storage.bucket(this.bucketName)
+    const stats = await fs.stat(localFilePath)
+
+    await bucket.upload(localFilePath, {
+      destination: destinationPath,
+      contentType,
+      metadata: {
+        cacheControl: 'public, max-age=31536000',
+      },
+    })
+
+    return {
+      url: `https://storage.googleapis.com/${this.bucketName}/${destinationPath}`,
+      size: stats.size,
+    }
+  }
 }

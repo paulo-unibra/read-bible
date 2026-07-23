@@ -2,6 +2,17 @@ import { Audio, AVPlaybackStatus } from "expo-av";
 import { Sound } from "expo-av/build/Audio";
 import * as FileSystem from "expo-file-system/legacy";
 import PlaybackNotificationService from "./PlaybackNotificationService";
+import bibleBrainService from "./BibleBrainService";
+
+const USFM_BOOK_ORDER = [
+  'GEN', 'EXO', 'LEV', 'NUM', 'DEU', 'JOS', 'JDG', 'RUT', '1SA', '2SA',
+  '1KI', '2KI', '1CH', '2CH', 'EZR', 'NEH', 'EST', 'JOB', 'PSA', 'PRO',
+  'ECC', 'SNG', 'ISA', 'JER', 'LAM', 'EZK', 'DAN', 'HOS', 'JOL', 'AMO',
+  'OBA', 'JON', 'MIC', 'NAM', 'HAB', 'ZEP', 'HAG', 'ZEC', 'MAL',
+  'MAT', 'MRK', 'LUK', 'JHN', 'ACT', 'ROM', '1CO', '2CO', 'GAL', 'EPH',
+  'PHP', 'COL', '1TH', '2TH', '1TI', '2TI', 'TIT', 'PHM', 'HEB', 'JAS',
+  '1PE', '2PE', '1JN', '2JN', '3JN', 'JUD', 'REV',
+]
 
 interface AudioState {
   isPlaying: boolean;
@@ -40,6 +51,16 @@ class AudioService {
   private statusCheckInterval: NodeJS.Timeout | null = null; // Timer para polling manual
   private lastTriggeredEnd: number | null = null; // Evitar múltiplos disparos
   // Permite sobrepor pasta específica de áudios, depois usa pasta geral e por fim fallback hardcoded
+  private bibleBrainBibleId: string | null = null;
+
+  setBibleBrainMode(bibleId: string | null) {
+    this.bibleBrainBibleId = bibleId;
+  }
+
+  private mapBookIdToUsfm(bookId: number): string {
+    return USFM_BOOK_ORDER[bookId - 1] || '';
+  }
+
   private DRIVE_FOLDER_ID =
     process.env.EXPO_PUBLIC_AUDIO_DRIVE_FOLDER_ID ||
     process.env.EXPO_PUBLIC_DRIVE_FOLDER_ID ||
@@ -249,9 +270,23 @@ class AudioService {
         return true;
       }
 
+      if (this.bibleBrainBibleId) {
+        return this.hasAudioBibleBrain();
+      }
+
       await this.resolveDriveFileId(fileName);
       return true;
     } catch (_) {
+      return false;
+    }
+  }
+
+  private async hasAudioBibleBrain(): Promise<boolean> {
+    if (!this.bibleBrainBibleId) return false;
+    try {
+      const bib = await bibleBrainService.getBible(this.bibleBrainBibleId);
+      return bib.hasAudio;
+    } catch {
       return false;
     }
   }
@@ -310,6 +345,65 @@ class AudioService {
     return localPath;
   }
 
+  private async getBibleBrainAudioLocalPath(
+    fileName: string,
+    bookId: number,
+    chapter: number,
+    isPrefetch: boolean = false,
+  ): Promise<string> {
+    if (!this.bibleBrainBibleId) {
+      throw new Error('BibleBrain mode not set');
+    }
+
+    await this.ensureAudioDir();
+    const localPath = `${this.AUDIO_DIR}${fileName}`;
+    const info = await FileSystem.getInfoAsync(localPath);
+    if (info.exists && info.size && info.size > 1024) {
+      return localPath;
+    }
+
+    if (!isPrefetch) {
+      this.state.downloadProgress = 0;
+      this.state.isLoading = true;
+      this.notifyListeners();
+    }
+
+    const bookIdStr = this.mapBookIdToUsfm(bookId);
+    const audioInfo = await bibleBrainService.getAudioChapterUrl(
+      this.bibleBrainBibleId,
+      bookIdStr,
+      chapter,
+    );
+
+    const downloadResumable = FileSystem.createDownloadResumable(
+      audioInfo.url,
+      localPath,
+      {},
+      (downloadProgress) => {
+        if (!isPrefetch) {
+          const progress =
+            downloadProgress.totalBytesWritten /
+            downloadProgress.totalBytesExpectedToWrite;
+          const progressPercent = Math.round(progress * 100);
+          this.state.downloadProgress = progressPercent;
+          this.notifyListeners();
+        }
+      },
+    );
+
+    const result = await downloadResumable.downloadAsync();
+    if (!result || result.status !== 200) {
+      throw new Error(`Falha ao baixar áudio BibleBrain (status ${result?.status})`);
+    }
+
+    if (!isPrefetch) {
+      this.state.downloadProgress = 100;
+      this.notifyListeners();
+    }
+
+    return localPath;
+  }
+
   async loadAndPlay(
     bookId: number,
     chapter: number,
@@ -356,8 +450,10 @@ class AudioService {
       this.notifyListeners();
 
       const fileName = this.getAudioFileName(bookId, chapter);
-      console.log("[AudioService] Getting audio file:", fileName);
-      const localPath = await this.getOrDownloadAudioLocalPath(fileName);
+      console.log("[AudioService] Getting audio file:", fileName, this.bibleBrainBibleId ? "(BibleBrain)" : "(Drive)");
+      const localPath = this.bibleBrainBibleId
+        ? await this.getBibleBrainAudioLocalPath(fileName, bookId, chapter)
+        : await this.getOrDownloadAudioLocalPath(fileName);
       console.log("[AudioService] Audio file ready at:", localPath);
 
       // Descarregar o som antigo AGORA, antes de criar o novo
@@ -597,7 +693,11 @@ class AudioService {
         chapter,
       });
       const fileName = this.getAudioFileName(bookId, chapter);
-      await this.getOrDownloadAudioLocalPath(fileName, true); // isPrefetch = true
+      if (this.bibleBrainBibleId) {
+        await this.getBibleBrainAudioLocalPath(fileName, bookId, chapter, true);
+      } else {
+        await this.getOrDownloadAudioLocalPath(fileName, true); // isPrefetch = true
+      }
       console.log("[AudioService] Prefetch completed successfully");
       return true;
     } catch (e) {
@@ -793,23 +893,41 @@ class AudioService {
     chapterNumber: number,
   ): Promise<void> {
     try {
-      const API_URL =
-        process.env.EXPO_PUBLIC_API_URL || "http://localhost:3333";
-      const response = await fetch(
-        `${API_URL}/audio-sync/${bookId}/${chapterNumber}`,
-      );
-      const data = await response.json();
-
-      if (data.success && data.data && data.data.length > 0) {
-        this.state.verseTimestamps = data.data;
-        console.log(
-          `[AudioService] Loaded ${data.data.length} timestamps for chapter`,
+      if (this.bibleBrainBibleId) {
+        const bookIdStr = this.mapBookIdToUsfm(bookId);
+        const timestamps = await bibleBrainService.getAudioTimestamps(
+          this.bibleBrainBibleId,
+          bookIdStr,
+          chapterNumber,
         );
+        if (timestamps.length > 0) {
+          this.state.verseTimestamps = timestamps;
+          console.log(
+            `[AudioService] Loaded ${timestamps.length} BibleBrain timestamps for chapter`,
+          );
+        } else {
+          this.state.verseTimestamps = [];
+          console.log("[AudioService] No BibleBrain timestamps found");
+        }
       } else {
-        this.state.verseTimestamps = [];
-        console.log(
-          "[AudioService] No timestamps found, using calculation fallback",
+        const API_URL =
+          process.env.EXPO_PUBLIC_API_URL || "http://localhost:3333";
+        const response = await fetch(
+          `${API_URL}/audio-sync/${bookId}/${chapterNumber}`,
         );
+        const data = await response.json();
+
+        if (data.success && data.data && data.data.length > 0) {
+          this.state.verseTimestamps = data.data;
+          console.log(
+            `[AudioService] Loaded ${data.data.length} timestamps for chapter`,
+          );
+        } else {
+          this.state.verseTimestamps = [];
+          console.log(
+            "[AudioService] No timestamps found, using calculation fallback",
+          );
+        }
       }
     } catch (error) {
       console.error("[AudioService] Error fetching timestamps:", error);

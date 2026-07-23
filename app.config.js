@@ -25,6 +25,7 @@ module.exports = ({ config }) => {
       ],
       "./plugins/withAndroidManifestFix",
       "./plugins/withSQLiteFix",
+      "expo-video",
     ],
   };
 };

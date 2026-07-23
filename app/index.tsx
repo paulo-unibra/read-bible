@@ -1228,6 +1228,54 @@ export default function HomeScreen() {
             />
           </TouchableOpacity>
 
+          {/* Filmes */}
+          <TouchableOpacity
+            style={[
+              styles.actionCard,
+              {
+                backgroundColor: colors.card,
+                shadowOpacity: isDark ? 0.25 : 0.1,
+              },
+            ]}
+            onPress={() => router.push("/video-list")}
+          >
+            <View
+              style={[
+                styles.actionIcon,
+                { backgroundColor: colors.surfaceAlt },
+              ]}
+            >
+              <Ionicons
+                name="film-outline"
+                size={32}
+                color={isDark ? "#ef9a9a" : "#E53935"}
+              />
+            </View>
+            <View style={styles.actionContent}>
+              <Text
+                style={[
+                  styles.actionTitle,
+                  { color: colors.textPrimary, fontSize: applyFontScale(18) },
+                ]}
+              >
+                Filmes
+              </Text>
+              <Text
+                style={[
+                  styles.actionDescription,
+                  { color: colors.textSecondary, fontSize: applyFontScale(14) },
+                ]}
+              >
+                Vídeos bíblicos do BibleBrain
+              </Text>
+            </View>
+            <Ionicons
+              name="chevron-forward"
+              size={20}
+              color={colors.iconForward}
+            />
+          </TouchableOpacity>
+
           {isAuthenticated && readingPlan && (
             <TouchableOpacity
               style={[

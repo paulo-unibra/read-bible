@@ -7,6 +7,7 @@ export interface Bible {
   isDownloaded: boolean;
   downloadDate?: string;
   size?: number;
+  source?: string;
 }
 
 export interface Book {
@@ -92,6 +93,21 @@ export interface SearchResult {
   verseNumber: number;
   text: string;
   highlightedText: string;
+}
+
+export interface BibleBrainBible {
+  bibleId: string;
+  name: string;
+  languageName: string;
+  languageIso: string;
+  countryId: string | null;
+  date: string | null;
+  hasText: boolean;
+  hasAudio: boolean;
+  packageStatus: string | null;
+  packageProgress: number;
+  downloadUrl: string | null;
+  packageSize: number | null;
 }
 
 export interface DriveFile {

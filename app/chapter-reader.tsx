@@ -484,6 +484,8 @@ export default function ChapterReaderScreen() {
       if (!currentBible) throw new Error("Bible not found");
       setBibleAbbrev(currentBible.abbreviation || "");
 
+      AudioService.setBibleBrainMode(currentBible.source === 'biblebrain' ? bibleId : null);
+
       await bibleReaderService.openBible(bibleId, currentBible.fileName);
 
       const books = await bibleReaderService.getBooks(bibleId);
@@ -676,21 +678,13 @@ export default function ChapterReaderScreen() {
     };
   }, []);
 
-  // Configurar total de versículos no AudioService quando carregar o capítulo
-  // DESATIVADO: Sincronização de versículos com áudio
-  /*
   useEffect(() => {
-    if (verses.length > 0 && currentChapter > 0) {
+    if (verses.length > 0 && currentChapter > 0 && audioAvailable) {
       AudioService.setTotalVerses(verses.length);
-      // Buscar timestamps sincronizados do backend
       AudioService.fetchVerseTimestamps(currentBookId, currentChapter);
     }
-  }, [verses, currentChapter, currentBookId]);
-  */
+  }, [verses, currentChapter, currentBookId, audioAvailable]);
 
-  // Escutar mudanças no AudioService para atualizar versículo atual
-  // DESATIVADO: Sincronização de versículos com áudio
-  /*
   useEffect(() => {
     const unsubscribe = AudioService.addListener((state) => {
       if (
@@ -708,11 +702,7 @@ export default function ChapterReaderScreen() {
       unsubscribe();
     };
   }, [currentBookId, currentChapter]);
-  */
 
-  // Auto-scroll para o versículo sendo narrado
-  // DESATIVADO: Sincronização de versículos com áudio
-  /*
   useEffect(() => {
     if (currentNarratedVerse && verses.length > 0 && versesListRef.current) {
       const index = verses.findIndex(v => v.verseNumber === currentNarratedVerse);
@@ -721,16 +711,14 @@ export default function ChapterReaderScreen() {
           versesListRef.current.scrollToIndex({
             index,
             animated: true,
-            viewPosition: 0.3, // Posiciona o versículo a 30% da tela
+            viewPosition: 0.3,
           });
         } catch (error) {
-          // Fallback se scrollToIndex falhar
           console.log("Auto-scroll error:", error);
         }
       }
     }
   }, [currentNarratedVerse, verses]);
-  */
 
   // Monitorar mudanças no estado do modal da Bíblia
   useEffect(() => {
@@ -2321,21 +2309,18 @@ ${deepLink}`;
       });
     }
 
-    // DESATIVADO: Sincronização de versículos com áudio
-    // const isBeingNarrated = currentNarratedVerse === item.verseNumber;
-    const isBeingNarrated = false; // Sempre false - funcionalidade desativada
+    const isBeingNarrated = currentNarratedVerse === item.verseNumber;
 
-    // Verificar se o versículo está destacado
     const highlightColor = verseHighlights[favoriteKey];
 
     return (
       <View
         style={[
           styles.verseContainer,
-          { flexDirection: "column" }, // títulos acima
+          { flexDirection: "column" },
           isDark && { backgroundColor: "#121212" },
-          // isBeingNarrated && styles.verseBeingNarrated,
-          // isBeingNarrated && isDark && styles.verseBeingNarratedDark,
+          isBeingNarrated && styles.verseBeingNarrated,
+          isBeingNarrated && isDark && styles.verseBeingNarratedDark,
         ]}
       >
         {/* TÍTULOS (fora da área clicável) */}

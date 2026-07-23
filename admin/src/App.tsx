@@ -3,6 +3,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import { AuthProvider } from "./contexts/AuthContext";
 import ActivePlans from "./pages/ActivePlans/ActivePlans";
 import AudioSync from "./pages/AudioSync";
+import BibleBrainManager from "./pages/BibleBrain/BibleBrainManager";
 import BibleCuriosities from "./pages/BibleCuriosities/BibleCuriosities";
 import BulkEmail from "./pages/BulkEmail";
 import Dashboard from "./pages/Dashboard";
@@ -100,6 +101,14 @@ function App() {
             element={
               <ProtectedRoute permission="gerenciar_conteudo">
                 <IncorrectPlans />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/bible-brain"
+            element={
+              <ProtectedRoute permission="gerenciar_conteudo">
+                <BibleBrainManager />
               </ProtectedRoute>
             }
           />
