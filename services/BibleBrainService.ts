@@ -111,6 +111,13 @@ class BibleBrainService {
     return result.data;
   }
 
+  async getVideoBooks(bibleId: string): Promise<{ bookId: string; name: string }[]> {
+    const result = await apiGet<{ success: boolean; data: { bookId: string; name: string }[] }>(
+      `/bible-brain/bibles/${bibleId}/video-books`,
+    )
+    return result.data
+  }
+
   async getVideoChapterUrl(bibleId: string, bookId: string, chapterNumber: number): Promise<VideoChapterInfo> {
     const result = await apiGet<{ success: boolean; data: VideoChapterInfo }>(
       `/bible-brain/bibles/${bibleId}/video/${bookId}/${chapterNumber}`,

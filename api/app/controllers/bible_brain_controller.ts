@@ -222,6 +222,11 @@ export default class BibleBrainController {
       }
 
       const chapter = videoData.data[0]
+
+      if (!chapter.path) {
+        return response.notFound({ success: false, message: 'Vídeo não encontrado para este capítulo' })
+      }
+
       const apiKey = bibleBrainService.getKey()
       const directUrl = String(chapter.path)
       const sep = directUrl.includes('?') ? '&' : '?'
@@ -249,6 +254,55 @@ export default class BibleBrainController {
         message: 'Erro ao buscar vídeo do capítulo',
         error: error.message,
       })
+    }
+  }
+
+  async videoBooks({ params, response }: HttpContext) {
+    try {
+      const NT_BOOKS = ['MAT','MRK','LUK','JHN','ACT','ROM','1CO','2CO','GAL','EPH','PHP','COL','1TH','2TH','1TI','2TI','TIT','PHM','HEB','JAS','1PE','2PE','1JN','2JN','3JN','JUD','REV']
+      let videoFilesetId: string | null = null
+
+      const bible = await BibleBrainBible.query().where('bible_id', params.bibleId).first()
+      if (bible) {
+        for (const fs of bible.filesets) {
+          if (fs.type?.startsWith('video')) { videoFilesetId = fs.id; break }
+        }
+      }
+
+      if (!videoFilesetId) {
+        const apiBible = await bibleBrainService.getBibleInfo(params.bibleId)
+        for (const envKey of ['dbp-prod', 'dbp-vid']) {
+          const filesetList = apiBible.data?.filesets?.[envKey]
+          if (filesetList) {
+            for (const fs of filesetList) {
+              if (fs.type?.startsWith('video')) { videoFilesetId = fs.id; break }
+            }
+            if (videoFilesetId) break
+          }
+        }
+      }
+
+      if (!videoFilesetId) {
+        return response.notFound({ success: false, message: 'Esta bíblia não possui vídeo disponível' })
+      }
+
+      const results = await Promise.all(
+        NT_BOOKS.map(async (bookId) => {
+          try {
+            const data = await bibleBrainService.getChapterContent(videoFilesetId!, bookId, 1)
+            if (data.data && data.data.length > 0) {
+              return { bookId, name: data.data[0].book_name || bookId }
+            }
+          } catch {}
+          return null
+        })
+      )
+
+      const available = results.filter((r): r is NonNullable<typeof r> => r !== null)
+      return response.ok({ success: true, data: available, filesetId: videoFilesetId })
+    } catch (error) {
+      console.error('[BibleBrainController] Erro ao listar livros com vídeo:', error)
+      return response.internalServerError({ success: false, message: 'Erro ao listar livros' })
     }
   }
 

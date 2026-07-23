@@ -74,20 +74,16 @@ export default function VideoPlayerScreen() {
 
   const discoverAvailableBooks = async () => {
     setCheckingBooks(true);
-    const found: BookChapter[] = [];
-
-    for (const book of BOOKS_NT) {
-      for (const ch of [1, 2, 3]) {
-        try {
-          const info = await bibleBrainService.getVideoChapterUrl(bibleId, book.id, ch);
-          found.push({ bookId: book.id, bookName: book.name, chapter: ch });
-          break;
-        } catch {
-          continue;
-        }
-      }
+    try {
+      const books = await bibleBrainService.getVideoBooks(bibleId);
+      const found: BookChapter[] = books.map((b) => {
+        const full = BOOKS_NT.find((bn) => bn.id === b.bookId);
+        return { bookId: b.bookId, bookName: full?.name || b.name, chapter: 1 };
+      });
+      setAvailableBooks(found);
+    } catch {
+      setAvailableBooks([]);
     }
-    setAvailableBooks(found);
     setCheckingBooks(false);
   };
 
