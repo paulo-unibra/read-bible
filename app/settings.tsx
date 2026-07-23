@@ -9,7 +9,7 @@ import googleDriveService from '../services/GoogleDriveService';
 import notificationService from '../services/NotificationService';
 import readingPlanService from '../services/ReadingPlanService';
 import { Bible } from '../types';
-
+import { useThemeCustom } from '../hooks/theme-context';
 export default function SettingsScreen() {
   const router = useRouter();
   const [bibles, setBibles] = useState<Bible[]>([]);
@@ -18,6 +18,7 @@ export default function SettingsScreen() {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [notificationTime, setNotificationTime] = useState('08:00');
+  const { setTheme: setGlobalTheme } = useThemeCustom();
 
   useEffect(() => {
     loadSettings();
@@ -78,6 +79,7 @@ export default function SettingsScreen() {
 
   const handleThemeChange = (newTheme: 'light' | 'dark') => {
     setTheme(newTheme);
+    setGlobalTheme(newTheme);
     saveSetting('theme', newTheme);
   };
 

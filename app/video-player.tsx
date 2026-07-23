@@ -15,35 +15,26 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../hooks/theme-context";
 import bibleBrainService from "../services/BibleBrainService";
+import AdBanner from "../components/AdBanner";
+import DatabaseService from "../services/DatabaseService";
+import { USFM_BOOKS } from "./usfm-books";
 
 interface BookChapter {
   bookId: string;
   bookName: string;
   chapter: number;
+  maxChapters: number;
 }
 
-const BOOKS_NT = [
-  { id: "MAT", name: "Mateus" }, { id: "MRK", name: "Marcos" },
-  { id: "LUK", name: "Lucas" }, { id: "JHN", name: "João" },
-  { id: "ACT", name: "Atos" }, { id: "ROM", name: "Romanos" },
-  { id: "1CO", name: "1 Coríntios" }, { id: "2CO", name: "2 Coríntios" },
-  { id: "GAL", name: "Gálatas" }, { id: "EPH", name: "Efésios" },
-  { id: "PHP", name: "Filipenses" }, { id: "COL", name: "Colossenses" },
-  { id: "1TH", name: "1 Tessalonicenses" }, { id: "2TH", name: "2 Tessalonicenses" },
-  { id: "1TI", name: "1 Timóteo" }, { id: "2TI", name: "2 Timóteo" },
-  { id: "TIT", name: "Tito" }, { id: "PHM", name: "Filemom" },
-  { id: "HEB", name: "Hebreus" }, { id: "JAS", name: "Tiago" },
-  { id: "1PE", name: "1 Pedro" }, { id: "2PE", name: "2 Pedro" },
-  { id: "1JN", name: "1 João" }, { id: "2JN", name: "2 João" },
-  { id: "3JN", name: "3 João" }, { id: "JUD", name: "Judas" },
-  { id: "REV", name: "Apocalipse" },
-];
 
 export default function VideoPlayerScreen() {
   const { colors, isDark } = useTheme();
   const params = useLocalSearchParams();
   const bibleId = params.bibleId as string;
   const bibleName = params.bibleName as string;
+  const resumeBookId = params.resumeBookId as string | undefined;
+  const resumeChapter = params.resumeChapter as string | undefined;
+  const resumePositionMs = params.resumePositionMs as string | undefined;
 
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [thumbnail, setThumbnail] = useState<string | null>(null);
@@ -54,7 +45,9 @@ export default function VideoPlayerScreen() {
   const [availableBooks, setAvailableBooks] = useState<BookChapter[]>([]);
   const [checkingBooks, setCheckingBooks] = useState(true);
   const [showThumbnail, setShowThumbnail] = useState(true);
-  const [segments, setSegments] = useState<{ verseStart: number; verseEnd: number; duration: number; url: string }[]>([]);
+  const [segments, setSegments] = useState<{ verseStart: number; verseEnd: number; duration: number; url: string; thumbnail: string | null }[]>([]);
+  const [availableChapters, setAvailableChapters] = useState<number[]>([]);
+  const resumePosRef = useRef(0);
 
   const player = useVideoPlayer(videoUrl ? { uri: videoUrl } : null, (player) => {
     player.loop = false;
@@ -64,6 +57,10 @@ export default function VideoPlayerScreen() {
   useEffect(() => {
     if (videoUrl) {
       player.replace({ uri: videoUrl });
+      if (resumePosRef.current > 0) {
+        player.currentTime = resumePosRef.current;
+        resumePosRef.current = 0;
+      }
       player.play();
     }
   }, [videoUrl]);
@@ -72,15 +69,57 @@ export default function VideoPlayerScreen() {
     discoverAvailableBooks();
   }, []);
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      try {
+        if (player.playing && selectedBook && selectedChapter) {
+          DatabaseService.saveVideoProgress({
+            bibleId,
+            bibleName,
+            bookId: selectedBook,
+            chapter: selectedChapter,
+            positionMs: Math.round(player.currentTime * 1000),
+            duration: Math.round(player.duration * 1000),
+          });
+        }
+      } catch {}
+    }, 10000);
+    return () => {
+      try {
+        if (player.playing && selectedBook && selectedChapter) {
+          DatabaseService.saveVideoProgress({
+            bibleId,
+            bibleName,
+            bookId: selectedBook,
+            chapter: selectedChapter,
+            positionMs: Math.round(player.currentTime * 1000),
+            duration: Math.round(player.duration * 1000),
+          });
+        }
+      } catch {}
+      clearInterval(interval);
+    };
+  }, [selectedBook, selectedChapter]);
+
   const discoverAvailableBooks = async () => {
     setCheckingBooks(true);
     try {
       const books = await bibleBrainService.getVideoBooks(bibleId);
       const found: BookChapter[] = books.map((b) => {
-        const full = BOOKS_NT.find((bn) => bn.id === b.bookId);
-        return { bookId: b.bookId, bookName: full?.name || b.name, chapter: 1 };
+        const full = USFM_BOOKS.find((bn) => bn.id === b.bookId);
+        return { bookId: b.bookId, bookName: full?.name || b.name, chapter: 1, maxChapters: full?.chapters || 28 };
       });
       setAvailableBooks(found);
+      if (resumeBookId && resumeChapter && found.some((b) => b.bookId === resumeBookId)) {
+        const ch = parseInt(resumeChapter, 10);
+        const full = USFM_BOOKS.find((bn) => bn.id === resumeBookId);
+        setSelectedBook(resumeBookId);
+        setAvailableChapters(Array.from({ length: full?.chapters || ch }, (_, i) => i + 1));
+        if (resumePositionMs) {
+          resumePosRef.current = parseInt(resumePositionMs, 10) / 1000;
+        }
+        loadChapter(resumeBookId, ch);
+      }
     } catch {
       setAvailableBooks([]);
     }
@@ -171,7 +210,7 @@ export default function VideoPlayerScreen() {
           {selectedBook && selectedChapter && (
             <View style={[styles.currentInfo, { backgroundColor: colors.card }]}>
               <Text style={[styles.currentText, { color: colors.textPrimary }]}>
-                {BOOKS_NT.find((b) => b.id === selectedBook)?.name || selectedBook} - Capítulo {selectedChapter}
+                {USFM_BOOKS.find((b) => b.id === selectedBook)?.name || selectedBook} - Capítulo {selectedChapter}
               </Text>
               {duration > 0 && (
                 <Text style={[styles.durationText, { color: colors.textSecondary }]}>
@@ -217,7 +256,7 @@ export default function VideoPlayerScreen() {
                   style={[styles.bookCard, { backgroundColor: colors.card }]}
                   onPress={() => {
                     setSelectedBook(item.bookId);
-                    setAvailableChapters(Array.from({ length: 28 }, (_, i) => i + 1));
+                    setAvailableChapters(Array.from({ length: item.maxChapters }, (_, i) => i + 1));
                   }}
                 >
                   <Ionicons name="film-outline" size={20} color={colors.primary} />
@@ -234,7 +273,8 @@ export default function VideoPlayerScreen() {
                         key={ch}
                         style={[
                           styles.chapterButton,
-                          selectedChapter === ch && { backgroundColor: colors.primary },
+                          { borderColor: colors.border },
+                          selectedChapter === ch && { backgroundColor: colors.primary, borderColor: colors.primary },
                         ]}
                         onPress={() => loadChapter(item.bookId, ch)}
                         disabled={loadingVideo}
@@ -254,6 +294,7 @@ export default function VideoPlayerScreen() {
           />
         </>
       )}
+      <AdBanner />
     </SafeAreaView>
   );
 }
@@ -315,7 +356,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#ddd",
   },
   chapterText: { fontSize: 13, fontWeight: "500" },
   segmentsContainer: { marginTop: 4, marginBottom: 8, gap: 6 },

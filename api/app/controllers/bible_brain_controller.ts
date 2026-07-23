@@ -1,6 +1,7 @@
 import BibleBrainBible from '#models/bible_brain_bible'
 import BibleBrainPackageService from '#services/bible_brain_package_service'
 import bibleBrainService from '#services/bible_brain_service'
+import { USFM_BOOK_ORDER } from '../utils/usfm_books.js'
 import type { HttpContext } from '@adonisjs/core/http'
 import { createReadStream, existsSync } from 'node:fs'
 
@@ -259,7 +260,6 @@ export default class BibleBrainController {
 
   async videoBooks({ params, response }: HttpContext) {
     try {
-      const NT_BOOKS = ['MAT','MRK','LUK','JHN','ACT','ROM','1CO','2CO','GAL','EPH','PHP','COL','1TH','2TH','1TI','2TI','TIT','PHM','HEB','JAS','1PE','2PE','1JN','2JN','3JN','JUD','REV']
       let videoFilesetId: string | null = null
 
       const bible = await BibleBrainBible.query().where('bible_id', params.bibleId).first()
@@ -286,10 +286,14 @@ export default class BibleBrainController {
         return response.notFound({ success: false, message: 'Esta bíblia não possui vídeo disponível' })
       }
 
+      const NT_BOOKS = USFM_BOOK_ORDER.slice(USFM_BOOK_ORDER.indexOf('MAT'))
       const results = await Promise.all(
         NT_BOOKS.map(async (bookId) => {
           try {
-            const data = await bibleBrainService.getChapterContent(videoFilesetId!, bookId, 1)
+            const data = await Promise.race([
+              bibleBrainService.getChapterContent(videoFilesetId!, bookId, 1),
+              new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000)),
+            ])
             if (data.data && data.data.length > 0) {
               return { bookId, name: data.data[0].book_name || bookId }
             }
@@ -374,6 +378,42 @@ export default class BibleBrainController {
     } catch (error) {
       console.error('[BibleBrainController] Erro ao listar segmentos:', error)
       return response.internalServerError({ success: false, message: 'Erro ao listar segmentos' })
+    }
+  }
+
+  async videoThumbnail({ params, response }: HttpContext) {
+    try {
+      let videoFilesetId: string | null = null
+
+      const bible = await BibleBrainBible.query().where('bible_id', params.bibleId).first()
+      if (bible) {
+        for (const fs of bible.filesets) {
+          if (fs.type?.startsWith('video')) { videoFilesetId = fs.id; break }
+        }
+      }
+
+      if (!videoFilesetId) {
+        const apiBible = await bibleBrainService.getBibleInfo(params.bibleId)
+        for (const envKey of ['dbp-prod', 'dbp-vid']) {
+          const filesetList = apiBible.data?.filesets?.[envKey]
+          if (filesetList) {
+            for (const fs of filesetList) {
+              if (fs.type?.startsWith('video')) { videoFilesetId = fs.id; break }
+            }
+            if (videoFilesetId) break
+          }
+        }
+      }
+
+      if (!videoFilesetId) {
+        return response.notFound({ success: false, message: 'Sem vídeo disponível' })
+      }
+
+      const data = await bibleBrainService.getChapterContent(videoFilesetId, params.bookId, parseInt(params.chapterNumber))
+      const thumb = data.data?.[0]?.thumbnail || null
+      return response.ok({ success: true, data: { thumbnail: thumb } })
+    } catch (error) {
+      return response.internalServerError({ success: false, message: 'Erro ao buscar thumbnail' })
     }
   }
 

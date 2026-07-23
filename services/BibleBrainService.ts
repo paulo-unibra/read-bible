@@ -132,6 +132,17 @@ class BibleBrainService {
     return result.data;
   }
 
+  async getVideoThumbnail(bibleId: string, bookId: string, chapterNumber: number): Promise<string | null> {
+    try {
+      const result = await apiGet<{ success: boolean; data: { thumbnail: string | null } }>(
+        `/bible-brain/bibles/${bibleId}/video-thumbnail/${bookId}/${chapterNumber}`,
+      );
+      return result.data?.thumbnail || null;
+    } catch {
+      return null;
+    }
+  }
+
   async getAudioChapterUrl(bibleId: string, bookId: string, chapterNumber: number): Promise<{ url: string; duration: number; filesize: number }> {
     const result = await apiGet<{ success: boolean; data: { url: string; duration: number; filesize: number } }>(
       `/bible-brain/bibles/${bibleId}/audio/${bookId}/${chapterNumber}`,

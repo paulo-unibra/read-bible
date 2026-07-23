@@ -85,6 +85,10 @@ class DictionaryService {
     return true
   }
 
+  private excludeFilter(): string {
+    return `"${this.wordColumn}" NOT LIKE 'Prefácio%' AND "${this.wordColumn}" NOT LIKE 'Sobre o Livro%' AND "${this.wordColumn}" NOT GLOB '[0-9].*'`
+  }
+
   async search(query: string, page = 1, perPage = 50): Promise<{ entries: DictionaryEntry[]; total: number; page: number; perPage: number }> {
     if (!this.ensureLoaded()) {
       await this.downloadLatest()
@@ -92,9 +96,10 @@ class DictionaryService {
     if (!this.db) throw new Error('Dicionário não carregado')
 
     const offset = (page - 1) * perPage
-    const like = `%${query}%`
-    const countRow = this.db.prepare(`SELECT COUNT(*) as total FROM "${this.tableName}" WHERE "${this.wordColumn}" LIKE ?`).get(like) as { total: number }
-    const rows = this.db.prepare(`SELECT "${this.wordColumn}" as word, "${this.definitionColumn}" as definition FROM "${this.tableName}" WHERE "${this.wordColumn}" LIKE ? ORDER BY "${this.wordColumn}" ASC LIMIT ? OFFSET ?`).all(like, perPage, offset) as DictionaryEntry[]
+    const like = `%${query.toUpperCase()}%`
+    const where = `"${this.wordColumn}" LIKE ? AND ${this.excludeFilter()}`
+    const countRow = this.db.prepare(`SELECT COUNT(*) as total FROM "${this.tableName}" WHERE ${where}`).get(like) as { total: number }
+    const rows = this.db.prepare(`SELECT "${this.wordColumn}" as word, "${this.definitionColumn}" as definition FROM "${this.tableName}" WHERE ${where} ORDER BY "${this.wordColumn}" ASC LIMIT ? OFFSET ?`).all(like, perPage, offset) as DictionaryEntry[]
 
     return { entries: rows, total: countRow.total, page, perPage }
   }
@@ -116,15 +121,17 @@ class DictionaryService {
     if (!this.db) throw new Error('Dicionário não carregado')
 
     const offset = (page - 1) * perPage
-    const countRow = this.db.prepare(`SELECT COUNT(*) as total FROM "${this.tableName}"`).get() as { total: number }
-    const rows = this.db.prepare(`SELECT "${this.wordColumn}" as word, "${this.definitionColumn}" as definition FROM "${this.tableName}" ORDER BY "${this.wordColumn}" ASC LIMIT ? OFFSET ?`).all(perPage, offset) as DictionaryEntry[]
+    const where = this.excludeFilter()
+    const countRow = this.db.prepare(`SELECT COUNT(*) as total FROM "${this.tableName}" WHERE ${where}`).get() as { total: number }
+    const rows = this.db.prepare(`SELECT "${this.wordColumn}" as word, "${this.definitionColumn}" as definition FROM "${this.tableName}" WHERE ${where} ORDER BY "${this.wordColumn}" ASC LIMIT ? OFFSET ?`).all(perPage, offset) as DictionaryEntry[]
 
     return { entries: rows, total: countRow.total, page, perPage }
   }
 
   async getTotalCount(): Promise<number> {
     if (!this.ensureLoaded() || !this.db) return 0
-    const row = this.db.prepare(`SELECT COUNT(*) as total FROM "${this.tableName}"`).get() as { total: number }
+    const where = this.excludeFilter()
+    const row = this.db.prepare(`SELECT COUNT(*) as total FROM "${this.tableName}" WHERE ${where}`).get() as { total: number }
     return row.total
   }
 }

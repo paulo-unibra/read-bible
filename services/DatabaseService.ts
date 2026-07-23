@@ -1272,6 +1272,47 @@ class DatabaseService {
       throw error;
     }
   }
+
+  async saveVideoProgress(progress: {
+    bibleId: string;
+    bibleName: string;
+    bookId: string;
+    chapter: number;
+    positionMs: number;
+    duration: number;
+  }): Promise<void> {
+    try {
+      await this.saveSetting('lastVideoProgress', JSON.stringify(progress));
+    } catch (error) {
+      console.error("[DB] Erro em saveVideoProgress:", error);
+    }
+  }
+
+  async getLastVideoProgress(): Promise<{
+    bibleId: string;
+    bibleName: string;
+    bookId: string;
+    chapter: number;
+    positionMs: number;
+    duration: number;
+  } | null> {
+    try {
+      const raw = await this.getSetting('lastVideoProgress');
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch (error) {
+      console.error("[DB] Erro em getLastVideoProgress:", error);
+      return null;
+    }
+  }
+
+  async clearVideoProgress(): Promise<void> {
+    try {
+      await this.saveSetting('lastVideoProgress', '');
+    } catch (error) {
+      console.error("[DB] Erro em clearVideoProgress:", error);
+    }
+  }
 }
 
 const databaseServiceInstance = new DatabaseService();

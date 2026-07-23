@@ -1237,7 +1237,7 @@ export default function HomeScreen() {
                 shadowOpacity: isDark ? 0.25 : 0.1,
               },
             ]}
-            onPress={() => router.push("/video-list")}
+            onPress={() => router.push("/videos")}
           >
             <View
               style={[

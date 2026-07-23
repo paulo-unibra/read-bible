@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../hooks/theme-context";
 import dictionaryService from "../services/DictionaryService";
+import AdBanner from "../components/AdBanner";
 
 interface Entry {
   word: string;
@@ -28,7 +29,6 @@ export default function DicionarioScreen() {
   const [searching, setSearching] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
-  const [selectedEntry, setSelectedEntry] = useState<Entry | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
@@ -42,10 +42,10 @@ export default function DicionarioScreen() {
       const result = q
         ? await dictionaryService.search(q, p)
         : await dictionaryService.getAlphabetList(p);
-      if (p === 1) {
-        setEntries(result.entries);
-      } else {
+      if (p > 1) {
         setEntries((prev) => [...prev, ...result.entries]);
+      } else {
+        setEntries(result.entries);
       }
       setTotal(result.total);
       setHasMore(result.page * result.perPage < result.total);
@@ -60,7 +60,6 @@ export default function DicionarioScreen() {
   const handleSearch = (text: string) => {
     setQuery(text);
     setSearching(true);
-    setSelectedEntry(null);
     if (searchTimer.current) clearTimeout(searchTimer.current);
     searchTimer.current = setTimeout(() => {
       setPage(1);
@@ -78,21 +77,18 @@ export default function DicionarioScreen() {
   const renderEntry = ({ item }: { item: Entry }) => (
     <TouchableOpacity
       style={[styles.entryCard, { backgroundColor: colors.card }]}
-      onPress={() => setSelectedEntry(selectedEntry?.word === item.word ? null : item)}
+      onPress={() =>
+        router.push(
+          `/dicionario-verbete?word=${encodeURIComponent(item.word)}`
+        )
+      }
     >
       <View style={styles.entryHeader}>
-        <Text style={[styles.entryWord, { color: colors.primary }]}>{item.word}</Text>
-        <Ionicons
-          name={selectedEntry?.word === item.word ? "chevron-up" : "chevron-down"}
-          size={18}
-          color={colors.textSecondary}
-        />
-      </View>
-      {selectedEntry?.word === item.word && (
-        <Text style={[styles.entryDefinition, { color: colors.textPrimary }]}>
-          {item.definition.replace(/<[^>]*>/g, "")}
+        <Text style={[styles.entryWord, { color: colors.primary }]}>
+          {item.word}
         </Text>
-      )}
+        <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+      </View>
     </TouchableOpacity>
   );
 
@@ -127,7 +123,7 @@ export default function DicionarioScreen() {
 
       {total > 0 && (
         <Text style={[styles.resultCount, { color: colors.textSecondary }]}>
-          {total} {total === 1 ? "verbetes" : "verbetes"}
+          {total} {total === 1 ? "verbete" : "verbetes"}
         </Text>
       )}
 
@@ -162,6 +158,7 @@ export default function DicionarioScreen() {
           }
         />
       )}
+      <AdBanner />
     </SafeAreaView>
   );
 }
@@ -203,6 +200,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   entryWord: { fontSize: 15, fontWeight: "700" },
-  entryDefinition: { fontSize: 14, marginTop: 8, lineHeight: 20 },
   loadingMore: { paddingVertical: 16, alignItems: "center" },
 });

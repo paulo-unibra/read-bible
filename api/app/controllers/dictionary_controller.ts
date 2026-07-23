@@ -25,9 +25,10 @@ export default class DictionaryController {
     }
   }
 
-  async word({ params, response }: HttpContext) {
+  async word({ request, response }: HttpContext) {
     try {
-      const entry = await dictionaryService.getWord(params.word)
+      const word = request.input('w', '')
+      const entry = await dictionaryService.getWord(word)
       if (!entry) {
         return response.notFound({ success: false, message: 'Palavra não encontrada' })
       }

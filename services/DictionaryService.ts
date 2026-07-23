@@ -24,7 +24,7 @@ class DictionaryService {
   }
 
   async getWord(word: string): Promise<DictionaryEntry | null> {
-    const response = await fetch(`${API_URL}/dictionary/word/${encodeURIComponent(word)}`);
+    const response = await fetch(`${API_URL}/dictionary/word?w=${encodeURIComponent(word)}`);
     if (!response.ok) return null;
     const data = await response.json();
     return data.data || null;

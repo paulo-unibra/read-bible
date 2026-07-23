@@ -12,15 +12,22 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../hooks/theme-context";
 import bibleBrainService, { VideoBible } from "../services/BibleBrainService";
+import AdBanner from "../components/AdBanner";
+import DatabaseService from "../services/DatabaseService";
 
 export default function VideoListScreen() {
   const { colors, isDark } = useTheme();
   const [videoBibles, setVideoBibles] = useState<VideoBible[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lastVideo, setLastVideo] = useState<{
+    bibleId: string; bibleName: string; bookId: string;
+    chapter: number; positionMs: number; duration: number;
+  } | null>(null);
 
   useFocusEffect(
     useCallback(() => {
       loadVideoBibles();
+      loadLastVideo();
     }, [])
   );
 
@@ -34,6 +41,13 @@ export default function VideoListScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadLastVideo = async () => {
+    try {
+      const progress = await DatabaseService.getLastVideoProgress();
+      setLastVideo(progress);
+    } catch {}
   };
 
   const renderBible = ({ item }: { item: VideoBible }) => (
@@ -83,6 +97,35 @@ export default function VideoListScreen() {
           renderItem={renderBible}
           keyExtractor={(item) => item.bibleId}
           contentContainerStyle={styles.list}
+          ListHeaderComponent={lastVideo ? (
+            <TouchableOpacity
+              style={[styles.continueCard, { backgroundColor: colors.accent + "15", borderColor: colors.accent }]}
+              onPress={() =>
+                router.push({
+                  pathname: "/video-player",
+                  params: {
+                    bibleId: lastVideo.bibleId,
+                    bibleName: lastVideo.bibleName,
+                    resumeBookId: lastVideo.bookId,
+                    resumeChapter: String(lastVideo.chapter),
+                    resumePositionMs: String(lastVideo.positionMs),
+                  },
+                })
+              }
+            >
+              <Ionicons name="play-skip-back" size={24} color={colors.accent} />
+              <View style={styles.continueInfo}>
+                <Text style={[styles.continueTitle, { color: colors.textPrimary }]}>
+                  Continuar assistindo
+                </Text>
+                <Text style={[styles.continueSub, { color: colors.textSecondary }]}>
+                  {lastVideo.bibleName} · Capítulo {lastVideo.chapter}
+                  {lastVideo.duration > 0 && ` · ${Math.round(lastVideo.positionMs / 1000 / 60)}:${(Math.round(lastVideo.positionMs / 1000) % 60).toString().padStart(2, "0")} / ${Math.floor(lastVideo.duration / 1000 / 60)}:${(Math.floor(lastVideo.duration / 1000) % 60).toString().padStart(2, "0")}`}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+          ) : null}
           ListEmptyComponent={
             <View style={styles.emptyState}>
               <Ionicons name="film-outline" size={64} color={colors.textSecondary} />
@@ -93,6 +136,7 @@ export default function VideoListScreen() {
           }
         />
       )}
+      <AdBanner />
     </SafeAreaView>
   );
 }
@@ -128,4 +172,16 @@ const styles = StyleSheet.create({
   bibleMeta: { fontSize: 12 },
   emptyState: { alignItems: "center", paddingVertical: 64 },
   emptyText: { fontSize: 16, marginTop: 16, textAlign: "center" },
+  continueCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 14,
+    marginBottom: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 12,
+  },
+  continueInfo: { flex: 1 },
+  continueTitle: { fontSize: 15, fontWeight: "700", marginBottom: 2 },
+  continueSub: { fontSize: 12 },
 });
