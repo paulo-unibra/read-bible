@@ -149,6 +149,7 @@ router.get('/bible-brain/bibles/:bibleId/package/download', [BibleBrainControlle
 router.get('/bible-brain/video-proxy/:filesetId/:bookId/:chapterNumber/*', [BibleBrainController, 'videoProxyPlaylist'])
 router.get('/bible-brain/video-proxy/:filesetId/:bookId/:chapterNumber', [BibleBrainController, 'videoProxyPlaylist'])
 router.get('/bible-brain/bibles/:bibleId/video-books', [BibleBrainController, 'videoBooks'])
+router.get('/bible-brain/bibles/:bibleId/video-segments/:bookId/:chapterNumber', [BibleBrainController, 'videoSegments'])
 router.get('/bible-brain/bibles/:bibleId/video/:bookId/:chapterNumber', [BibleBrainController, 'videoChapter'])
 router.get('/bible-brain/bibles/:bibleId/audio/:bookId/:chapterNumber', [BibleBrainController, 'audioChapter'])
 router.get('/bible-brain/bibles/:bibleId/audio-timestamps/:bookId/:chapterNumber', [BibleBrainController, 'audioTimestamps'])

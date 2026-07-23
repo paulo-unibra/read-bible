@@ -306,6 +306,77 @@ export default class BibleBrainController {
     }
   }
 
+  async videoSegments({ params, response }: HttpContext) {
+    try {
+      let videoFilesetId: string | null = null
+
+      const bible = await BibleBrainBible.query().where('bible_id', params.bibleId).first()
+      if (bible) {
+        for (const fs of bible.filesets) {
+          if (fs.type?.startsWith('video')) { videoFilesetId = fs.id; break }
+        }
+      }
+
+      if (!videoFilesetId) {
+        const apiBible = await bibleBrainService.getBibleInfo(params.bibleId)
+        for (const envKey of ['dbp-prod', 'dbp-vid']) {
+          const filesetList = apiBible.data?.filesets?.[envKey]
+          if (filesetList) {
+            for (const fs of filesetList) {
+              if (fs.type?.startsWith('video')) { videoFilesetId = fs.id; break }
+            }
+            if (videoFilesetId) break
+          }
+        }
+      }
+
+      if (!videoFilesetId) {
+        return response.notFound({ success: false, message: 'Esta bíblia não possui vídeo disponível' })
+      }
+
+      const data = await bibleBrainService.getChapterContent(videoFilesetId, params.bookId, parseInt(params.chapterNumber))
+
+      if (!data.data || data.data.length === 0) {
+        return response.notFound({ success: false, message: 'Nenhum segmento encontrado' })
+      }
+
+      const apiKey = bibleBrainService.getKey()
+      const segments = await Promise.all(
+        data.data.map(async (item: any) => {
+          const playlistUrl = String(item.path)
+          const sep = playlistUrl.includes('?') ? '&' : '?'
+          const fullUrl = `${playlistUrl}${sep}key=${apiKey}&v=4`
+
+          try {
+            const masterRes = await fetch(fullUrl)
+            if (!masterRes.ok) throw new Error('Failed to fetch master playlist')
+            const masterText = await masterRes.text()
+            const childLine = masterText.split('\n').map(l => l.trim()).find(l => l && !l.startsWith('#'))
+            const baseUrl = playlistUrl.substring(0, playlistUrl.lastIndexOf('/') + 1)
+            const childUrl = childLine ? `${baseUrl}${childLine}${childLine.includes('?') ? '&' : '?'}key=${apiKey}&v=4` : fullUrl
+
+            return {
+              chapter: Number(item.chapter_start) || 1,
+              verseStart: Number(item.verse_start) || 1,
+              verseEnd: Number(item.verse_end) || 1,
+              duration: Number(item.duration) || 0,
+              thumbnail: item.thumbnail || null,
+              url: childUrl,
+            }
+          } catch {
+            return null
+          }
+        })
+      )
+
+      const valid = segments.filter((s: any) => s !== null)
+      return response.ok({ success: true, data: valid, filesetId: videoFilesetId })
+    } catch (error) {
+      console.error('[BibleBrainController] Erro ao listar segmentos:', error)
+      return response.internalServerError({ success: false, message: 'Erro ao listar segmentos' })
+    }
+  }
+
   async videoProxyPlaylist({ params, request, response }: HttpContext) {
     try {
       const { filesetId, bookId, chapterNumber } = params

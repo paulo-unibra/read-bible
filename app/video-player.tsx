@@ -50,11 +50,11 @@ export default function VideoPlayerScreen() {
   const [duration, setDuration] = useState(0);
   const [loadingVideo, setLoadingVideo] = useState(false);
   const [selectedBook, setSelectedBook] = useState<string | null>(null);
-  const [availableChapters, setAvailableChapters] = useState<number[]>([]);
   const [selectedChapter, setSelectedChapter] = useState<number | null>(null);
   const [availableBooks, setAvailableBooks] = useState<BookChapter[]>([]);
   const [checkingBooks, setCheckingBooks] = useState(true);
   const [showThumbnail, setShowThumbnail] = useState(true);
+  const [segments, setSegments] = useState<{ verseStart: number; verseEnd: number; duration: number; url: string }[]>([]);
 
   const player = useVideoPlayer(videoUrl ? { uri: videoUrl } : null, (player) => {
     player.loop = false;
@@ -92,16 +92,33 @@ export default function VideoPlayerScreen() {
       setLoadingVideo(true);
       setSelectedBook(bookId);
       setSelectedChapter(chapter);
-      setShowThumbnail(true);
-      const info = await bibleBrainService.getVideoChapterUrl(bibleId, bookId, chapter);
-      setVideoUrl(info.url);
-      setThumbnail(info.thumbnail);
-      setDuration(info.duration);
+      setSegments([]);
+      const segs = await bibleBrainService.getVideoSegments(bibleId, bookId, chapter);
+      setSegments(segs);
+      if (segs.length === 1) {
+        setShowThumbnail(true);
+        setVideoUrl(segs[0].url);
+        setThumbnail(segs[0].thumbnail || null);
+        setDuration(segs[0].duration);
+      } else if (segs.length > 1) {
+        setVideoUrl(null);
+        setThumbnail(null);
+        setDuration(0);
+      } else {
+        Alert.alert("Info", "Nenhum vídeo disponível para este capítulo");
+      }
     } catch (error) {
       Alert.alert("Erro", "Não foi possível carregar este vídeo");
     } finally {
       setLoadingVideo(false);
     }
+  };
+
+  const playSegment = (segment: { verseStart: number; verseEnd: number; duration: number; url: string; thumbnail: string | null }) => {
+    setShowThumbnail(true);
+    setVideoUrl(segment.url);
+    setThumbnail(segment.thumbnail || null);
+    setDuration(segment.duration);
   };
 
   return (
@@ -161,6 +178,32 @@ export default function VideoPlayerScreen() {
                   {Math.floor(duration / 60)}:{(Math.floor(duration) % 60).toString().padStart(2, "0")}
                 </Text>
               )}
+            </View>
+          )}
+
+          {segments.length > 1 && (
+            <View style={[styles.segmentsContainer, { paddingHorizontal: 16 }]}>
+              {segments.map((seg, idx) => (
+                <TouchableOpacity
+                  key={idx}
+                  style={[styles.segmentCard, { backgroundColor: colors.card }]}
+                  onPress={() => playSegment(seg)}
+                >
+                  <View style={styles.segmentInfo}>
+                    <Text style={[styles.segmentTitle, { color: colors.textPrimary }]}>
+                      {seg.verseStart === seg.verseEnd
+                        ? `Versículo ${seg.verseStart}`
+                        : `${seg.verseStart}–${seg.verseEnd}`}
+                    </Text>
+                    {seg.duration > 0 && (
+                      <Text style={[styles.segmentDuration, { color: colors.textSecondary }]}>
+                        {Math.floor(seg.duration / 60)}:{(Math.floor(seg.duration) % 60).toString().padStart(2, "0")}
+                      </Text>
+                    )}
+                  </View>
+                  <Ionicons name="play-circle-outline" size={24} color={colors.primary} />
+                </TouchableOpacity>
+              ))}
             </View>
           )}
 
@@ -275,4 +318,15 @@ const styles = StyleSheet.create({
     borderColor: "#ddd",
   },
   chapterText: { fontSize: 13, fontWeight: "500" },
+  segmentsContainer: { marginTop: 4, marginBottom: 8, gap: 6 },
+  segmentCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 12,
+    borderRadius: 8,
+  },
+  segmentInfo: { flex: 1 },
+  segmentTitle: { fontSize: 14, fontWeight: "600" },
+  segmentDuration: { fontSize: 12, marginTop: 2 },
 });
