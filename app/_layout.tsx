@@ -44,6 +44,7 @@ export default function RootLayout() {
           <Stack.Screen name="reading-history" />
           <Stack.Screen name="video-list" />
           <Stack.Screen name="video-player" />
+          <Stack.Screen name="dicionario" />
           <Stack.Screen
             name="modal"
             options={{ presentation: "modal" }}

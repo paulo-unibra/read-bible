@@ -29,6 +29,7 @@ const PlanTypesController = () => import('#controllers/plan_types_controller')
 const HymnAudiosController = () => import('#controllers/hymn_audios_controller')
 const AudioSyncTimestampsController = () => import('#controllers/audio_sync_timestamps_controller')
 const BibleBrainController = () => import('#controllers/bible_brain_controller')
+const DictionaryController = () => import('#controllers/dictionary_controller')
 const AdminBibleBrainController = () => import('#controllers/Admin/bible_brain_controller')
 import router from '@adonisjs/core/services/router'
 import { middleware } from './kernel.js'
@@ -145,6 +146,12 @@ router.get('/audio-sync/:bookId/:chapterNumber', [AudioSyncTimestampsController,
 // IMPORTANTE: rotas específicas ANTES da rota com parâmetro
 router.get('/bible-brain/bibles', [BibleBrainController, 'index'])
 router.get('/bible-brain/video-bibles', [BibleBrainController, 'videoBibles'])
+// Dictionary routes
+router.get('/dictionary/search', [DictionaryController, 'search'])
+router.get('/dictionary/word/:word', [DictionaryController, 'word'])
+router.get('/dictionary/refresh', [DictionaryController, 'refresh'])
+router.get('/dictionary/stats', [DictionaryController, 'stats'])
+
 router.get('/bible-brain/bibles/:bibleId/package/download', [BibleBrainController, 'download'])
 router.get('/bible-brain/video-proxy/:filesetId/:bookId/:chapterNumber/*', [BibleBrainController, 'videoProxyPlaylist'])
 router.get('/bible-brain/video-proxy/:filesetId/:bookId/:chapterNumber', [BibleBrainController, 'videoProxyPlaylist'])

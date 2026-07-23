@@ -1276,6 +1276,54 @@ export default function HomeScreen() {
             />
           </TouchableOpacity>
 
+          {/* Dicionário */}
+          <TouchableOpacity
+            style={[
+              styles.actionCard,
+              {
+                backgroundColor: colors.card,
+                shadowOpacity: isDark ? 0.25 : 0.1,
+              },
+            ]}
+            onPress={() => router.push("/dicionario")}
+          >
+            <View
+              style={[
+                styles.actionIcon,
+                { backgroundColor: colors.surfaceAlt },
+              ]}
+            >
+              <Ionicons
+                name="book-outline"
+                size={32}
+                color={isDark ? "#90caf9" : "#1565C0"}
+              />
+            </View>
+            <View style={styles.actionContent}>
+              <Text
+                style={[
+                  styles.actionTitle,
+                  { color: colors.textPrimary, fontSize: applyFontScale(18) },
+                ]}
+              >
+                Dicionário
+              </Text>
+              <Text
+                style={[
+                  styles.actionDescription,
+                  { color: colors.textSecondary, fontSize: applyFontScale(14) },
+                ]}
+              >
+                Dicionário bíblico Wycliffe
+              </Text>
+            </View>
+            <Ionicons
+              name="chevron-forward"
+              size={20}
+              color={colors.iconForward}
+            />
+          </TouchableOpacity>
+
           {isAuthenticated && readingPlan && (
             <TouchableOpacity
               style={[
