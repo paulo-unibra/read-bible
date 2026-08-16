@@ -12,7 +12,9 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../hooks/theme-context";
-import dictionaryService, { DictionaryGroup } from "../services/DictionaryService";
+import dictionaryOfflineService, {
+  DictionaryFileInfo,
+} from "../services/DictionaryOfflineService";
 import AdBanner from "../components/AdBanner";
 
 interface Group {
@@ -43,7 +45,11 @@ function stripHtml(html: string): string {
 }
 
 export default function DicionarioScreen() {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
+  const [isDownloaded, setIsDownloaded] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [groups, setGroups] = useState<Group[]>([]);
   const [total, setTotal] = useState(0);
@@ -51,11 +57,51 @@ export default function DicionarioScreen() {
   const [searching, setSearching] = useState(false);
   const [page, setPage] = useState(1);
   const [expanded, setExpanded] = useState<ExpandedState | null>(null);
-  const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined
+  );
 
   useEffect(() => {
-    loadPage(1);
+    checkDictionaryStatus();
   }, []);
+
+  const checkDictionaryStatus = async () => {
+    try {
+      const status = await dictionaryOfflineService.checkDownloaded();
+      if (status.all) {
+        setIsDownloaded(true);
+        loadPage(1);
+        return;
+      }
+
+      setIsDownloading(true);
+      setDownloadProgress(0);
+      setDownloadError(null);
+
+      let files: DictionaryFileInfo[];
+      try {
+        files = await dictionaryOfflineService.listFiles();
+      } catch {
+        setDownloadError(
+          "Sem conexão com a internet para baixar os dicionários. Conecte-se e tente novamente."
+        );
+        return;
+      }
+
+      await dictionaryOfflineService.downloadAll(files, (p) =>
+        setDownloadProgress(p)
+      );
+      setIsDownloaded(true);
+      loadPage(1);
+    } catch (error: any) {
+      console.error("Erro ao baixar dicionários:", error);
+      setDownloadError(
+        error?.message || "Erro inesperado ao baixar os dicionários"
+      );
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   const mergeGroups = (prev: Group[], next: Group[]): Group[] => {
     const out = [...prev];
@@ -75,7 +121,7 @@ export default function DicionarioScreen() {
     try {
       if (p === 1) setLoading(true);
       const q = searchQuery !== undefined ? searchQuery : query;
-      const result = await dictionaryService.search(q, p);
+      const result = await dictionaryOfflineService.search(q, p);
       if (p > 1) {
         setGroups((prev) => mergeGroups(prev, result.groups));
       } else {
@@ -117,7 +163,7 @@ export default function DicionarioScreen() {
     }
     setExpanded({ word, dictKey, label, definition: "", loading: true });
     try {
-      const data = await dictionaryService.getWord(word, dictKey);
+      const data = await dictionaryOfflineService.getWord(word, dictKey);
       if (data) {
         setExpanded({
           word,
@@ -157,7 +203,8 @@ export default function DicionarioScreen() {
             {item.group.label}
           </Text>
           <Text style={[styles.groupCount, { color: colors.textSecondary }]}>
-            {item.group.total} {item.group.total === 1 ? "verbete" : "verbetes"}
+            {item.group.total}{" "}
+            {item.group.total === 1 ? "verbete" : "verbetes"}
           </Text>
         </View>
       );
@@ -206,7 +253,9 @@ export default function DicionarioScreen() {
               style={styles.fullButton}
               onPress={() =>
                 router.push(
-                  `/dicionario-verbete?word=${encodeURIComponent(word)}&dict=${dictKey}`
+                  `/dicionario-verbete?word=${encodeURIComponent(
+                    word
+                  )}&dict=${dictKey}`
                 )
               }
             >
@@ -221,74 +270,158 @@ export default function DicionarioScreen() {
     );
   };
 
+  const renderDownloadScreen = () => (
+    <View style={styles.centerContent}>
+      <Ionicons name="book-outline" size={80} color={colors.accent} />
+      <Text style={[styles.downloadTitle, { color: colors.textPrimary }]}>
+        Dicionários Bíblicos
+      </Text>
+      <Text style={[styles.downloadSubtitle, { color: colors.textSecondary }]}>
+        4 dicionários • Nomes, Wycliffe, Champlin e Temas Bíblicos
+      </Text>
+
+      {isDownloading && (
+        <View style={styles.progressContainer}>
+          <ActivityIndicator size="large" color={colors.accent} />
+          <Text style={[styles.progressText, { color: colors.textPrimary }]}>
+            Baixando dicionários... {Math.round(downloadProgress)}%
+          </Text>
+          <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
+            <View
+              style={[
+                styles.progressFill,
+                { backgroundColor: colors.accent, width: `${downloadProgress}%` },
+              ]}
+            />
+          </View>
+          <Text style={[styles.downloadInfo, { color: colors.textSecondary }]}>
+            Isso será feito apenas uma vez
+          </Text>
+        </View>
+      )}
+
+      {downloadError && !isDownloading && (
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle" size={48} color="#f44336" />
+          <Text style={[styles.errorText, { color: "#f44336" }]}>
+            {downloadError}
+          </Text>
+          <TouchableOpacity
+            style={[styles.retryButton, { backgroundColor: colors.accent }]}
+            onPress={checkDictionaryStatus}
+          >
+            <Text style={styles.retryButtonText}>Tentar novamente</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+
   const dictionaryCount = groups.length;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+      <View
+        style={[
+          styles.header,
+          { backgroundColor: colors.card, borderBottomColor: colors.border },
+        ]}
+      >
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Dicionário</Text>
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
+          Dicionário
+        </Text>
         <View style={{ width: 40 }} />
       </View>
 
-      <View style={[styles.searchContainer, { backgroundColor: colors.card }]}>
-        <Ionicons name="search" size={20} color={colors.textSecondary} style={styles.searchIcon} />
-        <TextInput
-          style={[styles.searchInput, { color: colors.textPrimary }]}
-          placeholder="Buscar palavra em todos os dicionários..."
-          placeholderTextColor={colors.textSecondary}
-          value={query}
-          onChangeText={handleSearch}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-        {searching && <ActivityIndicator size="small" color={colors.primary} />}
-        {query.length > 0 && !searching && (
-          <TouchableOpacity onPress={() => handleSearch("")}>
-            <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {total > 0 && (
-        <Text style={[styles.resultCount, { color: colors.textSecondary }]}>
-          {total} {total === 1 ? "resultado" : "resultados"}
-          {dictionaryCount > 0 && ` em ${dictionaryCount} ${dictionaryCount === 1 ? "dicionário" : "dicionários"}`}
-        </Text>
-      )}
-
-      {loading && listData.length === 0 ? (
-        <View style={styles.centerContent}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-            Carregando dicionários...
-          </Text>
-        </View>
-      ) : listData.length === 0 ? (
-        <View style={styles.centerContent}>
-          <Ionicons name="book-outline" size={64} color={colors.textSecondary} />
-          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-            {query ? "Nenhuma palavra encontrada" : "Nenhum verbete disponível"}
-          </Text>
-        </View>
+      {!isDownloaded ? (
+        renderDownloadScreen()
       ) : (
-        <FlatList
-          data={listData}
-          keyExtractor={(item) => item.key}
-          contentContainerStyle={styles.listContent}
-          renderItem={renderItem}
-          onEndReached={loadMore}
-          onEndReachedThreshold={0.5}
-          ListFooterComponent={
-            groups.some((g) => g.entries.length < g.total) ? (
-              <View style={styles.loadingMore}>
-                <ActivityIndicator size="small" color={colors.primary} />
-              </View>
-            ) : null
-          }
-        />
+        <>
+          <View
+            style={[styles.searchContainer, { backgroundColor: colors.card }]}
+          >
+            <Ionicons
+              name="search"
+              size={20}
+              color={colors.textSecondary}
+              style={styles.searchIcon}
+            />
+            <TextInput
+              style={[styles.searchInput, { color: colors.textPrimary }]}
+              placeholder="Buscar palavra em todos os dicionários..."
+              placeholderTextColor={colors.textSecondary}
+              value={query}
+              onChangeText={handleSearch}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            {searching && (
+              <ActivityIndicator size="small" color={colors.primary} />
+            )}
+            {query.length > 0 && !searching && (
+              <TouchableOpacity onPress={() => handleSearch("")}>
+                <Ionicons
+                  name="close-circle"
+                  size={20}
+                  color={colors.textSecondary}
+                />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {total > 0 && (
+            <Text style={[styles.resultCount, { color: colors.textSecondary }]}>
+              {total} {total === 1 ? "resultado" : "resultados"}
+              {dictionaryCount > 0 &&
+                ` em ${dictionaryCount} ${
+                  dictionaryCount === 1 ? "dicionário" : "dicionários"
+                }`}
+            </Text>
+          )}
+
+          {loading && listData.length === 0 ? (
+            <View style={styles.centerContent}>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text
+                style={[styles.loadingText, { color: colors.textSecondary }]}
+              >
+                Carregando dicionários...
+              </Text>
+            </View>
+          ) : listData.length === 0 ? (
+            <View style={styles.centerContent}>
+              <Ionicons
+                name="book-outline"
+                size={64}
+                color={colors.textSecondary}
+              />
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                {query
+                  ? "Nenhuma palavra encontrada"
+                  : "Nenhum verbete disponível"}
+              </Text>
+            </View>
+          ) : (
+            <FlatList
+              data={listData}
+              keyExtractor={(item) => item.key}
+              contentContainerStyle={styles.listContent}
+              renderItem={renderItem}
+              onEndReached={loadMore}
+              onEndReachedThreshold={0.5}
+              ListFooterComponent={
+                groups.some((g) => g.entries.length < g.total) ? (
+                  <View style={styles.loadingMore}>
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  </View>
+                ) : null
+              }
+            />
+          )}
+        </>
       )}
       <AdBanner />
     </SafeAreaView>
@@ -305,8 +438,18 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   backButton: { padding: 8 },
-  headerTitle: { fontSize: 20, fontWeight: "bold", flex: 1, marginHorizontal: 8 },
-  centerContent: { flex: 1, justifyContent: "center", alignItems: "center", padding: 32 },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    flex: 1,
+    marginHorizontal: 8,
+  },
+  centerContent: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 32,
+  },
   loadingText: { marginTop: 12, fontSize: 14 },
   emptyText: { marginTop: 12, fontSize: 15, textAlign: "center" },
   searchContainer: {
@@ -330,7 +473,12 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     paddingHorizontal: 2,
   },
-  groupTitle: { fontSize: 13, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.4 },
+  groupTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
   groupCount: { fontSize: 12 },
   entryCard: {
     borderRadius: 10,
@@ -353,4 +501,56 @@ const styles = StyleSheet.create({
   },
   fullButtonText: { fontSize: 13, fontWeight: "600" },
   loadingMore: { paddingVertical: 16, alignItems: "center" },
+  downloadTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    marginTop: 16,
+    textAlign: "center",
+  },
+  downloadSubtitle: {
+    fontSize: 16,
+    marginTop: 8,
+    textAlign: "center",
+  },
+  progressContainer: {
+    marginTop: 24,
+    alignItems: "center",
+    width: "100%",
+    paddingHorizontal: 24,
+  },
+  progressText: {
+    fontSize: 16,
+    marginTop: 12,
+    textAlign: "center",
+  },
+  progressBar: {
+    width: "100%",
+    height: 10,
+    borderRadius: 5,
+    marginTop: 12,
+    overflow: "hidden",
+  },
+  progressFill: { height: "100%", borderRadius: 5 },
+  downloadInfo: {
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: "center",
+  },
+  errorContainer: {
+    marginTop: 24,
+    alignItems: "center",
+    paddingHorizontal: 24,
+  },
+  errorText: {
+    fontSize: 14,
+    marginTop: 12,
+    textAlign: "center",
+  },
+  retryButton: {
+    marginTop: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  retryButtonText: { fontSize: 14, fontWeight: "600", color: "#fff" },
 });

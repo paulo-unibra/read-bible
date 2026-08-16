@@ -151,6 +151,8 @@ router.get('/dictionary/search', [DictionaryController, 'search'])
 router.get('/dictionary/word', [DictionaryController, 'word'])
 router.get('/dictionary/refresh', [DictionaryController, 'refresh'])
 router.get('/dictionary/stats', [DictionaryController, 'stats'])
+router.get('/dictionary/files', [DictionaryController, 'files'])
+router.get('/dictionary/files/download/:dictKey', [DictionaryController, 'download'])
 
 router.get('/bible-brain/bibles/:bibleId/package/download', [BibleBrainController, 'download'])
 router.get('/bible-brain/video-proxy/:filesetId/:bookId/:chapterNumber/*', [BibleBrainController, 'videoProxyPlaylist'])

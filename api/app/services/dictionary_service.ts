@@ -1,6 +1,6 @@
 import env from '#start/env'
 import Database from 'better-sqlite3'
-import { existsSync, mkdirSync, readdirSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, statSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 
 const DICTIONARIES_DIR = new URL('../../public/dictionaries/', import.meta.url)
@@ -279,6 +279,22 @@ class DictionaryService {
       }
     }
     return null
+  }
+
+  async getFileList(): Promise<{ dictKey: string; label: string; fileName: string; size: number }[]> {
+    await this.ensureLoaded()
+    return this.sources.map((source) => {
+      const stat = statSync(source.filePath)
+      return { dictKey: source.dictKey, label: source.label, fileName: source.fileName, size: stat.size }
+    })
+  }
+
+  async getFileByKey(dictKey: string): Promise<{ dictKey: string; label: string; fileName: string; size: number; filePath: string } | null> {
+    await this.ensureLoaded()
+    const source = this.sources.find((s) => s.dictKey === dictKey)
+    if (!source || !existsSync(source.filePath)) return null
+    const stat = statSync(source.filePath)
+    return { dictKey: source.dictKey, label: source.label, fileName: source.fileName, size: stat.size, filePath: source.filePath }
   }
 
   async getTotalCount(): Promise<number> {

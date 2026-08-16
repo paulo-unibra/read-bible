@@ -15,7 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../hooks/theme-context";
 import bibleReaderService from "../services/BibleReaderService";
 import DatabaseService from "../services/DatabaseService";
-import dictionaryService from "../services/DictionaryService";
+import dictionaryOfflineService from "../services/DictionaryOfflineService";
 import AdBanner from "../components/AdBanner";
 
 interface ContentSegment {
@@ -202,9 +202,9 @@ export default function DicionarioVerbeteScreen() {
     if (!word) return;
     try {
       setLoading(true);
-      let data = await dictionaryService.getWord(word, dictKey);
+      let data = await dictionaryOfflineService.getWord(word, dictKey);
       if (!data && dictKey) {
-        data = await dictionaryService.getWord(word);
+        data = await dictionaryOfflineService.getWord(word);
       }
       if (data) {
         setEntry(data);
@@ -298,7 +298,7 @@ export default function DicionarioVerbeteScreen() {
   const handleDictLinkPress = async (term: string) => {
     try {
       setVeiuDictLoading(true);
-      const data = await dictionaryService.getWord(term);
+      const data = await dictionaryOfflineService.getWord(term);
       if (data) {
         setVeiuDictData(data);
         setVeiuDictModalVisible(true);

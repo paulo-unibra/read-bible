@@ -1,7 +1,44 @@
 import dictionaryService from '#services/dictionary_service'
+import { createReadStream } from 'node:fs'
 import type { HttpContext } from '@adonisjs/core/http'
 
 export default class DictionaryController {
+  async files({ response }: HttpContext) {
+    try {
+      const files = await dictionaryService.getFileList()
+      return response.ok({ success: true, files })
+    } catch (error) {
+      console.error('[DictionaryController] Erro ao listar arquivos:', error)
+      return response.internalServerError({
+        success: false,
+        message: 'Erro ao listar dicionários',
+        error: error.message,
+      })
+    }
+  }
+
+  async download({ params, response }: HttpContext) {
+    try {
+      const file = await dictionaryService.getFileByKey(params.dictKey)
+      if (!file) {
+        return response.notFound({ success: false, message: 'Dicionário não encontrado' })
+      }
+
+      response.header('Content-Type', 'application/x-sqlite3')
+      response.header('Content-Disposition', `attachment; filename="${file.fileName}"`)
+      response.header('Cache-Control', 'public, max-age=86400')
+      response.header('Content-Length', String(file.size))
+
+      return response.stream(createReadStream(file.filePath))
+    } catch (error) {
+      console.error('[DictionaryController] Erro ao baixar dicionário:', error)
+      return response.internalServerError({
+        success: false,
+        message: 'Erro ao baixar dicionário',
+        error: error.message,
+      })
+    }
+  }
   async search({ request, response }: HttpContext) {
     try {
       const q = request.input('q', '')
