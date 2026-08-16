@@ -1,4 +1,5 @@
 import PasswordReset from '#models/password_reset'
+import AuditLog from '#models/audit_log'
 import User from '#models/user'
 import emailService from '#services/email_service'
 import type { HttpContext } from '@adonisjs/core/http'
@@ -35,6 +36,16 @@ export default class PasswordResetController {
 
       // Invalidar tokens anteriores não usados
       await PasswordReset.query().where('email', email).where('used', false).update({ used: true })
+
+      await AuditLog.create({
+        userId: user.id,
+        action: 'password.request_reset',
+        entityType: 'user',
+        entityId: user.id,
+        details: { email },
+        ipAddress: request.ip(),
+        userAgent: request.header('user-agent') || null,
+      })
 
       // Criar novo token (expira em 30 minutos)
       await PasswordReset.create({
@@ -160,6 +171,16 @@ export default class PasswordResetController {
       // Atualizar senha
       user.password = newPassword
       await user.save()
+
+      await AuditLog.create({
+        userId: user.id,
+        action: 'password.reset',
+        entityType: 'user',
+        entityId: user.id,
+        details: { email: user.email },
+        ipAddress: request.ip(),
+        userAgent: request.header('user-agent') || null,
+      })
 
       // Marcar token como usado
       resetToken.used = true

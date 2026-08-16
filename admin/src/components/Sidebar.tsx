@@ -297,6 +297,12 @@ const Sidebar: React.FC = () => {
           permission: "gerenciar_usuarios",
         },
         {
+          path: "/audit-logs",
+          icon: "📜",
+          label: "Logs de Auditoria",
+          permission: "gerenciar_usuarios",
+        },
+        {
           path: "/reports",
           icon: "📊",
           label: "Relatórios",

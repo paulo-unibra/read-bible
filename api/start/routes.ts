@@ -9,6 +9,7 @@
 
 const AuthController = () => import('#controllers/auth_controller')
 const AdminAuthController = () => import('#controllers/Admin/auth_controller')
+const AdminAuditLogController = () => import('#controllers/Admin/audit_log_controller')
 const AdminQuizController = () => import('#controllers/Admin/quiz_controller')
 const AdminReadingPlanTemplateController = () =>
   import('#controllers/Admin/reading_plan_template_controller')
@@ -233,6 +234,10 @@ router
         router.get('/email-logs', [AdminAuthController, 'listEmailLogs'])
         router.post('/email-logs/retry', [AdminAuthController, 'retryFailedEmails'])
         router.get('/email-logs/stats', [AdminAuthController, 'getEmailStats'])
+
+        // Audit logs
+        router.get('/audit-logs', [AdminAuditLogController, 'index'])
+        router.get('/audit-logs/actions', [AdminAuditLogController, 'actions'])
 
         router.get('/permissions', [AdminAuthController, 'listPermissions'])
         router.post('/permissions', [AdminAuthController, 'createPermission'])

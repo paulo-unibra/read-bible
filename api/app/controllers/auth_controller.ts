@@ -35,6 +35,16 @@ export default class AuthController {
       // Gerar token de acesso
       const token = await User.accessTokens.create(user)
 
+      await AuditLog.create({
+        userId: user.id,
+        action: 'auth.register',
+        entityType: 'user',
+        entityId: user.id,
+        details: { email: user.email, name: user.fullName },
+        ipAddress: request.ip(),
+        userAgent: request.header('user-agent') || null,
+      })
+
       return response.created({
         success: true,
         message: 'Usuário cadastrado com sucesso',
@@ -102,10 +112,20 @@ export default class AuthController {
   /**
    * Fazer logout
    */
-  async logout({ auth, response }: HttpContext) {
+  async logout({ auth, request, response }: HttpContext) {
     try {
       const user = auth.user!
       await User.accessTokens.delete(user, user.currentAccessToken.identifier)
+
+      await AuditLog.create({
+        userId: user.id,
+        action: 'auth.logout',
+        entityType: 'user',
+        entityId: user.id,
+        details: { email: user.email },
+        ipAddress: request.ip(),
+        userAgent: request.header('user-agent') || null,
+      })
 
       return response.ok({
         success: true,

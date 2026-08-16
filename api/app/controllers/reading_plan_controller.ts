@@ -81,7 +81,7 @@ export default class ReadingPlanController {
   /**
    * Criar plano de leitura anual
    */
-  async create({ auth, response }: HttpContext) {
+  async create({ auth, request, response }: HttpContext) {
     try {
       const user = auth.user!
 
@@ -142,6 +142,16 @@ export default class ReadingPlanController {
 
       // Gerar progresso diário
       await this.generateDailyProgress(plan.id, totalDays, chaptersPerDay)
+
+      await AuditLog.create({
+        userId: user.id,
+        action: 'plan.create',
+        entityType: 'reading_plan',
+        entityId: plan.id,
+        details: { name: plan.name, type: plan.type, totalDays: plan.totalDays },
+        ipAddress: request.ip(),
+        userAgent: request.header('user-agent') || null,
+      })
 
       return response.created({
         success: true,
@@ -320,6 +330,16 @@ export default class ReadingPlanController {
       await plan.save()
       console.log('✅ [API] Plano salvo com totais calculados')
 
+      await AuditLog.create({
+        userId: user.id,
+        action: 'plan.create',
+        entityType: 'reading_plan',
+        entityId: plan.id,
+        details: { name: plan.name, type: plan.type, totalDays: plan.totalDays },
+        ipAddress: request.ip(),
+        userAgent: request.header('user-agent') || null,
+      })
+
       console.log('🎉 [API] Plano customizado criado com sucesso!')
       console.log('📤 [API] Enviando resposta ao cliente...')
 
@@ -363,7 +383,7 @@ export default class ReadingPlanController {
    * Criar plano de leitura para iniciantes (Leia toda a Bíblia até o fim do ano de forma leve)
    * Distribui ~31.102 versículos proporcionalmente pelos dias restantes até 31/12
    */
-  async createBeginner({ auth, response }: HttpContext) {
+  async createBeginner({ auth, request, response }: HttpContext) {
     try {
       console.log('🔵 [API] createBeginner - INÍCIO')
       const user = auth.user!
@@ -488,6 +508,16 @@ export default class ReadingPlanController {
       // Salvar plano com totais já calculados
       await plan.save()
       console.log('✅ [API] Plano salvo com totais calculados')
+
+      await AuditLog.create({
+        userId: user.id,
+        action: 'plan.create',
+        entityType: 'reading_plan',
+        entityId: plan.id,
+        details: { name: plan.name, type: plan.type, totalDays: plan.totalDays },
+        ipAddress: request.ip(),
+        userAgent: request.header('user-agent') || null,
+      })
 
       console.log('🎉 [API] Plano para iniciantes criado com sucesso!')
       console.log('📤 [API] Enviando resposta ao cliente...')
@@ -676,6 +706,16 @@ export default class ReadingPlanController {
       plan.completedChapters += chaptersCompleted
       plan.currentDay = day + 1
       await plan.save()
+
+      await AuditLog.create({
+        userId: user.id,
+        action: 'reading.complete_day',
+        entityType: 'reading_plan',
+        entityId: plan.id,
+        details: { day, chapters: chaptersCompleted, readings: readings.length },
+        ipAddress: request.ip(),
+        userAgent: request.header('user-agent') || null,
+      })
 
       console.log('🔄 [API] Verificando se precisa criar próximos dias...')
 
@@ -1796,6 +1836,16 @@ export default class ReadingPlanController {
 
       await plan.save()
 
+      await AuditLog.create({
+        userId: user.id,
+        action: 'reading.unmark_day',
+        entityType: 'reading_plan',
+        entityId: plan.id,
+        details: { day, chapters: chaptersToUnmark },
+        ipAddress: request.ip(),
+        userAgent: request.header('user-agent') || null,
+      })
+
       return response.ok({
         success: true,
         message: 'Leitura desmarcada com sucesso',
@@ -2731,7 +2781,7 @@ export default class ReadingPlanController {
   /**
    * Desabilitar plano de leitura (Admin)
    */
-  async disablePlan({ params, response }: HttpContext) {
+  async disablePlan({ params, request, response }: HttpContext) {
     try {
       const plan = await ReadingPlan.query()
         .where('id', params.planId)
@@ -2747,6 +2797,16 @@ export default class ReadingPlanController {
 
       plan.isActive = false
       await plan.save()
+
+      await AuditLog.create({
+        userId: plan.userId,
+        action: 'plan.disable',
+        entityType: 'reading_plan',
+        entityId: plan.id,
+        details: { planName: plan.name, admin: true },
+        ipAddress: request.ip(),
+        userAgent: request.header('user-agent') || null,
+      })
 
       return response.ok({
         success: true,
@@ -2769,7 +2829,7 @@ export default class ReadingPlanController {
   /**
    * Reativar plano de leitura (Admin)
    */
-  async enablePlan({ params, response }: HttpContext) {
+  async enablePlan({ params, request, response }: HttpContext) {
     try {
       const plan = await ReadingPlan.query()
         .where('id', params.planId)
@@ -2800,6 +2860,16 @@ export default class ReadingPlanController {
 
       plan.isActive = true
       await plan.save()
+
+      await AuditLog.create({
+        userId: plan.userId,
+        action: 'plan.enable',
+        entityType: 'reading_plan',
+        entityId: plan.id,
+        details: { planName: plan.name, admin: true },
+        ipAddress: request.ip(),
+        userAgent: request.header('user-agent') || null,
+      })
 
       return response.ok({
         success: true,

@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { AuthProvider } from "./contexts/AuthContext";
 import ActivePlans from "./pages/ActivePlans/ActivePlans";
+import AuditLogs from "./pages/AuditLogs";
 import AudioSync from "./pages/AudioSync";
 import BibleBrainManager from "./pages/BibleBrain/BibleBrainManager";
 import BibleCuriosities from "./pages/BibleCuriosities/BibleCuriosities";
@@ -133,6 +134,14 @@ function App() {
             element={
               <ProtectedRoute permission="gerenciar_usuarios">
                 <EmailLogs />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/audit-logs"
+            element={
+              <ProtectedRoute permission="gerenciar_usuarios">
+                <AuditLogs />
               </ProtectedRoute>
             }
           />
