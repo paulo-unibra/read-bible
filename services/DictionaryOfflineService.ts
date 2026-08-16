@@ -26,13 +26,14 @@ export interface DictionaryEntry {
   definition: string;
   dictKey: string;
   dictionary: string;
+  title: string;
 }
 
 export interface DictionaryGroup {
   dictKey: string;
   label: string;
   total: number;
-  entries: { word: string; snippet: string }[];
+  entries: { word: string; snippet: string; title: string }[];
 }
 
 export interface SearchResult {
@@ -64,6 +65,20 @@ function plainText(html: string): string {
 function makeSnippet(definition: string): string {
   const text = plainText(definition);
   return text.length > 100 ? `${text.slice(0, 100)}...` : text;
+}
+
+// O dicionário de Temas Bíblicos usa códigos numéricos como palavra (1000, 1010...),
+// mas a definição começa com o título real dentro de um <b>...</b>
+function extractTopicTitle(html: string): string | null {
+  const match = html.match(/<b[^>]*>\s*([^<]*?)\s*<\/b>/i);
+  return match && match[1].trim() ? match[1].trim() : null;
+}
+
+function friendlyTitle(dictKey: string, word: string, definition: string): string {
+  if (dictKey === "outros" && /^\d/.test(word)) {
+    return extractTopicTitle(definition) || word;
+  }
+  return word;
 }
 
 class DictionaryOfflineService {
@@ -234,6 +249,7 @@ class DictionaryOfflineService {
           entries: rows.map((r) => ({
             word: r.word,
             snippet: makeSnippet(r.definition),
+            title: friendlyTitle(key, r.word, r.definition),
           })),
         });
       }
@@ -256,6 +272,7 @@ class DictionaryOfflineService {
           ...row,
           dictKey: key,
           dictionary: DICT_LABELS[key] || key,
+          title: friendlyTitle(key, row.word, row.definition),
         };
       }
     }

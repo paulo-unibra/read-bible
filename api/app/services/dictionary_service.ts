@@ -37,13 +37,14 @@ export interface DictionaryEntry {
   definition: string
   dictKey: string
   dictionary: string
+  title: string
 }
 
 export interface DictionaryGroup {
   dictKey: string
   label: string
   total: number
-  entries: { word: string; snippet: string }[]
+  entries: { word: string; snippet: string; title: string }[]
 }
 
 export interface DictionarySearchResult {
@@ -63,6 +64,20 @@ function plainText(html: string): string {
 function makeSnippet(definition: string): string {
   const text = plainText(definition)
   return text.length > 100 ? `${text.slice(0, 100)}...` : text
+}
+
+// O dicionário de Temas Bíblicos usa códigos numéricos como palavra (1000, 1010...),
+// mas a definição começa com o título real dentro de um <b>...</b>
+function extractTopicTitle(html: string): string | null {
+  const match = html.match(/<b[^>]*>\s*([^<]*?)\s*<\/b>/i)
+  return match && match[1].trim() ? match[1].trim() : null
+}
+
+function friendlyTitle(dictKey: string, word: string, definition: string): string {
+  if (dictKey === 'outros' && /^\d/.test(word)) {
+    return extractTopicTitle(definition) || word
+  }
+  return word
 }
 
 class DictionaryService {
@@ -245,7 +260,11 @@ class DictionaryService {
           dictKey: source.dictKey,
           label: source.label,
           total: countRow.total,
-          entries: rows.map((r) => ({ word: r.word, snippet: makeSnippet(r.definition) })),
+          entries: rows.map((r) => ({
+            word: r.word,
+            snippet: makeSnippet(r.definition),
+            title: friendlyTitle(source.dictKey, r.word, r.definition),
+          })),
         })
       }
       total += countRow.total
@@ -275,26 +294,50 @@ class DictionaryService {
         )
         .get(word) as { word: string; definition: string } | undefined
       if (row) {
-        return { ...row, dictKey: source.dictKey, dictionary: source.label }
+        return {
+          ...row,
+          dictKey: source.dictKey,
+          dictionary: source.label,
+          title: friendlyTitle(source.dictKey, row.word, row.definition),
+        }
       }
     }
     return null
   }
 
-  async getFileList(): Promise<{ dictKey: string; label: string; fileName: string; size: number }[]> {
+  async getFileList(): Promise<
+    { dictKey: string; label: string; fileName: string; size: number }[]
+  > {
     await this.ensureLoaded()
     return this.sources.map((source) => {
       const stat = statSync(source.filePath)
-      return { dictKey: source.dictKey, label: source.label, fileName: source.fileName, size: stat.size }
+      return {
+        dictKey: source.dictKey,
+        label: source.label,
+        fileName: source.fileName,
+        size: stat.size,
+      }
     })
   }
 
-  async getFileByKey(dictKey: string): Promise<{ dictKey: string; label: string; fileName: string; size: number; filePath: string } | null> {
+  async getFileByKey(dictKey: string): Promise<{
+    dictKey: string
+    label: string
+    fileName: string
+    size: number
+    filePath: string
+  } | null> {
     await this.ensureLoaded()
     const source = this.sources.find((s) => s.dictKey === dictKey)
     if (!source || !existsSync(source.filePath)) return null
     const stat = statSync(source.filePath)
-    return { dictKey: source.dictKey, label: source.label, fileName: source.fileName, size: stat.size, filePath: source.filePath }
+    return {
+      dictKey: source.dictKey,
+      label: source.label,
+      fileName: source.fileName,
+      size: stat.size,
+      filePath: source.filePath,
+    }
   }
 
   async getTotalCount(): Promise<number> {

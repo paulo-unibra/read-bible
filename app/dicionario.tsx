@@ -21,7 +21,7 @@ interface Group {
   dictKey: string;
   label: string;
   total: number;
-  entries: { word: string; snippet: string }[];
+  entries: { word: string; snippet: string; title: string }[];
 }
 
 interface ListItem {
@@ -29,19 +29,8 @@ interface ListItem {
   key: string;
   group: Group;
   word?: string;
+  title?: string;
   snippet?: string;
-}
-
-interface ExpandedState {
-  word: string;
-  dictKey: string;
-  label: string;
-  definition: string;
-  loading: boolean;
-}
-
-function stripHtml(html: string): string {
-  return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 }
 
 export default function DicionarioScreen() {
@@ -56,7 +45,6 @@ export default function DicionarioScreen() {
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
   const [page, setPage] = useState(1);
-  const [expanded, setExpanded] = useState<ExpandedState | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined
   );
@@ -121,14 +109,13 @@ export default function DicionarioScreen() {
     try {
       if (p === 1) setLoading(true);
       const q = searchQuery !== undefined ? searchQuery : query;
-      const result = await dictionaryOfflineService.search(q, p);
+      const result = await dictionaryOfflineService.search(q, p, q ? 50 : 3);
       if (p > 1) {
         setGroups((prev) => mergeGroups(prev, result.groups));
       } else {
         setGroups(result.groups);
       }
       setTotal(result.total);
-      setExpanded(null);
     } catch (error) {
       console.error("Erro ao carregar dicionário:", error);
     } finally {
@@ -148,6 +135,7 @@ export default function DicionarioScreen() {
   };
 
   const loadMore = () => {
+    if (!query) return;
     if (loading) return;
     const hasMore = groups.some((g) => g.entries.length < g.total);
     if (!hasMore) return;
@@ -156,29 +144,10 @@ export default function DicionarioScreen() {
     loadPage(nextPage);
   };
 
-  const toggleExpand = async (word: string, dictKey: string, label: string) => {
-    if (expanded && expanded.word === word && expanded.dictKey === dictKey) {
-      setExpanded(null);
-      return;
-    }
-    setExpanded({ word, dictKey, label, definition: "", loading: true });
-    try {
-      const data = await dictionaryOfflineService.getWord(word, dictKey);
-      if (data) {
-        setExpanded({
-          word,
-          dictKey,
-          label,
-          definition: stripHtml(data.definition),
-          loading: false,
-        });
-      } else {
-        setExpanded(null);
-      }
-    } catch (error) {
-      console.error("Erro ao expandir verbete:", error);
-      setExpanded(null);
-    }
+  const openEntry = (word: string, dictKey: string) => {
+    router.push(
+      `/dicionario-verbete?word=${encodeURIComponent(word)}&dict=${dictKey}`
+    );
   };
 
   const listData: ListItem[] = groups.flatMap((g) => [
@@ -188,12 +157,10 @@ export default function DicionarioScreen() {
       key: `${g.dictKey}-${e.word}`,
       group: g,
       word: e.word,
+      title: e.title,
       snippet: e.snippet,
     })),
   ]);
-
-  const isExpanded = (word: string, dictKey: string) =>
-    expanded?.word === word && expanded?.dictKey === dictKey;
 
   const renderItem = ({ item }: { item: ListItem }) => {
     if (item.type === "header") {
@@ -211,61 +178,31 @@ export default function DicionarioScreen() {
     }
 
     const word = item.word!;
+    const title = item.title || word;
     const dictKey = item.group.dictKey;
-    const open = isExpanded(word, dictKey);
 
     return (
       <TouchableOpacity
         style={[styles.entryCard, { backgroundColor: colors.card }]}
-        onPress={() => toggleExpand(word, dictKey, item.group.label)}
+        onPress={() => openEntry(word, dictKey)}
         activeOpacity={0.7}
       >
         <View style={styles.entryHeader}>
           <Text style={[styles.entryWord, { color: colors.textPrimary }]}>
-            {word}
+            {title}
           </Text>
           <Ionicons
-            name={open ? "chevron-up" : "chevron-down"}
+            name="chevron-forward"
             size={18}
             color={colors.textSecondary}
           />
         </View>
         <Text
           style={[styles.entrySnippet, { color: colors.textSecondary }]}
-          numberOfLines={open ? undefined : 2}
+          numberOfLines={2}
         >
           {item.snippet}
         </Text>
-        {open && (
-          <View>
-            {expanded!.loading ? (
-              <ActivityIndicator
-                size="small"
-                color={colors.primary}
-                style={{ marginTop: 8 }}
-              />
-            ) : (
-              <Text style={[styles.entryFull, { color: colors.textPrimary }]}>
-                {expanded!.definition}
-              </Text>
-            )}
-            <TouchableOpacity
-              style={styles.fullButton}
-              onPress={() =>
-                router.push(
-                  `/dicionario-verbete?word=${encodeURIComponent(
-                    word
-                  )}&dict=${dictKey}`
-                )
-              }
-            >
-              <Text style={[styles.fullButtonText, { color: colors.accent }]}>
-                Ver verbete completo
-              </Text>
-              <Ionicons name="open-outline" size={14} color={colors.accent} />
-            </TouchableOpacity>
-          </View>
-        )}
       </TouchableOpacity>
     );
   };
@@ -413,7 +350,7 @@ export default function DicionarioScreen() {
               onEndReached={loadMore}
               onEndReachedThreshold={0.5}
               ListFooterComponent={
-                groups.some((g) => g.entries.length < g.total) ? (
+                query && groups.some((g) => g.entries.length < g.total) ? (
                   <View style={styles.loadingMore}>
                     <ActivityIndicator size="small" color={colors.primary} />
                   </View>
@@ -492,14 +429,6 @@ const styles = StyleSheet.create({
   },
   entryWord: { fontSize: 15, fontWeight: "700" },
   entrySnippet: { fontSize: 13, lineHeight: 19, marginTop: 4 },
-  entryFull: { fontSize: 14, lineHeight: 22, marginTop: 10 },
-  fullButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    marginTop: 10,
-  },
-  fullButtonText: { fontSize: 13, fontWeight: "600" },
   loadingMore: { paddingVertical: 16, alignItems: "center" },
   downloadTitle: {
     fontSize: 24,

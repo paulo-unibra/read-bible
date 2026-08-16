@@ -1229,7 +1229,7 @@ export default function HomeScreen() {
           </TouchableOpacity>
 
           {/* Filmes */}
-          <TouchableOpacity
+          {/* <TouchableOpacity
             style={[
               styles.actionCard,
               {
@@ -1274,7 +1274,7 @@ export default function HomeScreen() {
               size={20}
               color={colors.iconForward}
             />
-          </TouchableOpacity>
+          </TouchableOpacity> */}
 
           {/* Dicionário */}
           <TouchableOpacity
@@ -1425,7 +1425,8 @@ export default function HomeScreen() {
             </TouchableOpacity>
           )} */}
 
-          <TouchableOpacity
+          {/* Explorar */}
+          {/* <TouchableOpacity
             style={[
               styles.actionCard,
               {
@@ -1470,7 +1471,7 @@ export default function HomeScreen() {
               size={20}
               color={colors.iconForward}
             />
-          </TouchableOpacity>
+          </TouchableOpacity> */}
         </View>
 
         <View style={styles.actionsSection}>

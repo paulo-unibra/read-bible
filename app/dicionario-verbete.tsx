@@ -179,6 +179,7 @@ export default function DicionarioVerbeteScreen() {
     word: string;
     definition: string;
     dictionary?: string;
+    title?: string;
   } | null>(null);
   const [segments, setSegments] = useState<ContentSegment[]>([]);
 
@@ -191,6 +192,7 @@ export default function DicionarioVerbeteScreen() {
   const [veuDictData, setVeiuDictData] = useState<{
     word: string;
     definition: string;
+    title?: string;
   } | null>(null);
   const [veuDictLoading, setVeiuDictLoading] = useState(false);
 
@@ -505,7 +507,7 @@ export default function DicionarioVerbeteScreen() {
           style={[styles.headerTitle, { color: colors.textPrimary }]}
           numberOfLines={1}
         >
-          {entry.word}
+          {entry.title || entry.word}
         </Text>
         <View style={{ width: 40 }} />
       </View>
@@ -598,7 +600,7 @@ export default function DicionarioVerbeteScreen() {
               ]}
             >
               <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>
-                {veuDictData?.word || "Dicionário"}
+                {veuDictData?.title || veuDictData?.word || "Dicionário"}
               </Text>
               <TouchableOpacity onPress={() => setVeiuDictModalVisible(false)}>
                 <Ionicons name="close" size={24} color={colors.textSecondary} />
