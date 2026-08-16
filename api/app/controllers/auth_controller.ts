@@ -69,6 +69,16 @@ export default class AuthController {
       // Gerar token
       const token = await User.accessTokens.create(user)
 
+      await AuditLog.create({
+        userId: user.id,
+        action: 'auth.login',
+        entityType: 'user',
+        entityId: user.id,
+        details: { email: user.email },
+        ipAddress: request.ip(),
+        userAgent: request.header('user-agent') || null,
+      })
+
       return response.ok({
         success: true,
         message: 'Login realizado com sucesso',

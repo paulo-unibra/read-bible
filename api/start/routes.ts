@@ -41,20 +41,28 @@ router.get('/', async () => {
 })
 
 // Auth routes
-router.post('/auth/register', [AuthController, 'register'])
-router.post('/auth/login', [AuthController, 'login'])
+router.post('/auth/register', [AuthController, 'register']).use(middleware.rateLimit({ limit: 10 }))
+router.post('/auth/login', [AuthController, 'login']).use(middleware.rateLimit({ limit: 10 }))
 router.post('/auth/logout', [AuthController, 'logout']).use(middleware.auth())
 router.get('/auth/me', [AuthController, 'me']).use(middleware.auth())
 router.get('/auth/stats', [AuthController, 'stats']).use(middleware.auth())
 router.put('/auth/profile', [AuthController, 'updateProfile']).use(middleware.auth())
-router.post('/auth/profile/picture', [AuthController, 'uploadProfilePicture']).use(middleware.auth())
-router.delete('/auth/profile/picture', [AuthController, 'removeProfilePicture']).use(middleware.auth())
+router
+  .post('/auth/profile/picture', [AuthController, 'uploadProfilePicture'])
+  .use(middleware.auth())
+router
+  .delete('/auth/profile/picture', [AuthController, 'removeProfilePicture'])
+  .use(middleware.auth())
 router.get('/uploads/profile-pictures/:fileName', [AuthController, 'getProfilePicture'])
 
 // Password Reset routes (public)
-router.post('/password/forgot', [PasswordResetController, 'requestReset'])
+router
+  .post('/password/forgot', [PasswordResetController, 'requestReset'])
+  .use(middleware.rateLimit({ limit: 5 }))
 router.post('/password/verify-token', [PasswordResetController, 'verifyToken'])
-router.post('/password/reset', [PasswordResetController, 'resetPassword'])
+router
+  .post('/password/reset', [PasswordResetController, 'resetPassword'])
+  .use(middleware.rateLimit({ limit: 5 }))
 
 // Reading Plan routes (protected)
 // IMPORTANTE: Rotas específicas ANTES das rotas genéricas
@@ -155,14 +163,35 @@ router.get('/dictionary/files', [DictionaryController, 'files'])
 router.get('/dictionary/files/download/:dictKey', [DictionaryController, 'download'])
 
 router.get('/bible-brain/bibles/:bibleId/package/download', [BibleBrainController, 'download'])
-router.get('/bible-brain/video-proxy/:filesetId/:bookId/:chapterNumber/*', [BibleBrainController, 'videoProxyPlaylist'])
-router.get('/bible-brain/video-proxy/:filesetId/:bookId/:chapterNumber', [BibleBrainController, 'videoProxyPlaylist'])
+router.get('/bible-brain/video-proxy/:filesetId/:bookId/:chapterNumber/*', [
+  BibleBrainController,
+  'videoProxyPlaylist',
+])
+router.get('/bible-brain/video-proxy/:filesetId/:bookId/:chapterNumber', [
+  BibleBrainController,
+  'videoProxyPlaylist',
+])
 router.get('/bible-brain/bibles/:bibleId/video-books', [BibleBrainController, 'videoBooks'])
-router.get('/bible-brain/bibles/:bibleId/video-segments/:bookId/:chapterNumber', [BibleBrainController, 'videoSegments'])
-router.get('/bible-brain/bibles/:bibleId/video-thumbnail/:bookId/:chapterNumber', [BibleBrainController, 'videoThumbnail'])
-router.get('/bible-brain/bibles/:bibleId/video/:bookId/:chapterNumber', [BibleBrainController, 'videoChapter'])
-router.get('/bible-brain/bibles/:bibleId/audio/:bookId/:chapterNumber', [BibleBrainController, 'audioChapter'])
-router.get('/bible-brain/bibles/:bibleId/audio-timestamps/:bookId/:chapterNumber', [BibleBrainController, 'audioTimestamps'])
+router.get('/bible-brain/bibles/:bibleId/video-segments/:bookId/:chapterNumber', [
+  BibleBrainController,
+  'videoSegments',
+])
+router.get('/bible-brain/bibles/:bibleId/video-thumbnail/:bookId/:chapterNumber', [
+  BibleBrainController,
+  'videoThumbnail',
+])
+router.get('/bible-brain/bibles/:bibleId/video/:bookId/:chapterNumber', [
+  BibleBrainController,
+  'videoChapter',
+])
+router.get('/bible-brain/bibles/:bibleId/audio/:bookId/:chapterNumber', [
+  BibleBrainController,
+  'audioChapter',
+])
+router.get('/bible-brain/bibles/:bibleId/audio-timestamps/:bookId/:chapterNumber', [
+  BibleBrainController,
+  'audioTimestamps',
+])
 router.get('/bible-brain/bibles/:bibleId/package', [BibleBrainController, 'packageStatus'])
 router.post('/bible-brain/bibles/:bibleId/package', [BibleBrainController, 'requestPackage'])
 router.get('/bible-brain/bibles/:bibleId', [BibleBrainController, 'show'])
@@ -308,7 +337,10 @@ router
         router.get('/bible-brain/sync/status', [AdminBibleBrainController, 'syncStatus'])
         router.get('/bible-brain/bibles', [AdminBibleBrainController, 'index'])
         router.patch('/bible-brain/bibles/:id/toggle', [AdminBibleBrainController, 'toggle'])
-        router.post('/bible-brain/bibles/:id/package', [AdminBibleBrainController, 'requestPackage'])
+        router.post('/bible-brain/bibles/:id/package', [
+          AdminBibleBrainController,
+          'requestPackage',
+        ])
       })
       .use(middleware.auth({ guards: ['api'] }))
   })

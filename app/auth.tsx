@@ -33,6 +33,17 @@ export default function AuthScreen() {
       return;
     }
 
+    if (
+      !isLogin &&
+      (password.length < 8 || !/[A-Za-z]/.test(password) || !/\d/.test(password))
+    ) {
+      Alert.alert(
+        'Atenção',
+        'A senha deve ter pelo menos 8 caracteres, com letras e números'
+      );
+      return;
+    }
+
     setLoading(true);
     try {
       console.log('🚀 Iniciando autenticação...');

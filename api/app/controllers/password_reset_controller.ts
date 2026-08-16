@@ -126,10 +126,10 @@ export default class PasswordResetController {
         })
       }
 
-      if (newPassword.length < 6) {
+      if (newPassword.length < 8 || !/[A-Za-z]/.test(newPassword) || !/\d/.test(newPassword)) {
         return response.badRequest({
           success: false,
-          message: 'A senha deve ter pelo menos 6 caracteres',
+          message: 'A senha deve ter pelo menos 8 caracteres, com letras e números',
         })
       }
 
