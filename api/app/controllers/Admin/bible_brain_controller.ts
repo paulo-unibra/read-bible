@@ -1,4 +1,5 @@
 import BibleBrainBible from '#models/bible_brain_bible'
+import BibleBrainAudioPackageService from '#services/bible_brain_audio_package_service'
 import BibleBrainPackageService from '#services/bible_brain_package_service'
 import BibleBrainSyncService from '#services/bible_brain_sync_service'
 import type { HttpContext } from '@adonisjs/core/http'
@@ -32,9 +33,9 @@ export default class AdminBibleBrainController {
         query.where('language_iso', languageIso)
       }
 
-      if (enabled === 'true') {
+      if (enabled === 'true' || enabled === '1') {
         query.where('is_enabled', true)
-      } else if (enabled === 'false') {
+      } else if (enabled === 'false' || enabled === '0') {
         query.where('is_enabled', false)
       }
 
@@ -111,7 +112,17 @@ export default class AdminBibleBrainController {
       const bible = await BibleBrainBible.findOrFail(params.id)
       const desired = request.input('isEnabled')
 
-      bible.isEnabled = typeof desired === 'boolean' ? desired : !bible.isEnabled
+      const willEnable = typeof desired === 'boolean' ? desired : !bible.isEnabled
+
+      if (willEnable && bible.packageStatus !== 'ready') {
+        return response.badRequest({
+          success: false,
+          message:
+            'Para ativar esta bíblia é necessário gerar o pacote primeiro. Clique em "Gerar" na coluna Pacote.',
+        })
+      }
+
+      bible.isEnabled = willEnable
       bible.updatedBy = auth.user!.id
       await bible.save()
 
@@ -133,8 +144,15 @@ export default class AdminBibleBrainController {
   async requestPackage({ params, response }: HttpContext) {
     try {
       const record = await BibleBrainBible.findOrFail(params.id)
-      const bible = await BibleBrainPackageService.requestPackage(record.bibleId)
-      return response.ok({ success: true, data: bible })
+
+      await BibleBrainPackageService.requestPackage(record.bibleId)
+
+      if (record.hasAudio && record.audioPackageStatus !== 'ready') {
+        BibleBrainAudioPackageService.requestAudioPackage(record.bibleId).catch(() => {})
+      }
+
+      const updated = await BibleBrainBible.findOrFail(params.id)
+      return response.ok({ success: true, data: updated })
     } catch (error) {
       console.error('[AdminBibleBrainController] Erro ao solicitar pacote:', error)
       return response.badRequest({

@@ -168,12 +168,17 @@ function mergeTextSegments(segments: ContentSegment[]): ContentSegment[] {
 
 export default function DicionarioVerbeteScreen() {
   const { colors, isDark } = useTheme();
-  const { word: encodedWord } = useLocalSearchParams<{ word: string }>();
+  const { word: encodedWord, dict: encodedDict } = useLocalSearchParams<{
+    word: string;
+    dict?: string;
+  }>();
   const word = encodedWord ? decodeURIComponent(encodedWord) : "";
+  const dictKey = encodedDict ? decodeURIComponent(encodedDict) : undefined;
   const [loading, setLoading] = useState(true);
   const [entry, setEntry] = useState<{
     word: string;
     definition: string;
+    dictionary?: string;
   } | null>(null);
   const [segments, setSegments] = useState<ContentSegment[]>([]);
 
@@ -197,12 +202,17 @@ export default function DicionarioVerbeteScreen() {
     if (!word) return;
     try {
       setLoading(true);
-      const data = await dictionaryService.getWord(word);
+      let data = await dictionaryService.getWord(word, dictKey);
+      if (!data && dictKey) {
+        data = await dictionaryService.getWord(word);
+      }
       if (data) {
         setEntry(data);
         const parsed = parseDefinitionHTML(data.definition);
         const merged = mergeTextSegments(parsed);
         setSegments(merged);
+      } else {
+        setEntry(null);
       }
     } catch (error) {
       console.error("Erro ao carregar verbete:", error);
@@ -510,6 +520,16 @@ export default function DicionarioVerbeteScreen() {
             { backgroundColor: colors.card },
           ]}
         >
+          {entry.dictionary ? (
+            <Text
+              style={[
+                styles.dictionaryLabel,
+                { color: colors.primary },
+              ]}
+            >
+              {entry.dictionary}
+            </Text>
+          ) : null}
           <Text
             style={[styles.definitionText]}
           >
@@ -633,6 +653,13 @@ const styles = StyleSheet.create({
   definitionCard: {
     borderRadius: 10,
     padding: 16,
+  },
+  dictionaryLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    marginBottom: 8,
   },
   definitionText: {
     fontSize: 15,

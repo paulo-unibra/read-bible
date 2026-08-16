@@ -1314,7 +1314,7 @@ export default function HomeScreen() {
                   { color: colors.textSecondary, fontSize: applyFontScale(14) },
                 ]}
               >
-                Dicionário bíblico Wycliffe
+                Dicionários bíblicos
               </Text>
             </View>
             <Ionicons

@@ -1,9 +1,12 @@
 import BibleBrainBible from '#models/bible_brain_bible'
+import BibleBrainAudioPackageService from '#services/bible_brain_audio_package_service'
 import BibleBrainPackageService from '#services/bible_brain_package_service'
 import bibleBrainService from '#services/bible_brain_service'
 import { USFM_BOOK_ORDER } from '../utils/usfm_books.js'
 import type { HttpContext } from '@adonisjs/core/http'
-import { createReadStream, existsSync } from 'node:fs'
+import app from '@adonisjs/core/services/app'
+import { createReadStream, existsSync, promises as fsPromises } from 'node:fs'
+import path from 'node:path'
 
 function toPublicBible(bible: BibleBrainBible, request?: HttpContext['request']) {
   let downloadUrl: string | null = null
@@ -24,6 +27,8 @@ function toPublicBible(bible: BibleBrainBible, request?: HttpContext['request'])
     packageProgress: bible.packageProgress,
     downloadUrl,
     packageSize: bible.packageSize,
+    audioPackageStatus: bible.audioPackageStatus,
+    audioPackageProgress: bible.audioPackageProgress,
   }
 }
 
@@ -35,7 +40,9 @@ export default class BibleBrainController {
       const search = request.input('search', '').trim()
       const languageIso = request.input('languageIso', '').trim()
 
-      const query = BibleBrainBible.query().where('is_enabled', true)
+      const query = BibleBrainBible.query()
+      .where('is_enabled', true)
+      .where('packageStatus', 'ready')
 
       if (search) {
         query.where((builder) => {
@@ -72,6 +79,7 @@ export default class BibleBrainController {
       const bible = await BibleBrainBible.query()
         .where('bible_id', params.bibleId)
         .where('is_enabled', true)
+        .where('packageStatus', 'ready')
         .first()
 
       if (!bible) {
@@ -100,7 +108,13 @@ export default class BibleBrainController {
         return response.notFound({ success: false, message: 'Bíblia não encontrada' })
       }
 
-      const bible = await BibleBrainPackageService.requestPackage(params.bibleId)
+      await BibleBrainPackageService.requestPackage(params.bibleId)
+
+      if (existing.hasAudio && existing.audioPackageStatus !== 'ready') {
+        BibleBrainAudioPackageService.requestAudioPackage(params.bibleId).catch(() => {})
+      }
+
+      const bible = await BibleBrainBible.findByOrFail('bibleId', params.bibleId)
       return response.ok({ success: true, data: toPublicBible(bible, request) })
     } catch (error) {
       console.error('[BibleBrainController] Erro ao solicitar pacote:', error)
@@ -524,7 +538,7 @@ export default class BibleBrainController {
     }
   }
 
-  async audioChapter({ params, response }: HttpContext) {
+  async audioChapter({ params, request, response }: HttpContext) {
     try {
       const bible = await BibleBrainBible.query()
         .where('bible_id', params.bibleId)
@@ -533,6 +547,24 @@ export default class BibleBrainController {
 
       if (!bible) {
         return response.notFound({ success: false, message: 'Bíblia não encontrada' })
+      }
+
+      const localFile = path.join(
+        app.publicPath('uploads/bible-brain-audio'),
+        params.bibleId,
+        params.bookId,
+        `${params.chapterNumber}.mp3`
+      )
+
+      if (existsSync(localFile)) {
+        const stat = await fsPromises.stat(localFile)
+        const protocol = request.protocol()
+        const host = request.host()
+        const url = `${protocol}://${host}/uploads/bible-brain-audio/${params.bibleId}/${params.bookId}/${params.chapterNumber}.mp3`
+        return response.ok({
+          success: true,
+          data: { url, duration: 0, filesize: stat.size, filesetId: null },
+        })
       }
 
       const audioFilesets = bible.filesets.filter((f) => f.type?.startsWith('audio'))

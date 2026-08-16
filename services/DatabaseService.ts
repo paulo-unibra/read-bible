@@ -163,7 +163,8 @@ class DatabaseService {
         fileName TEXT NOT NULL,
         isDownloaded INTEGER DEFAULT 0,
         downloadDate TEXT,
-        size INTEGER
+        size INTEGER,
+        source TEXT DEFAULT 'google_drive'
       );
 
       CREATE TABLE IF NOT EXISTS user_settings (
@@ -471,6 +472,9 @@ class DatabaseService {
         global.__READBIBLE_DB_HANDLE = this.db;
         await this.createTables();
 
+        // Migração de schema (adiciona colunas que não existiam)
+        await this.migrateSchema(this.db);
+
         // Teste final robusto
         console.log("[DB] 🧪 Testando conexão...");
         await this.db.getFirstAsync("SELECT 1");
@@ -545,7 +549,8 @@ class DatabaseService {
         fileName TEXT NOT NULL,
         isDownloaded INTEGER DEFAULT 0,
         downloadDate TEXT,
-        size INTEGER
+        size INTEGER,
+        source TEXT DEFAULT 'google_drive'
       );
 
       CREATE TABLE IF NOT EXISTS user_settings (

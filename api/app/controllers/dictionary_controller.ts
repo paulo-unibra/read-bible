@@ -5,13 +5,8 @@ export default class DictionaryController {
   async search({ request, response }: HttpContext) {
     try {
       const q = request.input('q', '')
-      const page = parseInt(request.input('page', '1'))
-      const perPage = Math.min(parseInt(request.input('perPage', '50')), 200)
-
-      if (!q) {
-        const result = await dictionaryService.getAlphabetList(page, perPage)
-        return response.ok({ success: true, ...result })
-      }
+      const page = Number.parseInt(request.input('page', '1'))
+      const perPage = Math.min(Number.parseInt(request.input('perPage', '50')), 200)
 
       const result = await dictionaryService.search(q, page, perPage)
       return response.ok({ success: true, ...result })
@@ -28,7 +23,8 @@ export default class DictionaryController {
   async word({ request, response }: HttpContext) {
     try {
       const word = request.input('w', '')
-      const entry = await dictionaryService.getWord(word)
+      const dict = request.input('dict', '') || undefined
+      const entry = await dictionaryService.getWord(word, dict)
       if (!entry) {
         return response.notFound({ success: false, message: 'Palavra não encontrada' })
       }
@@ -45,17 +41,18 @@ export default class DictionaryController {
 
   async refresh({ response }: HttpContext) {
     try {
-      const result = await dictionaryService.downloadLatest()
-      const total = await dictionaryService.getTotalCount()
+      const result = await dictionaryService.downloadAll(true)
+      const stats = await dictionaryService.getStats()
       return response.ok({
         success: true,
-        message: `Dicionário '${result.fileName}' carregado com ${total} verbetes`,
+        message: `Dicionários atualizados: ${result.downloaded.join(', ')}`,
+        ...stats,
       })
     } catch (error) {
       console.error('[DictionaryController] Erro ao recarregar:', error)
       return response.internalServerError({
         success: false,
-        message: 'Erro ao recarregar dicionário',
+        message: 'Erro ao recarregar dicionários',
         error: error.message,
       })
     }
@@ -63,12 +60,8 @@ export default class DictionaryController {
 
   async stats({ response }: HttpContext) {
     try {
-      const loaded = dictionaryService.ensureLoaded()
-      if (!loaded) {
-        return response.ok({ success: true, loaded: false, total: 0 })
-      }
-      const total = await dictionaryService.getTotalCount()
-      return response.ok({ success: true, loaded: true, total })
+      const stats = await dictionaryService.getStats()
+      return response.ok({ success: true, ...stats })
     } catch (error) {
       return response.internalServerError({ success: false, message: error.message })
     }

@@ -90,6 +90,18 @@ export default class BibleBrainBible extends BaseModel {
   declare packageGeneratedAt: DateTime | null
 
   @column()
+  declare audioPackageStatus: BibleBrainPackageStatus
+
+  @column()
+  declare audioPackageProgress: number
+
+  @column()
+  declare audioPackageError: string | null
+
+  @column.dateTime()
+  declare audioPackageGeneratedAt: DateTime | null
+
+  @column()
   declare updatedBy: number | null
 
   @belongsTo(() => User, {

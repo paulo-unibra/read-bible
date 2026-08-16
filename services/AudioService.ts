@@ -55,6 +55,7 @@ class AudioService {
 
   setBibleBrainMode(bibleId: string | null) {
     this.bibleBrainBibleId = bibleId;
+    this.bibleBrainAudioCache.clear();
   }
 
   private mapBookIdToUsfm(bookId: number): string {
@@ -271,7 +272,7 @@ class AudioService {
       }
 
       if (this.bibleBrainBibleId) {
-        return this.hasAudioBibleBrain();
+        return this.hasAudioBibleBrain(bookId, chapter);
       }
 
       await this.resolveDriveFileId(fileName);
@@ -281,12 +282,24 @@ class AudioService {
     }
   }
 
-  private async hasAudioBibleBrain(): Promise<boolean> {
+  private bibleBrainAudioCache: Map<string, boolean> = new Map();
+
+  private async hasAudioBibleBrain(bookId: number, chapter: number): Promise<boolean> {
     if (!this.bibleBrainBibleId) return false;
+    const cacheKey = `${this.bibleBrainBibleId}-${bookId}-${chapter}`;
+    const cached = this.bibleBrainAudioCache.get(cacheKey);
+    if (cached !== undefined) return cached;
     try {
-      const bib = await bibleBrainService.getBible(this.bibleBrainBibleId);
-      return bib.hasAudio;
+      const bookIdStr = this.mapBookIdToUsfm(bookId);
+      await bibleBrainService.getAudioChapterUrl(
+        this.bibleBrainBibleId,
+        bookIdStr,
+        chapter,
+      );
+      this.bibleBrainAudioCache.set(cacheKey, true);
+      return true;
     } catch {
+      this.bibleBrainAudioCache.set(cacheKey, false);
       return false;
     }
   }

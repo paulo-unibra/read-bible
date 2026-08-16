@@ -16,6 +16,10 @@ export interface BibleBrainBible {
   packageSize: number | null;
   packageError: string | null;
   packageGeneratedAt: string | null;
+  audioPackageStatus: string | null;
+  audioPackageProgress: number;
+  audioPackageError: string | null;
+  audioPackageGeneratedAt: string | null;
   updatedBy: number | null;
   syncedAt: string | null;
   createdAt: string;
