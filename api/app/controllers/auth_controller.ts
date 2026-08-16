@@ -327,12 +327,14 @@ export default class AuthController {
           profilePicture: user.profilePicture || null,
         },
       })
-    } catch (error) {
+    } catch (error: any) {
+      const validationMessage = Array.isArray(error?.messages)
+        ? error.messages.map((m: any) => m.message).join(', ')
+        : null
+
       return response.badRequest({
         success: false,
-        message: error?.messages
-          ? Object.values(error.messages).flat().join(', ')
-          : 'Erro ao atualizar perfil',
+        message: validationMessage || 'Erro ao atualizar perfil',
       })
     }
   }
