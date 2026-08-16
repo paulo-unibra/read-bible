@@ -181,6 +181,14 @@ class DatabaseService {
         createdDate TEXT DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(bibleId, bookId, chapterNumber, verseNumber)
       );
+      CREATE TABLE IF NOT EXISTS dictionary_favorites (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        word TEXT NOT NULL,
+        dictKey TEXT NOT NULL,
+        title TEXT,
+        createdDate TEXT DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(word, dictKey)
+      );
 
       CREATE TABLE IF NOT EXISTS reading_plans (
         id TEXT PRIMARY KEY,
@@ -314,6 +322,18 @@ class DatabaseService {
       } else {
         console.log("✅ Schema já está atualizado (bibles)");
       }
+
+      // Criar tabela de favoritos do dicionário (se ainda não existir)
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS dictionary_favorites (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          word TEXT NOT NULL,
+          dictKey TEXT NOT NULL,
+          title TEXT,
+          createdDate TEXT DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(word, dictKey)
+        );
+      `);
     } catch (error) {
       console.error("❌ Erro ao migrar schema:", error);
     }
@@ -566,6 +586,14 @@ class DatabaseService {
         verseNumber INTEGER NOT NULL,
         createdDate TEXT DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(bibleId, bookId, chapterNumber, verseNumber)
+      );
+      CREATE TABLE IF NOT EXISTS dictionary_favorites (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        word TEXT NOT NULL,
+        dictKey TEXT NOT NULL,
+        title TEXT,
+        createdDate TEXT DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(word, dictKey)
       );
 
       CREATE TABLE IF NOT EXISTS reading_plans (
@@ -864,6 +892,68 @@ class DatabaseService {
     );
 
     return !!result;
+  }
+
+  // Dictionary favorites management
+  async addDictionaryFavorite(
+    word: string,
+    dictKey: string,
+    title?: string,
+  ): Promise<void> {
+    return this.safeDbOperation(async () => {
+      await this.ensureInitialized();
+      if (!this.db) throw new Error("Database not initialized");
+
+      await this.db.runAsync(
+        "INSERT OR IGNORE INTO dictionary_favorites (word, dictKey, title) VALUES (?, ?, ?)",
+        [word, dictKey, title || word],
+      );
+    }, "addDictionaryFavorite");
+  }
+
+  async removeDictionaryFavorite(word: string, dictKey: string): Promise<void> {
+    return this.safeDbOperation(async () => {
+      await this.ensureInitialized();
+      if (!this.db) throw new Error("Database not initialized");
+
+      await this.db.runAsync(
+        "DELETE FROM dictionary_favorites WHERE word = ? AND dictKey = ?",
+        [word, dictKey],
+      );
+    }, "removeDictionaryFavorite");
+  }
+
+  async isDictionaryFavorite(
+    word: string,
+    dictKey: string,
+  ): Promise<boolean> {
+    await this.ensureInitialized();
+    if (!this.db) throw new Error("Database not initialized");
+
+    const result = await this.db.getFirstAsync(
+      "SELECT 1 FROM dictionary_favorites WHERE word = ? AND dictKey = ?",
+      [word, dictKey],
+    );
+
+    return !!result;
+  }
+
+  async getDictionaryFavorites(): Promise<
+    { word: string; dictKey: string; title: string; createdDate: string }[]
+  > {
+    await this.ensureInitialized();
+    if (!this.db) throw new Error("Database not initialized");
+
+    const result = await this.db.getAllAsync(
+      "SELECT word, dictKey, title, createdDate FROM dictionary_favorites ORDER BY createdDate DESC, id DESC",
+    );
+
+    return result.map((row: any) => ({
+      word: row.word as string,
+      dictKey: row.dictKey as string,
+      title: (row.title as string) || (row.word as string),
+      createdDate: row.createdDate as string,
+    }));
   }
 
   // Reading history management

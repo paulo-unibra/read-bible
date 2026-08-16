@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as Clipboard from "expo-clipboard";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -6,6 +7,7 @@ import {
   Alert,
   Modal,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -180,6 +182,7 @@ export default function DicionarioVerbeteScreen() {
     definition: string;
     dictionary?: string;
     title?: string;
+    dictKey?: string;
   } | null>(null);
   const [segments, setSegments] = useState<ContentSegment[]>([]);
 
@@ -195,6 +198,65 @@ export default function DicionarioVerbeteScreen() {
     title?: string;
   } | null>(null);
   const [veuDictLoading, setVeiuDictLoading] = useState(false);
+
+  const [isFavorite, setIsFavorite] = useState(false);
+
+  useEffect(() => {
+    if (word && dictKey) {
+      DatabaseService.isDictionaryFavorite(word, dictKey)
+        .then(setIsFavorite)
+        .catch(() => setIsFavorite(false));
+    }
+  }, [word, dictKey]);
+
+  const toggleFavorite = async () => {
+    if (!entry) return;
+    const key = entry.dictKey || dictKey;
+    if (!key) return;
+    try {
+      if (isFavorite) {
+        await DatabaseService.removeDictionaryFavorite(entry.word, key);
+        setIsFavorite(false);
+      } else {
+        await DatabaseService.addDictionaryFavorite(
+          entry.word,
+          key,
+          entry.title || entry.word
+        );
+        setIsFavorite(true);
+      }
+    } catch (error) {
+      console.error("Erro ao favoritar verbete:", error);
+      Alert.alert("Erro", "Não foi possível atualizar o favorito.");
+    }
+  };
+
+  const getPlainText = (): string => {
+    if (!entry) return "";
+    return entry.definition
+      .replace(/<[^>]*>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  };
+
+  const handleCopy = async () => {
+    if (!entry) return;
+    const title = entry.title || entry.word;
+    const text = `${title}\n\n${getPlainText()}`;
+    await Clipboard.setStringAsync(text);
+    Alert.alert("Copiado", "Verbete copiado para a área de transferência.");
+  };
+
+  const handleShare = async () => {
+    if (!entry) return;
+    const title = entry.title || entry.word;
+    const text = `${title} — ${entry.dictionary || "Dicionário"}\n\n${getPlainText()}`;
+    try {
+      await Share.share({ message: text });
+    } catch (error) {
+      console.error("Erro ao compartilhar:", error);
+    }
+  };
 
   useEffect(() => {
     loadEntry();
@@ -509,7 +571,41 @@ export default function DicionarioVerbeteScreen() {
         >
           {entry.title || entry.word}
         </Text>
-        <View style={{ width: 40 }} />
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            onPress={toggleFavorite}
+            style={styles.headerAction}
+            hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+          >
+            <Ionicons
+              name={isFavorite ? "heart" : "heart-outline"}
+              size={22}
+              color={isFavorite ? "#e91e63" : colors.textSecondary}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleCopy}
+            style={styles.headerAction}
+            hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+          >
+            <Ionicons
+              name="copy-outline"
+              size={22}
+              color={colors.textSecondary}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleShare}
+            style={styles.headerAction}
+            hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+          >
+            <Ionicons
+              name="share-social-outline"
+              size={22}
+              color={colors.textSecondary}
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -637,6 +733,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   backButton: { padding: 8 },
+  headerActions: { flexDirection: "row", alignItems: "center" },
+  headerAction: { padding: 8, marginLeft: 4 },
   headerTitle: {
     fontSize: 20,
     fontWeight: "bold",

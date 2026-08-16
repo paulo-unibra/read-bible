@@ -12,6 +12,8 @@ const DICT_LABELS: Record<string, string> = {
   outros: "Dicionário de Temas Bíblicos",
 };
 
+export { DICT_KEYS, DICT_LABELS };
+
 const SQLITE_DIR = `${FileSystem.documentDirectory}SQLite/`;
 
 export interface DictionaryFileInfo {

@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -13,8 +13,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../hooks/theme-context";
 import dictionaryOfflineService, {
+  DICT_LABELS,
   DictionaryFileInfo,
 } from "../services/DictionaryOfflineService";
+import DatabaseService from "../services/DatabaseService";
 import AdBanner from "../components/AdBanner";
 
 interface Group {
@@ -45,8 +47,73 @@ export default function DicionarioScreen() {
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
   const [page, setPage] = useState(1);
+  const [favoritesMode, setFavoritesMode] = useState(false);
+  const [favoriteGroups, setFavoriteGroups] = useState<Group[]>([]);
+  const [favoritesLoading, setFavoritesLoading] = useState(false);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined
+  );
+
+  const loadFavorites = useCallback(async () => {
+    try {
+      setFavoritesLoading(true);
+      const favorites = await DatabaseService.getDictionaryFavorites();
+
+      const groupsMap = new Map<string, Group>();
+      for (const fav of favorites) {
+        let snippet = "";
+        try {
+          const data = await dictionaryOfflineService.getWord(
+            fav.word,
+            fav.dictKey
+          );
+          snippet = data
+            ? data.definition
+                .replace(/<[^>]*>/g, " ")
+                .replace(/\s+/g, " ")
+                .trim()
+                .slice(0, 100)
+            : "";
+        } catch {
+          snippet = "";
+        }
+
+        let group = groupsMap.get(fav.dictKey);
+        if (!group) {
+          group = {
+            dictKey: fav.dictKey,
+            label: DICT_LABELS[fav.dictKey] || fav.dictKey,
+            total: 0,
+            entries: [],
+          };
+          groupsMap.set(fav.dictKey, group);
+        }
+        group.entries.push({
+          word: fav.word,
+          title: fav.title,
+          snippet,
+        });
+      }
+
+      for (const group of groupsMap.values()) {
+        group.total = group.entries.length;
+      }
+
+      setFavoriteGroups([...groupsMap.values()]);
+    } catch (error) {
+      console.error("Erro ao carregar favoritos:", error);
+    } finally {
+      setFavoritesLoading(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (favoritesMode) {
+        loadFavorites();
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [favoritesMode])
   );
 
   useEffect(() => {
@@ -150,17 +217,29 @@ export default function DicionarioScreen() {
     );
   };
 
-  const listData: ListItem[] = groups.flatMap((g) => [
-    { type: "header", key: `${g.dictKey}-header`, group: g },
-    ...g.entries.map((e) => ({
-      type: "entry" as const,
-      key: `${g.dictKey}-${e.word}`,
-      group: g,
-      word: e.word,
-      title: e.title,
-      snippet: e.snippet,
-    })),
-  ]);
+  const listData: ListItem[] = favoritesMode
+    ? favoriteGroups.flatMap((g) => [
+        { type: "header", key: `${g.dictKey}-header`, group: g },
+        ...g.entries.map((e) => ({
+          type: "entry" as const,
+          key: `${g.dictKey}-${e.word}`,
+          group: g,
+          word: e.word,
+          title: e.title,
+          snippet: e.snippet,
+        })),
+      ])
+    : groups.flatMap((g) => [
+        { type: "header", key: `${g.dictKey}-header`, group: g },
+        ...g.entries.map((e) => ({
+          type: "entry" as const,
+          key: `${g.dictKey}-${e.word}`,
+          group: g,
+          word: e.word,
+          title: e.title,
+          snippet: e.snippet,
+        })),
+      ]);
 
   const renderItem = ({ item }: { item: ListItem }) => {
     if (item.type === "header") {
@@ -191,11 +270,31 @@ export default function DicionarioScreen() {
           <Text style={[styles.entryWord, { color: colors.textPrimary }]}>
             {title}
           </Text>
-          <Ionicons
-            name="chevron-forward"
-            size={18}
-            color={colors.textSecondary}
-          />
+          <View style={styles.entryActions}>
+            {favoritesMode && (
+              <TouchableOpacity
+                onPress={async () => {
+                  try {
+                    await DatabaseService.removeDictionaryFavorite(
+                      word,
+                      dictKey
+                    );
+                    loadFavorites();
+                  } catch (error) {
+                    console.error("Erro ao remover favorito:", error);
+                  }
+                }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="heart" size={18} color="#e91e63" />
+              </TouchableOpacity>
+            )}
+            <Ionicons
+              name="chevron-forward"
+              size={18}
+              color={colors.textSecondary}
+            />
+          </View>
         </View>
         <Text
           style={[styles.entrySnippet, { color: colors.textSecondary }]}
@@ -277,69 +376,133 @@ export default function DicionarioScreen() {
         renderDownloadScreen()
       ) : (
         <>
-          <View
-            style={[styles.searchContainer, { backgroundColor: colors.card }]}
-          >
-            <Ionicons
-              name="search"
-              size={20}
-              color={colors.textSecondary}
-              style={styles.searchIcon}
-            />
-            <TextInput
-              style={[styles.searchInput, { color: colors.textPrimary }]}
-              placeholder="Buscar palavra em todos os dicionários..."
-              placeholderTextColor={colors.textSecondary}
-              value={query}
-              onChangeText={handleSearch}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            {searching && (
-              <ActivityIndicator size="small" color={colors.primary} />
+          {!favoritesMode && (
+            <View
+              style={[styles.searchContainer, { backgroundColor: colors.card }]}
+            >
+              <Ionicons
+                name="search"
+                size={20}
+                color={colors.textSecondary}
+                style={styles.searchIcon}
+              />
+              <TextInput
+                style={[styles.searchInput, { color: colors.textPrimary }]}
+                placeholder="Buscar palavra em todos os dicionários..."
+                placeholderTextColor={colors.textSecondary}
+                value={query}
+                onChangeText={handleSearch}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              {searching && (
+                <ActivityIndicator size="small" color={colors.primary} />
+              )}
+              {query.length > 0 && !searching && (
+                <TouchableOpacity onPress={() => handleSearch("")}>
+                  <Ionicons
+                    name="close-circle"
+                    size={20}
+                    color={colors.textSecondary}
+                  />
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+
+          <View style={styles.filterRow}>
+            <TouchableOpacity
+              style={[
+                styles.favoriteFilter,
+                {
+                  backgroundColor: favoritesMode
+                    ? "#e91e63"
+                    : colors.card,
+                },
+              ]}
+              onPress={() => setFavoritesMode((prev) => !prev)}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name={favoritesMode ? "heart" : "heart-outline"}
+                size={16}
+                color={favoritesMode ? "#fff" : colors.textSecondary}
+              />
+              <Text
+                style={[
+                  styles.favoriteFilterText,
+                  {
+                    color: favoritesMode ? "#fff" : colors.textSecondary,
+                  },
+                ]}
+              >
+                Favoritos
+              </Text>
+            </TouchableOpacity>
+
+            {!favoritesMode && total > 0 && (
+              <Text
+                style={[styles.resultCount, { color: colors.textSecondary }]}
+              >
+                {total} {total === 1 ? "resultado" : "resultados"}
+                {dictionaryCount > 0 &&
+                  ` em ${dictionaryCount} ${
+                    dictionaryCount === 1 ? "dicionário" : "dicionários"
+                  }`}
+              </Text>
             )}
-            {query.length > 0 && !searching && (
-              <TouchableOpacity onPress={() => handleSearch("")}>
-                <Ionicons
-                  name="close-circle"
-                  size={20}
-                  color={colors.textSecondary}
-                />
-              </TouchableOpacity>
+
+            {favoritesMode && favoriteGroups.length > 0 && (
+              <Text
+                style={[styles.resultCount, { color: colors.textSecondary }]}
+              >
+                {favoriteGroups.reduce((acc, g) => acc + g.entries.length, 0)}{" "}
+                {favoriteGroups.reduce((acc, g) => acc + g.entries.length, 0) === 1
+                  ? "favorito"
+                  : "favoritos"}
+              </Text>
             )}
           </View>
 
-          {total > 0 && (
-            <Text style={[styles.resultCount, { color: colors.textSecondary }]}>
-              {total} {total === 1 ? "resultado" : "resultados"}
-              {dictionaryCount > 0 &&
-                ` em ${dictionaryCount} ${
-                  dictionaryCount === 1 ? "dicionário" : "dicionários"
-                }`}
-            </Text>
-          )}
-
-          {loading && listData.length === 0 ? (
+          {(favoritesMode ? favoritesLoading : loading) &&
+          listData.length === 0 ? (
             <View style={styles.centerContent}>
               <ActivityIndicator size="large" color={colors.primary} />
               <Text
                 style={[styles.loadingText, { color: colors.textSecondary }]}
               >
-                Carregando dicionários...
+                {favoritesMode
+                  ? "Carregando favoritos..."
+                  : "Carregando dicionários..."}
               </Text>
             </View>
           ) : listData.length === 0 ? (
             <View style={styles.centerContent}>
               <Ionicons
-                name="book-outline"
+                name={favoritesMode ? "heart-outline" : "book-outline"}
                 size={64}
                 color={colors.textSecondary}
               />
               <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                {query
+                {favoritesMode
+                  ? "Nenhum verbete favorito ainda"
+                  : query
                   ? "Nenhuma palavra encontrada"
                   : "Nenhum verbete disponível"}
               </Text>
+              {favoritesMode && (
+                <TouchableOpacity
+                  style={[
+                    styles.goBackFilter,
+                    { backgroundColor: colors.primary },
+                  ]}
+                  onPress={() => setFavoritesMode(false)}
+                >
+                  <Text style={styles.goBackFilterText}>
+                    Explorar dicionários
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
           ) : (
             <FlatList
@@ -347,10 +510,12 @@ export default function DicionarioScreen() {
               keyExtractor={(item) => item.key}
               contentContainerStyle={styles.listContent}
               renderItem={renderItem}
-              onEndReached={loadMore}
+              onEndReached={favoritesMode ? undefined : loadMore}
               onEndReachedThreshold={0.5}
               ListFooterComponent={
-                query && groups.some((g) => g.entries.length < g.total) ? (
+                !favoritesMode &&
+                query &&
+                groups.some((g) => g.entries.length < g.total) ? (
                   <View style={styles.loadingMore}>
                     <ActivityIndicator size="small" color={colors.primary} />
                   </View>
@@ -427,6 +592,31 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
+  entryActions: { flexDirection: "row", alignItems: "center", gap: 10 },
+  filterRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    marginBottom: 8,
+    marginTop: 4,
+  },
+  favoriteFilter: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  favoriteFilterText: { fontSize: 13, fontWeight: "600" },
+  goBackFilter: {
+    marginTop: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  goBackFilterText: { fontSize: 14, fontWeight: "600", color: "#fff" },
   entryWord: { fontSize: 15, fontWeight: "700" },
   entrySnippet: { fontSize: 13, lineHeight: 19, marginTop: 4 },
   loadingMore: { paddingVertical: 16, alignItems: "center" },
