@@ -53,8 +53,11 @@ interface Meta {
 
 const ACTION_LABELS: Record<string, string> = {
   "auth.login": "Login",
+  "auth.login_failed": "Tentativa de login incorreta",
   "auth.register": "Cadastro",
   "auth.logout": "Logout",
+  "admin.login": "Login no painel",
+  "admin.login_failed": "Login no painel incorreto",
   "profile.name_update": "Alteração de nome",
   "profile.name_manual_fix": "Correção manual de nome",
   "plan.create": "Criação de plano",
@@ -69,8 +72,11 @@ const ACTION_LABELS: Record<string, string> = {
 
 const ACTION_COLORS: Record<string, string> = {
   "auth.login": "success",
+  "auth.login_failed": "error",
   "auth.register": "info",
   "auth.logout": "neutral",
+  "admin.login": "success",
+  "admin.login_failed": "error",
   "plan.create": "info",
   "plan.delete": "error",
   "plan.disable": "error",

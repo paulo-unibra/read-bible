@@ -74,7 +74,26 @@ export default class AuthController {
       const { email, password } = await request.validateUsing(loginValidator)
 
       // Verificar credenciais
-      const user = await User.verifyCredentials(email, password)
+      let user: User
+      try {
+        user = await User.verifyCredentials(email, password)
+      } catch (error) {
+        const existing = await User.findBy('email', email)
+        await AuditLog.create({
+          userId: existing ? existing.id : null,
+          action: 'auth.login_failed',
+          entityType: 'user',
+          entityId: existing ? existing.id : null,
+          details: { email },
+          ipAddress: request.ip(),
+          userAgent: request.header('user-agent') || null,
+        }).catch(() => {})
+
+        return response.unauthorized({
+          success: false,
+          message: 'Email ou senha incorretos',
+        })
+      }
 
       // Gerar token
       const token = await User.accessTokens.create(user)

@@ -1,3 +1,4 @@
+import AuditLog from '#models/audit_log'
 import EmailLog from '#models/email_log'
 import Permission from '#models/permission'
 import Role from '#models/role'
@@ -21,6 +22,16 @@ export default class AuthController {
       const user = await User.findBy('email', email)
 
       if (!user) {
+        await AuditLog.create({
+          userId: null,
+          action: 'admin.login_failed',
+          entityType: 'user',
+          entityId: null,
+          details: { email, reason: 'user_not_found' },
+          ipAddress: request.ip(),
+          userAgent: request.header('user-agent') || null,
+        }).catch(() => {})
+
         return response.unauthorized({
           error: 'Credenciais inválidas',
         })
@@ -30,6 +41,16 @@ export default class AuthController {
       const isPasswordValid = await hash.verify(user.password, password)
 
       if (!isPasswordValid) {
+        await AuditLog.create({
+          userId: user.id,
+          action: 'admin.login_failed',
+          entityType: 'user',
+          entityId: user.id,
+          details: { email, reason: 'wrong_password' },
+          ipAddress: request.ip(),
+          userAgent: request.header('user-agent') || null,
+        }).catch(() => {})
+
         return response.unauthorized({
           error: 'Credenciais inválidas',
         })
@@ -46,6 +67,16 @@ export default class AuthController {
           error: 'Você não tem permissão para acessar o painel administrativo',
         })
       }
+
+      await AuditLog.create({
+        userId: user.id,
+        action: 'admin.login',
+        entityType: 'user',
+        entityId: user.id,
+        details: { email },
+        ipAddress: request.ip(),
+        userAgent: request.header('user-agent') || null,
+      }).catch(() => {})
 
       // Gerar token de acesso
       const token = await User.accessTokens.create(user, ['admin:*'], {
