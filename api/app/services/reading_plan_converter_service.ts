@@ -19,7 +19,10 @@ export default class ReadingPlanConverterService {
   }> {
     try {
       // Buscar plano
-      const plan = await ReadingPlan.findOrFail(planId)
+      const plan = await ReadingPlan.query()
+        .where('id', planId)
+        .whereNull('deleted_at')
+        .firstOrFail()
 
       // Verificar se o plano tem mais de 365 dias
       if (plan.totalDays <= 365) {
@@ -133,6 +136,9 @@ export default class ReadingPlanConverterService {
    * Lista todos os planos que podem ser convertidos (> 365 dias)
    */
   async listConvertiblePlans(): Promise<ReadingPlan[]> {
-    return await ReadingPlan.query().where('total_days', '>', 365).orderBy('total_days', 'desc')
+    return await ReadingPlan.query()
+      .where('total_days', '>', 365)
+      .whereNull('deleted_at')
+      .orderBy('total_days', 'desc')
   }
 }

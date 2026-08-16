@@ -556,6 +556,7 @@ export default class AuthController {
       }
 
       await user.load('readingPlans', (query) => {
+        query.whereNull('deleted_at')
         query.where('total_days', '>', 365).orderBy('total_days', 'desc')
       })
 
@@ -600,6 +601,7 @@ export default class AuthController {
         const activePlan = await ReadingPlan.query()
           .where('user_id', userId)
           .where('is_active', true)
+          .whereNull('deleted_at')
           .first()
 
         if (!activePlan) {
@@ -640,7 +642,7 @@ export default class AuthController {
       const { planId } = params
 
       const recalculatorService = new ReadingPlanRecalculatorService()
-      const result = await recalculatorService.checkPlanForDuplicateBooks(parseInt(planId))
+      const result = await recalculatorService.checkPlanForDuplicateBooks(Number.parseInt(planId))
 
       return response.ok(result)
     } catch (error) {

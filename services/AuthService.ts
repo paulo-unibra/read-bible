@@ -212,6 +212,10 @@ class AuthService {
         throw new Error("Usuário não autenticado");
       }
 
+      if (name.includes("@")) {
+        throw new Error("O nome não pode ser um email");
+      }
+
       // Atualizar localmente
       this.user.name = name;
       await AsyncStorage.setItem("@auth_user", JSON.stringify(this.user));

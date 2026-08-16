@@ -1,5 +1,6 @@
 import User from '#models/user'
-import { loginValidator, registerValidator } from '#validators/auth'
+import AuditLog from '#models/audit_log'
+import { loginValidator, registerValidator, updateProfileValidator } from '#validators/auth'
 import type { HttpContext } from '@adonisjs/core/http'
 import { cuid } from '@adonisjs/core/helpers'
 import app from '@adonisjs/core/services/app'
@@ -294,11 +295,26 @@ export default class AuthController {
   async updateProfile({ auth, request, response }: HttpContext) {
     try {
       const user = auth.user!
-      const { name } = request.only(['name'])
+      const payload = request.only(['name'])
 
-      if (name) {
-        user.fullName = name
-        await user.save()
+      if (payload.name !== undefined) {
+        const { name } = await request.validateUsing(updateProfileValidator)
+
+        if (name !== user.fullName) {
+          const oldName = user.fullName
+          user.fullName = name
+          await user.save()
+
+          await AuditLog.create({
+            userId: user.id,
+            action: 'profile.name_update',
+            entityType: 'user',
+            entityId: user.id,
+            details: { oldName, newName: name },
+            ipAddress: request.ip(),
+            userAgent: request.header('user-agent') || null,
+          })
+        }
       }
 
       return response.ok({
@@ -314,7 +330,9 @@ export default class AuthController {
     } catch (error) {
       return response.badRequest({
         success: false,
-        message: 'Erro ao atualizar perfil',
+        message: error?.messages
+          ? Object.values(error.messages).flat().join(', ')
+          : 'Erro ao atualizar perfil',
       })
     }
   }
@@ -414,10 +432,7 @@ export default class AuthController {
         '.webp': 'image/webp',
       }
 
-      response.header(
-        'Content-Type',
-        contentTypeByExt[ext] || 'application/octet-stream'
-      )
+      response.header('Content-Type', contentTypeByExt[ext] || 'application/octet-stream')
       response.header('Cache-Control', 'public, max-age=86400')
 
       return response.stream(createReadStream(filePath))

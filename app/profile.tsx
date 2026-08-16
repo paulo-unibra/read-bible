@@ -241,6 +241,11 @@ export default function ProfileScreen() {
       return;
     }
 
+    if (newName.includes("@")) {
+      Alert.alert("Atenção", "O nome não pode ser um email");
+      return;
+    }
+
     try {
       setSaving(true);
 

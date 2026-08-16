@@ -1,5 +1,6 @@
 import ReadingPlan from '#models/reading_plan'
 import ReadingProgress from '#models/reading_progress'
+import AuditLog from '#models/audit_log'
 import type { HttpContext } from '@adonisjs/core/http'
 import { DateTime } from 'luxon'
 import { BIBLE_VERSES_PER_CHAPTER, getVersesInRange } from '../utils/bible_verses_per_chapter.js'
@@ -88,6 +89,7 @@ export default class ReadingPlanController {
       const existingPlan = await ReadingPlan.query()
         .where('user_id', user.id)
         .where('is_active', true)
+        .whereNull('deleted_at')
         .first()
 
       if (existingPlan) {
@@ -196,6 +198,7 @@ export default class ReadingPlanController {
       const existingPlan = await ReadingPlan.query()
         .where('user_id', user.id)
         .where('is_active', true)
+        .whereNull('deleted_at')
         .first()
 
       if (existingPlan) {
@@ -371,6 +374,7 @@ export default class ReadingPlanController {
       const existingPlan = await ReadingPlan.query()
         .where('user_id', user.id)
         .where('is_active', true)
+        .whereNull('deleted_at')
         .first()
 
       if (existingPlan) {
@@ -538,6 +542,7 @@ export default class ReadingPlanController {
       const plan = await ReadingPlan.query()
         .where('user_id', user.id)
         .where('is_active', true)
+        .whereNull('deleted_at')
         .first()
 
       console.log('Plan found:', !!plan)
@@ -638,6 +643,7 @@ export default class ReadingPlanController {
       const plan = await ReadingPlan.query()
         .where('user_id', user.id)
         .where('is_active', true)
+        .whereNull('deleted_at')
         .first()
 
       if (!plan) {
@@ -764,6 +770,7 @@ export default class ReadingPlanController {
       const plan = await ReadingPlan.query()
         .where('user_id', user.id)
         .where('is_active', true)
+        .whereNull('deleted_at')
         .first()
 
       if (!plan) {
@@ -1603,6 +1610,7 @@ export default class ReadingPlanController {
       const plan = await ReadingPlan.query()
         .where('user_id', user.id)
         .where('is_active', true)
+        .whereNull('deleted_at')
         .first()
 
       if (!plan) {
@@ -1649,6 +1657,7 @@ export default class ReadingPlanController {
       const plan = await ReadingPlan.query()
         .where('user_id', user.id)
         .where('is_active', true)
+        .whereNull('deleted_at')
         .first()
 
       if (!plan) {
@@ -1694,6 +1703,7 @@ export default class ReadingPlanController {
       const plan = await ReadingPlan.query()
         .where('user_id', user.id)
         .where('is_active', true)
+        .whereNull('deleted_at')
         .first()
 
       if (!plan) {
@@ -1740,6 +1750,7 @@ export default class ReadingPlanController {
       const plan = await ReadingPlan.query()
         .where('user_id', user.id)
         .where('is_active', true)
+        .whereNull('deleted_at')
         .first()
 
       if (!plan) {
@@ -1799,15 +1810,16 @@ export default class ReadingPlanController {
   }
 
   /**
-   * Excluir plano de leitura
+   * Excluir plano de leitura (soft delete + audit log)
    */
-  async deletePlan({ auth, response }: HttpContext) {
+  async deletePlan({ auth, request, response }: HttpContext) {
     try {
       const user = auth.user!
 
       const plan = await ReadingPlan.query()
         .where('user_id', user.id)
         .where('is_active', true)
+        .whereNull('deleted_at')
         .first()
 
       if (!plan) {
@@ -1817,15 +1829,34 @@ export default class ReadingPlanController {
         })
       }
 
-      // Excluir progresso de leitura (CASCADE vai fazer isso automaticamente)
-      await ReadingProgress.query().where('reading_plan_id', plan.id).delete()
+      // Soft delete: manter o plano e o progresso no banco para auditoria/restauração
+      plan.isActive = false
+      plan.deletedAt = DateTime.now()
+      await plan.save()
 
-      // Excluir plano
-      await plan.delete()
+      await AuditLog.create({
+        userId: user.id,
+        action: 'plan.delete',
+        entityType: 'reading_plan',
+        entityId: plan.id,
+        details: {
+          name: plan.name,
+          type: plan.type,
+          totalDays: plan.totalDays,
+          chaptersPerDay: plan.chaptersPerDay,
+          currentDay: plan.currentDay,
+          completedChapters: plan.completedChapters,
+          startDate: plan.startDate?.toISO(),
+          endDate: plan.endDate?.toISO(),
+        },
+        ipAddress: request.ip(),
+        userAgent: request.header('user-agent') || null,
+      })
 
       return response.ok({
         success: true,
         message: 'Plano de leitura excluído com sucesso',
+        data: { planId: plan.id },
       })
     } catch (error) {
       console.error('Erro ao excluir plano:', error)
@@ -1842,6 +1873,7 @@ export default class ReadingPlanController {
   async getRanking({ response }: HttpContext) {
     try {
       const plans = await ReadingPlan.query()
+        .whereNull('deleted_at')
         .preload('user')
         .preload('progress', (query) => {
           query.where('is_completed', true).orderBy('completed_at', 'asc')
@@ -1937,6 +1969,7 @@ export default class ReadingPlanController {
   async getRankingPage({ response }: HttpContext) {
     try {
       const plans = await ReadingPlan.query()
+        .whereNull('deleted_at')
         .preload('user')
         .preload('progress', (query) => {
           query.where('is_completed', true).orderBy('completed_at', 'asc')
@@ -2291,6 +2324,7 @@ export default class ReadingPlanController {
       // Buscar todos os planos ativos
       const plans = await ReadingPlan.query()
         .where('is_active', true)
+        .whereNull('deleted_at')
         .preload('user')
         .preload('progress')
 
@@ -2383,7 +2417,11 @@ export default class ReadingPlanController {
       const { planId } = params
 
       // Buscar plano
-      const plan = await ReadingPlan.query().where('id', planId).preload('progress').firstOrFail()
+      const plan = await ReadingPlan.query()
+        .where('id', planId)
+        .whereNull('deleted_at')
+        .preload('progress')
+        .firstOrFail()
 
       console.log(`[RecalculatePlan] Recalculando plano ${planId}...`)
 
@@ -2610,6 +2648,7 @@ export default class ReadingPlanController {
       const search = request.input('search')
 
       const query = ReadingPlan.query()
+        .whereNull('deleted_at')
         .preload('user', (userQuery) => {
           userQuery.select('id', 'full_name', 'email')
         })
@@ -2694,7 +2733,10 @@ export default class ReadingPlanController {
    */
   async disablePlan({ params, response }: HttpContext) {
     try {
-      const plan = await ReadingPlan.find(params.planId)
+      const plan = await ReadingPlan.query()
+        .where('id', params.planId)
+        .whereNull('deleted_at')
+        .first()
 
       if (!plan) {
         return response.notFound({
@@ -2729,7 +2771,10 @@ export default class ReadingPlanController {
    */
   async enablePlan({ params, response }: HttpContext) {
     try {
-      const plan = await ReadingPlan.find(params.planId)
+      const plan = await ReadingPlan.query()
+        .where('id', params.planId)
+        .whereNull('deleted_at')
+        .first()
 
       if (!plan) {
         return response.notFound({
@@ -2743,6 +2788,7 @@ export default class ReadingPlanController {
         .where('user_id', plan.userId)
         .where('is_active', true)
         .where('id', '!=', plan.id)
+        .whereNull('deleted_at')
         .first()
 
       if (existingActivePlan) {

@@ -28,6 +28,11 @@ export default function AuthScreen() {
       return;
     }
 
+    if (!isLogin && name.includes('@')) {
+      Alert.alert('Atenção', 'O nome não pode ser um email');
+      return;
+    }
+
     setLoading(true);
     try {
       console.log('🚀 Iniciando autenticação...');

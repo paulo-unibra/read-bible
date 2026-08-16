@@ -153,7 +153,7 @@ export default class BulkEmailController {
 
         // Verificar se expectedDays é NaN
         const expectedDays = Number(row.expectedDays)
-        if (isNaN(expectedDays)) {
+        if (Number.isNaN(expectedDays)) {
           console.warn(
             `⚠️ [BulkEmail] Plano ${row.planId} gerou expectedDays = NaN - removendo da lista`
           )
@@ -252,6 +252,7 @@ export default class BulkEmailController {
           const plan = await ReadingPlan.query()
             .where('user_id', userId)
             .where('is_active', true)
+            .whereNull('deleted_at')
             .whereNotNull('start_date')
             .whereNotNull('end_date')
             .where('start_date', '<=', DateTime.now().toSQLDate()!)

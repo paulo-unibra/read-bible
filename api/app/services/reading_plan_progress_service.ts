@@ -16,7 +16,10 @@ export default class ReadingPlanProgressService {
    */
   async createNextDay(planId: number, nextDayData: NextDayData): Promise<boolean> {
     try {
-      const plan = await ReadingPlan.findOrFail(planId)
+      const plan = await ReadingPlan.query()
+        .where('id', planId)
+        .whereNull('deleted_at')
+        .firstOrFail()
 
       // Verificar se já chegou no final do plano
       if (nextDayData.dayNumber > plan.totalDays) {
@@ -62,7 +65,10 @@ export default class ReadingPlanProgressService {
    */
   async getDaysAheadCount(planId: number): Promise<number> {
     try {
-      const plan = await ReadingPlan.findOrFail(planId)
+      const plan = await ReadingPlan.query()
+        .where('id', planId)
+        .whereNull('deleted_at')
+        .firstOrFail()
 
       // Buscar o maior dia já criado
       const lastCreatedDay = await ReadingProgress.query()

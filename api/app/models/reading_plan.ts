@@ -49,6 +49,9 @@ export default class ReadingPlan extends BaseModel {
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
 
+  @column.dateTime({ serializeAs: null })
+  declare deletedAt: DateTime | null
+
   @belongsTo(() => User)
   declare user: BelongsTo<typeof User>
 

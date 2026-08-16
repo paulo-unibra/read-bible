@@ -5,9 +5,28 @@ import vine from '@vinejs/vine'
  */
 export const registerValidator = vine.compile(
   vine.object({
-    name: vine.string().trim().minLength(3).maxLength(100),
+    name: vine
+      .string()
+      .trim()
+      .minLength(3)
+      .maxLength(100)
+      .regex(/^[^@]+$/),
     email: vine.string().trim().email().normalizeEmail(),
-    password: vine.string().minLength(6).maxLength(100)
+    password: vine.string().minLength(6).maxLength(100),
+  })
+)
+
+/**
+ * Validator para atualização de perfil
+ */
+export const updateProfileValidator = vine.compile(
+  vine.object({
+    name: vine
+      .string()
+      .trim()
+      .minLength(3)
+      .maxLength(100)
+      .regex(/^[^@]+$/),
   })
 )
 
@@ -17,6 +36,6 @@ export const registerValidator = vine.compile(
 export const loginValidator = vine.compile(
   vine.object({
     email: vine.string().trim().email().normalizeEmail(),
-    password: vine.string()
+    password: vine.string(),
   })
 )

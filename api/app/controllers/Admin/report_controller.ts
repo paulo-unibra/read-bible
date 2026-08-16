@@ -51,7 +51,7 @@ export default class ReportController {
       const usersUpToDateCount = Number(usersUpToDate[0][0].total)
 
       // Total de planos de leitura criados
-      const totalPlans = await ReadingPlan.query().count('* as total')
+      const totalPlans = await ReadingPlan.query().whereNull('deleted_at').count('* as total')
       const totalPlansCount = Number(totalPlans[0].$extras.total)
 
       // Total de dias de leitura completados

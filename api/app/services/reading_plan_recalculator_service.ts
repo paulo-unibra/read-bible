@@ -89,7 +89,10 @@ export default class ReadingPlanRecalculatorService {
   }> {
     try {
       // Buscar plano
-      const plan = await ReadingPlan.findOrFail(planId)
+      const plan = await ReadingPlan.query()
+        .where('id', planId)
+        .whereNull('deleted_at')
+        .firstOrFail()
 
       console.log(`📚 Recalculando livros do plano ${planId}: "${plan.name}"`)
 
