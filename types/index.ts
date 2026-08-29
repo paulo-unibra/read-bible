@@ -108,6 +108,8 @@ export interface BibleBrainBible {
   packageProgress: number;
   downloadUrl: string | null;
   packageSize: number | null;
+  audioPackageStatus?: string | null;
+  audioPackageProgress?: number;
 }
 
 export interface DriveFile {

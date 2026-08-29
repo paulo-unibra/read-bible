@@ -54,6 +54,7 @@ class AudioService {
   private bibleBrainBibleId: string | null = null;
 
   setBibleBrainMode(bibleId: string | null) {
+    console.log("[AudioService] setBibleBrainMode:", { bibleId });
     this.bibleBrainBibleId = bibleId;
     this.bibleBrainAudioCache.clear();
   }
@@ -262,17 +263,27 @@ class AudioService {
 
   async isAudioAvailable(bookId: number, chapter: number): Promise<boolean> {
     try {
+      if (this.bibleBrainBibleId) {
+        console.log("[AudioService] Verificando audio BibleBrain", {
+          bibleId: this.bibleBrainBibleId,
+          bookId,
+          chapter,
+        });
+        return this.hasAudioBibleBrain(bookId, chapter);
+      }
+
       const fileName = this.getAudioFileName(bookId, chapter);
 
       await this.ensureAudioDir();
       const localPath = `${this.AUDIO_DIR}${fileName}`;
       const info = await FileSystem.getInfoAsync(localPath);
       if (info.exists && info.size && info.size > 1024) {
+        console.log("[AudioService] Audio Drive local encontrado", {
+          fileName,
+          localPath,
+          size: info.size,
+        });
         return true;
-      }
-
-      if (this.bibleBrainBibleId) {
-        return this.hasAudioBibleBrain(bookId, chapter);
       }
 
       await this.resolveDriveFileId(fileName);
@@ -296,9 +307,20 @@ class AudioService {
         bookIdStr,
         chapter,
       );
+      console.log("[AudioService] Audio BibleBrain disponivel", {
+        bibleId: this.bibleBrainBibleId,
+        bookId: bookIdStr,
+        chapter,
+      });
       this.bibleBrainAudioCache.set(cacheKey, true);
       return true;
-    } catch {
+    } catch (error) {
+      console.log("[AudioService] Audio BibleBrain indisponivel", {
+        bibleId: this.bibleBrainBibleId,
+        bookId,
+        chapter,
+        error: error instanceof Error ? error.message : String(error),
+      });
       this.bibleBrainAudioCache.set(cacheKey, false);
       return false;
     }
@@ -368,10 +390,21 @@ class AudioService {
       throw new Error('BibleBrain mode not set');
     }
 
-    await this.ensureAudioDir();
-    const localPath = `${this.AUDIO_DIR}${fileName}`;
+    const bibleBrainAudioDir = `${this.AUDIO_DIR}biblebrain/${this.bibleBrainBibleId}/`;
+    const dirInfo = await FileSystem.getInfoAsync(bibleBrainAudioDir);
+    if (!dirInfo.exists) {
+      await FileSystem.makeDirectoryAsync(bibleBrainAudioDir, { intermediates: true });
+    }
+
+    const localPath = `${bibleBrainAudioDir}${fileName}`;
     const info = await FileSystem.getInfoAsync(localPath);
     if (info.exists && info.size && info.size > 1024) {
+      console.log("[AudioService] Cache BibleBrain local encontrado", {
+        bibleId: this.bibleBrainBibleId,
+        fileName,
+        localPath,
+        size: info.size,
+      });
       return localPath;
     }
 
@@ -387,6 +420,16 @@ class AudioService {
       bookIdStr,
       chapter,
     );
+
+    console.log("[AudioService] Baixando audio BibleBrain", {
+      bibleId: this.bibleBrainBibleId,
+      bookId: bookIdStr,
+      chapter,
+      fileName,
+      localPath,
+      remoteUrl: audioInfo.url,
+      remoteSize: audioInfo.filesize,
+    });
 
     const downloadResumable = FileSystem.createDownloadResumable(
       audioInfo.url,
@@ -408,6 +451,15 @@ class AudioService {
     if (!result || result.status !== 200) {
       throw new Error(`Falha ao baixar áudio BibleBrain (status ${result?.status})`);
     }
+
+    const downloadedInfo = await FileSystem.getInfoAsync(localPath);
+    console.log("[AudioService] Audio BibleBrain baixado", {
+      bibleId: this.bibleBrainBibleId,
+      fileName,
+      localPath,
+      status: result.status,
+      size: downloadedInfo.exists ? downloadedInfo.size : null,
+    });
 
     if (!isPrefetch) {
       this.state.downloadProgress = 100;

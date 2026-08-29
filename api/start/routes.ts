@@ -154,6 +154,7 @@ router.get('/audio-sync/:bookId/:chapterNumber', [AudioSyncTimestampsController,
 // BibleBrain routes (público para o app) — acréscimo em paralelo ao fluxo do Google Drive
 // IMPORTANTE: rotas específicas ANTES da rota com parâmetro
 router.get('/bible-brain/bibles', [BibleBrainController, 'index'])
+router.get('/bible-brain/languages', [BibleBrainController, 'languages'])
 router.get('/bible-brain/video-bibles', [BibleBrainController, 'videoBibles'])
 // Dictionary routes
 router.get('/dictionary/search', [DictionaryController, 'search'])
@@ -173,6 +174,7 @@ router.get('/bible-brain/video-proxy/:filesetId/:bookId/:chapterNumber', [
   'videoProxyPlaylist',
 ])
 router.get('/bible-brain/bibles/:bibleId/video-books', [BibleBrainController, 'videoBooks'])
+router.get('/bible-brain/bibles/:bibleId/audio-books', [BibleBrainController, 'audioBooks'])
 router.get('/bible-brain/bibles/:bibleId/video-segments/:bookId/:chapterNumber', [
   BibleBrainController,
   'videoSegments',
@@ -188,6 +190,10 @@ router.get('/bible-brain/bibles/:bibleId/video/:bookId/:chapterNumber', [
 router.get('/bible-brain/bibles/:bibleId/audio/:bookId/:chapterNumber', [
   BibleBrainController,
   'audioChapter',
+])
+router.get('/bible-brain/bibles/:bibleId/audio-file/:bookId/:chapterNumber', [
+  BibleBrainController,
+  'audioFile',
 ])
 router.get('/bible-brain/bibles/:bibleId/audio-timestamps/:bookId/:chapterNumber', [
   BibleBrainController,

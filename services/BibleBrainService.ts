@@ -75,6 +75,13 @@ class BibleBrainService {
     return { data: result.data, meta: result.meta };
   }
 
+  async getLanguages(): Promise<{ iso: string; name: string }[]> {
+    const result = await apiGet<{ success: boolean; data: { iso: string; name: string }[] }>(
+      `/bible-brain/languages`,
+    );
+    return result.data || [];
+  }
+
   async getBible(bibleId: string): Promise<BibleBrainBible> {
     const result = await apiGet<SingleResponse<BibleBrainBible>>(
       `/bible-brain/bibles/${bibleId}`,
@@ -118,6 +125,13 @@ class BibleBrainService {
     return result.data
   }
 
+  async getAudioBooks(bibleId: string): Promise<{ bookId: string; name: string; chapters: number[] }[]> {
+    const result = await apiGet<{ success: boolean; data: { bookId: string; name: string; chapters: number[] }[] }>(
+      `/bible-brain/bibles/${bibleId}/audio-books`,
+    )
+    return result.data
+  }
+
   async getVideoSegments(bibleId: string, bookId: string, chapterNumber: number): Promise<{ chapter: number; verseStart: number; verseEnd: number; duration: number; thumbnail: string | null; url: string }[]> {
     const result = await apiGet<{ success: boolean; data: any[] }>(
       `/bible-brain/bibles/${bibleId}/video-segments/${bookId}/${chapterNumber}`,
@@ -147,7 +161,14 @@ class BibleBrainService {
     const result = await apiGet<{ success: boolean; data: { url: string; duration: number; filesize: number } }>(
       `/bible-brain/bibles/${bibleId}/audio/${bookId}/${chapterNumber}`,
     )
-    return result.data
+    // O backend pode retornar uma URL relativa (arquivo hospedado no nosso
+    // próprio servidor) ou uma URL absoluta (CDN externo da BibleBrain).
+    // URLs relativas precisam ser resolvidas com a base de API do app,
+    // pois o backend, atrás do proxy, não sabe que está publicado sob "/api".
+    const url = result.data.url.startsWith("http")
+      ? result.data.url
+      : `${API_URL}${result.data.url}`;
+    return { ...result.data, url };
   }
 
   async downloadPackage(bibleId: string, fileName: string): Promise<string> {

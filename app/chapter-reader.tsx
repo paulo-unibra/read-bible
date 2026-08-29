@@ -484,18 +484,34 @@ export default function ChapterReaderScreen() {
       if (!currentBible) throw new Error("Bible not found");
       setBibleAbbrev(currentBible.abbreviation || "");
 
+      console.log("[ChapterReader] Biblia selecionada:", {
+        bibleId,
+        name: currentBible.name,
+        fileName: currentBible.fileName,
+        source: currentBible.source,
+        isBibleBrainAudioOnly: currentBible.source === "biblebrain" && currentBible.fileName.endsWith(".audio"),
+      });
+
       AudioService.setBibleBrainMode(currentBible.source === 'biblebrain' ? bibleId : null);
 
       await bibleReaderService.openBible(bibleId, currentBible.fileName);
 
       const books = await bibleReaderService.getBooks(bibleId);
-      const currentBook = books.find((b) => b.id === currentBookId);
-      if (!currentBook) throw new Error("Book not found");
+      let currentBook = books.find((b) => b.id === currentBookId);
+      if (!currentBook) {
+        console.warn(
+          "[ChapterReader] Livro solicitado não disponível nesta versão, usando o primeiro livro disponível:",
+          { bibleId, requestedBookId: currentBookId, fallbackBookId: books[0]?.id },
+        );
+        currentBook = books[0];
+        if (!currentBook) throw new Error("Book not found");
+        setCurrentBookId(currentBook.id);
+      }
       setBook(currentBook);
 
       const chapters = await bibleReaderService.getChapters(
         bibleId,
-        currentBookId,
+        currentBook.id,
       );
       // Calcular totalChapters corretamente: se tem introdução (capítulo 0), remove 1 do length
       const hasIntroduction = chapters.some((ch) => ch.chapterNumber === 0);
@@ -505,11 +521,22 @@ export default function ChapterReaderScreen() {
       setTotalChapters(actualTotalChapters);
 
       // Load initial verses - use the current chapter state
-      const chapterToLoad = currentChapter ?? initialChapter ?? 1;
+      let chapterToLoad = currentChapter ?? initialChapter ?? 1;
+      const chapterExists = chapters.some(
+        (ch) => ch.chapterNumber === chapterToLoad,
+      );
+      if (!chapterExists && chapters.length > 0) {
+        console.warn(
+          "[ChapterReader] Capítulo solicitado não disponível nesta versão, usando o primeiro capítulo disponível:",
+          { bibleId, bookId: currentBook.id, requestedChapter: chapterToLoad, fallbackChapter: chapters[0].chapterNumber },
+        );
+        chapterToLoad = chapters[0].chapterNumber;
+        setCurrentChapter(chapterToLoad);
+      }
 
       const versesData = await bibleReaderService.getVerses(
         bibleId,
-        currentBookId,
+        currentBook.id,
         chapterToLoad,
       );
       setVerses(versesData);
@@ -522,7 +549,7 @@ export default function ChapterReaderScreen() {
       // Save reading position (non-blocking)
       DatabaseService.saveLastReading(
         bibleId,
-        currentBookId,
+        currentBook.id,
         chapterToLoad,
       ).catch((error) => {
         console.warn(

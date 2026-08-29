@@ -1,10 +1,24 @@
 import * as FileSystem from "expo-file-system/legacy";
 import * as SQLite from "expo-sqlite";
 import { Book, BookIntroduction, Chapter, SearchResult, Verse } from "../types";
+import bibleBrainService from "./BibleBrainService";
 import googleDriveService from "./GoogleDriveService";
 
+const USFM_BOOK_ORDER = [
+  "GEN", "EXO", "LEV", "NUM", "DEU", "JOS", "JDG", "RUT", "1SA", "2SA",
+  "1KI", "2KI", "1CH", "2CH", "EZR", "NEH", "EST", "JOB", "PSA", "PRO",
+  "ECC", "SNG", "ISA", "JER", "LAM", "EZK", "DAN", "HOS", "JOL", "AMO",
+  "OBA", "JON", "MIC", "NAM", "HAB", "ZEP", "HAG", "ZEC", "MAL", "MAT",
+  "MRK", "LUK", "JHN", "ACT", "ROM", "1CO", "2CO", "GAL", "EPH", "PHP",
+  "COL", "1TH", "2TH", "1TI", "2TI", "TIT", "PHM", "HEB", "JAS", "1PE",
+  "2PE", "1JN", "2JN", "3JN", "JUD", "REV",
+];
+
 export class BibleReaderService {
-  private bibleConnections: Map<string, SQLite.SQLiteDatabase> = new Map();
+  private bibleConnections: Map<string, SQLite.SQLiteDatabase | null> = new Map();
+  private audioOnlyBibles: Set<string> = new Set();
+  // bibleId -> Map<numericBookId, chapterNumbers[]>
+  private audioOnlyBooksCache: Map<string, Map<number, number[]>> = new Map();
 
   // Parse HTML verse content to extract text, notes, and verse references
   private parseVerseContent(htmlContent: string): {
@@ -394,10 +408,48 @@ export class BibleReaderService {
     };
   }
 
+  private mapUsfmToBookId(usfmBookId: string): number | null {
+    const index = USFM_BOOK_ORDER.indexOf(usfmBookId);
+    return index === -1 ? null : index + 1;
+  }
+
+  private async loadAudioOnlyBooks(bibleId: string): Promise<Map<number, number[]>> {
+    const cached = this.audioOnlyBooksCache.get(bibleId);
+    if (cached) return cached;
+
+    const bookMap = new Map<number, number[]>();
+
+    try {
+      const audioBooks = await bibleBrainService.getAudioBooks(bibleId);
+      console.log("[BibleReaderService] Livros com áudio carregados:", {
+        bibleId,
+        totalBooks: audioBooks.length,
+        books: audioBooks.map((book) => ({ bookId: book.bookId, chapters: book.chapters.length })),
+      });
+
+      for (const book of audioBooks) {
+        const numericId = this.mapUsfmToBookId(book.bookId);
+        if (numericId === null) continue;
+        bookMap.set(numericId, book.chapters);
+      }
+    } catch (error) {
+      console.error("[BibleReaderService] Erro ao carregar livros com áudio:", error);
+    }
+
+    this.audioOnlyBooksCache.set(bibleId, bookMap);
+    return bookMap;
+  }
+
   async openBible(bibleId: string, fileName: string): Promise<void> {
     try {
       if (this.bibleConnections.has(bibleId)) {
         return; // Already open
+      }
+      if (fileName.endsWith(".audio")) {
+        this.audioOnlyBibles.add(bibleId);
+        this.bibleConnections.set(bibleId, null);
+        await this.loadAudioOnlyBooks(bibleId);
+        return;
       }
       if (bibleId === "sample-bible") {
         this.bibleConnections.set(bibleId, null as any);
@@ -659,8 +711,10 @@ export class BibleReaderService {
     const db = this.bibleConnections.get(bibleId);
     if (db) {
       await db.closeAsync();
-      this.bibleConnections.delete(bibleId);
     }
+    this.bibleConnections.delete(bibleId);
+    this.audioOnlyBibles.delete(bibleId);
+    this.audioOnlyBooksCache.delete(bibleId);
   }
 
   private getBibleConnection(bibleId: string): SQLite.SQLiteDatabase | null {
@@ -677,6 +731,30 @@ export class BibleReaderService {
     // If it's the sample bible, return sample data
     if (bibleId === "sample-bible") {
       return this.getSampleBooks();
+    }
+
+    if (this.audioOnlyBibles.has(bibleId)) {
+      const audioBooks = await this.loadAudioOnlyBooks(bibleId);
+      if (audioBooks.size === 0) {
+        console.warn(
+          "[BibleReaderService] Nenhum livro com áudio encontrado, usando lista padrão como fallback:",
+          bibleId,
+        );
+        return this.getStandardBooks();
+      }
+
+      return [...audioBooks.entries()]
+        .sort((a, b) => a[0] - b[0])
+        .map(([id, chapters]) => {
+          const name = this.getBookName(id);
+          return {
+            id,
+            name,
+            abbreviation: name.substring(0, 3),
+            testament: this.determineTestament(id),
+            chaptersCount: chapters.length,
+          };
+        });
     }
 
     if (!db) {
@@ -749,6 +827,32 @@ export class BibleReaderService {
     }));
   }
 
+  private getStandardChapterCount(bookId: number): number {
+    const chapterCounts = [
+      0, 50, 40, 27, 36, 34, 24, 21, 4, 31, 24, 22, 25, 29, 36, 10, 13, 10,
+      42, 150, 31, 12, 8, 66, 52, 5, 48, 12, 14, 3, 9, 1, 4, 7, 3, 3, 3, 2,
+      14, 4, 28, 16, 24, 21, 28, 16, 16, 13, 6, 6, 4, 4, 5, 3, 6, 4, 3, 1,
+      13, 5, 5, 3, 5, 1, 1, 1, 22,
+    ];
+
+    return chapterCounts[bookId] || 1;
+  }
+
+  private getStandardBooks(): Book[] {
+    return Array.from({ length: 66 }, (_, index) => {
+      const id = index + 1;
+      const name = this.getBookName(id);
+
+      return {
+        id,
+        name,
+        abbreviation: name.substring(0, 3),
+        testament: this.determineTestament(id),
+        chaptersCount: this.getStandardChapterCount(id),
+      };
+    });
+  }
+
   private getSampleVerses(bookId: number, chapterNumber: number): Verse[] {
     return [
       {
@@ -778,6 +882,34 @@ export class BibleReaderService {
     // If it's the sample bible, return sample data
     if (bibleId === "sample-bible") {
       return this.getSampleChapters(bookId);
+    }
+
+    if (this.audioOnlyBibles.has(bibleId)) {
+      const audioBooks = await this.loadAudioOnlyBooks(bibleId);
+      const chapterNumbers = audioBooks.get(bookId);
+
+      if (!chapterNumbers || chapterNumbers.length === 0) {
+        console.warn(
+          "[BibleReaderService] Nenhum capítulo com áudio encontrado para o livro, usando fallback:",
+          { bibleId, bookId },
+        );
+        return Array.from(
+          { length: this.getStandardChapterCount(bookId) },
+          (_, index) => ({
+            id: index + 1,
+            bookId,
+            chapterNumber: index + 1,
+            versesCount: 0,
+          }),
+        );
+      }
+
+      return chapterNumbers.map((chapterNumber, index) => ({
+        id: index + 1,
+        bookId,
+        chapterNumber,
+        versesCount: 0,
+      }));
     }
 
     if (!db) {
@@ -827,6 +959,20 @@ export class BibleReaderService {
     // If it's the sample bible, return sample data
     if (bibleId === "sample-bible") {
       return this.getSampleVerses(bookId, chapterNumber);
+    }
+
+    if (this.audioOnlyBibles.has(bibleId)) {
+      return [
+        {
+          id: parseInt(
+            `${bookId}${chapterNumber.toString().padStart(3, "0")}000`,
+          ),
+          bookId,
+          chapterNumber,
+          verseNumber: 0,
+          text: "Esta versão possui apenas áudio. Use o player para ouvir este capítulo.",
+        },
+      ];
     }
 
     if (!db) {

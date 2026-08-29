@@ -2,7 +2,9 @@ import BibleBrainBible from '#models/bible_brain_bible'
 import BibleBrainAudioPackageService from '#services/bible_brain_audio_package_service'
 import BibleBrainPackageService from '#services/bible_brain_package_service'
 import bibleBrainService from '#services/bible_brain_service'
+import BibleBrainTimestampsService from '#services/bible_brain_timestamps_service'
 import { USFM_BOOK_ORDER } from '../utils/usfm_books.js'
+import { displayLanguageName } from '../utils/bible_brain_languages.js'
 import type { HttpContext } from '@adonisjs/core/http'
 import app from '@adonisjs/core/services/app'
 import { createReadStream, existsSync, promises as fsPromises } from 'node:fs'
@@ -41,8 +43,17 @@ export default class BibleBrainController {
       const languageIso = request.input('languageIso', '').trim()
 
       const query = BibleBrainBible.query()
-      .where('is_enabled', true)
-      .where('packageStatus', 'ready')
+        .where('is_enabled', true)
+        .where((builder) => {
+          builder
+            .where('packageStatus', 'ready')
+            .orWhere((audioBuilder) => {
+              audioBuilder
+                .where('has_text', false)
+                .where('has_audio', true)
+                .where('audioPackageStatus', 'ready')
+            })
+        })
 
       if (search) {
         query.where((builder) => {
@@ -74,12 +85,65 @@ export default class BibleBrainController {
     }
   }
 
+  /**
+   * GET /bible-brain/languages
+   * Lista de idiomas distintos entre as bíblias visíveis publicamente
+   * (habilitadas pelo admin e com pacote de texto ou áudio pronto),
+   * usada para popular o filtro de idioma no app.
+   */
+  async languages({ response }: HttpContext) {
+    try {
+      const rows = await BibleBrainBible.query()
+        .where('is_enabled', true)
+        .where((builder) => {
+          builder
+            .where('packageStatus', 'ready')
+            .orWhere((audioBuilder) => {
+              audioBuilder
+                .where('has_text', false)
+                .where('has_audio', true)
+                .where('audioPackageStatus', 'ready')
+            })
+        })
+        .whereNotNull('language_iso')
+        .select('language_iso')
+        .min('language_name as language_name')
+        .groupBy('language_iso')
+
+      return response.ok({
+        success: true,
+        data: rows
+          .map((row) => ({
+            iso: row.languageIso,
+            name: displayLanguageName(row.languageIso, row.languageName),
+          }))
+          .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')),
+      })
+    } catch (error) {
+      console.error('[BibleBrainController] Erro ao listar idiomas:', error)
+      return response.internalServerError({
+        success: false,
+        message: 'Erro ao listar idiomas',
+        error: error.message,
+      })
+    }
+  }
+
   async show({ params, request, response }: HttpContext) {
     try {
       const bible = await BibleBrainBible.query()
         .where('bible_id', params.bibleId)
         .where('is_enabled', true)
-        .where('packageStatus', 'ready')
+        .where((builder) => {
+          builder
+            .where('packageStatus', 'ready')
+            .orWhere((audioBuilder) => {
+              audioBuilder
+                .where('has_text', false)
+                .where('has_audio', true)
+                .where('audioPackageStatus', 'ready')
+            })
+        })
         .first()
 
       if (!bible) {
@@ -267,6 +331,65 @@ export default class BibleBrainController {
       return response.internalServerError({
         success: false,
         message: 'Erro ao buscar vídeo do capítulo',
+        error: error.message,
+      })
+    }
+  }
+
+  async audioBooks({ params, response }: HttpContext) {
+    try {
+      const bible = await BibleBrainBible.query()
+        .where('bible_id', params.bibleId)
+        .where('is_enabled', true)
+        .first()
+
+      if (!bible) {
+        return response.notFound({ success: false, message: 'Bíblia não encontrada' })
+      }
+
+      const allAudioFilesets = bible.filesets.filter((f) => f.type?.startsWith('audio'))
+      const mp3AudioFilesets = allAudioFilesets.filter((f) => f.container === 'mp3' || f.codec === 'mp3')
+      const audioFilesets = mp3AudioFilesets.length > 0 ? mp3AudioFilesets : allAudioFilesets
+
+      if (audioFilesets.length === 0) {
+        return response.notFound({ success: false, message: 'Esta bíblia não possui áudio disponível' })
+      }
+
+      const books = new Map<string, { bookId: string; name: string; chapters: Set<number> }>()
+
+      for (const fileset of audioFilesets) {
+        const filesetChapters = await bibleBrainService.getAudioFilesetChapters(fileset.id)
+        for (const chapter of filesetChapters.data || []) {
+          if (!chapter.book_id || !chapter.chapter_start) continue
+          const current = books.get(chapter.book_id) || {
+            bookId: chapter.book_id,
+            name: chapter.book_id,
+            chapters: new Set<number>(),
+          }
+          current.chapters.add(Number(chapter.chapter_start))
+          books.set(chapter.book_id, current)
+        }
+      }
+
+      return response.ok({
+        success: true,
+        data: [...books.values()]
+          .map((book) => ({
+            bookId: book.bookId,
+            name: book.name,
+            chapters: [...book.chapters].sort((a, b) => a - b),
+          }))
+          .sort((a, b) => {
+            const aOrder = USFM_BOOK_ORDER.indexOf(a.bookId)
+            const bOrder = USFM_BOOK_ORDER.indexOf(b.bookId)
+            return (aOrder === -1 ? 999 : aOrder) - (bOrder === -1 ? 999 : bOrder)
+          }),
+      })
+    } catch (error) {
+      console.error('[BibleBrainController] Erro ao listar livros com áudio:', error)
+      return response.internalServerError({
+        success: false,
+        message: 'Erro ao listar livros com áudio',
         error: error.message,
       })
     }
@@ -504,32 +627,23 @@ export default class BibleBrainController {
         return response.notFound({ success: false, message: 'Bíblia não encontrada' })
       }
 
-      const audioFilesets = bible.filesets.filter((f) => f.type?.startsWith('audio'))
-      const audioFileset =
-        audioFilesets.find((f) => f.container === 'mp3' || f.codec === 'mp3') ||
-        audioFilesets.find((f) => f.type !== 'audio_drama_stream') ||
-        audioFilesets[0]
+      const allAudioFilesets = bible.filesets.filter((f) => f.type?.startsWith('audio'))
+      const mp3AudioFilesets = allAudioFilesets.filter((f) => f.container === 'mp3' || f.codec === 'mp3')
+      const audioFilesets = mp3AudioFilesets.length > 0 ? mp3AudioFilesets : allAudioFilesets
 
-      if (!audioFileset) {
+      if (audioFilesets.length === 0) {
         return response.notFound({ success: false, message: 'Esta bíblia não possui áudio disponível' })
       }
 
-      const timestampsData = await bibleBrainService.getAudioTimestamps(
-        audioFileset.id,
+      // Busca primeiro no nosso banco (importado durante a geração do pacote
+      // de áudio); só cai para a API externa se ainda não tiver sido
+      // importado (pacotes gerados antes deste recurso existir).
+      const timestamps = await BibleBrainTimestampsService.fetchWithFallback(
+        params.bibleId,
         params.bookId,
-        parseInt(params.chapterNumber)
+        parseInt(params.chapterNumber),
+        audioFilesets.map((f) => f.id)
       )
-
-      if (!timestampsData.data || timestampsData.data.length === 0) {
-        return response.ok({ success: true, data: [] })
-      }
-
-      const timestamps = timestampsData.data
-        .filter((t) => Number(t.verse_start) > 0 && t.timestamp != null)
-        .map((t) => ({
-          verseNumber: Number(t.verse_start),
-          timestampMs: Math.round(Number(t.timestamp) * 1000),
-        }))
 
       return response.ok({ success: true, data: timestamps })
     } catch (error) {
@@ -538,7 +652,7 @@ export default class BibleBrainController {
     }
   }
 
-  async audioChapter({ params, request, response }: HttpContext) {
+  async audioChapter({ params, response }: HttpContext) {
     try {
       const bible = await BibleBrainBible.query()
         .where('bible_id', params.bibleId)
@@ -558,52 +672,104 @@ export default class BibleBrainController {
 
       if (existsSync(localFile)) {
         const stat = await fsPromises.stat(localFile)
-        const protocol = request.protocol()
-        const host = request.host()
-        const url = `${protocol}://${host}/uploads/bible-brain-audio/${params.bibleId}/${params.bookId}/${params.chapterNumber}.mp3`
+        // URL relativa (sem host/protocolo): o Apache expõe esta API sob o
+        // prefixo "/api", que não é visível para o Node por trás do proxy.
+        // Construir uma URL absoluta aqui geraria um link quebrado (sem
+        // "/api"). O cliente resolve o caminho relativo usando sua própria
+        // base de API.
+        const url = `/bible-brain/bibles/${params.bibleId}/audio-file/${params.bookId}/${params.chapterNumber}`
         return response.ok({
           success: true,
           data: { url, duration: 0, filesize: stat.size, filesetId: null },
         })
       }
 
-      const audioFilesets = bible.filesets.filter((f) => f.type?.startsWith('audio'))
-      const audioFileset =
-        audioFilesets.find((f) => f.container === 'mp3' || f.codec === 'mp3') ||
-        audioFilesets.find((f) => f.type !== 'audio_drama_stream') ||
-        audioFilesets[0]
+      const allAudioFilesets = bible.filesets.filter((f) => f.type?.startsWith('audio'))
+      const mp3AudioFilesets = allAudioFilesets.filter((f) => f.container === 'mp3' || f.codec === 'mp3')
+      const audioFilesets = mp3AudioFilesets.length > 0 ? mp3AudioFilesets : allAudioFilesets
 
-      if (!audioFileset) {
+      if (audioFilesets.length === 0) {
         return response.notFound({ success: false, message: 'Esta bíblia não possui áudio disponível' })
       }
 
-      const audioData = await bibleBrainService.getAudioChapterInfo(
-        audioFileset.id,
-        params.bookId,
-        parseInt(params.chapterNumber)
-      )
+      for (const audioFileset of audioFilesets) {
+        try {
+          const audioData = await bibleBrainService.getAudioChapterInfo(
+            audioFileset.id,
+            params.bookId,
+            parseInt(params.chapterNumber)
+          )
 
-      if (!audioData.data || audioData.data.length === 0) {
-        return response.notFound({ success: false, message: 'Áudio não encontrado para este capítulo' })
+          if (!audioData.data || audioData.data.length === 0) {
+            continue
+          }
+
+          const chapter = audioData.data[0]
+
+          return response.ok({
+            success: true,
+            data: {
+              url: chapter.path,
+              duration: chapter.duration,
+              filesize: chapter.filesize_in_bytes,
+              filesetId: audioFileset.id,
+            },
+          })
+        } catch (error) {
+          console.log('[BibleBrainController] Fileset sem áudio para capítulo:', {
+            bibleId: params.bibleId,
+            filesetId: audioFileset.id,
+            bookId: params.bookId,
+            chapterNumber: params.chapterNumber,
+            error: error instanceof Error ? error.message : String(error),
+          })
+        }
       }
 
-      const chapter = audioData.data[0]
-
-      return response.ok({
-        success: true,
-        data: {
-          url: chapter.path,
-          duration: chapter.duration,
-          filesize: chapter.filesize_in_bytes,
-          filesetId: audioFileset.id,
-        },
-      })
+      return response.notFound({ success: false, message: 'Áudio não encontrado para este capítulo' })
     } catch (error) {
       console.error('[BibleBrainController] Erro ao buscar áudio:', error)
       return response.internalServerError({
         success: false,
         message: 'Erro ao buscar áudio do capítulo',
         error: error.message,
+      })
+    }
+  }
+
+  async audioFile({ params, response }: HttpContext) {
+    try {
+      const bookId = String(params.bookId || '')
+      const chapterNumber = String(params.chapterNumber || '')
+
+      if (!/^[A-Z0-9]{2,4}$/i.test(bookId) || !/^\d+$/.test(chapterNumber)) {
+        return response.badRequest({ success: false, message: 'Parâmetros inválidos' })
+      }
+
+      const filePath = path.join(
+        app.publicPath('uploads/bible-brain-audio'),
+        params.bibleId,
+        bookId,
+        `${chapterNumber}.mp3`
+      )
+
+      if (!existsSync(filePath)) {
+        return response.notFound({ success: false, message: 'Arquivo de áudio não encontrado' })
+      }
+
+      const stat = await fsPromises.stat(filePath)
+
+      response.header('Content-Type', 'audio/mpeg')
+      response.header('Content-Length', String(stat.size))
+      response.header('Accept-Ranges', 'bytes')
+      response.header('Cache-Control', 'public, max-age=86400')
+
+      return response.stream(createReadStream(filePath))
+    } catch (error) {
+      console.error('[BibleBrainController] Erro ao servir arquivo de áudio:', error)
+      return response.internalServerError({
+        success: false,
+        message: 'Erro ao servir arquivo de áudio',
       })
     }
   }

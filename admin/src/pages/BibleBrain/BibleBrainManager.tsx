@@ -46,6 +46,48 @@ function useDebouncedValue<T>(value: T, delay: number): T {
   return debounced;
 }
 
+const LANGUAGE_ALIASES: Record<string, string[]> = {
+  por: ["portugues", "português", "portuguese"],
+  eng: ["ingles", "inglês", "english"],
+  spa: ["espanhol", "spanish", "español"],
+  fra: ["frances", "francês", "french"],
+  deu: ["alemao", "alemão", "german"],
+  ita: ["italiano", "italian"],
+};
+
+function normalizeSearchText(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function languageSearchText(language: { iso: string; name: string }) {
+  return normalizeSearchText([
+    language.name,
+    language.iso,
+    ...(LANGUAGE_ALIASES[language.iso] || []),
+  ].join(" "));
+}
+
+function languageSearchRank(language: { iso: string; name: string }, query: string) {
+  const name = normalizeSearchText(language.name || "");
+  const iso = normalizeSearchText(language.iso || "");
+  const aliases = (LANGUAGE_ALIASES[language.iso] || []).map(normalizeSearchText);
+  const words = name.split(/\s+/).filter(Boolean);
+
+  if (iso === query) return 0;
+  if (aliases.some((alias) => alias === query)) return 1;
+  if (name === query) return 2;
+  if (iso.startsWith(query)) return 3;
+  if (aliases.some((alias) => alias.startsWith(query))) return 4;
+  if (name.startsWith(query)) return 5;
+  if (words.some((word) => word.startsWith(query))) return 6;
+  if (aliases.some((alias) => alias.includes(query))) return 7;
+  return 8;
+}
+
 function LanguageSearchSelect({
   languages,
   value,
@@ -62,17 +104,21 @@ function LanguageSearchSelect({
 
   const selected = languages.find((l) => l.iso === value);
 
-  const filtered = useMemo(
-    () =>
-      filterText
-        ? languages.filter(
-            (l) =>
-              (l.name || "").toLowerCase().includes(filterText.toLowerCase()) ||
-              (l.iso || "").toLowerCase().includes(filterText.toLowerCase()),
-          )
-        : languages,
-    [filterText, languages],
-  );
+  const filtered = useMemo(() => {
+    const query = normalizeSearchText(filterText);
+    const items = query
+      ? languages.filter((language) => languageSearchText(language).includes(query))
+      : languages;
+
+    return [...items].sort((a, b) => {
+      if (query) {
+        const rankDiff = languageSearchRank(a, query) - languageSearchRank(b, query);
+        if (rankDiff !== 0) return rankDiff;
+      }
+
+      return (a.name || "").localeCompare(b.name || "", "pt-BR");
+    });
+  }, [filterText, languages]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -298,6 +344,22 @@ export default function BibleBrainManager() {
   };
 
   const renderProgressBar = (bible: BibleBrainBible) => {
+    if (!bible.hasText) {
+      if (bible.hasAudio) {
+        return (
+          <ActionButton
+            onClick={() => handleRequestPackage(bible.id, bible.bibleId)}
+            disabled={actionLoading === bible.id || bible.audioPackageStatus === "generating"}
+            title="Importar áudio"
+          >
+            {actionLoading === bible.id ? "..." : "🔊 Gerar áudio"}
+          </ActionButton>
+        );
+      }
+
+      return <span className="no-audio">—</span>;
+    }
+
     if (bible.packageStatus === "ready") {
       return <Badge type="success">Pronto</Badge>;
     }

@@ -649,6 +649,7 @@ class DatabaseService {
       isDownloaded: bible.isDownloaded,
       downloadDate: bible.downloadDate,
       size: bible.size,
+      source: bible.source,
     });
 
     return this.safeDbOperation(
@@ -720,6 +721,15 @@ class DatabaseService {
       });
       this.biblesCache = { data: mapped, updatedAt: Date.now() };
       console.log("BÍBLIAS NO BANCO", mapped.length);
+      console.log(
+        "BÍBLIAS NO BANCO DETALHES",
+        mapped.map((bible) => ({
+          id: bible.id,
+          name: bible.name,
+          fileName: bible.fileName,
+          source: bible.source,
+        })),
+      );
       console.log("----------------------");
       return mapped;
     } catch (error) {

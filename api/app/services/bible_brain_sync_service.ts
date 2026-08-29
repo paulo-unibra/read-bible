@@ -16,6 +16,7 @@ interface SyncState {
 }
 
 const PAGE_LIMIT = 50
+const PRIORITY_LANGUAGE_CODES = ['por']
 
 /**
  * Sincroniza o catálogo de bíblias da BibleBrain com a nossa base local.
@@ -101,6 +102,10 @@ export default class BibleBrainSyncService {
       await new Promise((resolve) => setTimeout(resolve, 150))
     }
 
+    for (const languageCode of PRIORITY_LANGUAGE_CODES) {
+      await this.syncLanguage(languageCode)
+    }
+
     this.state.status = 'completed'
     this.state.finishedAt = new Date().toISOString()
     console.log(
@@ -136,6 +141,36 @@ export default class BibleBrainSyncService {
         bibleId: item.abbr,
         ...payload,
       })
+    }
+  }
+
+  private static async syncLanguage(languageCode: string) {
+    console.log(`[BibleBrainSyncService] Complementando idioma ${languageCode}...`)
+    let page = 1
+
+    while (true) {
+      const response = await bibleBrainService.listBibles({
+        page,
+        limit: PAGE_LIMIT,
+        languageCode,
+      })
+      const pagination = response.meta?.pagination
+      const totalPages = pagination?.last_page ?? pagination?.total_pages ?? page
+
+      for (const item of response.data) {
+        try {
+          await this.upsertBible(item)
+        } catch (error) {
+          console.error(`[BibleBrainSyncService] Erro ao salvar bíblia ${item.abbr}:`, error)
+        }
+      }
+
+      if (response.data.length === 0 || page >= totalPages) {
+        break
+      }
+
+      page++
+      await new Promise((resolve) => setTimeout(resolve, 150))
     }
   }
 }

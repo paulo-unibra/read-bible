@@ -2,6 +2,7 @@ import BibleBrainBible from '#models/bible_brain_bible'
 import BibleBrainAudioPackageService from '#services/bible_brain_audio_package_service'
 import BibleBrainPackageService from '#services/bible_brain_package_service'
 import BibleBrainSyncService from '#services/bible_brain_sync_service'
+import { displayLanguageName } from '../../utils/bible_brain_languages.js'
 import type { HttpContext } from '@adonisjs/core/http'
 
 export default class AdminBibleBrainController {
@@ -70,12 +71,18 @@ export default class AdminBibleBrainController {
     try {
       const rows = await BibleBrainBible.query()
         .whereNotNull('language_iso')
-        .distinct('language_iso', 'language_name')
-        .orderBy('language_name', 'asc')
+        .select('language_iso')
+        .min('language_name as language_name')
+        .groupBy('language_iso')
 
       return response.ok({
         success: true,
-        data: rows.map((row) => ({ iso: row.languageIso, name: row.languageName })),
+        data: rows
+          .map((row) => ({
+            iso: row.languageIso,
+            name: displayLanguageName(row.languageIso, row.languageName),
+          }))
+          .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')),
       })
     } catch (error) {
       console.error('[AdminBibleBrainController] Erro ao listar idiomas:', error)
@@ -114,7 +121,10 @@ export default class AdminBibleBrainController {
 
       const willEnable = typeof desired === 'boolean' ? desired : !bible.isEnabled
 
-      if (willEnable && bible.packageStatus !== 'ready') {
+      const textReady = bible.hasText && bible.packageStatus === 'ready'
+      const audioOnlyReady = !bible.hasText && bible.hasAudio && bible.audioPackageStatus === 'ready'
+
+      if (willEnable && !textReady && !audioOnlyReady) {
         return response.badRequest({
           success: false,
           message:
@@ -145,10 +155,42 @@ export default class AdminBibleBrainController {
     try {
       const record = await BibleBrainBible.findOrFail(params.id)
 
-      await BibleBrainPackageService.requestPackage(record.bibleId)
+      console.log('[AdminBibleBrainController] Solicitação de geração BibleBrain:', {
+        id: record.id,
+        bibleId: record.bibleId,
+        name: record.name,
+        hasText: record.hasText,
+        hasAudio: record.hasAudio,
+        packageStatus: record.packageStatus,
+        audioPackageStatus: record.audioPackageStatus,
+        filesets: record.filesets?.map((fileset) => ({
+          id: fileset.id,
+          type: fileset.type,
+          size: fileset.size,
+          codec: fileset.codec,
+          container: fileset.container,
+        })),
+      })
 
-      if (record.hasAudio && record.audioPackageStatus !== 'ready') {
-        BibleBrainAudioPackageService.requestAudioPackage(record.bibleId).catch(() => {})
+      if (!record.hasText && !record.hasAudio) {
+        return response.badRequest({
+          success: false,
+          message: 'Esta bíblia não possui texto nem áudio disponível',
+        })
+      }
+
+      if (record.hasText) {
+        console.log('[AdminBibleBrainController] Iniciando geração de pacote de texto:', record.bibleId)
+        await BibleBrainPackageService.requestPackage(record.bibleId)
+      }
+
+      if (record.hasAudio && (record.audioPackageStatus !== 'ready' || !record.hasText)) {
+        console.log('[AdminBibleBrainController] Iniciando importação de áudio:', record.bibleId)
+        BibleBrainAudioPackageService.requestAudioPackage(record.bibleId, { force: !record.hasText }).catch(
+          () => {}
+        )
+      } else if (record.hasAudio) {
+        console.log('[AdminBibleBrainController] Áudio já estava pronto:', record.bibleId)
       }
 
       const updated = await BibleBrainBible.findOrFail(params.id)

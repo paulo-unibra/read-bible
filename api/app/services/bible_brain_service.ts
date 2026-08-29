@@ -199,6 +199,18 @@ class BibleBrainService {
   }> {
     return this.request(`/bibles/filesets/${filesetId}/${bookId}/${chapter}`)
   }
+
+  async getAudioFilesetChapters(filesetId: string): Promise<{
+    data: Array<{
+      book_id: string
+      chapter_start: number
+      path: string
+      duration: number
+      filesize_in_bytes: number
+    }>
+  }> {
+    return this.request(`/bibles/filesets/${filesetId}`)
+  }
 }
 
 export default new BibleBrainService()
