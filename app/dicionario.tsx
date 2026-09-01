@@ -11,6 +11,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import FocusBottomNav, { FOCUS_BOTTOM_NAV_HEIGHT } from "../components/FocusBottomNav";
+import { FocusRadius, getFocusShadow } from "../constants/design";
 import { useTheme } from "../hooks/theme-context";
 import dictionaryOfflineService, {
   DICT_LABELS,
@@ -36,7 +38,8 @@ interface ListItem {
 }
 
 export default function DicionarioScreen() {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
+  const focusShadow = getFocusShadow(isDark);
   const [isDownloaded, setIsDownloaded] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
@@ -262,7 +265,7 @@ export default function DicionarioScreen() {
 
     return (
       <TouchableOpacity
-        style={[styles.entryCard, { backgroundColor: colors.card }]}
+        style={[styles.entryCard, { backgroundColor: colors.card }, focusShadow]}
         onPress={() => openEntry(word, dictKey)}
         activeOpacity={0.7}
       >
@@ -508,7 +511,10 @@ export default function DicionarioScreen() {
             <FlatList
               data={listData}
               keyExtractor={(item) => item.key}
-              contentContainerStyle={styles.listContent}
+              contentContainerStyle={[
+                styles.listContent,
+                { paddingBottom: FOCUS_BOTTOM_NAV_HEIGHT + 32 },
+              ]}
               renderItem={renderItem}
               onEndReached={favoritesMode ? undefined : loadMore}
               onEndReachedThreshold={0.5}
@@ -526,6 +532,7 @@ export default function DicionarioScreen() {
         </>
       )}
       <AdBanner />
+      <FocusBottomNav active="dictionary" />
     </SafeAreaView>
   );
 }
@@ -536,13 +543,20 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderBottomWidth: 1,
   },
-  backButton: { padding: 8 },
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   headerTitle: {
     fontSize: 20,
-    fontWeight: "bold",
+    fontWeight: "600",
     flex: 1,
     marginHorizontal: 8,
   },
@@ -559,14 +573,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     margin: 16,
     marginBottom: 8,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    height: 44,
+    paddingHorizontal: 14,
+    borderRadius: FocusRadius.sm,
+    height: 48,
   },
   searchIcon: { marginRight: 8 },
   searchInput: { flex: 1, fontSize: 15, height: 44 },
   resultCount: { fontSize: 13, marginHorizontal: 16, marginBottom: 8 },
-  listContent: { paddingHorizontal: 16, paddingBottom: 32 },
+  listContent: { paddingHorizontal: 16, paddingBottom: 32, paddingTop: 6 },
   groupHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -583,9 +597,9 @@ const styles = StyleSheet.create({
   },
   groupCount: { fontSize: 12 },
   entryCard: {
-    borderRadius: 10,
+    borderRadius: FocusRadius.sm,
     padding: 14,
-    marginBottom: 6,
+    marginBottom: 10,
   },
   entryHeader: {
     flexDirection: "row",
@@ -607,14 +621,14 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 20,
+    borderRadius: FocusRadius.pill,
   },
   favoriteFilterText: { fontSize: 13, fontWeight: "600" },
   goBackFilter: {
     marginTop: 16,
     paddingHorizontal: 20,
     paddingVertical: 10,
-    borderRadius: 8,
+    borderRadius: FocusRadius.pill,
   },
   goBackFilterText: { fontSize: 14, fontWeight: "600", color: "#fff" },
   entryWord: { fontSize: 15, fontWeight: "700" },
@@ -645,11 +659,11 @@ const styles = StyleSheet.create({
   progressBar: {
     width: "100%",
     height: 10,
-    borderRadius: 5,
+    borderRadius: FocusRadius.pill,
     marginTop: 12,
     overflow: "hidden",
   },
-  progressFill: { height: "100%", borderRadius: 5 },
+  progressFill: { height: "100%", borderRadius: FocusRadius.pill },
   downloadInfo: {
     fontSize: 14,
     marginTop: 8,
@@ -669,7 +683,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingHorizontal: 24,
     paddingVertical: 10,
-    borderRadius: 8,
+    borderRadius: FocusRadius.pill,
   },
   retryButtonText: { fontSize: 14, fontWeight: "600", color: "#fff" },
 });

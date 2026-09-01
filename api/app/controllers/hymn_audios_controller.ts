@@ -16,7 +16,7 @@ export default class HymnAudiosController {
 
       console.log(`[HymnAudiosController] Buscando áudios do hino ${hymnNumber} no Drive...`)
 
-      const audios = await searchHymnAudiosInDrive(parseInt(hymnNumber))
+      const audios = await searchHymnAudiosInDrive(Number.parseInt(hymnNumber))
 
       // Substituir URL do Drive por URL do nosso proxy
       const baseUrl = `${request.protocol()}://${request.hostname()}`
@@ -60,7 +60,8 @@ export default class HymnAudiosController {
 
       // Se useDirect=true, usar URL direta do Drive (para mobile app)
       // Caso contrário, usar proxy (para admin panel com CORS)
-      const env = (await import('#start/env')).default
+      const envModule = await import('#start/env')
+      const env = envModule.default
       const apiKey = env.get('GOOGLE_API_KEY')
 
       const audiosWithUrl = audios.map((audio) => {
@@ -243,9 +244,22 @@ export default class HymnAudiosController {
 
       console.log(`[HymnAudiosController] Streaming áudio: ${fileId}`)
 
+      const registeredAudio = await HymnAudioSync.query()
+        .where('file_id', fileId)
+        .where('is_active', true)
+        .first()
+
+      if (!registeredAudio) {
+        return response.notFound({
+          success: false,
+          message: 'Áudio não encontrado',
+        })
+      }
+
       // Usar Service Account (GCS_CREDENTIALS) ao invés de OAuth
       const { google } = await import('googleapis')
-      const env = (await import('#start/env')).default
+      const envModule = await import('#start/env')
+      const env = envModule.default
 
       const credentials = env.get('GCS_CREDENTIALS')
 
@@ -288,7 +302,6 @@ export default class HymnAudiosController {
         response.header('Content-Length', fileMeta.data.size)
       }
       response.header('Cache-Control', 'public, max-age=3600')
-      response.header('Access-Control-Allow-Origin', '*')
 
       // Retornar o stream
       return response.stream(fileStream.data)

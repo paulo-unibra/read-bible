@@ -111,7 +111,10 @@ router.put('/notes/:id', [NotesController, 'update']).use(middleware.auth())
 router.delete('/notes/:id', [NotesController, 'destroy']).use(middleware.auth())
 
 // Quiz routes
-router.post('/generate-quiz', [QuizController, 'generate'])
+router
+  .post('/generate-quiz', [QuizController, 'generate'])
+  .use(middleware.auth())
+  .use(middleware.rateLimit({ limit: 10 }))
 router.get('/quizzes', [QuizController, 'list'])
 router.get('/quizzes/:id', [QuizController, 'show'])
 
@@ -122,16 +125,34 @@ router.get('/quiz-results/ranking', [QuizResultController, 'ranking'])
 router.get('/quiz-results/stats', [QuizResultController, 'stats']).use(middleware.auth())
 
 // Fila para livros completos
-router.post('/queue/book', [QueueController, 'createBookJob'])
-router.get('/queue/job/:jobId', [QueueController, 'getJobStatus'])
-router.get('/queue/jobs', [QueueController, 'listJobs'])
+router
+  .post('/queue/book', [QueueController, 'createBookJob'])
+  .use(middleware.auth())
+  .use(middleware.admin())
+router
+  .get('/queue/job/:jobId', [QueueController, 'getJobStatus'])
+  .use(middleware.auth())
+  .use(middleware.admin())
+router
+  .get('/queue/jobs', [QueueController, 'listJobs'])
+  .use(middleware.auth())
+  .use(middleware.admin())
 
 // Import routes
-router.get('/import/quizzes', [ImportController, 'importQuizzes'])
-router.get('/queue/books', [QueueController, 'listBooks'])
+router
+  .get('/import/quizzes', [ImportController, 'importQuizzes'])
+  .use(middleware.auth())
+  .use(middleware.admin())
+router
+  .get('/queue/books', [QueueController, 'listBooks'])
+  .use(middleware.auth())
+  .use(middleware.admin())
 
 // Bible Curiosities routes
-router.post('/curiosities/generate', [BibleCuriositiesController, 'generate'])
+router
+  .post('/curiosities/generate', [BibleCuriositiesController, 'generate'])
+  .use(middleware.auth())
+  .use(middleware.admin())
 // Rota pública para visualizar curiosidade (não requer login)
 router.get('/curiosities/today', [BibleCuriositiesController, 'getToday'])
 router.post('/curiosities/:id/share', [BibleCuriositiesController, 'registerShare'])
@@ -159,7 +180,10 @@ router.get('/bible-brain/video-bibles', [BibleBrainController, 'videoBibles'])
 // Dictionary routes
 router.get('/dictionary/search', [DictionaryController, 'search'])
 router.get('/dictionary/word', [DictionaryController, 'word'])
-router.get('/dictionary/refresh', [DictionaryController, 'refresh'])
+router
+  .get('/dictionary/refresh', [DictionaryController, 'refresh'])
+  .use(middleware.auth())
+  .use(middleware.admin())
 router.get('/dictionary/stats', [DictionaryController, 'stats'])
 router.get('/dictionary/files', [DictionaryController, 'files'])
 router.get('/dictionary/files/download/:dictKey', [DictionaryController, 'download'])
@@ -200,7 +224,10 @@ router.get('/bible-brain/bibles/:bibleId/audio-timestamps/:bookId/:chapterNumber
   'audioTimestamps',
 ])
 router.get('/bible-brain/bibles/:bibleId/package', [BibleBrainController, 'packageStatus'])
-router.post('/bible-brain/bibles/:bibleId/package', [BibleBrainController, 'requestPackage'])
+router
+  .post('/bible-brain/bibles/:bibleId/package', [BibleBrainController, 'requestPackage'])
+  .use(middleware.auth())
+  .use(middleware.rateLimit({ limit: 5 }))
 router.get('/bible-brain/bibles/:bibleId', [BibleBrainController, 'show'])
 
 // Admin routes
@@ -354,5 +381,6 @@ router
         ])
       })
       .use(middleware.auth({ guards: ['api'] }))
+      .use(middleware.admin())
   })
   .prefix('/admin')

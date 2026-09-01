@@ -22,6 +22,7 @@ import type { BibleBrainBible } from "../../services/bibleBrainService";
 import "./BibleBrainManager.css";
 
 const FILTERS_KEY = "biblebrain_filters";
+const PACKAGE_POLL_TIMEOUT_MS = 10 * 60 * 1000;
 
 function loadSavedFilters() {
   try {
@@ -195,12 +196,48 @@ export default function BibleBrainManager() {
   const [enabledFilter, setEnabledFilter] = useState(saved?.enabledFilter || "all");
   const [mediaFilter, setMediaFilter] = useState(saved?.mediaFilter || "all");
   const [actionLoading, setActionLoading] = useState<number | null>(null);
+  const [packagePollIds, setPackagePollIds] = useState<number[]>([]);
   const [syncing, setSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
   const [languages, setLanguages] = useState<{ iso: string; name: string }[]>([]);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
   const filtersLoaded = useRef(false);
   const prevSearch = useRef(search);
+  const packagePollStartedAt = useRef<Record<number, number>>({});
+
+  const loadLanguages = useCallback(async () => {
+    try {
+      const data = await bibleBrainService.languages();
+      setLanguages(data);
+    } catch (error) {
+      console.error("Erro ao carregar idiomas:", error);
+    }
+  }, []);
+
+  const loadBibles = useCallback(async (options: { silent?: boolean } = {}) => {
+    try {
+      if (!options.silent) setLoading(true);
+      const params: any = { page: currentPage, perPage: 20 };
+      if (enabledFilter !== "all") params.enabled = enabledFilter;
+      if (mediaFilter !== "all") params.media = mediaFilter;
+      if (search.trim()) params.search = search.trim();
+      if (languageIso) params.languageIso = languageIso;
+
+      const data = await bibleBrainService.listAll(params);
+      setBibles(data.data);
+      setTotalPages(data.meta.lastPage);
+    } catch (error) {
+      console.error("Erro ao carregar bíblias:", error);
+      if (!options.silent) setToast({ message: "Erro ao carregar bíblias", type: "error" });
+    } finally {
+      if (!options.silent) setLoading(false);
+    }
+  }, [currentPage, enabledFilter, languageIso, mediaFilter, search]);
+
+  const hasPackageInProgress = bibles.some(
+    (bible) => bible.packageStatus === "generating" || bible.audioPackageStatus === "generating",
+  );
+  const hasPackagePolling = packagePollIds.length > 0;
 
   // Quando o search debounced mudar, reseta página
   useEffect(() => {
@@ -212,11 +249,46 @@ export default function BibleBrainManager() {
 
   useEffect(() => {
     loadLanguages();
-  }, []);
+  }, [loadLanguages]);
 
   useEffect(() => {
     loadBibles();
-  }, [currentPage, search, languageIso, enabledFilter, mediaFilter]);
+  }, [loadBibles]);
+
+  useEffect(() => {
+    if (!hasPackageInProgress && !hasPackagePolling) return;
+
+    const poll = window.setInterval(() => {
+      loadBibles({ silent: true });
+    }, 2000);
+
+    return () => window.clearInterval(poll);
+  }, [hasPackageInProgress, hasPackagePolling, loadBibles]);
+
+  useEffect(() => {
+    if (packagePollIds.length === 0) return;
+
+    const now = Date.now();
+    setPackagePollIds((ids) => ids.filter((id) => {
+      const bible = bibles.find((item) => item.id === id);
+      const startedAt = packagePollStartedAt.current[id] || now;
+      const timedOut = now - startedAt > PACKAGE_POLL_TIMEOUT_MS;
+      const stillGenerating = bible?.packageStatus === "generating" || bible?.audioPackageStatus === "generating";
+      const stillPendingFirstRefresh = !bible || (
+        bible.packageStatus !== "ready" &&
+        bible.packageStatus !== "failed" &&
+        bible.audioPackageStatus !== "ready" &&
+        bible.audioPackageStatus !== "failed"
+      );
+
+      if (timedOut || (!stillGenerating && !stillPendingFirstRefresh)) {
+        delete packagePollStartedAt.current[id];
+        return false;
+      }
+
+      return true;
+    }));
+  }, [bibles, packagePollIds.length]);
 
   useEffect(() => {
     if (filtersLoaded.current === false) {
@@ -231,35 +303,6 @@ export default function BibleBrainManager() {
       mediaFilter,
     });
   }, [currentPage, search, languageIso, enabledFilter, mediaFilter]);
-
-  const loadLanguages = async () => {
-    try {
-      const data = await bibleBrainService.languages();
-      setLanguages(data);
-    } catch (error) {
-      console.error("Erro ao carregar idiomas:", error);
-    }
-  };
-
-  const loadBibles = async () => {
-    try {
-      setLoading(true);
-      const params: any = { page: currentPage, perPage: 20 };
-      if (enabledFilter !== "all") params.enabled = enabledFilter;
-      if (mediaFilter !== "all") params.media = mediaFilter;
-      if (search.trim()) params.search = search.trim();
-      if (languageIso) params.languageIso = languageIso;
-
-      const data = await bibleBrainService.listAll(params);
-      setBibles(data.data);
-      setTotalPages(data.meta.lastPage);
-    } catch (error) {
-      console.error("Erro ao carregar bíblias:", error);
-      setToast({ message: "Erro ao carregar bíblias", type: "error" });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSearch = useCallback((value: string) => {
     setSearchInput(value);
@@ -331,14 +374,14 @@ export default function BibleBrainManager() {
   const handleRequestPackage = async (id: number, bibleId: string) => {
     try {
       setActionLoading(id);
-      await bibleBrainService.requestPackage(id);
+      packagePollStartedAt.current[id] = Date.now();
+      setPackagePollIds((ids) => (ids.includes(id) ? ids : [...ids, id]));
+      const updated = await bibleBrainService.requestPackage(id);
+      setBibles((items) => items.map((item) => (item.id === id ? updated : item)));
       setToast({ message: `Geração de pacote iniciada para ${bibleId}`, type: "info" });
-      setTimeout(() => {
-        loadBibles();
-        setActionLoading(null);
-      }, 3000);
     } catch (error: any) {
       setToast({ message: `Erro: ${error.message}`, type: "error" });
+    } finally {
       setActionLoading(null);
     }
   };

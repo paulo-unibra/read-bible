@@ -128,12 +128,6 @@ export default class BibleCuriositiesController {
    */
   async getToday({ auth, response }: HttpContext) {
     try {
-      console.log('🔄 [BibleCuriositiesController.getToday] Iniciado')
-      console.log(
-        '👤 [BibleCuriositiesController.getToday] auth.user:',
-        auth.user ? `ID ${auth.user.id}` : 'null'
-      )
-
       const today = DateTime.now().setZone('America/Sao_Paulo').toFormat('yyyy-MM-dd')
 
       const curiosity = await BibleCuriosity.query()
@@ -148,25 +142,11 @@ export default class BibleCuriositiesController {
         })
       }
 
-      console.log('📋 [BibleCuriositiesController.getToday] Curiosity ID:', curiosity.id)
-      console.log('📋 [BibleCuriositiesController.getToday] likesCount:', curiosity.likesCount)
-
       // Verificar se o usuário favoritou
       let isFavorited = false
       if (auth.user) {
-        console.log('🔍 [BibleCuriositiesController.getToday] Carregando favoritedBy...')
         await curiosity.load('favoritedBy')
-        console.log(
-          '📊 [BibleCuriositiesController.getToday] Total de favoritedBy:',
-          curiosity.favoritedBy.length
-        )
-        console.log(
-          '📊 [BibleCuriositiesController.getToday] IDs dos usuários que favoritaram:',
-          curiosity.favoritedBy.map((u) => u.id)
-        )
-
         isFavorited = curiosity.favoritedBy.some((user) => user.id === auth.user!.id)
-        console.log('⭐ [BibleCuriositiesController.getToday] isFavorited:', isFavorited)
       }
 
       const result = {
@@ -178,11 +158,6 @@ export default class BibleCuriositiesController {
         likesCount: curiosity.likesCount || 0,
         sharesCount: curiosity.sharesCount || 0,
       }
-
-      console.log(
-        '📤 [BibleCuriositiesController.getToday] Resposta:',
-        JSON.stringify(result, null, 2)
-      )
 
       return response.ok({
         success: true,
@@ -202,46 +177,26 @@ export default class BibleCuriositiesController {
    */
   async toggleFavorite({ auth, params, response }: HttpContext) {
     try {
-      console.log('🔄 [BibleCuriositiesController] toggleFavorite iniciado')
-
       const user = auth.user!
-      console.log('👤 [BibleCuriositiesController] User ID:', user.id)
-      console.log('👤 [BibleCuriositiesController] User email:', user.email)
-
       const curiosityId = params.id
-      console.log('📋 [BibleCuriositiesController] Curiosity ID:', curiosityId)
-
       const curiosity = await BibleCuriosity.find(curiosityId)
-      console.log(
-        '🔍 [BibleCuriositiesController] Curiosidade encontrada:',
-        curiosity ? 'SIM' : 'NÃO'
-      )
 
       if (!curiosity) {
-        console.error('❌ [BibleCuriositiesController] Curiosidade não encontrada')
         return response.notFound({
           success: false,
           message: 'Curiosidade não encontrada',
         })
       }
 
-      console.log('📥 [BibleCuriositiesController] Carregando favoritos...')
       await curiosity.load('favoritedBy')
-      console.log(
-        '📊 [BibleCuriositiesController] Favoritos carregados:',
-        curiosity.favoritedBy.length
-      )
 
       const isFavorited = curiosity.favoritedBy.some((u) => u.id === user.id)
-      console.log('⭐ [BibleCuriositiesController] Já está favoritado?', isFavorited)
 
       if (isFavorited) {
-        console.log('➖ [BibleCuriositiesController] Removendo dos favoritos...')
         await curiosity.related('favoritedBy').detach([user.id])
         curiosity.likesCount = Math.max(0, (curiosity.likesCount || 0) - 1)
         await curiosity.save()
       } else {
-        console.log('➕ [BibleCuriositiesController] Adicionando aos favoritos...')
         await curiosity.related('favoritedBy').attach([user.id])
         curiosity.likesCount = (curiosity.likesCount || 0) + 1
         await curiosity.save()
@@ -250,9 +205,6 @@ export default class BibleCuriositiesController {
       const resultMessage = isFavorited
         ? 'Curiosidade removida dos favoritos'
         : 'Curiosidade adicionada aos favoritos'
-
-      console.log('✅ [BibleCuriositiesController]', resultMessage)
-      console.log('📤 [BibleCuriositiesController] isFavorited final:', !isFavorited)
 
       return response.ok({
         success: true,
@@ -265,10 +217,6 @@ export default class BibleCuriositiesController {
       })
     } catch (error) {
       console.error('❌ [BibleCuriositiesController] Erro ao favoritar curiosidade:', error)
-      console.error(
-        '❌ [BibleCuriositiesController] Stack trace:',
-        error instanceof Error ? error.stack : 'N/A'
-      )
       return response.badRequest({
         success: false,
         message: 'Erro ao favoritar curiosidade',

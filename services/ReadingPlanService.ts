@@ -3,6 +3,30 @@ import DatabaseService from "./DatabaseService";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:1999";
 
+type BackendPlan = {
+  id: number | string;
+  name: string;
+  type?: string;
+  currentDay?: number;
+  totalDays?: number;
+  completedDays?: number;
+  completedChapters?: number;
+  totalChapters?: number;
+  progress?: number;
+  startDate?: string;
+  endDate?: string;
+};
+
+type BackendReading = {
+  id: number | string;
+  day: number;
+  bookName: string;
+  startChapter: number;
+  endChapter: number;
+  isCompleted: boolean;
+  completedAt?: string | null;
+};
+
 export class ReadingPlanService {
   async createDefaultAnnualPlan(customName: string): Promise<ReadingPlan> {
     try {
@@ -740,7 +764,115 @@ export class ReadingPlanService {
     }
   }
 
+  private mapBackendPlan(plan: BackendPlan): ReadingPlan {
+    return {
+      id: String(plan.id),
+      name: plan.name,
+      type: this.mapBackendPlanType(plan.type),
+      startDate: plan.startDate || new Date().toISOString(),
+      endDate: plan.endDate || plan.startDate || new Date().toISOString(),
+      isActive: true,
+      createdDate: plan.startDate || new Date().toISOString(),
+      totalDays: plan.totalDays || 0,
+      completedDays: plan.completedDays || 0,
+      currentDay: plan.currentDay,
+      completedChapters: plan.completedChapters,
+      totalChapters: plan.totalChapters,
+      progress: plan.progress,
+    };
+  }
+
+  private mapBackendPlanType(type?: string): ReadingPlan["type"] {
+    if (type === "yearly" || type === "monthly") {
+      return type;
+    }
+
+    return "custom";
+  }
+
+  private mapBackendReadingsToPlanDays(
+    plan: BackendPlan,
+    readings: BackendReading[],
+  ): ReadingPlanDay[] {
+    const readingsByDay = new Map<number, BackendReading[]>();
+
+    for (const reading of readings) {
+      const dayReadings = readingsByDay.get(reading.day) || [];
+      dayReadings.push(reading);
+      readingsByDay.set(reading.day, dayReadings);
+    }
+
+    return Array.from(readingsByDay.entries())
+      .sort(([dayA], [dayB]) => dayA - dayB)
+      .map(([dayNumber, dayReadings]) => {
+        const completedReadings = dayReadings.filter((reading) => reading.isCompleted);
+        const completedDate = completedReadings
+          .map((reading) => reading.completedAt)
+          .filter(Boolean)
+          .sort()
+          .at(-1);
+
+        return {
+          id: this.getBackendDayId(plan.id, dayNumber),
+          planId: String(plan.id),
+          dayNumber,
+          date: this.getDateForBackendDay(plan.startDate, dayNumber),
+          readings: dayReadings.map((reading) => ({
+            id: String(reading.id),
+            bookId: 0,
+            bookName: reading.bookName,
+            startChapter: reading.startChapter,
+            endChapter: reading.endChapter,
+          })),
+          isCompleted:
+            dayReadings.length > 0 &&
+            completedReadings.length === dayReadings.length,
+          completedDate: completedDate || undefined,
+        };
+      });
+  }
+
+  private getBackendDayId(planId: string | number, dayNumber: number): string {
+    return `backend_plan_day_${planId}_${dayNumber}`;
+  }
+
+  private parseBackendDayId(dayId: string): { planId: string; dayNumber: number } | null {
+    const match = dayId.match(/^backend_plan_day_(.+)_(\d+)$/);
+
+    if (!match) {
+      return null;
+    }
+
+    return {
+      planId: match[1],
+      dayNumber: Number(match[2]),
+    };
+  }
+
+  private getDateForBackendDay(startDate: string | undefined, dayNumber: number): string {
+    const date = startDate ? new Date(startDate) : new Date();
+
+    if (Number.isNaN(date.getTime())) {
+      return new Date().toISOString();
+    }
+
+    date.setDate(date.getDate() + dayNumber - 1);
+    return date.toISOString();
+  }
+
   async getActivePlans(): Promise<ReadingPlan[]> {
+    const authService = (await import("./AuthService")).default;
+
+    if (authService.isAuthenticated()) {
+      const response = await authService.getActivePlan();
+
+      if (!response.success || !response.data?.plan) {
+        return [];
+      }
+
+      return [this.mapBackendPlan(response.data.plan as BackendPlan)];
+    }
+
     await DatabaseService.init();
     const db = (DatabaseService as any).db;
 
@@ -762,6 +894,30 @@ export class ReadingPlanService {
   }
 
   async getPlanDays(planId: string): Promise<ReadingPlanDay[]> {
+    const authService = (await import("./AuthService")).default;
+
+    if (authService.isAuthenticated()) {
+      const [planResponse, readingsResponse] = await Promise.all([
+        authService.getActivePlan(),
+        authService.getAllPlanReadings(),
+      ]);
+
+      if (
+        !planResponse.success ||
+        !planResponse.data?.plan ||
+        String(planResponse.data.plan.id) !== String(planId) ||
+        !readingsResponse.success ||
+        !readingsResponse.data
+      ) {
+        return [];
+      }
+
+      return this.mapBackendReadingsToPlanDays(
+        planResponse.data.plan as BackendPlan,
+        readingsResponse.data as BackendReading[],
+      );
+    }
+
     await DatabaseService.init();
     const db = (DatabaseService as any).db;
 
@@ -783,6 +939,20 @@ export class ReadingPlanService {
 
   async markDayAsCompleted(dayId: string): Promise<void> {
     console.log(`📝 [markDayAsCompleted] Iniciando marcação do dia ${dayId}`);
+
+    const backendDay = this.parseBackendDayId(dayId);
+    const authService = (await import("./AuthService")).default;
+
+    if (backendDay && authService.isAuthenticated()) {
+      console.log("☁️ [markDayAsCompleted] Marcando dia no backend...");
+      const response = await authService.completeDay(backendDay.dayNumber);
+
+      if (!response.success) {
+        throw new Error(response.message || "Falha ao marcar dia como concluído");
+      }
+
+      return;
+    }
 
     await DatabaseService.init();
     const db = (DatabaseService as any).db;
@@ -871,6 +1041,22 @@ export class ReadingPlanService {
     console.log(
       `🗑️ [ReadingPlanService] Iniciando exclusão do plano: ${planId}`,
     );
+
+    const authService = (await import("./AuthService")).default;
+
+    if (authService.isAuthenticated()) {
+      const activePlan = await authService.getActivePlan();
+
+      if (activePlan.success && String(activePlan.data?.plan?.id) === String(planId)) {
+        const response = await authService.deletePlan();
+
+        if (!response.success) {
+          throw new Error(response.message || "Falha ao excluir plano");
+        }
+
+        return;
+      }
+    }
 
     await DatabaseService.init();
     const db = (DatabaseService as any).db;

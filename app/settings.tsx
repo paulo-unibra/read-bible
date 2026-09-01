@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { FocusRadius, getFocusColors, getFocusShadow } from '../constants/design';
 import authService from '../services/AuthService';
 import DatabaseService from '../services/DatabaseService';
 import googleDriveService from '../services/GoogleDriveService';
@@ -93,19 +94,21 @@ export default function SettingsScreen() {
     }
   }, [fontSize]);
 
+  const focus = getFocusColors(isDark);
+  const focusShadow = getFocusShadow(isDark);
   const colors = {
-    bg: isDark ? '#121212' : '#f5f5f5',
-    headerBg: isDark ? '#1d1d1d' : '#fff',
-    sectionBg: isDark ? '#1e1e1e' : '#fff',
-    border: isDark ? '#2b2b2b' : '#e0e0e0',
-    cardBorder: isDark ? '#2b2b2b' : '#ddd',
-    textPrimary: isDark ? '#e0e0e0' : '#333',
-    textSecondary: isDark ? '#b0b0b0' : '#666',
-    accent: isDark ? '#90caf9' : '#2196F3',
-    selectedBg: isDark ? '#263850' : '#2196F3',
+    bg: focus.screen,
+    headerBg: focus.screen,
+    sectionBg: focus.screen,
+    border: focus.line,
+    cardBorder: focus.line,
+    textPrimary: focus.text,
+    textSecondary: focus.muted,
+    accent: focus.blue,
+    selectedBg: focus.blue,
     dangerBg: isDark ? '#3a1f1f' : '#fff5f5',
-    dangerBorder: isDark ? '#873838' : '#f44336',
-    dangerText: isDark ? '#ff8a80' : '#f44336',
+    dangerBorder: focus.danger,
+    dangerText: focus.danger,
   } as const;
 
   const handleNotificationToggle = async (enabled: boolean) => {
@@ -288,7 +291,7 @@ export default function SettingsScreen() {
 
       <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 40 }}>
         {/* Bible Selection */}
-        <View style={[styles.section, { backgroundColor: colors.sectionBg }]}>
+        <View style={[styles.section, { backgroundColor: colors.sectionBg }, focusShadow]}>
           <Text style={[styles.sectionTitle, { color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Bíblia Preferida</Text>
           <Text style={[styles.sectionDescription, { color: colors.textSecondary }] }>
             Selecione a versão da Bíblia que será usada por padrão
@@ -342,7 +345,7 @@ export default function SettingsScreen() {
         </View>
 
         {/* Font Size */}
-        <View style={[styles.section, { backgroundColor: colors.sectionBg }]}>
+        <View style={[styles.section, { backgroundColor: colors.sectionBg }, focusShadow]}>
           <Text style={[styles.sectionTitle, { color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Tamanho da Fonte</Text>
           <View style={styles.optionsContainer}>
             {[
@@ -375,7 +378,7 @@ export default function SettingsScreen() {
         </View>
 
         {/* Theme */}
-        <View style={[styles.section, { backgroundColor: colors.sectionBg }]}>
+        <View style={[styles.section, { backgroundColor: colors.sectionBg }, focusShadow]}>
           <Text style={[styles.sectionTitle, { color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Tema</Text>
           <View style={styles.optionsContainer}>
             {[
@@ -407,7 +410,7 @@ export default function SettingsScreen() {
         </View>
 
         {/* Notifications */}
-        <View style={[styles.section, { backgroundColor: colors.sectionBg }]}>
+        <View style={[styles.section, { backgroundColor: colors.sectionBg }, focusShadow]}>
           <Text style={[styles.sectionTitle, { color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Notificações Diárias</Text>
           <View style={styles.switchContainer}>
             <Text style={[styles.switchLabel, { color: colors.textPrimary, fontSize: applyFontScale(16) }]}>Receber lembretes diários</Text>
@@ -431,7 +434,7 @@ export default function SettingsScreen() {
         </View>
 
         {/* Account Management */}
-        <View style={[styles.section, { backgroundColor: colors.sectionBg }]}>
+        <View style={[styles.section, { backgroundColor: colors.sectionBg }, focusShadow]}>
           <Text style={[styles.sectionTitle, { color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Conta</Text>
           
           <TouchableOpacity 
@@ -452,7 +455,7 @@ export default function SettingsScreen() {
         </View>
 
         {/* Data Management */}
-        <View style={[styles.section, { backgroundColor: colors.sectionBg }]}>
+        <View style={[styles.section, { backgroundColor: colors.sectionBg }, focusShadow]}>
           <Text style={[styles.sectionTitle, { color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Gerenciar Dados</Text>
           <TouchableOpacity style={[styles.dangerButton, { backgroundColor: colors.dangerBg, borderColor: colors.dangerBorder }]} onPress={clearAllData}>
             <Ionicons name="trash-outline" size={24} color={colors.dangerText} />
@@ -461,7 +464,7 @@ export default function SettingsScreen() {
         </View>
 
         {/* App Info */}
-        <View style={[styles.section, { backgroundColor: colors.sectionBg }]}>
+        <View style={[styles.section, { backgroundColor: colors.sectionBg }, focusShadow]}>
           <Text style={[styles.sectionTitle, { color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Sobre o App</Text>
           <View style={styles.infoContainer}>
             <Text style={[styles.infoText, { color: colors.textSecondary }]}>{`Bíblia em Foco v1.0.5`}</Text>
@@ -482,18 +485,23 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },
   backButton: {
-    padding: 8,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginRight: 16,
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: '#333',
   },
   content: {
@@ -501,13 +509,15 @@ const styles = StyleSheet.create({
   },
   section: {
     backgroundColor: '#fff',
+    marginHorizontal: 16,
     marginTop: 16,
     paddingHorizontal: 16,
     paddingVertical: 20,
+    borderRadius: FocusRadius.lg,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: '#333',
     marginBottom: 8,
   },
@@ -526,7 +536,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: '#ddd',
-    borderRadius: 8,
+    borderRadius: FocusRadius.sm,
   },
   selectedOption: {
     backgroundColor: '#2196F3',
@@ -594,7 +604,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: '#f44336',
-    borderRadius: 8,
+    borderRadius: FocusRadius.sm,
     backgroundColor: '#fff5f5',
   },
   dangerButtonText: {

@@ -16,6 +16,8 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import AdBanner from "../components/AdBanner";
+import FocusBottomNav, { FOCUS_BOTTOM_NAV_HEIGHT } from "../components/FocusBottomNav";
+import { FocusRadius, getFocusColors, getFocusShadow } from "../constants/design";
 import DatabaseService from "../services/DatabaseService";
 import harpaOfflineService from "../services/HarpaOfflineService";
 
@@ -232,15 +234,17 @@ export default function HarpaScreen() {
   };
 
   const isDark = theme === "dark";
+  const focus = getFocusColors(isDark);
+  const focusShadow = getFocusShadow(isDark);
   const colors = {
-    bg: isDark ? "#121212" : "#f5f5f5",
-    headerBg: isDark ? "#1d1d1d" : "#fff",
-    border: isDark ? "#2b2b2b" : "#e0e0e0",
-    card: isDark ? "#1e1e1e" : "#fff",
-    textPrimary: isDark ? "#e0e0e0" : "#333",
-    textSecondary: isDark ? "#b0b0b0" : "#666",
-    accent: isDark ? "#81c784" : "#4CAF50",
-    searchBg: isDark ? "#2b2b2b" : "#f0f0f0",
+    bg: focus.screen,
+    headerBg: focus.screen,
+    border: focus.line,
+    card: focus.screen,
+    textPrimary: focus.text,
+    textSecondary: focus.muted,
+    accent: focus.blue,
+    searchBg: focus.surface,
   };
 
   // Não renderizar nada até o tema estar carregado
@@ -364,7 +368,7 @@ export default function HarpaScreen() {
   const renderHymnItem = ({ item }: { item: HymnListItem }) => {
     return (
       <TouchableOpacity
-        style={[styles.hymnCard, { backgroundColor: colors.card }]}
+        style={[styles.hymnCard, { backgroundColor: colors.card }, focusShadow]}
         onPress={() => {
           router.push({
             pathname: "/hymn-viewer",
@@ -372,6 +376,11 @@ export default function HarpaScreen() {
           });
         }}
       >
+        <View style={[styles.hymnNumber, { backgroundColor: focus.blueSoft }]}>
+          <Text style={[styles.hymnNumberText, { color: colors.accent }]}>
+            {item.number}
+          </Text>
+        </View>
         <View style={styles.hymnInfo}>
           <Text
             style={[
@@ -380,7 +389,7 @@ export default function HarpaScreen() {
             ]}
             numberOfLines={2}
           >
-            {String(item.number).padStart(3, "0")} - {item.title}
+            {item.title}
           </Text>
           {item.snippet && renderHighlightedSnippet(item.snippet)}
         </View>
@@ -396,38 +405,41 @@ export default function HarpaScreen() {
   // Se não baixou ainda, mostrar tela de download
   if (!isDownloaded) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
-        <StatusBar
-          barStyle={isDark ? "light-content" : "dark-content"}
-          backgroundColor={colors.headerBg}
-        />
-        <View
-          style={[
-            styles.header,
-            {
-              backgroundColor: colors.headerBg,
-              borderBottomColor: colors.border,
-            },
-          ]}
-        >
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={styles.backButton}
-          >
-            <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
-          </TouchableOpacity>
-          <Text
+      <>
+        <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
+          <StatusBar
+            barStyle={isDark ? "light-content" : "dark-content"}
+            backgroundColor={colors.headerBg}
+          />
+          <View
             style={[
-              styles.headerTitle,
-              { color: colors.textPrimary, fontSize: applyFontScale(20) },
+              styles.header,
+              {
+                backgroundColor: colors.headerBg,
+                borderBottomColor: colors.border,
+              },
             ]}
           >
-            Harpa Cristã
-          </Text>
-          <View style={{ width: 40 }} />
-        </View>
-        {renderDownloadScreen()}
-      </SafeAreaView>
+            <TouchableOpacity
+              onPress={() => router.back()}
+              style={styles.backButton}
+            >
+              <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
+            </TouchableOpacity>
+            <Text
+              style={[
+                styles.headerTitle,
+                { color: colors.textPrimary, fontSize: applyFontScale(20) },
+              ]}
+            >
+              Harpa Cristã
+            </Text>
+            <View style={{ width: 40 }} />
+          </View>
+          {renderDownloadScreen()}
+        </SafeAreaView>
+        <FocusBottomNav active="harpa" />
+      </>
     );
   }
 
@@ -510,7 +522,7 @@ export default function HarpaScreen() {
           renderItem={renderHymnItem}
           keyExtractor={(item) => item.number.toString()}
           contentContainerStyle={{
-            paddingBottom: 80,
+            paddingBottom: FOCUS_BOTTOM_NAV_HEIGHT + 84 + insets.bottom,
             paddingHorizontal: 16,
             paddingTop: 16,
           }}
@@ -546,11 +558,15 @@ export default function HarpaScreen() {
       <View
         style={[
           styles.bannerContainer,
-          { backgroundColor: colors.bg, paddingBottom: insets.bottom },
+          {
+            backgroundColor: colors.bg,
+            bottom: FOCUS_BOTTOM_NAV_HEIGHT + Math.max(8, insets.bottom),
+          },
         ]}
       >
         <AdBanner />
       </View>
+      <FocusBottomNav active="harpa" />
     </>
   );
 }
@@ -564,15 +580,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 10,
     borderBottomWidth: 1,
   },
   backButton: {
-    padding: 8,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: "bold",
+    fontWeight: "600",
   },
   searchContainer: {
     paddingHorizontal: 16,
@@ -581,9 +601,10 @@ const styles = StyleSheet.create({
   searchInputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 12,
+    minHeight: 48,
+    paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 8,
+    borderRadius: FocusRadius.sm,
     gap: 8,
   },
   searchInput: {
@@ -593,9 +614,9 @@ const styles = StyleSheet.create({
   hymnCard: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 12,
+    padding: 11,
     marginBottom: 12,
-    borderRadius: 12,
+    borderRadius: FocusRadius.sm,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -603,24 +624,23 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   hymnNumber: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
   },
   hymnNumberText: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#fff",
+    fontSize: 15,
+    fontWeight: "600",
   },
   hymnInfo: {
     flex: 1,
   },
   hymnTitle: {
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: "500",
     marginBottom: 4,
   },
   hymnSnippet: {
@@ -691,7 +711,7 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 24,
     paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: FocusRadius.pill,
   },
   retryButtonText: {
     fontSize: 16,
@@ -744,7 +764,7 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: 32,
     paddingVertical: 16,
-    borderRadius: 12,
+    borderRadius: FocusRadius.sm,
   },
   downloadButtonText: {
     fontSize: 16,
@@ -763,12 +783,12 @@ const styles = StyleSheet.create({
   progressBar: {
     width: "100%",
     height: 8,
-    borderRadius: 4,
+    borderRadius: FocusRadius.pill,
     overflow: "hidden",
   },
   progressFill: {
     height: "100%",
-    borderRadius: 4,
+    borderRadius: FocusRadius.pill,
   },
   errorContainer: {
     alignItems: "center",

@@ -26,6 +26,7 @@ export interface AuthResponse {
 export interface ReadingPlan {
   id: number;
   name: string;
+  type?: string;
   currentDay: number;
   totalDays: number;
   chaptersPerDay: number;
@@ -33,6 +34,7 @@ export interface ReadingPlan {
   totalChapters: number;
   completedDays: number;
   startDate: string;
+  endDate: string;
   progress: number;
 }
 

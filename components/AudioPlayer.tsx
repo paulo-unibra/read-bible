@@ -2,14 +2,15 @@ import { Ionicons } from "@expo/vector-icons";
 import Slider from "@react-native-community/slider";
 import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
+  ActivityIndicator,
+  Alert,
     Modal,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
 } from "react-native";
+import { getFocusColors } from "../constants/design";
 import AudioService from "../services/AudioService";
 import AdBanner from "./AdBanner";
 interface AudioPlayerProps {
@@ -372,15 +373,14 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
   const downloadProgress = audioState.downloadProgress || 0;
   const showProgress =
     isLoading && downloadProgress > 0 && downloadProgress < 100;
-  const iconColor = isDark ? "#90caf9" : "#2196F3";
-  const iconBg = isDark ? "#2a2a2a" : "#f8f9fa";
+  const focus = getFocusColors(isDark);
 
   return (
     <>
       <TouchableOpacity
         style={[
           styles.audioButton,
-          { backgroundColor: iconBg, borderColor: iconColor },
+          { backgroundColor: focus.blueSoft },
           isCurrentChapter && audioState.isPlaying && styles.audioButtonPlaying,
         ]}
         onPress={handleAudioPress}
@@ -388,22 +388,17 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
       >
         {isLoading ? (
           showProgress ? (
-            <Text style={[styles.progressText, { color: iconColor }]}>
+            <Text style={[styles.progressText, { color: focus.blue }]}>
               {downloadProgress}%
             </Text>
           ) : (
-            <ActivityIndicator size="small" color={iconColor} />
+            <ActivityIndicator size="small" color={focus.blue} />
           )
         ) : (
-          <Ionicons
-            name={
-              isCurrentChapter && audioState.isPlaying
-                ? "volume-high"
-                : "headset"
-            }
-            size={20}
-            color={iconColor}
-          />
+          <>
+            <Ionicons name="headset" size={17} color={focus.blue} />
+            <Text style={[styles.audioButtonText, { color: focus.blue }]}>Ouvir</Text>
+          </>
         )}
       </TouchableOpacity>
 
@@ -420,17 +415,24 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
 
 const styles = StyleSheet.create({
   audioButton: {
-    width: 36,
+    minWidth: 76,
     height: 36,
+    paddingHorizontal: 13,
     borderRadius: 18,
+    flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 1,
+    gap: 6,
+    borderWidth: 0,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
+  },
+  audioButtonText: {
+    fontSize: 14,
+    fontWeight: "500",
   },
   audioButtonPlaying: {
     shadowColor: "#2196F3",

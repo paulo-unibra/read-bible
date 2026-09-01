@@ -25,16 +25,18 @@ export default function RootLayout() {
     })();
   }, []);
 
+  const bottomNavScreenOptions = { animation: "none" as const };
+
   return (
     <ThemeProviderCustom>
       <ThemeProvider value={userTheme === "dark" ? DarkTheme : DefaultTheme}>
         <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="index" />
+          <Stack.Screen name="index" options={bottomNavScreenOptions} />
           <Stack.Screen name="explore" />
           <Stack.Screen name="bible-manager" />
           <Stack.Screen name="free-reading" />
-          <Stack.Screen name="chapter-reader" />
-          <Stack.Screen name="reading-plans" />
+          <Stack.Screen name="chapter-reader" options={bottomNavScreenOptions} />
+          <Stack.Screen name="reading-plans" options={bottomNavScreenOptions} />
           <Stack.Screen name="settings" />
           <Stack.Screen name="quiz" />
           <Stack.Screen name="login" />
@@ -45,7 +47,8 @@ export default function RootLayout() {
           <Stack.Screen name="video-list" />
           <Stack.Screen name="videos" />
           <Stack.Screen name="video-player" />
-          <Stack.Screen name="dicionario" />
+          <Stack.Screen name="harpa" options={bottomNavScreenOptions} />
+          <Stack.Screen name="dicionario" options={bottomNavScreenOptions} />
           <Stack.Screen name="dicionario-verbete" />
           <Stack.Screen
             name="modal"

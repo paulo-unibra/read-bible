@@ -1,4 +1,5 @@
 import { defineConfig } from '@adonisjs/cors'
+import env from '#start/env'
 
 /**
  * Configuration options to tweak the CORS policy. The following
@@ -10,9 +11,23 @@ const corsConfig = defineConfig({
   enabled: true,
   origin: (origin) => {
     // Permitir localhost em qualquer porta
-    if (!origin || origin.includes('localhost') || origin.includes('127.0.0.1')) {
+    if (!origin) {
       return true
     }
+
+    try {
+      const { hostname } = new URL(origin)
+      if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        return true
+      }
+    } catch {
+      return false
+    }
+
+    if (origin === env.get('ADMIN_ORIGIN', '')) {
+      return true
+    }
+
     return false
   },
   methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],

@@ -21,8 +21,12 @@ import {
     useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import AudioPlayer from "../components/AudioPlayer";
+import FocusBottomNav, {
+  FOCUS_BOTTOM_NAV_HEIGHT,
+} from "../components/FocusBottomNav";
 import { IntroductionRenderer } from "../components/IntroductionRenderer";
 import QuizButton from "../components/QuizButton";
+import { FocusRadius, getFocusColors, getFocusShadow } from "../constants/design";
 import AudioService from "../services/AudioService";
 import AuthService from "../services/AuthService";
 import bibleReaderService from "../services/BibleReaderService";
@@ -236,28 +240,30 @@ export default function ChapterReaderScreen() {
   };
 
   const isDark = readerTheme === "dark";
+  const focus = getFocusColors(isDark);
+  const focusShadow = getFocusShadow(isDark);
   // Paleta ajustada para suavizar o branco e links no modo escuro
   const colorScheme = {
-    verseText: isDark ? "#d4d4d4" : "#333",
-    verseNumber: isDark ? "#7fb4e8" : "#2196F3",
+    verseText: focus.text,
+    verseNumber: focus.blue,
     refSymbol: isDark ? "#6fa87b" : "#1b5e20",
-    noteSymbol: isDark ? "#6a8fbf" : "#1565c0",
-    dash: isDark ? "#b0b0b0" : "#222",
-    icon: isDark ? "#e0e6ed" : "#2196F3", // ícone claro suave no dark
-    iconInactive: isDark ? "#b0b6bd" : "#666", // ícone inativo no dark
+    noteSymbol: focus.blueDark,
+    dash: focus.text,
+    icon: focus.blue,
+    iconInactive: focus.muted,
   } as const;
   const verseTextDynamic = {
     fontSize: applyFontScale(16),
     color: colorScheme.verseText,
     lineHeight: applyFontScale(24),
   } as const;
-  const screenBackground = { backgroundColor: isDark ? "#121212" : "#f5f5f5" };
-  const versesListBg = { backgroundColor: isDark ? "#121212" : "#fff" };
+  const screenBackground = { backgroundColor: focus.screen };
+  const versesListBg = { backgroundColor: focus.screen };
   const headerBg = {
-    backgroundColor: isDark ? "#1d1d1d" : "#fff",
-    borderBottomColor: isDark ? "#2b2b2b" : "#e0e0e0",
+    backgroundColor: focus.screen,
+    borderBottomColor: focus.line,
   };
-  const chapterHeaderBg = { backgroundColor: isDark ? "#1d1d1d" : "#fff" };
+  const chapterHeaderBg = { backgroundColor: focus.screen };
   const iconColor = colorScheme.icon;
 
   const openSettings = () => setSettingsModalVisible(true);
@@ -2579,8 +2585,8 @@ ${deepLink}`;
               style={[
                 styles.introButton,
                 {
-                  backgroundColor: isDark ? "#2a2a2a" : "#e8e8e8",
-                  borderColor: isDark ? "#444" : "#ccc",
+                  backgroundColor: focus.blueSoft,
+                  borderColor: focus.line,
                 },
               ]}
               accessibilityLabel="Ver introdução do livro"
@@ -2588,7 +2594,7 @@ ${deepLink}`;
               <Ionicons
                 name="book-outline"
                 size={18}
-                color={isDark ? "#64B5F6" : "#1976D2"}
+                color={focus.blue}
               />
             </TouchableOpacity>
           ) : (
@@ -2607,57 +2613,6 @@ ${deepLink}`;
                     isDark={isDark}
                   />
                 )}
-
-                {/* Áudio - só aparece em capítulos normais */}
-                {currentChapter !== 0 && audioAvailable && (
-                  <AudioPlayer
-                    bookId={currentBookId}
-                    chapterNumber={currentChapter}
-                    bookName={book.name}
-                    isDark={isDark}
-                    onRequestNext={async () => {
-                      console.log("[ChapterReader] onRequestNext called", {
-                        navigating,
-                        loading,
-                        currentChapter,
-                      });
-                      if (navigating || loading) {
-                        console.log(
-                          "[ChapterReader] Skipping - already navigating or loading",
-                        );
-                        return;
-                      }
-                      const prevChapter = currentChapter;
-                      console.log(
-                        "[ChapterReader] Navigating to next chapter from",
-                        prevChapter,
-                      );
-                      await navigateChapter("next");
-                      const targetChapter = prevChapter + 1;
-                      console.log(
-                        "[ChapterReader] Starting audio for chapter",
-                        targetChapter,
-                      );
-
-                      // Chamar diretamente sem setTimeout para funcionar com tela bloqueada
-                      try {
-                        await AudioService.loadAndPlay(
-                          currentBookId,
-                          targetChapter,
-                          { bookName: book.name },
-                        );
-                        console.log(
-                          "[ChapterReader] Next audio loaded and playing successfully",
-                        );
-                      } catch (err) {
-                        console.error(
-                          "[ChapterReader] Error loading next audio:",
-                          err,
-                        );
-                      }
-                    }}
-                  />
-                )}
               </>
             )}
 
@@ -2670,7 +2625,7 @@ ${deepLink}`;
               <Ionicons
                 name="settings-outline"
                 size={22}
-                color={isDark ? "#ddd" : "#555"}
+                color={focus.muted}
               />
             </TouchableOpacity>
           </View>
@@ -2685,7 +2640,11 @@ ${deepLink}`;
             style={[styles.versesList, versesListBg]}
             contentContainerStyle={[
               styles.introductionContent,
-              { paddingTop: 16, paddingHorizontal: 16, paddingBottom: 80 },
+              {
+                paddingTop: 16,
+                paddingHorizontal: 16,
+                paddingBottom: FOCUS_BOTTOM_NAV_HEIGHT + 96 + insets.bottom,
+              },
             ]}
             showsVerticalScrollIndicator={false}
           >
@@ -2700,13 +2659,14 @@ ${deepLink}`;
               <View
                 style={[
                   styles.introductionContainer,
-                  isDark && { backgroundColor: "#1a1a1a" },
+                  { backgroundColor: focus.screen },
+                  focusShadow,
                 ]}
               >
                 <Text
                   style={[
                     styles.introductionTitle,
-                    isDark && { color: "#e0e0e0" },
+                    { color: focus.text },
                   ]}
                 >
                   Introdução
@@ -2714,14 +2674,13 @@ ${deepLink}`;
                 <View
                   style={[
                     styles.introductionTextContainer,
-                    isDark && { backgroundColor: "#242424" },
+                    { backgroundColor: focus.surface, borderLeftColor: focus.blue },
                   ]}
                 >
                   <Text
                     style={[
                       styles.introductionText,
                       verseTextDynamic,
-                      isDark && { color: "#888" },
                     ]}
                   >
                     Não há introdução disponível para este livro.
@@ -2752,14 +2711,17 @@ ${deepLink}`;
             }}
             contentContainerStyle={[
               styles.versesListContent,
-              { paddingTop: 8 },
+              {
+                paddingTop: 8,
+                paddingBottom: FOCUS_BOTTOM_NAV_HEIGHT + 108 + insets.bottom,
+              },
             ]}
             ListHeaderComponent={
               <View style={styles.chapterTitleContainer}>
                 <Text
                   style={[
                     styles.chapterTitleH1,
-                    { color: isDark ? "#e8e8e8" : "#222" },
+                    { color: focus.text },
                   ]}
                 >
                   {book?.name} {currentChapter}
@@ -2773,7 +2735,7 @@ ${deepLink}`;
         {chapterLoading && (
           <View style={styles.chapterLoadingOverlay}>
             <View style={styles.chapterLoadingIndicator}>
-              <ActivityIndicator size="small" color="#2196F3" />
+              <ActivityIndicator size="small" color={focus.blue} />
             </View>
           </View>
         )}
@@ -2784,20 +2746,19 @@ ${deepLink}`;
         style={[
           styles.floatingNavigation,
           {
-            bottom: Math.max(30, insets.bottom + 20),
-            backgroundColor: isDark ? "#1e1e1e" : "#fff",
-            borderWidth: isDark ? 1 : 0,
-            borderColor: isDark ? "#2b2b2b" : "transparent",
+            bottom: FOCUS_BOTTOM_NAV_HEIGHT + Math.max(12, insets.bottom),
+            backgroundColor: focus.screen,
+            borderWidth: 1,
+            borderColor: focus.line,
+            ...focusShadow,
           },
         ]}
       >
         <TouchableOpacity
           style={[
             styles.floatingNavButton,
-            isDark && { backgroundColor: "#2a2a2a" },
             (isFirstOfBible || navigating) && [
               styles.floatingNavButtonDisabled,
-              isDark && { backgroundColor: "#333" },
             ],
           ]}
           onPress={() => {
@@ -2818,13 +2779,47 @@ ${deepLink}`;
           />
         </TouchableOpacity>
 
+        {book && currentChapter !== 0 && audioAvailable && (
+          <AudioPlayer
+            bookId={currentBookId}
+            chapterNumber={currentChapter}
+            bookName={book.name}
+            isDark={isDark}
+            onRequestNext={async () => {
+              console.log("[ChapterReader] onRequestNext called", {
+                navigating,
+                loading,
+                currentChapter,
+              });
+              if (navigating || loading) {
+                console.log(
+                  "[ChapterReader] Skipping - already navigating or loading",
+                );
+                return;
+              }
+              const prevChapter = currentChapter;
+              await navigateChapter("next");
+              const targetChapter = prevChapter + 1;
+
+              try {
+                await AudioService.loadAndPlay(currentBookId, targetChapter, {
+                  bookName: book.name,
+                });
+                console.log(
+                  "[ChapterReader] Next audio loaded and playing successfully",
+                );
+              } catch (err) {
+                console.error("[ChapterReader] Error loading next audio:", err);
+              }
+            }}
+          />
+        )}
+
         <TouchableOpacity
           style={[
             styles.floatingNavButton,
-            isDark && { backgroundColor: "#2a2a2a" },
             (isLastOfBible || navigating) && [
               styles.floatingNavButtonDisabled,
-              isDark && { backgroundColor: "#333" },
             ],
           ]}
           onPress={() => {
@@ -2845,6 +2840,8 @@ ${deepLink}`;
           />
         </TouchableOpacity>
       </View>
+
+      <FocusBottomNav active="bible" />
 
       {/* Search Modal */}
       <Modal
@@ -4245,20 +4242,25 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     backgroundColor: "#fff",
     borderBottomWidth: 1,
     borderBottomColor: "#e0e0e0",
   },
   backButton: {
-    padding: 8,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
   },
   headerCenter: {
     flex: 1,
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: "bold",
+    fontWeight: "600",
     color: "#333",
   },
   headerSubtitle: {
@@ -4271,8 +4273,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
   },
   headerButton: {
-    padding: 8,
-    marginLeft: 8,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 4,
   },
   navigationBar: {
     flexDirection: "row",
@@ -4347,8 +4353,8 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
   },
   verseContainer: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: "#f0f0f0",
     flexDirection: "row",
@@ -4836,27 +4842,29 @@ const styles = StyleSheet.create({
   floatingNavigation: {
     position: "absolute",
     left: "50%",
-    marginLeft: -67, // Half of the component width (8+50+16+50+8 = 132, so -66)
+    width: 180,
+    marginLeft: -90,
     flexDirection: "row",
+    justifyContent: "space-between",
     backgroundColor: "#fff",
-    borderRadius: 30,
-    paddingHorizontal: 8,
-    paddingVertical: 8,
+    borderRadius: 28,
+    paddingHorizontal: 5,
+    paddingVertical: 5,
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 2,
     },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
     elevation: 5,
-    gap: 16,
+    gap: 4,
   },
   floatingNavButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "#f8f9fa",
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "transparent",
     justifyContent: "center",
     alignItems: "center",
     shadowColor: "#000",
@@ -4864,12 +4872,11 @@ const styles = StyleSheet.create({
       width: 0,
       height: 1,
     },
-    shadowOpacity: 0.18,
-    shadowRadius: 1.0,
-    elevation: 1,
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   floatingNavButtonDisabled: {
-    backgroundColor: "#e9ecef",
     opacity: 0.5,
   },
   versesListContent: {
@@ -4926,7 +4933,7 @@ const styles = StyleSheet.create({
 
   fixedChapterHeader: {
     paddingHorizontal: 16,
-    paddingVertical: 4,
+    paddingVertical: 8,
     backgroundColor: "#fff",
   },
 
@@ -4964,9 +4971,9 @@ const styles = StyleSheet.create({
   versionHeaderBadge: {
     marginLeft: 4,
     backgroundColor: "#2196F3",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: FocusRadius.pill,
   },
   versionHeaderBadgeText: {
     color: "#fff",
@@ -5441,7 +5448,7 @@ const styles = StyleSheet.create({
   },
   introductionContainer: {
     backgroundColor: "#ffffff",
-    borderRadius: 12,
+    borderRadius: FocusRadius.lg,
     padding: 20,
     marginBottom: 16,
     shadowColor: "#000",
@@ -5471,7 +5478,7 @@ const styles = StyleSheet.create({
   },
   introductionTextContainer: {
     backgroundColor: "#f8f9fa",
-    borderRadius: 8,
+    borderRadius: FocusRadius.sm,
     padding: 16,
     borderLeftWidth: 4,
     borderLeftColor: "#3498db",
@@ -5490,12 +5497,13 @@ const styles = StyleSheet.create({
   },
   chapterTitleH1: {
     fontSize: 28,
-    fontWeight: "700",
-    letterSpacing: 0.5,
+    fontWeight: "600",
+    letterSpacing: -0.4,
   },
   introButton: {
-    padding: 8,
-    borderRadius: 6,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     borderWidth: 1,
     marginRight: 8,
     justifyContent: "center",

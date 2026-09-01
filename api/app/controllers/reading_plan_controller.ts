@@ -630,6 +630,7 @@ export default class ReadingPlanController {
             totalChapters: plan.totalChapters,
             completedDays: completedDays,
             startDate: plan.startDate.toISO(),
+            endDate: plan.endDate.toISO(),
             progress: Math.round((plan.completedChapters / plan.totalChapters) * 100),
           },
           todayReadings: todayReading.map((r) => ({

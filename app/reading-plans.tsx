@@ -1,40 +1,65 @@
-import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Calendar } from 'react-native-calendars';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import readingPlanService from '../services/ReadingPlanService';
-import { ReadingPlan, ReadingPlanDay } from '../types';
+import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useEffect, useState } from "react";
+import {
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import FocusBottomNav, {
+  FOCUS_BOTTOM_NAV_HEIGHT,
+} from "../components/FocusBottomNav";
+import authService from "../services/AuthService";
+import readingPlanService from "../services/ReadingPlanService";
+import { ReadingPlan, ReadingPlanDay } from "../types";
 
 export default function ReadingPlansScreen() {
   const router = useRouter();
   const [plans, setPlans] = useState<ReadingPlan[]>([]);
   const [selectedPlan, setSelectedPlan] = useState<ReadingPlan | null>(null);
   const [planDays, setPlanDays] = useState<ReadingPlanDay[]>([]);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
-    loadPlans();
+    checkAuthAndLoadPlans();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reload plans when screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      loadPlans();
-    }, []) // eslint-disable-line react-hooks/exhaustive-deps
+      checkAuthAndLoadPlans();
+    }, []), // eslint-disable-line react-hooks/exhaustive-deps
   );
+
+  const checkAuthAndLoadPlans = async () => {
+    await authService.init().catch(() => {});
+    const authenticated = authService.isAuthenticated();
+    setIsAuthenticated(authenticated);
+    setAuthChecked(true);
+    if (authenticated) {
+      await loadPlans();
+    }
+  };
 
   const loadPlans = async () => {
     try {
       const activePlans = await readingPlanService.getActivePlans();
       setPlans(activePlans);
-      
-      if (activePlans.length > 0 && !selectedPlan) {
-        selectPlan(activePlans[0]);
+
+      if (activePlans.length > 0) {
+        const planToSelect =
+          activePlans.find((plan) => plan.id === selectedPlan?.id) ||
+          activePlans[0];
+        await selectPlan(planToSelect);
       }
     } catch (error) {
-      console.error('Error loading plans:', error);
-      Alert.alert('Erro', 'Falha ao carregar planos de leitura');
+      console.error("Error loading plans:", error);
+      Alert.alert("Erro", "Falha ao carregar planos de leitura");
     }
   };
 
@@ -44,190 +69,277 @@ export default function ReadingPlansScreen() {
       const days = await readingPlanService.getPlanDays(plan.id);
       setPlanDays(days);
     } catch (error) {
-      console.error('Error loading plan days:', error);
-      Alert.alert('Erro', 'Falha ao carregar dias do plano');
+      console.error("Error loading plan days:", error);
+      Alert.alert("Erro", "Falha ao carregar dias do plano");
     }
   };
-
-
 
   const markDayAsCompleted = async (day: ReadingPlanDay) => {
     try {
       await readingPlanService.markDayAsCompleted(day.id);
-      
-      // Update local state
-      setPlanDays(days => 
-        days.map(d => 
-          d.id === day.id 
-            ? { ...d, isCompleted: true, completedDate: new Date().toISOString() }
-            : d
-        )
-      );
-      
-      Alert.alert('Parabéns!', 'Leitura marcada como concluída! 🎉');
+
+      await loadPlans();
+
+      Alert.alert("Parabéns!", "Leitura marcada como concluída! 🎉");
     } catch (error) {
-      console.error('Error marking day as completed:', error);
-      Alert.alert('Erro', 'Falha ao marcar dia como concluído');
+      console.error("Error marking day as completed:", error);
+      Alert.alert("Erro", "Falha ao marcar dia como concluído");
     }
   };
 
-  const deletePlan = async (plan: ReadingPlan) => {
-    Alert.alert(
-      'Excluir Plano',
-      `Deseja realmente excluir o plano "${plan.name}"? Esta ação não pode ser desfeita.`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Excluir',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await readingPlanService.deletePlan(plan.id);
-              
-              // Update local state
-              const updatedPlans = plans.filter(p => p.id !== plan.id);
-              setPlans(updatedPlans);
-              
-              // If deleted plan was selected, select another or clear
-              if (selectedPlan?.id === plan.id) {
-                if (updatedPlans.length > 0) {
-                  selectPlan(updatedPlans[0]);
-                } else {
-                  setSelectedPlan(null);
-                  setPlanDays([]);
-                }
-              }
-              
-              Alert.alert('Sucesso', 'Plano excluído com sucesso!');
-            } catch (error) {
-              console.error('Error deleting plan:', error);
-              Alert.alert('Erro', 'Falha ao excluir plano');
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  const getCalendarMarkedDates = () => {
-    const marked: any = {};
-    
-    planDays.forEach(day => {
-      const dateKey = day.date.split('T')[0];
-      marked[dateKey] = {
-        marked: true,
-        dotColor: day.isCompleted ? '#4CAF50' : '#2196F3',
-        selectedColor: day.isCompleted ? '#4CAF50' : '#2196F3',
-      };
+  const openDailyReading = (day: ReadingPlanDay) => {
+    router.push({
+      pathname: "/daily-reading",
+      params: {
+        readings: JSON.stringify(
+          day.readings.map((reading) => ({
+            id: Number(reading.id) || 0,
+            day: day.dayNumber,
+            bookName: reading.bookName,
+            startChapter: reading.startChapter,
+            endChapter: reading.endChapter,
+            isCompleted: day.isCompleted,
+          })),
+        ),
+        dayNumber: String(day.dayNumber),
+        todayDayId: day.id,
+        hasLocalPlan: "false",
+      },
     });
-    
-    // Mark today
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayStr = today.toISOString().split('T')[0];
-    if (marked[todayStr]) {
-      marked[todayStr].selected = true;
-    } else {
-      marked[todayStr] = { selected: true, selectedColor: '#FF9800' };
-    }
-    
-    return marked;
   };
 
   const getTodayReading = () => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayStr = today.toISOString().split('T')[0];
-    return planDays.find(day => day.date.startsWith(todayStr));
+    if (selectedPlan?.currentDay) {
+      const currentDay = planDays.find(
+        (day) => day.dayNumber === selectedPlan.currentDay,
+      );
+
+      if (currentDay) {
+        return currentDay;
+      }
+    }
+
+    return planDays.find((day) => !day.isCompleted);
   };
 
-  const renderPlan = ({ item }: { item: ReadingPlan }) => (
-    <View style={[
-      styles.planCard,
-      selectedPlan?.id === item.id && styles.selectedPlanCard
-    ]}>
-      <TouchableOpacity 
-        style={styles.planCardContent}
-        onPress={() => selectPlan(item)}
-      >
-        <Text style={styles.planName}>{item.name}</Text>
-        <Text style={styles.planType}>
-          {item.type === 'monthly' ? 'Mensal' : 
-           item.type === 'yearly' ? 'Anual' : 'Personalizado'}
-        </Text>
-        <View style={styles.planProgress}>
-          <Text style={styles.planProgressText}>
-            {item.completedDays}/{item.totalDays} dias
-          </Text>
-          <View style={styles.progressBar}>
-            <View 
-              style={[
-                styles.progressFill,
-                { width: `${(item.completedDays / item.totalDays) * 100}%` }
-              ]}
-            />
+  const getReadingSummary = (day: ReadingPlanDay) =>
+    day.readings
+      .map(
+        (reading) =>
+          `${reading.bookName} ${reading.startChapter}${reading.endChapter !== reading.startChapter ? `-${reading.endChapter}` : ""}`,
+      )
+      .join(", ");
+
+  const getChaptersCount = (day: ReadingPlanDay) =>
+    day.readings.reduce(
+      (sum, reading) => sum + reading.endChapter - reading.startChapter + 1,
+      0,
+    );
+
+  const getCompletedChapters = () =>
+    selectedPlan?.completedChapters ??
+    planDays
+      .filter((day) => day.isCompleted)
+      .reduce((sum, day) => sum + getChaptersCount(day), 0);
+
+  const getTotalChapters = () =>
+    selectedPlan?.totalChapters ??
+    planDays.reduce((sum, day) => sum + getChaptersCount(day), 0);
+
+  const getProgressPercent = () => {
+    const totalChapters = getTotalChapters();
+
+    if (!totalChapters) {
+      return 0;
+    }
+
+    return Math.round((getCompletedChapters() / totalChapters) * 100);
+  };
+
+  const getTestamentLabel = (day: ReadingPlanDay) => {
+    const newTestamentBooks = new Set([
+      "Mateus",
+      "Marcos",
+      "Lucas",
+      "João",
+      "Atos",
+      "Romanos",
+      "1 Coríntios",
+      "2 Coríntios",
+      "Gálatas",
+      "Efésios",
+      "Filipenses",
+      "Colossenses",
+      "1 Tessalonicenses",
+      "2 Tessalonicenses",
+      "1 Timóteo",
+      "2 Timóteo",
+      "Tito",
+      "Filemom",
+      "Hebreus",
+      "Tiago",
+      "1 Pedro",
+      "2 Pedro",
+      "1 João",
+      "2 João",
+      "3 João",
+      "Judas",
+      "Apocalipse",
+    ]);
+
+    const hasOldTestament = day.readings.some(
+      (reading) => !newTestamentBooks.has(reading.bookName),
+    );
+    const hasNewTestament = day.readings.some((reading) =>
+      newTestamentBooks.has(reading.bookName),
+    );
+
+    if (hasOldTestament && hasNewTestament) {
+      return "Antigo e Novo Testamento";
+    }
+
+    return hasNewTestament ? "Novo Testamento" : "Antigo Testamento";
+  };
+
+  const renderTodayReading = (item: ReadingPlanDay) => {
+    const completedChapters = getCompletedChapters();
+    const totalChapters = getTotalChapters();
+    const progressPercent = getProgressPercent();
+    const progressWidth = `${Math.min(100, Math.max(0, progressPercent))}%`;
+    const currentDay = selectedPlan?.currentDay || item.dayNumber;
+    const totalDays = selectedPlan?.totalDays || 0;
+    const remainingDays = Math.max(totalDays - currentDay, 0);
+    const readingSummary = getReadingSummary(item);
+
+    return (
+      <>
+        <View style={styles.todaySummaryRow}>
+          <View>
+            <Text style={styles.todayEyebrow}>Leitura de hoje</Text>
+            <Text style={styles.todayDayLabel}>
+              Dia {item.dayNumber} de {totalDays || "-"}
+            </Text>
+          </View>
+          <View style={styles.statusPill}>
+            <Ionicons name="checkmark-circle" size={18} color="#2E7D32" />
+            <Text style={styles.statusPillText}>
+              {item.isCompleted ? "Concluída" : "Em dia"}
+            </Text>
           </View>
         </View>
-      </TouchableOpacity>
-      <TouchableOpacity 
-        style={styles.deletePlanButton}
-        onPress={() => deletePlan(item)}
-      >
-        <Ionicons name="trash-outline" size={20} color="#f44336" />
-      </TouchableOpacity>
-    </View>
-  );
 
-  const renderReading = ({ item }: { item: ReadingPlanDay }) => (
-    <View style={styles.readingCard}>
-      <View style={styles.readingHeader}>
-        <Text style={styles.readingDay}>Dia {item.dayNumber}</Text>
-        <Text style={styles.readingDate}>
-          {new Date(item.date).toLocaleDateString('pt-BR')}
-        </Text>
-      </View>
-      
-      <View style={styles.readingContent}>
-        {item.readings.map((reading, index) => (
-          <Text key={index} style={styles.readingText}>
-            {reading.bookName} {reading.startChapter}
-            {reading.endChapter !== reading.startChapter && `-${reading.endChapter}`}
-          </Text>
-        ))}
-      </View>
-      
-      {!item.isCompleted ? (
-        <TouchableOpacity 
-          style={styles.completeButton}
-          onPress={() => markDayAsCompleted(item)}
-        >
-          <Ionicons name="checkmark-circle" size={20} color="#fff" />
-          <Text style={styles.completeButtonText}>Marcar como Lida</Text>
-        </TouchableOpacity>
-      ) : (
-        <View style={styles.completedBadge}>
-          <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
-          <Text style={styles.completedText}>Concluída</Text>
+        <View style={styles.readingCard}>
+          <View style={styles.readingCardContent}>
+            <View style={styles.readingIconBubble}>
+              <Ionicons name="book-outline" size={22} color="#2196F3" />
+            </View>
+            <View style={styles.readingTextBlock}>
+              <Text style={styles.readingMeta}>{getTestamentLabel(item)}</Text>
+              <Text style={styles.readingTitle} numberOfLines={2}>
+                {readingSummary}
+              </Text>
+              <Text style={styles.readingSubline}>
+                {getChaptersCount(item)} capítulos para hoje
+              </Text>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={() => openDailyReading(item)}
+          >
+            <Text style={styles.primaryButtonText}>Ler agora</Text>
+            <Ionicons name="arrow-forward" size={18} color="#fff" />
+          </TouchableOpacity>
+
+          {!item.isCompleted ? (
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              onPress={() => markDayAsCompleted(item)}
+            >
+              <View style={styles.radioCircle} />
+              <Text style={styles.secondaryButtonText}>Marcar como lida</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.secondaryButton}>
+              <Ionicons name="checkmark-circle" size={20} color="#2E7D32" />
+              <Text style={styles.secondaryButtonText}>Leitura concluída</Text>
+            </View>
+          )}
         </View>
-      )}
-    </View>
-  );
+
+        <View style={styles.progressCard}>
+          <View style={styles.progressHeaderRow}>
+            <View>
+              <Text style={styles.progressLabel}>Progresso do plano</Text>
+              <Text style={styles.progressStrong}>
+                {completedChapters} de {totalChapters.toLocaleString("pt-BR")} capítulos
+              </Text>
+            </View>
+            <Text style={styles.progressPercent}>{progressPercent}%</Text>
+          </View>
+          <View style={styles.planProgressBar}>
+            <View style={[styles.planProgressFill, { width: progressWidth }]} />
+          </View>
+          <View style={styles.progressFooterRow}>
+            <Text style={styles.progressFooterText}>Iniciado há {currentDay} dias</Text>
+            <Text style={styles.progressFooterText}>
+              {remainingDays} dias restantes
+            </Text>
+          </View>
+        </View>
+      </>
+    );
+  };
 
   const todayReading = getTodayReading();
+
+  if (authChecked && !isAuthenticated) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Plano de leitura</Text>
+          <View style={{ width: 40 }} />
+        </View>
+
+        <View style={styles.emptyState}>
+          <Ionicons name="today-outline" size={64} color="#2196F3" />
+          <Text style={styles.emptyTitle}>Entre para acessar seu plano</Text>
+          <Text style={styles.emptyText}>
+            Autentique-se para criar, acompanhar e sincronizar seu plano de
+            leitura.
+          </Text>
+          <TouchableOpacity
+            style={styles.createFirstPlanButton}
+            onPress={() => router.push("/auth?mode=login")}
+          >
+            <Text style={styles.createFirstPlanButtonText}>Entrar</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.createFirstPlanButton,
+              { marginTop: 10, backgroundColor: "#4CAF50" },
+            ]}
+            onPress={() => router.push("/auth?mode=register")}
+          >
+            <Text style={styles.createFirstPlanButtonText}>Criar Conta</Text>
+          </TouchableOpacity>
+        </View>
+        <FocusBottomNav active="plan" />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Planos de Leitura</Text>
-        <TouchableOpacity 
-          onPress={() => router.push('/select-plan-template')} 
+        <Text style={styles.headerTitle}>Plano de leitura</Text>
+        <TouchableOpacity
+          onPress={() => router.push("/select-plan-template")}
           style={styles.addButton}
         >
-          <Ionicons name="add" size={24} color="#333" />
+          <Ionicons name="add" size={22} color="#2196F3" />
         </TouchableOpacity>
       </View>
 
@@ -238,75 +350,29 @@ export default function ReadingPlansScreen() {
           <Text style={styles.emptyText}>
             Crie seu primeiro plano de leitura para começar
           </Text>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.createFirstPlanButton}
-            onPress={() => router.push('/select-plan-template')}
+            onPress={() => router.push("/select-plan-template")}
           >
             <Text style={styles.createFirstPlanButtonText}>Criar Plano</Text>
           </TouchableOpacity>
         </View>
       ) : (
-        <View style={styles.content}>
-          {/* Plans List */}
-          <FlatList
-            data={plans}
-            renderItem={renderPlan}
-            keyExtractor={(item) => item.id}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.plansList}
-          />
-
+        <ScrollView
+          style={styles.content}
+          contentContainerStyle={styles.contentInner}
+          showsVerticalScrollIndicator={false}
+        >
           {/* Today's Reading */}
           {todayReading && (
             <View style={styles.todaySection}>
-              <Text style={styles.sectionTitle}>Leitura de Hoje</Text>
-              <View style={styles.todayCard}>
-                {renderReading({ item: todayReading })}
-              </View>
+              {renderTodayReading(todayReading)}
             </View>
           )}
-
-          {/* Calendar */}
-          {selectedPlan && (
-            <View style={styles.calendarSection}>
-              <Text style={styles.sectionTitle}>Calendário</Text>
-              <Calendar
-                markedDates={getCalendarMarkedDates()}
-                theme={{
-                  selectedDayBackgroundColor: '#2196F3',
-                  selectedDayTextColor: '#ffffff',
-                  todayTextColor: '#FF9800',
-                  dayTextColor: '#2d4150',
-                  textDisabledColor: '#d9e1e8',
-                  dotColor: '#00adf5',
-                  selectedDotColor: '#ffffff',
-                  arrowColor: '#2196F3',
-                  monthTextColor: '#2d4150',
-                  indicatorColor: '#2196F3',
-                }}
-              />
-              
-              <View style={styles.legend}>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: '#4CAF50' }]} />
-                  <Text style={styles.legendText}>Concluída</Text>
-                </View>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: '#2196F3' }]} />
-                  <Text style={styles.legendText}>Pendente</Text>
-                </View>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: '#FF9800' }]} />
-                  <Text style={styles.legendText}>Hoje</Text>
-                </View>
-              </View>
-            </View>
-          )}
-        </View>
+        </ScrollView>
       )}
 
-
+      <FocusBottomNav active="plan" />
     </SafeAreaView>
   );
 }
@@ -314,216 +380,228 @@ export default function ReadingPlansScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: "#F5F8FB",
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    backgroundColor: '#fff',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    height: 64,
+    paddingHorizontal: 14,
+    backgroundColor: "#fff",
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  backButton: {
-    padding: 8,
+    borderBottomColor: "#DEE6EE",
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: "700",
+    color: "#0F172A",
   },
   addButton: {
-    padding: 8,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#EAF6FF",
   },
   emptyState: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     padding: 32,
+    paddingBottom: FOCUS_BOTTOM_NAV_HEIGHT + 32,
   },
   emptyTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: "bold",
+    color: "#333",
     marginTop: 16,
     marginBottom: 8,
   },
   emptyText: {
     fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
+    color: "#666",
+    textAlign: "center",
     marginBottom: 32,
   },
   createFirstPlanButton: {
-    backgroundColor: '#2196F3',
+    backgroundColor: "#2196F3",
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 24,
   },
   createFirstPlanButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   content: {
     flex: 1,
   },
-  plansList: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-  },
-  planCard: {
-    backgroundColor: '#fff',
-    padding: 16,
-    marginRight: 12,
-    borderRadius: 12,
-    minWidth: 200,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  planCardContent: {
-    flex: 1,
-  },
-  deletePlanButton: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    padding: 4,
-  },
-  selectedPlanCard: {
-    borderWidth: 2,
-    borderColor: '#2196F3',
-  },
-  planName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
-  },
-  planType: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 12,
-  },
-  planProgress: {
-    marginTop: 8,
-  },
-  planProgressText: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
-  },
-  progressBar: {
-    height: 4,
-    backgroundColor: '#e0e0e0',
-    borderRadius: 2,
-  },
-  progressFill: {
-    height: 4,
-    backgroundColor: '#4CAF50',
-    borderRadius: 2,
+  contentInner: {
+    paddingBottom: FOCUS_BOTTOM_NAV_HEIGHT + 20,
   },
   todaySection: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 25,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 12,
+  todaySummaryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 18,
   },
-  todayCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  calendarSection: {
-    padding: 16,
-  },
-  legend: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 16,
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: 12,
-  },
-  legendDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginRight: 6,
-  },
-  legendText: {
+  todayEyebrow: {
     fontSize: 12,
-    color: '#666',
-  },
-  readingCard: {
-    padding: 16,
-  },
-  readingHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  readingDay: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  readingDate: {
-    fontSize: 14,
-    color: '#666',
-  },
-  readingContent: {
-    marginBottom: 16,
-  },
-  readingText: {
-    fontSize: 16,
-    color: '#666',
+    color: "#64748B",
     marginBottom: 4,
   },
-  completeButton: {
-    backgroundColor: '#2196F3',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
+  todayDayLabel: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+  statusPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 11,
+    paddingVertical: 9,
+    borderRadius: 18,
+    backgroundColor: "#EAF8EF",
+  },
+  statusPillText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#16A34A",
+  },
+  readingCard: {
+    padding: 19,
+    borderRadius: 20,
+    overflow: "hidden",
+    backgroundColor: "#fff",
+    shadowColor: "#0F172A",
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    elevation: 6,
+    marginBottom: 27,
+  },
+  readingCardContent: {
+    flexDirection: "row",
+    gap: 14,
+    marginBottom: 20,
+  },
+  readingIconBubble: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#EAF6FF",
+  },
+  readingTextBlock: {
+    flex: 1,
+  },
+  readingMeta: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: "#64748B",
+    marginBottom: 5,
+  },
+  readingTitle: {
+    fontSize: 27,
+    lineHeight: 32,
+    fontWeight: "500",
+    color: "#0F172A",
+    marginBottom: 5,
+  },
+  readingSubline: {
+    fontSize: 12,
+    color: "#64748B",
+  },
+  primaryButton: {
+    height: 49,
+    borderRadius: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 17,
+    backgroundColor: "#1EA0E6",
+    marginBottom: 16,
+  },
+  primaryButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  secondaryButton: {
+    height: 26,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 9,
+    backgroundColor: "transparent",
+  },
+  radioCircle: {
+    width: 15,
+    height: 15,
     borderRadius: 8,
+    borderWidth: 1.4,
+    borderColor: "#64748B",
   },
-  completeButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
+  secondaryButtonText: {
+    color: "#475569",
+    fontSize: 15,
+    fontWeight: "500",
   },
-  completedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
+  progressCard: {
+    backgroundColor: "transparent",
   },
-  completedText: {
-    color: '#4CAF50',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
+  progressHeaderRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  progressLabel: {
+    fontSize: 12,
+    color: "#64748B",
+    marginBottom: 3,
+  },
+  progressStrong: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+  progressPercent: {
+    fontSize: 22,
+    fontWeight: "500",
+    color: "#0EA5E9",
+  },
+  planProgressBar: {
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: "#E2E8F0",
+    overflow: "hidden",
+    marginBottom: 12,
+  },
+  planProgressFill: {
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: "#1EA0E6",
+  },
+  progressFooterRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  progressFooterText: {
+    fontSize: 11,
+    color: "#64748B",
   },
 });
