@@ -72,7 +72,7 @@ router.get('/curiosities/favorites', [BibleCuriositiesController, 'getFavorites'
 Adicione ao arquivo `api/.env`:
 
 ```env
-DEEPSEEK_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxx
+DEEPSEEK_API_KEY=sua-chave-deepseek
 ```
 
 ### 3. Executar Migration (já executada)

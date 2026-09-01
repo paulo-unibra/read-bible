@@ -4,6 +4,11 @@ import User from '#models/user'
 import emailService from '#services/email_service'
 import type { HttpContext } from '@adonisjs/core/http'
 import { DateTime } from 'luxon'
+import { createHash, randomInt } from 'node:crypto'
+
+function hashResetToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex')
+}
 
 export default class PasswordResetController {
   /**
@@ -31,8 +36,9 @@ export default class PasswordResetController {
         })
       }
 
-      // Gerar token aleatório de 6 dígitos
-      const token = Math.floor(100000 + Math.random() * 900000).toString()
+      // Gerar token aleatório de 6 dígitos usando CSPRNG.
+      const token = randomInt(100000, 1000000).toString()
+      const hashedToken = hashResetToken(token)
 
       // Invalidar tokens anteriores não usados
       await PasswordReset.query().where('email', email).where('used', false).update({ used: true })
@@ -50,8 +56,8 @@ export default class PasswordResetController {
       // Criar novo token (expira em 30 minutos)
       await PasswordReset.create({
         email,
-        token,
-        expiresAt: DateTime.now().plus({ minutes: 30 }),
+        token: hashedToken,
+        expiresAt: DateTime.now().plus({ minutes: 15 }),
         used: false,
       })
 
@@ -73,7 +79,6 @@ export default class PasswordResetController {
       return response.internalServerError({
         success: false,
         message: 'Erro ao processar solicitação',
-        error: error.message,
       })
     }
   }
@@ -93,10 +98,12 @@ export default class PasswordResetController {
         })
       }
 
+      const hashedToken = hashResetToken(token)
+
       // Buscar token válido
       const resetToken = await PasswordReset.query()
         .where('email', email)
-        .where('token', token)
+        .where('token', hashedToken)
         .where('used', false)
         .where('expires_at', '>', DateTime.now().toSQL())
         .first()
@@ -117,7 +124,6 @@ export default class PasswordResetController {
       return response.internalServerError({
         success: false,
         message: 'Erro ao verificar token',
-        error: error.message,
       })
     }
   }
@@ -144,10 +150,12 @@ export default class PasswordResetController {
         })
       }
 
+      const hashedToken = hashResetToken(token)
+
       // Buscar token válido
       const resetToken = await PasswordReset.query()
         .where('email', email)
-        .where('token', token)
+        .where('token', hashedToken)
         .where('used', false)
         .where('expires_at', '>', DateTime.now().toSQL())
         .first()
@@ -197,7 +205,6 @@ export default class PasswordResetController {
       return response.internalServerError({
         success: false,
         message: 'Erro ao redefinir senha',
-        error: error.message,
       })
     }
   }

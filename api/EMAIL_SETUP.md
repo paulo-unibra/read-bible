@@ -58,9 +58,9 @@ No arquivo `.env` da API:
 ```env
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
-SMTP_USER=pr1999ricardo@gmail.com
-SMTP_PASSWORD=ociqezwznxjkgewi
-SMTP_FROM=pr1999ricardo@gmail.com
+SMTP_USER=seu-email@gmail.com
+SMTP_PASSWORD=sua-senha-de-app
+SMTP_FROM=seu-email@gmail.com
 SMTP_FROM_NAME=Bíblia em Foco
 ```
 

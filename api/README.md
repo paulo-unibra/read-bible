@@ -35,11 +35,11 @@ cp .env.example .env
 
 ```env
 # DeepSeek API
-DEEPSEEK_API_KEY=sk-your-deepseek-api-key
+DEEPSEEK_API_KEY=sua-chave-deepseek
 
 # Google Drive
-GOOGLE_DRIVE_FOLDER_ID=12CZeaVlNKMfO3gT5PpOFdVgvY7fEQ0Yq
-GOOGLE_DRIVE_CREDENTIALS={"type":"service_account",...}
+GOOGLE_DRIVE_FOLDER_ID=id-da-pasta-do-drive
+GOOGLE_DRIVE_CREDENTIALS=json-da-service-account
 ```
 
 ### Obtendo Credenciais do Google Drive

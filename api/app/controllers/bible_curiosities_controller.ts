@@ -300,8 +300,11 @@ export default class BibleCuriositiesController {
       const page = request.input('page', 1)
       const limit = request.input('limit', 20)
       const isActive = request.input('isActive') // 'true', 'false', ou undefined (todos)
-      const orderBy = request.input('orderBy', 'id')
-      const order = request.input('order', 'desc')
+      const requestedOrderBy = request.input('orderBy', 'id')
+      const requestedOrder = request.input('order', 'desc')
+      const allowedOrderColumns = ['id', 'date', 'created_at', 'likes_count', 'shares_count']
+      const orderBy = allowedOrderColumns.includes(requestedOrderBy) ? requestedOrderBy : 'id'
+      const order = requestedOrder === 'asc' ? 'asc' : 'desc'
 
       const query = BibleCuriosity.query().orderBy(orderBy, order)
 

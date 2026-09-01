@@ -404,7 +404,7 @@ class GooglePlayReportingService {
         throw new Error('Não foi possível obter access token')
       }
 
-      console.log('🔑 Access token obtido:', accessToken.token.substring(0, 50) + '...')
+      console.log('🔑 Access token obtido com sucesso')
 
       // Tenta acessar diretamente a API
       const url = `https://playdeveloperreporting.googleapis.com/v1beta1/apps/${packageName}/crashRateMetricSet`

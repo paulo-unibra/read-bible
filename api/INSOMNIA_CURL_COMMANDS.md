@@ -32,10 +32,10 @@ Você precisa extrair do `GOOGLE_PLAY_CREDENTIALS`:
 ```json
 {
   "type": "service_account",
-  "project_id": "nutotia",
+  "project_id": "seu-projeto",
   "private_key_id": "...",
-  "private_key": "-----BEGIN PRIVATE KEY-----\n...",
-  "client_email": "play-store-reporting@nutotia.iam.gserviceaccount.com",
+  "private_key": "cole-a-chave-privada-aqui",
+  "client_email": "service-account@seu-projeto.iam.gserviceaccount.com",
   "client_id": "...",
   "auth_uri": "https://accounts.google.com/o/oauth2/auth",
   "token_uri": "https://oauth2.googleapis.com/token",
@@ -46,8 +46,8 @@ Você precisa extrair do `GOOGLE_PLAY_CREDENTIALS`:
 **No Insomnia:**
 
 - **Token URL:** `https://oauth2.googleapis.com/token`
-- **Client Email:** `play-store-reporting@nutotia.iam.gserviceaccount.com`
-- **Private Key:** Cole a chave privada completa (com `-----BEGIN PRIVATE KEY-----` e `-----END PRIVATE KEY-----`)
+- **Client Email:** email da service account
+- **Private Key:** chave privada da service account
 - **Scope:** `https://www.googleapis.com/auth/playdeveloperreporting`
 
 ---

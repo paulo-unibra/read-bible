@@ -36,7 +36,7 @@ O `.env` já está configurado! Apenas certifique-se de que o nome do bucket est
 
 ```env
 GCS_BUCKET_NAME=bibliaquiz-files
-GCS_CREDENTIALS={"type": "service_account",...}
+GCS_CREDENTIALS=json-da-service-account
 ```
 
 ## Passo 4: Testar

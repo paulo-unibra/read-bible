@@ -124,7 +124,10 @@ export default class QuizResultController {
    */
   async ranking({ request, response }: HttpContext) {
     try {
-      const { limit = 50 } = request.qs()
+      const requestedLimit = Number.parseInt(String(request.input('limit', '50')))
+      const limit = Number.isFinite(requestedLimit)
+        ? Math.min(Math.max(requestedLimit, 1), 100)
+        : 50
 
       // Buscar top usuários por pontuação média
       const results = await QuizResult.query()

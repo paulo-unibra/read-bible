@@ -1245,11 +1245,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 40,
   },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: "#666",
-  },
   referenceContentContainer: {
     flex: 1,
     padding: 16,

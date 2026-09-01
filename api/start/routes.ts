@@ -60,7 +60,9 @@ router.get('/uploads/profile-pictures/:fileName', [AuthController, 'getProfilePi
 router
   .post('/password/forgot', [PasswordResetController, 'requestReset'])
   .use(middleware.rateLimit({ limit: 5 }))
-router.post('/password/verify-token', [PasswordResetController, 'verifyToken'])
+router
+  .post('/password/verify-token', [PasswordResetController, 'verifyToken'])
+  .use(middleware.rateLimit({ limit: 5 }))
 router
   .post('/password/reset', [PasswordResetController, 'resetPassword'])
   .use(middleware.rateLimit({ limit: 5 }))
@@ -238,7 +240,11 @@ router
     router
       .post('/logout', [AdminAuthController, 'logout'])
       .use(middleware.auth({ guards: ['api'] }))
-    router.get('/me', [AdminAuthController, 'me']).use(middleware.auth({ guards: ['api'] }))
+      .use(middleware.admin())
+    router
+      .get('/me', [AdminAuthController, 'me'])
+      .use(middleware.auth({ guards: ['api'] }))
+      .use(middleware.admin())
 
     // Protected admin routes (requerem autenticação)
     router

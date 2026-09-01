@@ -186,7 +186,7 @@ export default class ReadingPlanController {
     try {
       console.log('🔵 [API] createCustom - INÍCIO')
       const user = auth.user!
-      console.log('👤 [API] Usuário autenticado:', { id: user.id, email: user.email })
+      console.log('👤 [API] Usuário autenticado:', { id: user.id })
 
       const { name, type, startDate, endDate, totalDays } = request.only([
         'name',
@@ -387,7 +387,7 @@ export default class ReadingPlanController {
     try {
       console.log('🔵 [API] createBeginner - INÍCIO')
       const user = auth.user!
-      console.log('👤 [API] Usuário autenticado:', { id: user.id, email: user.email })
+      console.log('👤 [API] Usuário autenticado:', { id: user.id })
 
       // Verificar se já existe um plano ativo
       console.log('🔍 [API] Verificando planos ativos existentes...')

@@ -2,8 +2,10 @@ import env from '#start/env'
 import Database from 'better-sqlite3'
 import { existsSync, mkdirSync, readdirSync, statSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
+import path from 'node:path'
 
 const DICTIONARIES_DIR = new URL('../../public/dictionaries/', import.meta.url)
+const DICTIONARIES_PATH = path.resolve(DICTIONARIES_DIR.pathname)
 
 const DICT_KEYS = ['nomes', 'wycliffe', 'champlin', 'outros'] as const
 type DictKey = (typeof DICT_KEYS)[number]
@@ -104,12 +106,24 @@ class DictionaryService {
     return data.files || []
   }
 
-  private async downloadFile(file: DriveFile): Promise<void> {
+  private async downloadFile(file: DriveFile): Promise<string> {
+    const fileName = path.basename(file.name)
+
+    if (!/^[\w .()-]+\.(mybible|dct)$/i.test(fileName)) {
+      throw new Error('Nome de dicionário inválido')
+    }
+
+    const filePath = path.resolve(DICTIONARIES_PATH, fileName)
+    if (!filePath.startsWith(`${DICTIONARIES_PATH}${path.sep}`)) {
+      throw new Error('Caminho de dicionário inválido')
+    }
+
     const dlUrl = `https://drive.usercontent.google.com/download?id=${file.id}&export=download`
     const response = await fetch(dlUrl)
     if (!response.ok) throw new Error(`Download failed: ${response.status}`)
     const buffer = Buffer.from(await response.arrayBuffer())
-    await writeFile(`${DICTIONARIES_DIR.pathname}${file.name}`, buffer)
+    await writeFile(filePath, buffer)
+    return fileName
   }
 
   private openSource(dictKey: DictKey, fileName: string): DictionarySource | null {
@@ -192,8 +206,8 @@ class DictionaryService {
       for (const key of missing) {
         const driveFile = dctFiles.find((f) => this.classifyFile(f.name) === key)
         if (driveFile) {
-          await this.downloadFile(driveFile)
-          found.set(key, driveFile.name)
+          const fileName = await this.downloadFile(driveFile)
+          found.set(key, fileName)
         }
       }
     }
@@ -222,9 +236,10 @@ class DictionaryService {
     const downloaded: string[] = []
 
     for (const file of dctFiles) {
-      if (!force && existsSync(`${dir}${file.name}`)) continue
-      await this.downloadFile(file)
-      downloaded.push(file.name)
+      const localFileName = path.basename(file.name)
+      if (!force && existsSync(path.resolve(dir, localFileName))) continue
+      const fileName = await this.downloadFile(file)
+      downloaded.push(fileName)
     }
 
     await this.ensureLoaded()

@@ -741,30 +741,36 @@ export default class BibleBrainController {
     try {
       const bookId = String(params.bookId || '')
       const chapterNumber = String(params.chapterNumber || '')
+      const bibleId = String(params.bibleId || '')
 
-      if (!/^[A-Z0-9]{2,4}$/i.test(bookId) || !/^\d+$/.test(chapterNumber)) {
+      if (
+        !/^[A-Z0-9_-]+$/i.test(bibleId) ||
+        !/^[A-Z0-9]{2,4}$/i.test(bookId) ||
+        !/^\d+$/.test(chapterNumber)
+      ) {
         return response.badRequest({ success: false, message: 'Parâmetros inválidos' })
       }
 
-      const filePath = path.join(
-        app.publicPath('uploads/bible-brain-audio'),
-        params.bibleId,
-        bookId,
-        `${chapterNumber}.mp3`
-      )
+      const audioRoot = path.resolve(app.publicPath('uploads/bible-brain-audio'))
+      const filePath = path.join(audioRoot, bibleId, bookId, `${chapterNumber}.mp3`)
+      const resolvedFilePath = path.resolve(filePath)
 
-      if (!existsSync(filePath)) {
+      if (!resolvedFilePath.startsWith(`${audioRoot}${path.sep}`)) {
+        return response.badRequest({ success: false, message: 'Parâmetros inválidos' })
+      }
+
+      if (!existsSync(resolvedFilePath)) {
         return response.notFound({ success: false, message: 'Arquivo de áudio não encontrado' })
       }
 
-      const stat = await fsPromises.stat(filePath)
+      const stat = await fsPromises.stat(resolvedFilePath)
 
       response.header('Content-Type', 'audio/mpeg')
       response.header('Content-Length', String(stat.size))
       response.header('Accept-Ranges', 'bytes')
       response.header('Cache-Control', 'public, max-age=86400')
 
-      return response.stream(createReadStream(filePath))
+      return response.stream(createReadStream(resolvedFilePath))
     } catch (error) {
       console.error('[BibleBrainController] Erro ao servir arquivo de áudio:', error)
       return response.internalServerError({

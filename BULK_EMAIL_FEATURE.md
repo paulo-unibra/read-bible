@@ -150,14 +150,14 @@ Cada e-mail contém:
 # Email configuration for password reset
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
-SMTP_USER=pr1999ricardo@gmail.com
-SMTP_PASSWORD=ociqezwznxjkgewi
-SMTP_FROM=pr1999ricardo@gmail.com
+SMTP_USER=seu-email@gmail.com
+SMTP_PASSWORD=sua-senha-de-app
+SMTP_FROM=seu-email@gmail.com
 SMTP_FROM_NAME=Bíblia em Foco
 
 # Email testing - Em desenvolvimento, todos os e-mails vão para este endereço
 # Em produção, comente esta linha para enviar para os e-mails reais dos usuários
-TEST_EMAIL_RECIPIENT=pr1999ricardo@gmail.com
+TEST_EMAIL_RECIPIENT=seu-email@gmail.com
 ```
 
 **Arquivo:** `api/start/env.ts`

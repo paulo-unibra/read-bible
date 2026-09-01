@@ -77,7 +77,7 @@ export default class NotesController {
   async store({ auth, request, response }: HttpContext) {
     try {
       console.log('🔵 [STORE] Iniciando criação de nota')
-      console.log('🔵 [STORE] Auth user:', auth.user?.id, auth.user?.email)
+      console.log('🔵 [STORE] Auth user ID:', auth.user?.id)
 
       const user = auth.user!
       console.log('🔵 [STORE] Request body:', request.body())
