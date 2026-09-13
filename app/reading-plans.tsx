@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   ScrollView,
   StyleSheet,
@@ -23,11 +24,7 @@ export default function ReadingPlansScreen() {
   const [selectedPlan, setSelectedPlan] = useState<ReadingPlan | null>(null);
   const [planDays, setPlanDays] = useState<ReadingPlanDay[]>([]);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [authChecked, setAuthChecked] = useState(false);
-
-  useEffect(() => {
-    checkAuthAndLoadPlans();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const [isLoading, setIsLoading] = useState(true);
 
   // Reload plans when screen comes into focus
   useFocusEffect(
@@ -37,12 +34,16 @@ export default function ReadingPlansScreen() {
   );
 
   const checkAuthAndLoadPlans = async () => {
-    await authService.init().catch(() => {});
-    const authenticated = authService.isAuthenticated();
-    setIsAuthenticated(authenticated);
-    setAuthChecked(true);
-    if (authenticated) {
-      await loadPlans();
+    setIsLoading(true);
+    try {
+      await authService.init().catch(() => {});
+      const authenticated = authService.isAuthenticated();
+      setIsAuthenticated(authenticated);
+      if (authenticated) {
+        await loadPlans();
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -273,7 +274,8 @@ export default function ReadingPlansScreen() {
             <View>
               <Text style={styles.progressLabel}>Progresso do plano</Text>
               <Text style={styles.progressStrong}>
-                {completedChapters} de {totalChapters.toLocaleString("pt-BR")} capítulos
+                {completedChapters} de {totalChapters.toLocaleString("pt-BR")}{" "}
+                capítulos
               </Text>
             </View>
             <Text style={styles.progressPercent}>{progressPercent}%</Text>
@@ -282,7 +284,9 @@ export default function ReadingPlansScreen() {
             <View style={[styles.planProgressFill, { width: progressWidth }]} />
           </View>
           <View style={styles.progressFooterRow}>
-            <Text style={styles.progressFooterText}>Iniciado há {currentDay} dias</Text>
+            <Text style={styles.progressFooterText}>
+              Iniciado há {currentDay} dias
+            </Text>
             <Text style={styles.progressFooterText}>
               {remainingDays} dias restantes
             </Text>
@@ -294,7 +298,22 @@ export default function ReadingPlansScreen() {
 
   const todayReading = getTodayReading();
 
-  if (authChecked && !isAuthenticated) {
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Plano de leitura</Text>
+        </View>
+        <View style={styles.emptyState}>
+          <ActivityIndicator size="large" color="#2196F3" />
+          <Text style={styles.loadingText}>Carregando plano de leitura...</Text>
+        </View>
+        <FocusBottomNav active="plan" />
+      </SafeAreaView>
+    );
+  }
+
+  if (!isAuthenticated) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
@@ -336,10 +355,16 @@ export default function ReadingPlansScreen() {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Plano de leitura</Text>
         <TouchableOpacity
-          onPress={() => router.push("/select-plan-template")}
+          onPress={() =>
+            !plans.length ? router.push("/select-plan-template") : null
+          }
           style={styles.addButton}
         >
-          <Ionicons name="add" size={22} color="#2196F3" />
+          {plans.length === 0 ? (
+            <Ionicons name="add" size={22} color="#2196F3" />
+          ) : (
+            <Ionicons name="add" size={22} color="#fff" />
+          )}
         </TouchableOpacity>
       </View>
 
@@ -418,6 +443,12 @@ const styles = StyleSheet.create({
     color: "#333",
     marginTop: 16,
     marginBottom: 8,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: "#666",
+    textAlign: "center",
+    marginTop: 16,
   },
   emptyText: {
     fontSize: 16,

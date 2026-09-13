@@ -67,7 +67,7 @@ export default function ChapterReaderScreen() {
   const [bookIntroduction, setBookIntroduction] =
     useState<BookIntroduction | null>(null);
   const [totalChapters, setTotalChapters] = useState(0);
-  const [loading, setLoading] = useState(true); // Loading inicial completo
+  const [loading, setLoading] = useState(true);
   const [initializing, setInitializing] = useState(true);
   const [lastLoadedChapter, setLastLoadedChapter] = useState<number | null>(
     null,
@@ -861,10 +861,12 @@ export default function ChapterReaderScreen() {
     }
   };
 
-  const navigateChapter = async (direction: "prev" | "next") => {
+  const navigateChapter = async (
+    direction: "prev" | "next",
+  ): Promise<{ bookId: number; bookName: string; chapter: number } | null> => {
     if (navigating) {
       console.log("Navigation blocked - already navigating");
-      return;
+      return null;
     }
 
     console.log("Starting navigation:", direction);
@@ -894,14 +896,12 @@ export default function ChapterReaderScreen() {
             newChapter = 0;
           } else {
             setIsFirstOfBible(true);
-            await navigateToAdjacentBook("prev");
-            return;
+            return await navigateToAdjacentBook("prev");
           }
         } else if (currentChapter === 0) {
           // Se estamos na introdução e tentamos ir para trás, vai para livro anterior
           setIsFirstOfBible(true);
-          await navigateToAdjacentBook("prev");
-          return;
+          return await navigateToAdjacentBook("prev");
         }
       } else {
         if (currentChapter === 0) {
@@ -910,8 +910,7 @@ export default function ChapterReaderScreen() {
         } else if (currentChapter < totalChapters) {
           newChapter = currentChapter + 1;
         } else {
-          await navigateToAdjacentBook("next");
-          return;
+          return await navigateToAdjacentBook("next");
         }
       }
 
@@ -921,7 +920,13 @@ export default function ChapterReaderScreen() {
         setTimeout(async () => {
           await updateNavigationState(newChapter);
         }, 100);
+
+        return currentBookId && book
+          ? { bookId: currentBookId, bookName: book.name, chapter: newChapter }
+          : null;
       }
+
+      return null;
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
@@ -932,6 +937,7 @@ export default function ChapterReaderScreen() {
         `Falha ao navegar para o capítulo: ${errorMessage}`,
         [{ text: "OK" }],
       );
+      return null;
     } finally {
       setNavigating(false);
     }
@@ -1206,7 +1212,9 @@ export default function ChapterReaderScreen() {
     }
   };
 
-  const navigateToAdjacentBook = async (direction: "prev" | "next") => {
+  const navigateToAdjacentBook = async (
+    direction: "prev" | "next",
+  ): Promise<{ bookId: number; bookName: string; chapter: number } | null> => {
     try {
       // setLoading(true);
 
@@ -1223,7 +1231,7 @@ export default function ChapterReaderScreen() {
             ? "Você já está no primeiro capítulo da Bíblia"
             : "Você já está no último capítulo da Bíblia",
         );
-        return;
+        return null;
       }
 
       const newBook = books[newBookIndex];
@@ -1262,9 +1270,16 @@ export default function ChapterReaderScreen() {
       setVerses(versesData);
 
       await updateNavigationState();
+
+      return {
+        bookId: newBook.id,
+        bookName: newBook.name,
+        chapter: newChapter,
+      };
     } catch (error) {
       console.error("Error navigating to adjacent book:", error);
       Alert.alert("Erro", "Falha ao navegar para o livro adjacente");
+      return null;
     } finally {
       setLoading(false);
     }
@@ -2463,17 +2478,7 @@ ${deepLink}`;
     </TouchableOpacity>
   );
 
-  // Só mostra tela de loading completa durante a inicialização inicial
-  if (loading && initializing) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.centerContent}>
-          <ActivityIndicator size="large" color="#2196F3" />
-          <Text style={styles.loadingText}>Carregando capítulo...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  const isInitialLoading = loading && initializing;
 
   const selectBookInModal = async (selectedBook: Book) => {
     setSelectedBookInModal(selectedBook);
@@ -2530,6 +2535,7 @@ ${deepLink}`;
                 }
               }}
               style={styles.versionHeaderBadge}
+              disabled={isInitialLoading}
             >
               <Text style={styles.versionHeaderBadgeText}>{bibleAbbrev}</Text>
             </TouchableOpacity>
@@ -2553,12 +2559,14 @@ ${deepLink}`;
           <TouchableOpacity
             onPress={() => setSearchModalVisible(true)}
             style={styles.headerButton}
+            disabled={isInitialLoading}
           >
             <Ionicons name="search" size={24} color={iconColor} />
           </TouchableOpacity>
           <TouchableOpacity
             onPress={openBookSelector}
             style={styles.headerButton}
+            disabled={isInitialLoading}
           >
             <Ionicons name="library" size={24} color={iconColor} />
           </TouchableOpacity>
@@ -2590,6 +2598,7 @@ ${deepLink}`;
                 },
               ]}
               accessibilityLabel="Ver introdução do livro"
+              disabled={isInitialLoading}
             >
               <Ionicons
                 name="book-outline"
@@ -2601,7 +2610,7 @@ ${deepLink}`;
             <View></View>
           )}
           <View style={styles.chapterHeaderActions}>
-            {book && (
+            {book && !isInitialLoading && (
               <>
                 {/* Quiz - só aparece em capítulos normais */}
                 {currentChapter !== 0 && (
@@ -2634,7 +2643,19 @@ ${deepLink}`;
 
       {/* Content Area - Introduction or Verses */}
       <View style={styles.versesContainer}>
-        {currentChapter === 0 ? (
+        {isInitialLoading ? (
+          <View
+            style={[
+              styles.centerContent,
+              { paddingBottom: FOCUS_BOTTOM_NAV_HEIGHT + 108 + insets.bottom },
+            ]}
+          >
+            <ActivityIndicator size="large" color={focus.blue} />
+            <Text style={[styles.loadingText, { color: focus.muted }]}>
+              Carregando capítulo...
+            </Text>
+          </View>
+        ) : currentChapter === 0 ? (
           /* Introduction View */
           <ScrollView
             style={[styles.versesList, versesListBg]}
@@ -2732,7 +2753,7 @@ ${deepLink}`;
         )}
 
         {/* Indicador discreto de carregamento de capítulo */}
-        {chapterLoading && (
+        {chapterLoading && !isInitialLoading && (
           <View style={styles.chapterLoadingOverlay}>
             <View style={styles.chapterLoadingIndicator}>
               <ActivityIndicator size="small" color={focus.blue} />
@@ -2757,7 +2778,7 @@ ${deepLink}`;
         <TouchableOpacity
           style={[
             styles.floatingNavButton,
-            (isFirstOfBible || navigating) && [
+            (isFirstOfBible || navigating || isInitialLoading) && [
               styles.floatingNavButtonDisabled,
             ],
           ]}
@@ -2766,20 +2787,20 @@ ${deepLink}`;
               navigateChapter("prev");
             }
           }}
-          disabled={isFirstOfBible || navigating}
+          disabled={isFirstOfBible || navigating || isInitialLoading}
         >
           <Ionicons
             name="chevron-back"
             size={24}
             color={
-              isFirstOfBible || navigating
+              isFirstOfBible || navigating || isInitialLoading
                 ? colorScheme.iconInactive
                 : colorScheme.icon
             }
           />
         </TouchableOpacity>
 
-        {book && currentChapter !== 0 && audioAvailable && (
+        {book && currentChapter !== 0 && audioAvailable && !isInitialLoading && (
           <AudioPlayer
             bookId={currentBookId}
             chapterNumber={currentChapter}
@@ -2797,13 +2818,24 @@ ${deepLink}`;
                 );
                 return;
               }
-              const prevChapter = currentChapter;
-              await navigateChapter("next");
-              const targetChapter = prevChapter + 1;
+
+              // Resolver o próximo capítulo a partir do retorno da própria
+              // navegação, em vez de inferir currentBookId/currentChapter+1
+              // (estado desatualizado neste closure). Isso evita tocar o
+              // áudio do livro/capítulo errado ao cruzar para o próximo
+              // livro da Bíblia.
+              const target = await navigateChapter("next");
+              if (!target || target.chapter === 0) {
+                console.log(
+                  "[ChapterReader] Sem próximo capítulo com áudio para reprodução automática",
+                  target,
+                );
+                return;
+              }
 
               try {
-                await AudioService.loadAndPlay(currentBookId, targetChapter, {
-                  bookName: book.name,
+                await AudioService.loadAndPlay(target.bookId, target.chapter, {
+                  bookName: target.bookName,
                 });
                 console.log(
                   "[ChapterReader] Next audio loaded and playing successfully",
@@ -2818,7 +2850,7 @@ ${deepLink}`;
         <TouchableOpacity
           style={[
             styles.floatingNavButton,
-            (isLastOfBible || navigating) && [
+            (isLastOfBible || navigating || isInitialLoading) && [
               styles.floatingNavButtonDisabled,
             ],
           ]}
@@ -2827,13 +2859,13 @@ ${deepLink}`;
               navigateChapter("next");
             }
           }}
-          disabled={isLastOfBible || navigating}
+          disabled={isLastOfBible || navigating || isInitialLoading}
         >
           <Ionicons
             name="chevron-forward"
             size={24}
             color={
-              isLastOfBible || navigating
+              isLastOfBible || navigating || isInitialLoading
                 ? colorScheme.iconInactive
                 : colorScheme.icon
             }
@@ -4841,15 +4873,15 @@ const styles = StyleSheet.create({
   // Floating Navigation Styles
   floatingNavigation: {
     position: "absolute",
-    left: "50%",
-    width: 180,
-    marginLeft: -90,
+    alignSelf: "center",
+    minWidth: 180,
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
     backgroundColor: "#fff",
     borderRadius: 28,
-    paddingHorizontal: 5,
-    paddingVertical: 5,
+    paddingHorizontal: 6,
+    paddingVertical: 6,
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
@@ -4858,7 +4890,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 16,
     elevation: 5,
-    gap: 4,
+    gap: 8,
   },
   floatingNavButton: {
     width: 44,

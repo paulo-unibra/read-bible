@@ -226,6 +226,16 @@ export default function HomeScreen() {
   );
 
   const renderPanel = () => {
+    if (loading) {
+      return (
+        <View style={styles.centerContent}>
+          <ActivityIndicator size="large" color={focus.blue} />
+          <Text style={[styles.loadingText, { color: focus.muted }]}>
+            Carregando...
+          </Text>
+        </View>
+      );
+    }
     if (activeTab === "more") return renderMorePanel();
     if (bibleOpenError) {
       return (
@@ -252,21 +262,6 @@ export default function HomeScreen() {
       </View>
     );
   };
-
-  if (loading) {
-    return (
-      <SafeAreaView
-        style={[styles.container, { backgroundColor: focus.screen }]}
-      >
-        <View style={styles.centerContent}>
-          <ActivityIndicator size="large" color={focus.blue} />
-          <Text style={[styles.loadingText, { color: focus.muted }]}>
-            Carregando...
-          </Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: focus.screen }]}>

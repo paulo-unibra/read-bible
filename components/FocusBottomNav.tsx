@@ -32,26 +32,38 @@ export default function FocusBottomNav({ active }: FocusBottomNavProps) {
       const downloadedBibles = bibles.filter((bible) => bible.isDownloaded);
 
       if (downloadedBibles.length === 0) {
-        Alert.alert("Nenhuma Bíblia Disponível", "Você precisa baixar pelo menos uma Bíblia.", [
-          { text: "Cancelar", style: "cancel" },
-          { text: "Baixar Bíblias", onPress: () => router.replace("/bible-manager") },
-        ]);
+        Alert.alert(
+          "Nenhuma Bíblia Disponível",
+          "Você precisa baixar pelo menos uma Bíblia.",
+          [
+            { text: "Cancelar", style: "cancel" },
+            {
+              text: "Baixar Bíblias",
+              onPress: () => router.replace("/bible-manager"),
+            },
+          ],
+        );
         return;
       }
 
-      const preferredBibleId = await DatabaseService.getSetting("preferredBibleId");
+      const preferredBibleId =
+        await DatabaseService.getSetting("preferredBibleId");
       const bible = preferredBibleId
-        ? downloadedBibles.find((item) => item.id === preferredBibleId) || downloadedBibles[0]
+        ? downloadedBibles.find((item) => item.id === preferredBibleId) ||
+          downloadedBibles[0]
         : downloadedBibles[0];
 
       let lastReading = await DatabaseService.getLastReading();
       if (!lastReading) {
         await bibleReaderService.openBible(bible.id, bible.fileName);
         const books = await bibleReaderService.getBooks(bible.id);
-        const hasOldTestament = books.some((book: Book) => book.testament === "old");
+        const hasOldTestament = books.some(
+          (book: Book) => book.testament === "old",
+        );
         const firstBook = hasOldTestament
           ? books[0]
-          : books.find((book: Book) => /Mateus|Matthew/i.test(book.name)) || books[0];
+          : books.find((book: Book) => /Mateus|Matthew/i.test(book.name)) ||
+            books[0];
         lastReading = {
           bibleId: bible.id,
           bookId: firstBook?.id || 1,
@@ -77,8 +89,18 @@ export default function FocusBottomNav({ active }: FocusBottomNavProps) {
     const selected = key === active;
     return (
       <TouchableOpacity key={key} style={styles.tabButton} onPress={onPress}>
-        <Ionicons name={icon} size={22} color={selected ? focus.blue : focus.muted} />
-        <Text style={[styles.tabLabel, { color: selected ? focus.blue : focus.muted }, selected && styles.tabLabelActive]}>
+        <Ionicons
+          name={icon}
+          size={22}
+          color={selected ? focus.blue : focus.muted}
+        />
+        <Text
+          style={[
+            styles.tabLabel,
+            { color: selected ? focus.blue : focus.muted },
+            selected && styles.tabLabelActive,
+          ]}
+        >
           {label}
         </Text>
       </TouchableOpacity>
@@ -99,9 +121,15 @@ export default function FocusBottomNav({ active }: FocusBottomNavProps) {
     >
       {renderButton("plan", "today-outline", "Plano", openReadingPlan)}
       {renderButton("bible", "book", "Bíblia", openBible)}
-      {renderButton("harpa", "musical-notes-outline", "Harpa", () => router.replace("/harpa"))}
-      {renderButton("dictionary", "book-outline", "Dicionário", () => router.replace("/dicionario"))}
-      {renderButton("more", "menu-outline", "Mais", () => router.replace("/?tab=more"))}
+      {renderButton("dictionary", "book-outline", "Dicionário", () =>
+        router.replace("/dicionario"),
+      )}
+      {renderButton("harpa", "musical-notes-outline", "Harpa", () =>
+        router.replace("/harpa"),
+      )}
+      {renderButton("more", "menu-outline", "Mais", () =>
+        router.replace("/?tab=more"),
+      )}
     </View>
   );
 }

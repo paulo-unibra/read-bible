@@ -16,7 +16,8 @@
       },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSMicrophoneUsageDescription": "Permitir o uso do microfone para gravar sua voz nos hinos da Harpa."
+        "NSMicrophoneUsageDescription": "Permitir o uso do microfone para gravar sua voz nos hinos da Harpa.",
+        "UIBackgroundModes": ["audio"]
       }
     },
     "android": {

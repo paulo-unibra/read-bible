@@ -1,7 +1,12 @@
-import { Audio, AVPlaybackStatus } from "expo-av";
-import { Sound } from "expo-av/build/Audio";
+import {
+  AudioPlayer,
+  AudioStatus,
+  createAudioPlayer,
+  setAudioModeAsync,
+  setIsAudioActiveAsync,
+} from "expo-audio";
 import * as FileSystem from "expo-file-system/legacy";
-import PlaybackNotificationService from "./PlaybackNotificationService";
+import { AppState, AppStateStatus } from "react-native";
 import bibleBrainService from "./BibleBrainService";
 
 const USFM_BOOK_ORDER = [
@@ -19,7 +24,7 @@ interface AudioState {
   isLoading: boolean;
   currentTime: number;
   duration: number;
-  sound: Sound | null;
+  sound: AudioPlayer | null;
   currentBookId: number | null;
   currentChapter: number | null;
   currentBookName?: string | null;
@@ -48,8 +53,10 @@ class AudioService {
   private listeners: Set<(state: AudioState) => void> = new Set();
   private endListeners: Set<() => void> = new Set();
   private downloadProgressCallback: ((progress: number) => void) | null = null;
-  private statusCheckInterval: NodeJS.Timeout | null = null; // Timer para polling manual
-  private lastTriggeredEnd: number | null = null; // Evitar múltiplos disparos
+  private playbackSubscription: { remove(): void } | null = null;
+  private endHandled = false;
+  private loadVersion = 0;
+  private cancelPendingPlay: (() => void) | null = null;
   // Permite sobrepor pasta específica de áudios, depois usa pasta geral e por fim fallback hardcoded
   private bibleBrainBibleId: string | null = null;
 
@@ -144,57 +151,45 @@ class AudioService {
   };
 
   constructor() {
-    this.initializeAudio();
-    // Registrar handler de ações de notificação (play/pause/stop)
-    PlaybackNotificationService.setActionHandler(async (action) => {
-      try {
-        switch (action) {
-          case "PAUSE_ACTION":
-            await this.pause();
-            break;
-          case "PLAY_ACTION":
-            await this.play();
-            break;
-          case "STOP_ACTION":
-            await this.stop();
-            break;
-          default:
-            break;
-        }
-      } catch (e) {
-        console.warn("Falha ao executar ação da notificação", action, e);
-      }
-    });
+    AppState.addEventListener("change", this.handleAppStateChange);
+  }
+
+  private handleAppStateChange = (nextState: AppStateStatus) => {
+    if (nextState === "active") {
+      console.log(
+        "[AudioService] App voltou ao primeiro plano - reconciliando estado de reprodução",
+      );
+      this.reconcilePlaybackStatus().catch((error) => {
+        console.warn("[AudioService] Falha ao reconciliar status:", error);
+      });
+    }
+  };
+
+  // Verifica o status real do som nativo. Serve como rede de segurança para
+  // quando o polling/callback em JS foi pausado (tela bloqueada) e o áudio
+  // terminou sem que o app conseguisse reagir a tempo.
+  private async reconcilePlaybackStatus(): Promise<void> {
+    if (!this.state.sound || !this.playbackSubscription) return;
+
+    try {
+      this.onPlaybackStatusUpdate(this.state.sound.currentStatus);
+    } catch (error) {
+      console.warn(
+        "[AudioService] Erro ao consultar status para reconciliação:",
+        error,
+      );
+    }
   }
 
   private async initializeAudio() {
-    try {
-      // Modo que permite reproduzir mesmo durante chamadas - compartilha o foco de áudio
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        staysActiveInBackground: true,
-        playsInSilentModeIOS: true,
-        shouldDuckAndroid: true, // Abaixa volume de outros áudios em vez de bloquear
-        playThroughEarpieceAndroid: false,
-        interruptionModeIOS: 1, // DuckOthers - permite mixar com outros áudios
-        interruptionModeAndroid: 1, // DuckOthers - permite reproduzir durante chamadas
-      });
-      console.log(
-        "[AudioService] Audio mode initialized with background support",
-      );
-    } catch (error) {
-      console.error("Error initializing audio:", error);
-      // Tentar modo fallback mais simples
-      try {
-        await Audio.setAudioModeAsync({
-          playsInSilentModeIOS: true,
-          staysActiveInBackground: false,
-          shouldDuckAndroid: true,
-        });
-      } catch (fallbackError) {
-        console.error("Fallback audio initialization failed:", fallbackError);
-      }
-    }
+    await setIsAudioActiveAsync(true);
+    await setAudioModeAsync({
+      allowsRecording: false,
+      shouldPlayInBackground: true,
+      playsInSilentMode: true,
+      interruptionMode: "doNotMix",
+      shouldRouteThroughEarpiece: false,
+    });
   }
 
   addListener(callback: (state: AudioState) => void) {
@@ -208,7 +203,8 @@ class AudioService {
   }
 
   private notifyListeners() {
-    this.listeners.forEach((callback) => callback(this.state));
+    const snapshot = this.getState();
+    this.listeners.forEach((callback) => callback(snapshot));
   }
 
   private getAudioFileName(bookId: number, chapter: number): string {
@@ -330,6 +326,7 @@ class AudioService {
     fileName: string,
     isPrefetch: boolean = false,
   ): Promise<string> {
+    const version = this.loadVersion;
     await this.ensureAudioDir();
     const localPath = `${this.AUDIO_DIR}${fileName}`;
     const info = await FileSystem.getInfoAsync(localPath);
@@ -338,7 +335,7 @@ class AudioService {
     }
 
     // Só atualizar estado se NÃO for prefetch
-    if (!isPrefetch) {
+    if (!isPrefetch && version === this.loadVersion) {
       // Resetar progresso e notificar que está baixando
       this.state.downloadProgress = 0;
       this.state.isLoading = true;
@@ -355,7 +352,7 @@ class AudioService {
       {},
       (downloadProgress) => {
         // Só atualizar progresso se NÃO for prefetch
-        if (!isPrefetch) {
+        if (!isPrefetch && version === this.loadVersion) {
           const progress =
             downloadProgress.totalBytesWritten /
             downloadProgress.totalBytesExpectedToWrite;
@@ -372,7 +369,7 @@ class AudioService {
     }
 
     // Download completo - só atualizar se NÃO for prefetch
-    if (!isPrefetch) {
+    if (!isPrefetch && version === this.loadVersion) {
       this.state.downloadProgress = 100;
       this.notifyListeners();
     }
@@ -386,6 +383,7 @@ class AudioService {
     chapter: number,
     isPrefetch: boolean = false,
   ): Promise<string> {
+    const version = this.loadVersion;
     if (!this.bibleBrainBibleId) {
       throw new Error('BibleBrain mode not set');
     }
@@ -408,7 +406,7 @@ class AudioService {
       return localPath;
     }
 
-    if (!isPrefetch) {
+    if (!isPrefetch && version === this.loadVersion) {
       this.state.downloadProgress = 0;
       this.state.isLoading = true;
       this.notifyListeners();
@@ -436,7 +434,7 @@ class AudioService {
       localPath,
       {},
       (downloadProgress) => {
-        if (!isPrefetch) {
+        if (!isPrefetch && version === this.loadVersion) {
           const progress =
             downloadProgress.totalBytesWritten /
             downloadProgress.totalBytesExpectedToWrite;
@@ -461,7 +459,7 @@ class AudioService {
       size: downloadedInfo.exists ? downloadedInfo.size : null,
     });
 
-    if (!isPrefetch) {
+    if (!isPrefetch && version === this.loadVersion) {
       this.state.downloadProgress = 100;
       this.notifyListeners();
     }
@@ -474,6 +472,8 @@ class AudioService {
     chapter: number,
     opts?: { bookName?: string },
   ): Promise<void> {
+    if (this.state.isLoading) return;
+    let version = this.loadVersion;
     try {
       console.log("[AudioService] loadAndPlay called", {
         bookId,
@@ -496,22 +496,15 @@ class AudioService {
         return;
       }
 
-      // Guardar referência do som antigo para descarregar DEPOIS
-      const oldSound = this.state.sound;
-
       console.log("[AudioService] Preparing to load new audio");
-
-      // Parar polling se houver
-      this.stopStatusPolling();
-
-      // Resetar flag de último disparo para permitir novo onEnded
-      this.lastTriggeredEnd = null;
+      version = ++this.loadVersion;
+      this.playbackSubscription?.remove();
+      this.playbackSubscription = null;
+      this.state.sound?.pause();
 
       console.log("[AudioService] Setting loading state");
       this.state.isLoading = true;
-      this.state.currentBookId = bookId;
-      this.state.currentChapter = chapter;
-      this.state.currentBookName = opts?.bookName || undefined;
+      this.state.isPlaying = false;
       this.notifyListeners();
 
       const fileName = this.getAudioFileName(bookId, chapter);
@@ -519,205 +512,61 @@ class AudioService {
       const localPath = this.bibleBrainBibleId
         ? await this.getBibleBrainAudioLocalPath(fileName, bookId, chapter)
         : await this.getOrDownloadAudioLocalPath(fileName);
+      if (version !== this.loadVersion) return;
       console.log("[AudioService] Audio file ready at:", localPath);
-
-      // Descarregar o som antigo AGORA, antes de criar o novo
-      if (oldSound) {
-        try {
-          console.log("[AudioService] Unloading old sound...");
-
-          const status = await oldSound.getStatusAsync();
-          if (status.isLoaded) {
-            if (status.isPlaying) {
-              await oldSound.pauseAsync();
-            }
-            await oldSound.stopAsync();
-          }
-          await oldSound.unloadAsync();
-          console.log("[AudioService] Old sound unloaded successfully");
-        } catch (error) {
-          console.error("[AudioService] Error unloading old sound:", error);
-        }
-      }
-
-      // Limpar referência do som antigo
-      this.state.sound = null;
-      this.state.isPlaying = false;
-
-      // Reinicializar o áudio antes de criar o som
-      console.log("[AudioService] Initializing audio mode");
       await this.initializeAudio();
+      if (version !== this.loadVersion) return;
 
-      // Criar o som com configuração para continuar em background
-      console.log("[AudioService] Creating sound object");
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: localPath },
-        {
-          shouldPlay: false,
-          progressUpdateIntervalMillis: 1000, // Atualizar progresso a cada 1 segundo
-          isLooping: false,
+      const metadata = {
+        title: `${opts?.bookName || this.bookNameMapping[bookId]} ${chapter}`,
+        artist: "Bíblia em Foco",
+      };
+      // Keep the native media service alive across source changes. Recreating
+      // it while locked would require starting a foreground service in background.
+      if (this.state.sound) {
+        this.state.sound.replace({ uri: localPath });
+        this.state.sound.updateLockScreenMetadata(metadata);
+      } else {
+        this.state.sound = createAudioPlayer({ uri: localPath }, {
+          updateInterval: 1000,
+          keepAudioSessionActive: true,
+        });
+        this.state.sound.setActiveForLockScreen(true, metadata, {
+          showSeekBackward: true,
+          showSeekForward: true,
+        });
+      }
+      this.state.currentBookId = bookId;
+      this.state.currentChapter = chapter;
+      this.state.currentBookName = opts?.bookName;
+      this.state.currentTime = 0;
+      this.state.duration = 0;
+      this.endHandled = false;
+      this.playbackSubscription = this.state.sound.addListener(
+        "playbackStatusUpdate",
+        (status) => {
+          if (version === this.loadVersion) this.onPlaybackStatusUpdate(status);
         },
-        (status) => this.onPlaybackStatusUpdate(status),
       );
-      console.log("[AudioService] Sound object created");
-
-      this.state.sound = sound;
-
-      // Tentar reproduzir com retries
-      let playSuccess = false;
-      let retryCount = 0;
-      const maxRetries = 5; // Aumentado para 5 tentativas
-
-      console.log("[AudioService] Starting playback attempts");
-      while (retryCount < maxRetries && !playSuccess) {
-        try {
-          console.log(
-            `[AudioService] Playback attempt ${retryCount + 1}/${maxRetries}`,
-          );
-
-          // Tentar reproduzir
-          await sound.playAsync();
-          playSuccess = true;
-          console.log("[AudioService] Playback started successfully");
-        } catch (error: any) {
-          retryCount++;
-          console.error(
-            `[AudioService] Play attempt ${retryCount} failed:`,
-            error?.message || error,
-          );
-
-          // Se for erro de foco de áudio e ainda tem tentativas
-          if (
-            error?.message?.includes("AudioFocusNotAcquired") &&
-            retryCount < maxRetries
-          ) {
-            console.log(
-              `[AudioService] AudioFocus error, reconfiguring audio mode for retry ${retryCount}...`,
-            );
-
-            // Tentar reinicializar o modo de áudio para liberar/readquirir o foco
-            try {
-              await Audio.setAudioModeAsync({
-                playsInSilentModeIOS: true,
-                staysActiveInBackground: true,
-                interruptionModeAndroid: 1, // DuckOthers - permite mixar
-                shouldDuckAndroid: true, // Abaixa volume em vez de bloquear
-              });
-              console.log(
-                `[AudioService] Audio mode reconfigured, retrying...`,
-              );
-            } catch (modeError) {
-              console.error(
-                "[AudioService] Error reconfiguring audio mode:",
-                modeError,
-              );
-            }
-          } else {
-            // Se não for erro de foco ou acabaram as tentativas, propagar o erro
-            console.error(
-              "[AudioService] Non-recoverable error or max retries reached",
-            );
-            throw error;
-          }
-        }
-      }
-
-      if (!playSuccess) {
-        console.error("[AudioService] Failed to play audio after all retries");
-        throw new Error(
-          "Não foi possível reproduzir o áudio após múltiplas tentativas",
-        );
-      }
-
-      console.log(
-        "[AudioService] Setting final state - isPlaying: true, isLoading: false",
-      );
+      await this.play();
+      if (version !== this.loadVersion) return;
       this.state.isLoading = false;
-      this.state.isPlaying = true;
       this.state.downloadProgress = 0; // Resetar progresso após sucesso
-
-      const initialStatus = await sound.getStatusAsync();
-      this.onPlaybackStatusUpdate(initialStatus);
-
-      // Iniciar polling manual para detectar fim do áudio mesmo com tela bloqueada
-      this.startStatusPolling();
-
-      console.log("[AudioService] Notifying listeners - loadAndPlay complete");
       this.notifyListeners();
-      console.log("[AudioService] loadAndPlay finished successfully");
-
-      // Fazer prefetch e notificação DEPOIS de notificar o estado final
-      PlaybackNotificationService.showOrUpdate({
-        bookName: this.state.currentBookName || this.bookNameMapping[bookId],
-        chapter,
-        currentTime: 0,
-        duration: 0,
-        isPlaying: true,
-        loading: false,
-      }).catch(() => {});
-
       this.prefetch(bookId, chapter + 1).catch(() => {});
     } catch (error) {
+      if (version !== this.loadVersion) return;
       console.error("[AudioService] Error loading audio:", error);
-      this.state.isLoading = false;
-      this.state.isPlaying = false;
-      this.state.downloadProgress = 0; // Resetar progresso em caso de erro
-      this.notifyListeners();
+      await this.stop();
 
       // Re-throw com mensagem mais amigável
       if (error instanceof Error) {
         if (/not found/i.test(error.message)) {
           throw new Error(`Áudio não disponível para este capítulo`);
         }
-        if (/AudioFocusNotAcquired/i.test(error.message)) {
-          throw new Error(
-            `Não foi possível obter o foco de áudio. Tente fechar outros aplicativos de mídia e tente novamente.`,
-          );
-        }
+        throw error;
       }
       throw new Error("Erro ao carregar áudio");
-    }
-  }
-
-  private startStatusPolling() {
-    // Limpar qualquer polling anterior
-    this.stopStatusPolling();
-
-    console.log("[AudioService] Starting status polling");
-
-    // Polling simples para atualizar UI e backup de detecção
-    const poll = async () => {
-      if (this.state.sound && this.statusCheckInterval) {
-        try {
-          const status = await this.state.sound.getStatusAsync();
-          if (status.isLoaded) {
-            this.state.currentTime = status.positionMillis || 0;
-            this.state.duration = status.durationMillis || 0;
-            this.state.isPlaying = status.isPlaying;
-
-            // Notificar listeners sobre mudanças de estado
-            this.notifyListeners();
-          }
-
-          // Agendar próximo poll
-          if (this.statusCheckInterval) {
-            this.statusCheckInterval = setTimeout(poll, 1000) as any;
-          }
-        } catch (error) {
-          console.error("[AudioService] Error in status polling:", error);
-        }
-      }
-    };
-
-    // Iniciar polling
-    this.statusCheckInterval = setTimeout(poll, 1000) as any;
-  }
-
-  private stopStatusPolling() {
-    if (this.statusCheckInterval) {
-      console.log("[AudioService] Stopping status polling");
-      clearTimeout(this.statusCheckInterval as any);
-      this.statusCheckInterval = null;
     }
   }
 
@@ -738,17 +587,6 @@ class AudioService {
         console.warn("onEnded listener error", e);
       }
     });
-    PlaybackNotificationService.showOrUpdate({
-      bookName:
-        this.state.currentBookName ||
-        (this.state.currentBookId
-          ? this.bookNameMapping[this.state.currentBookId]
-          : ""),
-      chapter: this.state.currentChapter || undefined,
-      currentTime: this.state.currentTime,
-      duration: this.state.duration,
-      isPlaying: false,
-    }).catch(() => {});
   }
 
   async prefetch(bookId: number, chapter: number): Promise<boolean> {
@@ -772,95 +610,61 @@ class AudioService {
   }
 
   async play(): Promise<void> {
-    if (this.state?.sound && !this.state.isPlaying) {
-      try {
-        // Verificar se o som está carregado antes de reproduzir
-        const status = await this.state.sound.getStatusAsync();
-        console.log("Audio status before play:", { isLoaded: status.isLoaded });
-
-        if (!status.isLoaded) {
-          console.error("Audio status not loaded:", status);
-          throw new Error("Áudio não está carregado");
-        }
-
-        // Reinicializar o modo de áudio antes de reproduzir
-        await this.initializeAudio();
-
-        await this.state.sound.playAsync();
-        this.state.isPlaying = true;
-
-        // Reiniciar polling ao retomar reprodução
-        this.startStatusPolling();
-
-        this.notifyListeners();
-        PlaybackNotificationService.showOrUpdate({
-          bookName:
-            this.state.currentBookName ||
-            (this.state.currentBookId
-              ? this.bookNameMapping[this.state.currentBookId]
-              : ""),
-          chapter: this.state.currentChapter || undefined,
-          currentTime: this.state.currentTime,
-          duration: this.state.duration,
-          isPlaying: true,
-        }).catch(() => {});
-      } catch (error: any) {
-        console.error("Error playing audio:", error);
-
-        // Se for erro de foco de áudio, mostrar mensagem específica
-        if (error?.message?.includes("AudioFocusNotAcquired")) {
-          throw new Error(
-            "Não foi possível obter o foco de áudio. Tente fechar outros aplicativos de mídia.",
-          );
-        }
-        throw error;
-      }
+    const sound = this.state.sound;
+    if (!sound || sound.playing) return;
+    this.cancelPendingPlay?.();
+    if (this.endHandled || sound.currentStatus.didJustFinish) {
+      await sound.seekTo(0);
+      this.endHandled = false;
     }
+    if (sound !== this.state.sound) return;
+
+    // play() is synchronous in expo-audio; wait for native confirmation instead
+    // of reporting success when focus was denied or the file failed to load.
+    await new Promise<void>((resolve, reject) => {
+      const finish = (error?: Error) => {
+        clearTimeout(timeout);
+        subscription.remove();
+        this.cancelPendingPlay = null;
+        if (error) reject(error);
+        else resolve();
+      };
+      const subscription = sound.addListener("playbackStatusUpdate", () => {
+        if (sound.playing) finish();
+      });
+      const timeout = setTimeout(() => {
+        sound.pause();
+        finish(new Error("Não foi possível iniciar o áudio. Tente reproduzir novamente."));
+      }, 15000);
+      this.cancelPendingPlay = () => finish(new Error("Reprodução cancelada"));
+      try {
+        sound.play();
+      } catch (error) {
+        finish(error instanceof Error ? error : new Error("Erro ao reproduzir áudio"));
+      }
+    });
   }
 
   async pause(): Promise<void> {
-    if (this.state?.sound && this.state.isPlaying) {
-      try {
-        await this.state.sound.pauseAsync();
-        this.state.isPlaying = false;
-
-        // Parar polling quando pausar
-        this.stopStatusPolling();
-
-        this.notifyListeners();
-        PlaybackNotificationService.showOrUpdate({
-          bookName:
-            this.state.currentBookName ||
-            (this.state.currentBookId
-              ? this.bookNameMapping[this.state.currentBookId]
-              : ""),
-          chapter: this.state.currentChapter || undefined,
-          currentTime: this.state.currentTime,
-          duration: this.state.duration,
-          isPlaying: false,
-        }).catch(() => {});
-      } catch (error) {
-        console.error("Error pausing audio:", error);
-      }
-    }
+    this.cancelPendingPlay?.();
+    this.state.sound?.pause();
+    this.state.isPlaying = false;
+    this.notifyListeners();
   }
 
   async stop(): Promise<void> {
     console.log("[AudioService] Stopping audio");
 
-    // Parar polling de status
-    this.stopStatusPolling();
+    this.loadVersion++;
+    this.cancelPendingPlay?.();
+    this.playbackSubscription?.remove();
+    this.playbackSubscription = null;
 
     if (this.state?.sound) {
       try {
-        // Primeiro pausar, depois parar, e por fim descarregar
-        // Isso garante uma liberação suave do foco de áudio
-        const status = await this.state.sound.getStatusAsync();
-        if (status.isLoaded && status.isPlaying) {
-          await this.state.sound.pauseAsync();
-        }
-        await this.state.sound.stopAsync();
-        await this.state.sound.unloadAsync();
+        this.state.sound.pause();
+        this.state.sound.clearLockScreenControls();
+        this.state.sound.remove();
         console.log("[AudioService] Sound unloaded successfully");
       } catch (error) {
         console.error("Error stopping audio:", error);
@@ -878,27 +682,40 @@ class AudioService {
     this.state.currentChapter = null;
     console.log("[AudioService] Audio stopped, state reset");
     this.notifyListeners();
-    PlaybackNotificationService.dismiss().catch(() => {});
+    this.endHandled = false;
+    await setIsAudioActiveAsync(false);
   }
 
   async seekTo(positionMillis: number): Promise<void> {
     if (this.state?.sound) {
       try {
-        await this.state.sound.setPositionAsync(positionMillis);
+        await this.state.sound.seekTo(positionMillis / 1000);
+        if (positionMillis < this.state.duration) this.endHandled = false;
       } catch (error) {
         console.error("Error seeking audio:", error);
       }
     }
   }
 
-  private onPlaybackStatusUpdate = (status: AVPlaybackStatus) => {
+  private onPlaybackStatusUpdate = (status: AudioStatus) => {
+    const current = this.state.sound?.currentStatus;
+    if (!current) return;
+    // A persistent player can deliver queued events from the previous source.
+    // Read live state; only preserve iOS's event-only end flag at the actual end.
+    status = {
+      ...current,
+      didJustFinish: current.didJustFinish || (
+        status.didJustFinish && !current.playing && current.duration > 0 &&
+        current.currentTime >= current.duration
+      ),
+    };
     if (status.isLoaded) {
-      const currentTime = status.positionMillis || 0;
-      const duration = status.durationMillis || 0;
+      const currentTime = (status.currentTime || 0) * 1000;
+      const duration = (status.duration || 0) * 1000;
 
       this.state.currentTime = currentTime;
       this.state.duration = duration;
-      this.state.isPlaying = status.isPlaying;
+      this.state.isPlaying = status.playing;
 
       // Calcular versículo atual
       if (this.state.verseTimestamps.length > 0) {
@@ -923,20 +740,12 @@ class AudioService {
         );
       }
 
-      // Detectar fim do áudio apenas com didJustFinish (funciona bem com tela desbloqueada)
-      if (status.didJustFinish) {
+      // Android reports didJustFinish on every status while ended. Handle once
+      // per source, not once every few seconds, including after unlocking.
+      if (status.didJustFinish && !this.endHandled) {
         console.log("[AudioService] Audio finished (didJustFinish)");
-
-        // Evitar disparos duplicados
-        const now = Date.now();
-        const canTrigger =
-          !this.lastTriggeredEnd || now - this.lastTriggeredEnd > 3000;
-
-        if (canTrigger) {
-          this.lastTriggeredEnd = now;
-          this.triggerEndListeners();
-          this.stopStatusPolling();
-        }
+        this.endHandled = true;
+        this.triggerEndListeners();
       }
 
       this.notifyListeners();
