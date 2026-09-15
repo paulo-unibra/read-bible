@@ -9,6 +9,8 @@ import * as FileSystem from "expo-file-system/legacy";
 import { AppState, AppStateStatus } from "react-native";
 import bibleBrainService from "./BibleBrainService";
 
+const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:1999";
+
 const USFM_BOOK_ORDER = [
   'GEN', 'EXO', 'LEV', 'NUM', 'DEU', 'JOS', 'JDG', 'RUT', '1SA', '2SA',
   '1KI', '2KI', '1CH', '2CH', 'EZR', 'NEH', 'EST', 'JOB', 'PSA', 'PRO',
@@ -57,7 +59,6 @@ class AudioService {
   private endHandled = false;
   private loadVersion = 0;
   private cancelPendingPlay: (() => void) | null = null;
-  // Permite sobrepor pasta específica de áudios, depois usa pasta geral e por fim fallback hardcoded
   private bibleBrainBibleId: string | null = null;
 
   setBibleBrainMode(bibleId: string | null) {
@@ -70,11 +71,6 @@ class AudioService {
     return USFM_BOOK_ORDER[bookId - 1] || '';
   }
 
-  private DRIVE_FOLDER_ID =
-    process.env.EXPO_PUBLIC_AUDIO_DRIVE_FOLDER_ID ||
-    process.env.EXPO_PUBLIC_DRIVE_FOLDER_ID ||
-    "1oqKoOzUu1Ae6sFYlb6QI-wMN4aHjKYjw";
-  private API_KEY = process.env.EXPO_PUBLIC_GOOGLE_API_KEY;
   private AUDIO_DIR = `${FileSystem.documentDirectory}audio/`;
 
   // Mapeamento de nomes de livros bíblicos para o padrão dos arquivos de áudio
@@ -232,7 +228,7 @@ class AudioService {
   }
 
   private async resolveDriveFileId(fileName: string): Promise<string> {
-    const listUrl = `https://www.googleapis.com/drive/v3/files?q='${this.DRIVE_FOLDER_ID}'+in+parents+and+name='${fileName}'&key=${this.API_KEY}&fields=files(id,name)`;
+    const listUrl = `${API_URL}/drive/audio/${encodeURIComponent(fileName)}/metadata`;
     console.log("[AudioService] Searching Drive for file:", fileName);
     console.log("[AudioService] Drive URL query:", listUrl);
 
@@ -242,12 +238,12 @@ class AudioService {
     const data = await response.json();
     console.log("[AudioService] Drive search result:", data);
 
-    if (!data.files || data.files.length === 0) {
+    if (!data.success || !data.file?.id) {
       console.error("[AudioService] Audio file not found in Drive:", fileName);
       throw new Error(`Audio file not found: ${fileName}`);
     }
 
-    const file = data.files[0];
+    const file = data.file;
     if (!file.id) throw new Error("File ID not found");
 
     console.log("[AudioService] Found file in Drive:", {
@@ -342,8 +338,8 @@ class AudioService {
       this.notifyListeners();
     }
 
-    const fileId = await this.resolveDriveFileId(fileName);
-    const downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+    await this.resolveDriveFileId(fileName);
+    const downloadUrl = `${API_URL}/drive/audio/${encodeURIComponent(fileName)}`;
 
     // Download com callback de progresso
     const downloadResumable = FileSystem.createDownloadResumable(

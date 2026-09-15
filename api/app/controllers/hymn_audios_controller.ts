@@ -50,7 +50,6 @@ export default class HymnAudiosController {
   async getByHymnNumber({ params, response, request }: HttpContext) {
     try {
       const { hymnNumber } = params
-      const useDirect = request.qs().direct === 'true'
 
       const audios = await HymnAudioSync.query()
         .where('hymn_number', hymnNumber)
@@ -58,26 +57,20 @@ export default class HymnAudiosController {
         .orderBy('display_order', 'asc')
         .orderBy('instrument', 'asc')
 
-      // Se useDirect=true, usar URL direta do Drive (para mobile app)
-      // Caso contrário, usar proxy (para admin panel com CORS)
-      const envModule = await import('#start/env')
-      const env = envModule.default
-      const apiKey = env.get('GOOGLE_API_KEY')
+      const baseUrl = `${request.protocol()}://${request.host()}`
 
-      const audiosWithUrl = audios.map((audio) => {
-        const downloadUrl = useDirect
-          ? `https://www.googleapis.com/drive/v3/files/${audio.fileId}?alt=media&key=${apiKey}`
-          : (() => {
-              const baseUrl = `${request.protocol()}://${request.hostname()}`
-              const port = request.protocol() === 'https' ? '' : ':1999'
-              return `${baseUrl}${port}/hymn-audios/stream/${audio.fileId}`
-            })()
+      let audiosWithUrl = audios.map((audio) => ({
+        ...audio.serialize(),
+        downloadUrl: `${baseUrl}/hymn-audios/stream/${audio.fileId}`,
+      }))
 
-        return {
-          ...audio.serialize(),
-          downloadUrl,
-        }
-      })
+      if (audiosWithUrl.length === 0) {
+        const driveAudios = await searchHymnAudiosInDrive(Number.parseInt(hymnNumber))
+        audiosWithUrl = driveAudios.map((audio: any) => ({
+          ...audio,
+          downloadUrl: `https://drive.usercontent.google.com/download?id=${audio.fileId}&export=download`,
+        }))
+      }
 
       return response.ok({
         success: true,

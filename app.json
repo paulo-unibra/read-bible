@@ -22,6 +22,7 @@
     },
     "android": {
       "package": "com.readbible.app",
+      "versionCode": 29,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/icon-v2.png",

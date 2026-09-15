@@ -96,8 +96,8 @@ class DictionaryService {
 
   async listDriveFiles(): Promise<DriveFile[]> {
     const folderId =
-      env.get('EXPO_PUBLIC_DICTIONARY_DRIVE_FOLDER_ID') || '1uOQqOPGnImUTApeyY94XJ7BCvIFBzG0H'
-    const apiKey = env.get('GOOGLE_API_KEY') || env.get('EXPO_PUBLIC_GOOGLE_API_KEY')
+      env.get('GOOGLE_DICTIONARY_DRIVE_FOLDER_ID') || '1uOQqOPGnImUTApeyY94XJ7BCvIFBzG0H'
+    const apiKey = env.get('GOOGLE_API_KEY')
 
     const url = `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents&key=${apiKey}&fields=files(id,name,size)`
     const response = await fetch(url)

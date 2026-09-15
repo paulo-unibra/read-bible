@@ -108,6 +108,7 @@ Upload no Google Drive na pasta configurada:
 ### Backend (.env)
 ```env
 GOOGLE_API_KEY=sua_chave_aqui
+GOOGLE_AUDIO_DRIVE_FOLDER_ID=id_da_pasta_de_audios
 GOOGLE_DRIVE_CLIENT_ID=...
 GOOGLE_DRIVE_CLIENT_SECRET=...
 GOOGLE_DRIVE_REFRESH_TOKEN=...
@@ -116,7 +117,6 @@ GOOGLE_DRIVE_REFRESH_TOKEN=...
 ### Mobile (.env)
 ```env
 EXPO_PUBLIC_API_URL=http://seu-servidor:3333
-EXPO_PUBLIC_GOOGLE_API_KEY=sua_chave_aqui
 ```
 
 ## 📊 Endpoints Criados

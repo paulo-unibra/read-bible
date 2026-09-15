@@ -7,6 +7,8 @@ export interface Hymn {
   verses: HymnVerse[];
 }
 
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:1999';
+
 export interface HymnListItem {
   number: number;
   title: string;
@@ -22,8 +24,6 @@ export interface HymnVerse {
 class HarpaService {
   private hymnsCache: Hymn[] | null = null;
   private hymnDetailsCache: Map<number, Hymn> = new Map(); // Cache de hinos já baixados
-  private readonly DRIVE_FOLDER_ID = '1lj2MHwuf5KYXshnITBVlJbVUbVij6o4f';
-  private readonly API_KEY = process.env.EXPO_PUBLIC_GOOGLE_API_KEY; // Usar mesma API Key do AudioService
 
   /**
    * Retorna lista completa de todos os 640 hinos (só com número e título)
@@ -51,7 +51,7 @@ class HarpaService {
       const numberStr = hymnNumber.toString().padStart(3, '0');
       const fileName = `HC ${numberStr}`; // Ex: "HC 001"
       
-      const listUrl = `https://www.googleapis.com/drive/v3/files?q='${this.DRIVE_FOLDER_ID}'+in+parents+and+name+contains+'${fileName}'&key=${this.API_KEY}&fields=files(id,name)`;
+      const listUrl = `${API_URL}/drive/harpa/${hymnNumber}/metadata`;
       
       if (hymnNumber === 1) {
         console.log('[HarpaService] URL de busca (hino 1):', listUrl);
@@ -75,12 +75,12 @@ class HarpaService {
         console.log('[HarpaService] Resposta completa (hino 1):', JSON.stringify(data, null, 2));
       }
       
-      if (data.error) {
-        console.error(`[HarpaService] Erro API hino ${hymnNumber}:`, data.error);
+      if (!data.success) {
+        console.error(`[HarpaService] Erro API hino ${hymnNumber}:`, data.message);
         return null;
       }
       
-      if (!data.files || data.files.length === 0) {
+      if (!data.file) {
         if (hymnNumber === 1) {
           console.log('[HarpaService] Nenhum arquivo retornado para hino 1');
         }
@@ -88,19 +88,10 @@ class HarpaService {
       }
       
       if (hymnNumber === 1) {
-        console.log(`[HarpaService] Arquivos encontrados para hino 1:`, data.files);
+        console.log(`[HarpaService] Arquivo encontrado para hino 1:`, data.file);
       }
       
-      // Filtrar arquivo que começa com "HC 001" e termina com .xml
-      const xmlFile = data.files.find((f: any) => 
-        f.name.startsWith(`HC ${numberStr}`) && f.name.toLowerCase().endsWith('.xml')
-      );
-      
-      if (hymnNumber === 1 && xmlFile) {
-        console.log(`[HarpaService] ✓ XML filtrado (hino 1):`, xmlFile);
-      }
-      
-      return xmlFile || null;
+      return data.file;
     } catch (error) {
       console.error(`[HarpaService] Exceção ao buscar hino ${hymnNumber}:`, error);
       return null;
@@ -195,22 +186,14 @@ class HarpaService {
       
       // Método 3: Buscar metadados e tentar webContentLink
       try {
-        const metadataUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?fields=id,name,webContentLink&key=${this.API_KEY}`;
+        const metadataUrl = `${API_URL}/drive/harpa/${fileId}/download`;
         const metadataResponse = await fetch(metadataUrl);
         
         if (metadataResponse.ok) {
-          const metadata = await metadataResponse.json();
-          console.log(`[HarpaService] Metadados:`, metadata);
-          
-          if (metadata.webContentLink) {
-            const response = await fetch(metadata.webContentLink);
-            if (response.ok) {
-              const xmlContent = await response.text();
-              if (xmlContent.includes('<?xml') || xmlContent.includes('<song')) {
-                console.log(`[HarpaService] ✓ Arquivo baixado via webContentLink (${xmlContent.length} bytes)`);
-                return xmlContent;
-              }
-            }
+          const xmlContent = await metadataResponse.text();
+          if (xmlContent.includes('<?xml') || xmlContent.includes('<song')) {
+            console.log(`[HarpaService] ✓ Arquivo baixado via backend (${xmlContent.length} bytes)`);
+            return xmlContent;
           }
         }
       } catch (e) {

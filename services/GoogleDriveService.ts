@@ -1,24 +1,19 @@
 import * as FileSystem from "expo-file-system/legacy";
 import { Bible, DriveFile } from "../types";
 
-const API_KEY = process.env.EXPO_PUBLIC_GOOGLE_API_KEY;
-const FOLDER_ID = process.env.EXPO_PUBLIC_DRIVE_FOLDER_ID;
+const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:1999";
 
 export class GoogleDriveService {
-  private baseUrl = "https://www.googleapis.com/drive/v3";
-
   async listBibleFiles(): Promise<DriveFile[]> {
     try {
-      const url = `${this.baseUrl}/files?q='${FOLDER_ID}'+in+parents&key=${API_KEY}&fields=files(id,name,webContentLink,size,modifiedTime)`;
-
-      const response = await fetch(url);
+      const response = await fetch(`${API_URL}/drive/bibles`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
 
-      return data.files
+      return (data.files || [])
         .filter((file: any) => file.name.endsWith(".db"))
         .map((file: any) => ({
           id: file.id,

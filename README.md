@@ -33,10 +33,9 @@ Variáveis usadas:
 
 | Variável | Descrição |
 |----------|-----------|
-| EXPO_PUBLIC_GOOGLE_API_KEY | API key do Google usada para acesso ao Drive (quizzes, áudios, bíblias) |
-| EXPO_PUBLIC_DRIVE_FOLDER_ID | Pasta principal no Google Drive com os recursos (DBs / mídia) |
-| EXPO_PUBLIC_QUIZ_DRIVE_FOLDER_ID | (Opcional) Pasta específica para JSON de quizzes (fallback para principal) |
-| EXPO_PUBLIC_AUDIO_DRIVE_FOLDER_ID | (Opcional) Pasta específica para arquivos de áudio (fallback para principal) |
+| EXPO_PUBLIC_API_URL | URL pública da API usada pelo app |
+
+Chaves do Google, IDs de pastas do Drive e `BIBLE_BRAIN_KEY` devem ficar apenas no `.env` do back-end (`api/.env`).
 
 Após criar ou alterar o `.env`, reinicie o bundler:
 

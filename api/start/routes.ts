@@ -31,6 +31,7 @@ const HymnAudiosController = () => import('#controllers/hymn_audios_controller')
 const AudioSyncTimestampsController = () => import('#controllers/audio_sync_timestamps_controller')
 const BibleBrainController = () => import('#controllers/bible_brain_controller')
 const DictionaryController = () => import('#controllers/dictionary_controller')
+const DriveAssetsController = () => import('#controllers/drive_assets_controller')
 const AdminBibleBrainController = () => import('#controllers/Admin/bible_brain_controller')
 import router from '@adonisjs/core/services/router'
 import { middleware } from './kernel.js'
@@ -170,6 +171,14 @@ router
 // IMPORTANTE: Rota específica ANTES da rota com parâmetro
 router.get('/hymn-audios/stream/:fileId', [HymnAudiosController, 'streamAudio'])
 router.get('/hymn-audios/:hymnNumber', [HymnAudiosController, 'getByHymnNumber'])
+
+// Google Drive assets proxied by the API so keys never go to the mobile bundle
+router.get('/drive/bibles', [DriveAssetsController, 'listBibles'])
+router.get('/drive/bibles/:fileId/download', [DriveAssetsController, 'downloadBible'])
+router.get('/drive/audio/:fileName/metadata', [DriveAssetsController, 'audioMetadata'])
+router.get('/drive/audio/:fileName', [DriveAssetsController, 'downloadAudio'])
+router.get('/drive/harpa/:hymnNumber/metadata', [DriveAssetsController, 'harpaMetadata'])
+router.get('/drive/harpa/:fileId/download', [DriveAssetsController, 'downloadHarpa'])
 
 // Audio Sync Timestamps routes (public para o app)
 router.get('/audio-sync/:bookId/:chapterNumber', [AudioSyncTimestampsController, 'show'])
