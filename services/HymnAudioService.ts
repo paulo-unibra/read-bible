@@ -7,6 +7,22 @@ const API_URL =
   Constants.expoConfig?.extra?.apiUrl ||
   "http://localhost:3333";
 
+function resolveApiUrl(url: string): string {
+  if (url.startsWith("/")) return `${API_URL}${url}`;
+  const api = new URL(API_URL);
+  const current = new URL(url);
+
+  if (
+    current.origin === api.origin &&
+    api.pathname !== "/" &&
+    !current.pathname.startsWith(api.pathname)
+  ) {
+    return `${api.origin}${api.pathname}${current.pathname}${current.search}`;
+  }
+
+  return url;
+}
+
 export interface HymnAudioTrack {
   instrument: string; // 'voz', 'teclado', etc.
   fileId: string;
@@ -62,7 +78,7 @@ class HymnAudioService {
               return {
                 instrument: audio.instrument,
                 fileId: audio.fileId,
-                downloadUrl: audio.downloadUrl, // Já vem com URL direta do Drive
+                downloadUrl: resolveApiUrl(audio.downloadUrl),
                 volume: isTeclado ? 0.4 : audio.defaultVolume || 1.0,
                 isMuted: audio.defaultMuted || false,
                 isLoaded: false,

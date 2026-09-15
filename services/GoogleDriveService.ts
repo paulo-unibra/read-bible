@@ -30,10 +30,6 @@ export class GoogleDriveService {
 
   async downloadBible(driveFile: DriveFile): Promise<string> {
     try {
-      if (!driveFile.webContentLink) {
-        throw new Error("No download link available for this file");
-      }
-
       const fileName = driveFile.name;
       const localPath = `${FileSystem.documentDirectory!}bibles/${fileName}`;
 
@@ -54,7 +50,7 @@ export class GoogleDriveService {
       // Download the file
       console.log("Starting download:", fileName);
       const downloadResult = await FileSystem.downloadAsync(
-        driveFile.webContentLink,
+        `${API_URL}/drive/bibles/${driveFile.id}/download`,
         localPath,
       );
 
