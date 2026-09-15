@@ -19,6 +19,7 @@ import bibleBrainService from "../services/BibleBrainService";
 import DatabaseService from "../services/DatabaseService";
 import googleDriveService from "../services/GoogleDriveService";
 import { Bible, BibleBrainBible, DriveFile } from "../types";
+import { formatBibleAbbreviation } from "../utils/bibleAbbreviation";
 
 // As Bíblias do Google Drive hospedadas hoje neste app são todas em português.
 const DRIVE_LANGUAGE_ISO = "por";
@@ -495,7 +496,7 @@ export default function BibleManagerScreen() {
             )}
           </View>
           <Text style={[styles.bibleDetails, { color: theme.subText }]}> 
-            {bibleInfo.abbreviation}
+            {formatBibleAbbreviation(bibleInfo.abbreviation)}
           </Text>
           {item.size && (
             <Text style={[styles.bibleSize, { color: theme.subText }]}>
@@ -580,7 +581,7 @@ export default function BibleManagerScreen() {
             )}
           </View>
           <Text style={[styles.bibleDetails, { color: theme.subText }]}> 
-            {item.languageName} · {item.bibleId}
+            {item.languageName} · {formatBibleAbbreviation(item.bibleId)}
           </Text>
           {item.packageSize && (
             <Text style={[styles.bibleSize, { color: theme.subText }]}>
@@ -639,7 +640,7 @@ export default function BibleManagerScreen() {
           </View>
         </View>
         <Text style={[styles.bibleDetails, { color: theme.subText }]}>
-          {item.abbreviation}
+          {formatBibleAbbreviation(item.abbreviation)}
         </Text>
       </View>
 

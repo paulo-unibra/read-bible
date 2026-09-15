@@ -17,6 +17,7 @@ import authService, { TodayReading } from "../services/AuthService";
 import bibleReaderService from "../services/BibleReaderService";
 import DatabaseService from "../services/DatabaseService";
 import readingPlanService from "../services/ReadingPlanService";
+import { formatBibleAbbreviation } from "../utils/bibleAbbreviation";
 
 interface ChapterContent {
   bookName: string;
@@ -729,7 +730,7 @@ export default function DailyReadingScreen() {
                         { color: colors.textSecondary, fontSize: applyFontScale(14) },
                       ]}
                     >
-                      {bible.abbreviation}
+                      {formatBibleAbbreviation(bible.abbreviation)}
                     </Text>
                   </View>
                   {currentBible?.id === bible.id && (

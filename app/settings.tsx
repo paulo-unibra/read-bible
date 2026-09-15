@@ -11,6 +11,7 @@ import notificationService from '../services/NotificationService';
 import readingPlanService from '../services/ReadingPlanService';
 import { Bible } from '../types';
 import { useThemeCustom } from '../hooks/theme-context';
+import { formatBibleAbbreviation } from '../utils/bibleAbbreviation';
 export default function SettingsScreen() {
   const router = useRouter();
   const [bibles, setBibles] = useState<Bible[]>([]);
@@ -328,7 +329,7 @@ export default function SettingsScreen() {
                       { color: colors.textSecondary, fontSize: applyFontScale(14) },
                       selectedBibleId === bible.id && { color: '#fff' }
                     ]}>
-                     {bible.abbreviation}
+                     {formatBibleAbbreviation(bible.abbreviation)}
                     </Text>
                   </View>
                   {selectedBibleId === bible.id && (

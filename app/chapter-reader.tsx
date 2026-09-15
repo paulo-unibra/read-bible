@@ -41,6 +41,7 @@ import {
     SearchResult,
     Verse,
 } from "../types";
+import { formatBibleAbbreviation } from "../utils/bibleAbbreviation";
 
 export default function ChapterReaderScreen() {
   const router = useRouter();
@@ -488,7 +489,7 @@ export default function ChapterReaderScreen() {
       const bibles = await DatabaseService.getBibles();
       const currentBible = bibles.find((b) => b.id === bibleId);
       if (!currentBible) throw new Error("Bible not found");
-      setBibleAbbrev(currentBible.abbreviation || "");
+      setBibleAbbrev(formatBibleAbbreviation(currentBible.abbreviation));
 
       console.log("[ChapterReader] Biblia selecionada:", {
         bibleId,
@@ -3614,7 +3615,7 @@ ${deepLink}`;
                                 isDark && { color: "#b0b0b0" },
                               ]}
                             >
-                              {item.abbreviation}
+                              {formatBibleAbbreviation(item.abbreviation)}
                               {item.downloadDate && (
                                 <Text style={styles.downloadDate}>
                                   {" • Baixada em "}
@@ -3704,7 +3705,7 @@ ${deepLink}`;
                                   isDark && { color: "#b0b0b0" },
                                 ]}
                               >
-                                `${bibleInfo.abbreviation}$
+                                `${formatBibleAbbreviation(bibleInfo.abbreviation)}$
                                 {driveFile.size
                                   ? ` • ${(
                                       parseInt(driveFile.size) /

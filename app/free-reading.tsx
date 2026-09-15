@@ -7,6 +7,7 @@ import { useTheme } from '../hooks/theme-context';
 import bibleReaderService from '../services/BibleReaderService';
 import DatabaseService from '../services/DatabaseService';
 import { Bible, Book, Chapter, SearchResult } from '../types';
+import { formatBibleAbbreviation } from '../utils/bibleAbbreviation';
 
 type ViewMode = 'books' | 'chapters' | 'search';
 
@@ -240,7 +241,7 @@ export default function FreeReadingScreen() {
                   styles.bibleOptionText,
                   selectedBible?.id === item.id && styles.selectedBibleOptionText
                 ]}>
-                  {item.abbreviation}
+                  {formatBibleAbbreviation(item.abbreviation)}
                 </Text>
               </TouchableOpacity>
             )}

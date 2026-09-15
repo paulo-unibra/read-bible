@@ -14,6 +14,7 @@ import { useTheme } from "../hooks/theme-context";
 import bibleBrainService, { VideoBible } from "../services/BibleBrainService";
 import AdBanner from "../components/AdBanner";
 import DatabaseService from "../services/DatabaseService";
+import { formatBibleAbbreviation } from "../utils/bibleAbbreviation";
 
 export default function VideoListScreen() {
   const { colors, isDark } = useTheme();
@@ -65,7 +66,7 @@ export default function VideoListScreen() {
           {item.name}
         </Text>
         <Text style={[styles.bibleLang, { color: colors.textSecondary }]}>
-          {item.languageName} · {item.bibleId}
+          {item.languageName} · {formatBibleAbbreviation(item.bibleId)}
         </Text>
         <Text style={[styles.bibleMeta, { color: colors.textSecondary }]}>
           {item.videoFilesets.length} disponíveis

@@ -23,6 +23,7 @@ import authService from "../services/AuthService";
 import bibleReaderService from "../services/BibleReaderService";
 import DatabaseService from "../services/DatabaseService";
 import { Book } from "../types";
+import { formatBibleAbbreviation } from "../utils/bibleAbbreviation";
 
 type MainTab = "bible" | "more";
 
@@ -86,7 +87,7 @@ export default function HomeScreen() {
         : downloadedBibles[0];
 
       if (preferredBible) {
-        setBibleAbbrev(preferredBible.abbreviation || "Bíblia");
+        setBibleAbbrev(formatBibleAbbreviation(preferredBible.abbreviation) || "Bíblia");
       }
     } catch (error) {
       console.error("Erro ao inicializar tela inicial:", error);
