@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { router, useLocalSearchParams } from "expo-router";
+import { Redirect, router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -19,7 +19,7 @@ import FocusBottomNav, {
   FOCUS_BOTTOM_NAV_HEIGHT,
 } from "../components/FocusBottomNav";
 import { FocusRadius, getFocusColors } from "../constants/design";
-import authService from "../services/AuthService";
+import authService, { API_URL } from "../services/AuthService";
 import bibleReaderService from "../services/BibleReaderService";
 import DatabaseService from "../services/DatabaseService";
 import { Book } from "../types";
@@ -27,7 +27,42 @@ import { formatBibleAbbreviation } from "../utils/bibleAbbreviation";
 
 type MainTab = "bible" | "more";
 
-export default function HomeScreen() {
+export default function IndexScreen() {
+  const { tab } = useLocalSearchParams();
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (tab === "bible" || tab === "more") return;
+
+    let mounted = true;
+    authService.init().then(() => {
+      if (mounted) setIsAuthenticated(authService.isAuthenticated());
+    }).catch((error) => {
+      console.error("Erro ao verificar sessão inicial:", error);
+      if (mounted) setIsAuthenticated(false);
+    });
+
+    return () => { mounted = false; };
+  }, [tab]);
+
+  if (tab === "bible" || tab === "more") {
+    return <HomeScreen />;
+  }
+
+  if (isAuthenticated === null) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.centerContent}>
+          <ActivityIndicator size="large" color="#2196F3" />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return <Redirect href={isAuthenticated ? "/reading-plans" : "/?tab=bible"} />;
+}
+
+function HomeScreen() {
   const params = useLocalSearchParams();
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<MainTab>(
@@ -42,6 +77,7 @@ export default function HomeScreen() {
     null,
   );
   const [profileImageLoadError, setProfileImageLoadError] = useState(false);
+  const [profileImageUrlIndex, setProfileImageUrlIndex] = useState(0);
   const [bibleOpenError, setBibleOpenError] = useState(false);
 
   const isDark = theme === "dark";
@@ -50,6 +86,16 @@ export default function HomeScreen() {
   useEffect(() => {
     initializeApp();
   }, []);
+
+  useFocusEffect(useCallback(() => {
+    const authenticated = authService.isAuthenticated();
+    const user = authService.getUser();
+    setIsAuthenticated(authenticated);
+    setUserName(authenticated && user?.name ? user.name.split(" ")[0] : "");
+    setUserProfilePicture(authenticated ? user?.profilePicture || null : null);
+    setProfileImageUrlIndex(0);
+    setProfileImageLoadError(false);
+  }, []));
 
   useEffect(() => {
     if (params.message && typeof params.message === "string") {
@@ -77,6 +123,8 @@ export default function HomeScreen() {
       setUserProfilePicture(
         authenticated ? user?.profilePicture || null : null,
       );
+      setProfileImageUrlIndex(0);
+      setProfileImageLoadError(false);
 
       const bibles = await DatabaseService.getBibles();
       const downloadedBibles = bibles.filter((bible) => bible.isDownloaded);
@@ -159,16 +207,46 @@ export default function HomeScreen() {
     }
   }, [activeTab, loading, openBible, params.tab]);
 
+  const profilePictureUrls = (() => {
+    if (!userProfilePicture) return [];
+    if (/^(https?:|file:|content:|asset:|data:image)/.test(userProfilePicture)) {
+      return [userProfilePicture];
+    }
+    const apiBaseUrl = API_URL.replace(/\/+$/, "");
+    const originBaseUrl = apiBaseUrl.replace(/\/api$/, "");
+    const path = userProfilePicture.startsWith("/")
+      ? userProfilePicture
+      : `/${userProfilePicture}`;
+    const normalizedPath = path.replace(/^\/api\//, "/");
+    if (normalizedPath.startsWith("/uploads/")) {
+      return Array.from(new Set([
+        `${apiBaseUrl}${normalizedPath}`,
+        `${originBaseUrl}${normalizedPath}`,
+      ]));
+    }
+    return [`${apiBaseUrl}${path}`];
+  })();
+  const profilePictureUrl = profilePictureUrls[profileImageUrlIndex];
+  const handleProfileImageError = () => {
+    if (profileImageUrlIndex < profilePictureUrls.length - 1) {
+      setProfileImageUrlIndex((index) => index + 1);
+    } else {
+      setProfileImageLoadError(true);
+    }
+  };
+
   const renderListButton = ({
     icon,
     title,
     subtitle,
     onPress,
+    avatar = false,
   }: {
     icon: keyof typeof Ionicons.glyphMap;
     title: string;
     subtitle: string;
     onPress: () => void;
+    avatar?: boolean;
   }) => (
     <TouchableOpacity
       style={[
@@ -179,7 +257,19 @@ export default function HomeScreen() {
       activeOpacity={0.78}
     >
       <View style={[styles.optionIcon, { backgroundColor: focus.blueSoft }]}>
-        <Ionicons name={icon} size={21} color={focus.blue} />
+        {avatar && profilePictureUrl && !profileImageLoadError ? (
+          <Image
+            source={{ uri: profilePictureUrl }}
+            style={styles.optionAvatar}
+            onError={handleProfileImageError}
+          />
+        ) : (
+          <Ionicons
+            name={avatar ? "person-circle-outline" : icon}
+            size={avatar ? 34 : 21}
+            color={focus.blue}
+          />
+        )}
       </View>
       <View style={styles.optionText}>
         <Text style={[styles.optionTitle, { color: focus.text }]}>{title}</Text>
@@ -207,6 +297,7 @@ export default function HomeScreen() {
       <View style={styles.buttonList}>
         {renderListButton({
           icon: "person-outline",
+          avatar: true,
           title: isAuthenticated
             ? `Perfil de ${userName || "usuário"}`
             : "Entrar",
@@ -266,56 +357,48 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: focus.screen }]}>
-      <View
-        style={[
-          styles.header,
-          { backgroundColor: focus.screen, borderBottomColor: focus.line },
-        ]}
-      >
-        <TouchableOpacity
+      {activeTab === "bible" && (
+        <View
           style={[
-            styles.versionButton,
-            { backgroundColor: focus.blue },
-            activeTab !== "bible" && styles.headerButtonDisabled,
+            styles.header,
+            { backgroundColor: focus.screen, borderBottomColor: focus.line },
           ]}
-          onPress={() => {
-            if (activeTab === "bible") router.push("/bible-manager");
-          }}
-          disabled={activeTab !== "bible"}
         >
-          <Text style={styles.versionButtonText}>{bibleAbbrev}</Text>
-          <Ionicons name="chevron-down" size={16} color="#fff" />
-        </TouchableOpacity>
-        <View style={styles.headerActions}>
           <TouchableOpacity
             style={[
-              styles.iconButton,
-              activeTab !== "bible" && styles.headerButtonDisabled,
+              styles.versionButton,
+              { backgroundColor: focus.blue },
             ]}
-            onPress={() => {
-              if (activeTab === "bible") router.push("/free-reading");
-            }}
-            disabled={activeTab !== "bible"}
+            onPress={() => router.push("/bible-manager")}
           >
-            <Ionicons name="search" size={22} color={focus.blue} />
+            <Text style={styles.versionButtonText}>{bibleAbbrev}</Text>
+            <Ionicons name="chevron-down" size={16} color="#fff" />
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.iconButton}
-            onPress={() => router.push("/settings")}
-          >
-            <Ionicons name="options-outline" size={22} color={focus.blue} />
-          </TouchableOpacity>
-          {userProfilePicture && !profileImageLoadError ? (
-            <TouchableOpacity onPress={() => router.push("/profile")}>
-              <Image
-                source={{ uri: userProfilePicture }}
-                style={styles.avatar}
-                onError={() => setProfileImageLoadError(true)}
-              />
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={styles.iconButton}
+              onPress={() => router.push("/free-reading")}
+            >
+              <Ionicons name="search" size={22} color={focus.blue} />
             </TouchableOpacity>
-          ) : null}
+            <TouchableOpacity
+              style={styles.iconButton}
+              onPress={() => router.push("/settings")}
+            >
+              <Ionicons name="options-outline" size={22} color={focus.blue} />
+            </TouchableOpacity>
+            {profilePictureUrl && !profileImageLoadError ? (
+              <TouchableOpacity onPress={() => router.push("/profile")}>
+                <Image
+                  source={{ uri: profilePictureUrl }}
+                  style={styles.avatar}
+                  onError={handleProfileImageError}
+                />
+              </TouchableOpacity>
+            ) : null}
+          </View>
         </View>
-      </View>
+      )}
 
       <View style={styles.main}>{renderPanel()}</View>
 
@@ -369,7 +452,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 22,
   },
-  headerButtonDisabled: { opacity: 0.35 },
   avatar: { width: 34, height: 34, borderRadius: 17, marginLeft: 4 },
   main: { flex: 1 },
   panelContent: { paddingHorizontal: 18, paddingTop: 18 },
@@ -435,7 +517,9 @@ const styles = StyleSheet.create({
     borderRadius: 21,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
   },
+  optionAvatar: { width: 42, height: 42, borderRadius: 21 },
   optionText: { flex: 1 },
   optionTitle: { fontSize: 15, fontWeight: "600" },
   optionSubtitle: { marginTop: 3, fontSize: 12 },

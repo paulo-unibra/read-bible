@@ -41,6 +41,7 @@ export default function DicionarioScreen() {
   const { colors, isDark } = useTheme();
   const focusShadow = getFocusShadow(isDark);
   const [isDownloaded, setIsDownloaded] = useState(false);
+  const [isCheckingDownload, setIsCheckingDownload] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [downloadError, setDownloadError] = useState<string | null>(null);
@@ -129,9 +130,18 @@ export default function DicionarioScreen() {
       if (status.all) {
         setIsDownloaded(true);
         loadPage(1);
-        return;
       }
+    } catch (error) {
+      console.error("Erro ao verificar dicionários:", error);
+      setDownloadError("Não foi possível verificar os dicionários. Tente novamente.");
+    } finally {
+      setIsCheckingDownload(false);
+    }
+  };
 
+  const handleDownloadDictionaries = async () => {
+    if (isDownloading) return;
+    try {
       setIsDownloading(true);
       setDownloadProgress(0);
       setDownloadError(null);
@@ -175,6 +185,36 @@ export default function DicionarioScreen() {
     return out;
   };
 
+  const resetAfterReadError = async () => {
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    let message = "Não foi possível abrir os dicionários. Deseja baixá-los novamente?";
+    try {
+      const status = await dictionaryOfflineService.checkDownloaded();
+      if (status.all) {
+        // Se os arquivos parecem íntegros, mas falharam na leitura, reiniciar o conjunto.
+        await dictionaryOfflineService.deleteAll();
+      }
+    } catch (error) {
+      console.error("Erro ao recuperar dicionários:", error);
+      try {
+        await dictionaryOfflineService.deleteAll();
+      } catch (cleanupError) {
+        console.error("Erro ao limpar dicionários:", cleanupError);
+        message = "Não foi possível limpar os dicionários. Tente novamente.";
+      }
+    }
+
+    setIsDownloaded(false);
+    setGroups([]);
+    setFavoriteGroups([]);
+    setTotal(0);
+    setQuery("");
+    setPage(1);
+    setFavoritesMode(false);
+    setDownloadProgress(0);
+    setDownloadError(message);
+  };
+
   const loadPage = async (p: number, searchQuery?: string) => {
     try {
       if (p === 1) setLoading(true);
@@ -188,6 +228,7 @@ export default function DicionarioScreen() {
       setTotal(result.total);
     } catch (error) {
       console.error("Erro ao carregar dicionário:", error);
+      await resetAfterReadError();
     } finally {
       setLoading(false);
       setSearching(false);
@@ -339,20 +380,36 @@ export default function DicionarioScreen() {
         </View>
       )}
 
+      {isCheckingDownload && <ActivityIndicator size="large" color={colors.accent} />}
+
       {downloadError && !isDownloading && (
-        <View style={styles.errorContainer}>
-          <Ionicons name="alert-circle" size={48} color="#f44336" />
-          <Text style={[styles.errorText, { color: "#f44336" }]}>
-            {downloadError}
+        <Text style={[styles.errorText, { color: "#D64545" }]}>
+          {downloadError}
+        </Text>
+      )}
+
+      {!isCheckingDownload && !isDownloading && (
+        <View style={styles.downloadPrompt}>
+          <Text style={[styles.downloadInfo, { color: colors.textSecondary }]}>
+            Deseja baixar os dicionários para consultar os verbetes?
           </Text>
           <TouchableOpacity
             style={[styles.retryButton, { backgroundColor: colors.accent }]}
-            onPress={checkDictionaryStatus}
+            onPress={handleDownloadDictionaries}
           >
-            <Text style={styles.retryButtonText}>Tentar novamente</Text>
+            <Text style={styles.retryButtonText}>Baixar dicionários</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.notNowButton}
+            onPress={() => router.replace("/reading-plans")}
+          >
+            <Text style={[styles.notNowText, { color: colors.textSecondary }]}>
+              Agora não
+            </Text>
           </TouchableOpacity>
         </View>
       )}
+
     </View>
   );
 
@@ -515,6 +572,11 @@ export default function DicionarioScreen() {
                 styles.listContent,
                 { paddingBottom: FOCUS_BOTTOM_NAV_HEIGHT + 32 },
               ]}
+              ListHeaderComponent={
+                <View style={styles.listAd}>
+                  <AdBanner />
+                </View>
+              }
               renderItem={renderItem}
               onEndReached={favoritesMode ? undefined : loadMore}
               onEndReachedThreshold={0.5}
@@ -531,7 +593,6 @@ export default function DicionarioScreen() {
           )}
         </>
       )}
-      <AdBanner />
       <FocusBottomNav active="dictionary" />
     </SafeAreaView>
   );
@@ -581,6 +642,7 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 15, height: 44 },
   resultCount: { fontSize: 13, marginHorizontal: 16, marginBottom: 8 },
   listContent: { paddingHorizontal: 16, paddingBottom: 32, paddingTop: 6 },
+  listAd: { marginHorizontal: -16, marginBottom: 12 },
   groupHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -669,15 +731,14 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: "center",
   },
-  errorContainer: {
-    marginTop: 24,
-    alignItems: "center",
-    paddingHorizontal: 24,
-  },
+  downloadPrompt: { alignItems: "center", marginTop: 24 },
+  notNowButton: { padding: 12, marginTop: 8 },
+  notNowText: { fontSize: 14, fontWeight: "600" },
   errorText: {
     fontSize: 14,
     marginTop: 12,
     textAlign: "center",
+    paddingHorizontal: 24,
   },
   retryButton: {
     marginTop: 16,

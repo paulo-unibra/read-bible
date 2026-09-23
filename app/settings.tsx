@@ -212,7 +212,7 @@ export default function SettingsScreen() {
               Alert.alert('Sucesso', 'Você saiu da sua conta', [
                 {
                   text: 'OK',
-                  onPress: () => router.replace('/auth'),
+                  onPress: () => router.replace('/?tab=bible'),
                 },
               ]);
             } catch (error) {

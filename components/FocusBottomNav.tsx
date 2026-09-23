@@ -23,7 +23,7 @@ export default function FocusBottomNav({ active }: FocusBottomNavProps) {
   const shadow = isDark ? FocusShadow.dark : FocusShadow.light;
 
   const openReadingPlan = () => {
-    router.replace("/reading-plans");
+    router.push("/reading-plans");
   };
 
   const openBible = async () => {
@@ -39,7 +39,7 @@ export default function FocusBottomNav({ active }: FocusBottomNavProps) {
             { text: "Cancelar", style: "cancel" },
             {
               text: "Baixar Bíblias",
-              onPress: () => router.replace("/bible-manager"),
+              onPress: () => router.push("/bible-manager"),
             },
           ],
         );
@@ -71,7 +71,7 @@ export default function FocusBottomNav({ active }: FocusBottomNavProps) {
         };
       }
 
-      router.replace(
+      router.push(
         `/chapter-reader?bibleId=${lastReading.bibleId}&bookId=${lastReading.bookId}&chapterNumber=${lastReading.chapterNumber}`,
       );
     } catch (error) {
@@ -88,7 +88,13 @@ export default function FocusBottomNav({ active }: FocusBottomNavProps) {
   ) => {
     const selected = key === active;
     return (
-      <TouchableOpacity key={key} style={styles.tabButton} onPress={onPress}>
+      <TouchableOpacity
+        key={key}
+        style={styles.tabButton}
+        onPress={selected ? undefined : onPress}
+        accessibilityRole="tab"
+        accessibilityState={{ selected }}
+      >
         <Ionicons
           name={icon}
           size={22}
@@ -122,13 +128,13 @@ export default function FocusBottomNav({ active }: FocusBottomNavProps) {
       {renderButton("plan", "today-outline", "Plano", openReadingPlan)}
       {renderButton("bible", "book", "Bíblia", openBible)}
       {renderButton("dictionary", "book-outline", "Dicionário", () =>
-        router.replace("/dicionario"),
+        router.push("/dicionario"),
       )}
       {renderButton("harpa", "musical-notes-outline", "Harpa", () =>
-        router.replace("/harpa"),
+        router.push("/harpa"),
       )}
       {renderButton("more", "menu-outline", "Mais", () =>
-        router.replace("/?tab=more"),
+        router.push("/?tab=more"),
       )}
     </View>
   );

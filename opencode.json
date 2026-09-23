@@ -1,0 +1,15 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "google-play-developer": {
+      "type": "local",
+      "command": ["google-play-developer-mcp"],
+      "enabled": true
+    },
+    "expo": {
+      "type": "remote",
+      "url": "https://mcp.expo.dev/mcp",
+      "enabled": true
+    }
+  }
+}

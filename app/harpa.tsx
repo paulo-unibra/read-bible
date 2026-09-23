@@ -40,6 +40,7 @@ export default function HarpaScreen() {
 
   // Estados de download
   const [isDownloaded, setIsDownloaded] = useState(false);
+  const [isCheckingDownload, setIsCheckingDownload] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [downloadError, setDownloadError] = useState<string | null>(null);
@@ -89,24 +90,12 @@ export default function HarpaScreen() {
 
       if (downloaded) {
         await loadHymnsList();
-      } else {
-        // Extrair automaticamente na primeira vez
-        setIsDownloading(true);
-        const result = await harpaOfflineService.downloadHarpa((progress) => {
-          setDownloadProgress(progress);
-        });
-
-        if (result.success) {
-          setIsDownloaded(true);
-          await loadHymnsList();
-        } else {
-          setDownloadError(result.error || "Erro ao preparar a Harpa");
-        }
-        setIsDownloading(false);
       }
     } catch (error) {
       console.error("Erro ao verificar status da Harpa:", error);
-      setIsDownloading(false);
+      setDownloadError("Não foi possível verificar os hinos. Tente novamente.");
+    } finally {
+      setIsCheckingDownload(false);
     }
   };
 
@@ -339,6 +328,26 @@ export default function HarpaScreen() {
         </View>
       )}
 
+      {isCheckingDownload && <ActivityIndicator size="large" color={colors.accent} />}
+
+      {!isCheckingDownload && !isDownloading && !downloadError && (
+        <View style={styles.downloadPrompt}>
+          <Text style={[styles.downloadInfo, { color: colors.textSecondary, fontSize: applyFontScale(14) }]}>
+            Deseja baixar os hinos para acessar a Harpa Cristã?
+          </Text>
+          <TouchableOpacity
+            style={[styles.downloadButton, { backgroundColor: colors.accent }]}
+            onPress={handleDownloadHarpa}
+          >
+            <Ionicons name="download-outline" size={20} color="#fff" />
+            <Text style={styles.downloadButtonText}>Baixar hinos</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.replace("/reading-plans")} style={styles.notNowButton}>
+            <Text style={[styles.notNowText, { color: colors.textSecondary }]}>Agora não</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {downloadError && (
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle" size={48} color="#f44336" />
@@ -554,13 +563,13 @@ export default function HarpaScreen() {
         />
       </SafeAreaView>
 
-      {/* Banner fixo - usando fragment para ficar fora do SafeAreaView */}
+      {/* Banner fixo imediatamente acima do menu inferior */}
       <View
         style={[
           styles.bannerContainer,
           {
             backgroundColor: colors.bg,
-            bottom: FOCUS_BOTTOM_NAV_HEIGHT + Math.max(8, insets.bottom),
+            bottom: 64 + 1 + Math.max(8, insets.bottom),
           },
         ]}
       >
@@ -771,6 +780,9 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#fff",
   },
+  downloadPrompt: { alignItems: "center", marginTop: 24 },
+  notNowButton: { padding: 12, marginTop: 8 },
+  notNowText: { fontSize: 14, fontWeight: "600" },
   progressContainer: {
     width: "100%",
     alignItems: "center",

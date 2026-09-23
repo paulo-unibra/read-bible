@@ -2,7 +2,7 @@
   "expo": {
     "name": "Bíblia em Foco",
     "slug": "ReadBible",
-    "version": "1.0.32",
+    "version": "1.0.33",
     "orientation": "portrait",
     "icon": "./assets/images/icon-v2.png",
     "scheme": "readbible",
@@ -36,6 +36,7 @@
       },
       "permissions": [
         "INTERNET",
+        "CAMERA",
         "MODIFY_AUDIO_SETTINGS",
         "RECORD_AUDIO",
         "READ_CALENDAR",
@@ -49,8 +50,7 @@
         "WRITE_EXTERNAL_STORAGE",
         "READ_MEDIA_IMAGES",
         "READ_MEDIA_VIDEO",
-        "READ_MEDIA_VISUAL_USER_SELECTED",
-        "CAMERA"
+        "READ_MEDIA_VISUAL_USER_SELECTED"
       ]
     },
     "web": {

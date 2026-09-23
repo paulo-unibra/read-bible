@@ -94,14 +94,52 @@ class DictionaryOfflineService {
   }
 
   async checkDownloaded(): Promise<{ all: boolean; missing: string[] }> {
-    const results = await Promise.all(
-      DICT_KEYS.map(async (key) => {
-        const info = await FileSystem.getInfoAsync(localPath(key));
-        return { key, ok: info.exists && !!info.size && info.size >= 50000 };
-      })
-    );
-    const missing = results.filter((r) => !r.ok).map((r) => r.key);
+    await this.closeAll();
+    const missing: string[] = [];
+    for (const key of DICT_KEYS) {
+      const path = localPath(key);
+      const info = await FileSystem.getInfoAsync(path);
+      if (!info.exists) {
+        missing.push(key);
+        continue;
+      }
+      try {
+        await this.validateFile(localFileName(key));
+      } catch (error) {
+        console.warn(`Dicionário ${key} incompleto ou inválido:`, error);
+        await this.removeSqliteFile(path);
+        missing.push(key);
+      }
+    }
     return { all: missing.length === 0, missing };
+  }
+
+  private async validateFile(fileName: string): Promise<void> {
+    const info = await FileSystem.getInfoAsync(`${SQLITE_DIR}${fileName}`);
+    if (!info.exists || !info.size || info.size < 50000) {
+      throw new Error("Arquivo incompleto");
+    }
+
+    const db = await SQLite.openDatabaseAsync(fileName, undefined, SQLITE_DIR);
+    try {
+      const integrity = await db.getFirstAsync<{ quick_check: string }>("PRAGMA quick_check(1)");
+      if (integrity?.quick_check !== "ok") {
+        throw new Error("Banco de dados corrompido");
+      }
+      const tables = await db.getAllAsync<{ name: string }>(
+        "SELECT name FROM sqlite_master WHERE type='table'"
+      );
+      const table = tables.find((item) =>
+        ["dictionary", "dict", "entries", "definitions"].includes(item.name.toLowerCase())
+      );
+      if (!table || !/^[a-z_]+$/i.test(table.name)) {
+        throw new Error("Tabela do dicionário ausente");
+      }
+      const entry = await db.getFirstAsync(`SELECT 1 FROM "${table.name}" LIMIT 1`);
+      if (!entry) throw new Error("Dicionário vazio");
+    } finally {
+      await db.closeAsync();
+    }
   }
 
   private async ensureSqliteDir(): Promise<void> {
@@ -111,54 +149,65 @@ class DictionaryOfflineService {
     }
   }
 
+  private async removeSqliteFile(path: string): Promise<void> {
+    for (const suffix of ["", "-wal", "-shm", "-journal"]) {
+      await FileSystem.deleteAsync(`${path}${suffix}`, { idempotent: true });
+    }
+  }
+
   async downloadAll(
     files: DictionaryFileInfo[],
     onProgress?: (progress: number) => void
   ): Promise<void> {
     await this.ensureSqliteDir();
+    const { missing } = await this.checkDownloaded();
+    if (DICT_KEYS.some((key) => !files.some((file) => file.dictKey === key))) {
+      throw new Error("Lista de dicionários incompleta. Tente novamente.");
+    }
 
     const totalBytes = files.reduce((sum, f) => sum + f.size, 0);
     let downloadedBytes = 0;
 
     for (const file of files) {
       const target = localPath(file.dictKey);
-
-      const existing = await FileSystem.getInfoAsync(target);
-      if (existing.exists && existing.size && existing.size >= 50000) {
-        downloadedBytes += existing.size;
+      if (!missing.includes(file.dictKey)) {
+        const existing = await FileSystem.getInfoAsync(target);
+        downloadedBytes += existing.exists ? existing.size || 0 : 0;
         onProgress?.((downloadedBytes / totalBytes) * 100);
         continue;
       }
 
-      await FileSystem.deleteAsync(target, { idempotent: true });
+      const tempName = `${localFileName(file.dictKey)}.download`;
+      const tempPath = `${SQLITE_DIR}${tempName}`;
+      await this.removeSqliteFile(tempPath);
+      try {
+        const resumable = FileSystem.createDownloadResumable(
+          `${API_URL}/dictionary/files/download/${file.dictKey}`,
+          tempPath,
+          {},
+          (p) => {
+            const written = p.totalBytesWritten || 0;
+            onProgress?.(((downloadedBytes + written) / totalBytes) * 100);
+          }
+        );
 
-      const resumable = FileSystem.createDownloadResumable(
-        `${API_URL}/dictionary/files/download/${file.dictKey}`,
-        target,
-        {},
-        (p) => {
-          const written = p.totalBytesWritten || 0;
-          onProgress?.(((downloadedBytes + written) / totalBytes) * 100);
+        const result = await resumable.downloadAsync();
+        if (!result || result.status !== 200) {
+          throw new Error(`Falha ao baixar ${file.label}`);
         }
-      );
-
-      const result = await resumable.downloadAsync();
-      if (!result || result.status !== 200) {
-        await FileSystem.deleteAsync(target, { idempotent: true });
-        throw new Error(`Falha ao baixar ${file.label}`);
+        await this.validateFile(tempName);
+        await FileSystem.moveAsync({ from: tempPath, to: target });
+      } catch (error) {
+        await this.removeSqliteFile(tempPath);
+        throw error;
       }
 
       const info = await FileSystem.getInfoAsync(target);
-      if (!info.exists || !info.size || info.size < 50000) {
-        await FileSystem.deleteAsync(target, { idempotent: true });
-        throw new Error(`Arquivo inválido: ${file.label}`);
-      }
-
-      downloadedBytes += info.size;
+      downloadedBytes += info.exists ? info.size || 0 : 0;
       onProgress?.((downloadedBytes / totalBytes) * 100);
     }
 
-    this.closeAll();
+    await this.closeAll();
   }
 
   private async openDict(dictKey: string): Promise<OpenSource> {
@@ -171,46 +220,51 @@ class DictionaryOfflineService {
       SQLITE_DIR
     );
 
-    const tables = (await db.getAllAsync(
-      "SELECT name FROM sqlite_master WHERE type='table'"
-    )) as { name: string }[];
-    const dictTable = tables.find((t) =>
-      ["dictionary", "dict", "entries", "definitions"].includes(
-        t.name.toLowerCase()
-      )
-    );
-    if (!dictTable) {
+    try {
+      const tables = (await db.getAllAsync(
+        "SELECT name FROM sqlite_master WHERE type='table'"
+      )) as { name: string }[];
+      const dictTable = tables.find((t) =>
+        ["dictionary", "dict", "entries", "definitions"].includes(
+          t.name.toLowerCase()
+        )
+      );
+      if (!dictTable) {
+        throw new Error(`Tabela de dicionário não encontrada em ${dictKey}`);
+      }
+
+      const cols = (await db.getAllAsync(
+        `PRAGMA table_info("${dictTable.name}")`
+      )) as { name: string }[];
+      if (!cols.length) throw new Error(`Colunas do dicionário ausentes em ${dictKey}`);
+      const colNames = cols.map((c) => c.name.toLowerCase());
+      const wordColumn = colNames.includes("word")
+        ? "word"
+        : colNames.includes("topic")
+          ? "topic"
+          : cols[0].name;
+      const definitionColumn = colNames.includes("definition")
+        ? "definition"
+        : colNames.includes("meaning")
+          ? "meaning"
+          : colNames.includes("data")
+            ? "data"
+            : colNames.includes("content")
+              ? "content"
+              : cols[1]?.name || cols[0].name;
+
+      const source: OpenSource = {
+        db,
+        tableName: dictTable.name,
+        wordColumn,
+        definitionColumn,
+      };
+      this.connections.set(dictKey, source);
+      return source;
+    } catch (error) {
       await db.closeAsync();
-      throw new Error(`Tabela de dicionário não encontrada em ${dictKey}`);
+      throw error;
     }
-
-    const cols = (await db.getAllAsync(
-      `PRAGMA table_info("${dictTable.name}")`
-    )) as { name: string }[];
-    const colNames = cols.map((c) => c.name.toLowerCase());
-    const wordColumn = colNames.includes("word")
-      ? "word"
-      : colNames.includes("topic")
-        ? "topic"
-        : cols[0].name;
-    const definitionColumn = colNames.includes("definition")
-      ? "definition"
-      : colNames.includes("meaning")
-        ? "meaning"
-        : colNames.includes("data")
-          ? "data"
-          : colNames.includes("content")
-            ? "content"
-            : cols[1]?.name || cols[0].name;
-
-    const source: OpenSource = {
-      db,
-      tableName: dictTable.name,
-      wordColumn,
-      definitionColumn,
-    };
-    this.connections.set(dictKey, source);
-    return source;
   }
 
   private excludeFilter(wordColumn: string): string {
@@ -282,21 +336,16 @@ class DictionaryOfflineService {
   }
 
   async deleteAll(): Promise<void> {
-    this.closeAll();
+    await this.closeAll();
     for (const key of DICT_KEYS) {
-      await FileSystem.deleteAsync(localPath(key), { idempotent: true });
+      await this.removeSqliteFile(localPath(key));
     }
   }
 
-  private closeAll(): void {
-    for (const source of this.connections.values()) {
-      try {
-        source.db.closeAsync();
-      } catch {
-        // ignore
-      }
-    }
+  private async closeAll(): Promise<void> {
+    const connections = [...this.connections.values()];
     this.connections.clear();
+    await Promise.all(connections.map((source) => source.db.closeAsync()));
   }
 }
 
