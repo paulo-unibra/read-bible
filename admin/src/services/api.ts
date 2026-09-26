@@ -27,11 +27,12 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 && error.config?.url !== '/admin/login') {
       // Token expirado ou inválido
       localStorage.removeItem('admin_token');
       localStorage.removeItem('admin_user');
-      window.location.href = '/login';
+      const appBase = import.meta.env.BASE_URL.replace(/\/$/, '');
+      window.location.href = `${appBase}/login`;
     }
     return Promise.reject(error);
   }
