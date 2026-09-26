@@ -55,7 +55,7 @@ jobs:
           DEPLOY_USER: ${{ vars.DEPLOY_USER }}
           DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
         run: >-
-          rsync -az --delete
+          rsync -rzc --delete --no-perms
           -e "ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes"
           admin/dist/
           "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
