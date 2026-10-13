@@ -8,7 +8,7 @@ export default class AuditLogController {
    */
   async index({ request, response }: HttpContext) {
     try {
-      const { action, search, from, to, page = 1, limit = 50 } = request.qs()
+      const { action, search, ip, from, to, page = 1, limit = 50 } = request.qs()
 
       const query = AuditLog.query()
         .preload('user')
@@ -33,6 +33,10 @@ export default class AuditLogController {
             .where('email', 'like', term)
             .orWhere('full_name', 'like', term)
         })
+      }
+
+      if (ip && ip.trim()) {
+        query.where('ip_address', 'like', `%${ip.trim()}%`)
       }
 
       const logs = await query.paginate(page, limit)

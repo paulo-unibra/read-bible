@@ -106,6 +106,10 @@ const AuditLogs: React.FC = () => {
   const [periodFilter, setPeriodFilter] = useState("30");
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
+  const [ipFilter, setIpFilter] = useState("");
+  const [ipInput, setIpInput] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedLog, setSelectedLog] = useState<AuditLogEntry | null>(null);
@@ -122,13 +126,7 @@ const AuditLogs: React.FC = () => {
 
   useEffect(() => {
     loadActions();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => {
-    loadLogs();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [actionFilter, periodFilter, search, page]);
 
   const loadActions = async () => {
     try {
@@ -157,7 +155,18 @@ const AuditLogs: React.FC = () => {
         params.search = search.trim();
       }
 
-      if (periodFilter !== "all") {
+      if (ipFilter.trim()) {
+        params.ip = ipFilter.trim();
+      }
+
+      if (dateFrom) {
+        params.from = new Date(`${dateFrom}T00:00:00`).toISOString();
+      }
+      if (dateTo) {
+        params.to = new Date(`${dateTo}T23:59:59.999`).toISOString();
+      }
+
+      if (!dateFrom && !dateTo && periodFilter !== "all") {
         const to = new Date();
         const from = new Date();
 
@@ -180,7 +189,11 @@ const AuditLogs: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [actionFilter, periodFilter, search, page]);
+  }, [actionFilter, periodFilter, search, ipFilter, dateFrom, dateTo, page]);
+
+  useEffect(() => {
+    loadLogs();
+  }, [loadLogs]);
 
   const getActionLabel = (action: string) =>
     ACTION_LABELS[action] || action.replace(/\./g, " · ");
@@ -215,15 +228,16 @@ const AuditLogs: React.FC = () => {
     setSelectedLog(null);
   };
 
-  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      setSearch(searchInput.trim());
-      setPage(1);
-    }
-  };
-
   const handlePeriodChange = (value: string) => {
     setPeriodFilter(value);
+    setDateFrom("");
+    setDateTo("");
+    setPage(1);
+  };
+
+  const applyTextFilters = () => {
+    setSearch(searchInput.trim());
+    setIpFilter(ipInput.trim());
     setPage(1);
   };
 
@@ -276,10 +290,36 @@ const AuditLogs: React.FC = () => {
                 value={searchInput}
                 placeholder="Digite e pressione Enter"
                 onChange={(e) => setSearchInput(e.target.value)}
-                onKeyDown={handleSearchKeyDown}
-                style={{ padding: "0.5rem", minWidth: "220px" }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") applyTextFilters();
+                }}
+                className="filter-input"
               />
             </label>
+
+            <label>
+              IP:
+              <input
+                type="text"
+                value={ipInput}
+                placeholder="Ex.: 192.168.0.1"
+                onChange={(e) => setIpInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") applyTextFilters();
+                }}
+                className="filter-input filter-ip"
+              />
+            </label>
+
+            <label>
+              De:
+              <input type="date" value={dateFrom} max={dateTo || undefined} onChange={(e) => { setDateFrom(e.target.value); setPeriodFilter("all"); setPage(1); }} />
+            </label>
+            <label>
+              Até:
+              <input type="date" value={dateTo} min={dateFrom || undefined} onChange={(e) => { setDateTo(e.target.value); setPeriodFilter("all"); setPage(1); }} />
+            </label>
+            <Button onClick={applyTextFilters} disabled={loading}>Filtrar</Button>
           </div>
 
           {meta && (
