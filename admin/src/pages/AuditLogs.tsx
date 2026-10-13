@@ -113,6 +113,8 @@ const AuditLogs: React.FC = () => {
   const [page, setPage] = useState(1);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedLog, setSelectedLog] = useState<AuditLogEntry | null>(null);
+  const [copyFeedback, setCopyFeedback] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(true);
   const { hasPermission } = useAuth();
   const navigate = useNavigate();
 
@@ -241,6 +243,55 @@ const AuditLogs: React.FC = () => {
     setPage(1);
   };
 
+  const handleCopyLogs = async () => {
+    const logText = logs
+      .map((log) =>
+        [
+          `Log #${log.id}`,
+          `Data/Hora: ${formatDate(log.createdAt)}`,
+          `Usuário: ${log.user?.fullName || "Usuário removido"}`,
+          `E-mail: ${log.user?.email || "—"}`,
+          `ID do usuário: ${log.userId ?? "—"}`,
+          `Ação: ${getActionLabel(log.action)} (${log.action})`,
+          `Entidade: ${log.entityType || "—"}`,
+          `ID da entidade: ${log.entityId ?? "—"}`,
+          `IP: ${log.ipAddress || "—"}`,
+          `User-Agent: ${log.userAgent || "—"}`,
+          `Detalhes: ${JSON.stringify(log.details, null, 2)}`,
+        ].join("\n")
+      )
+      .join("\n\n---\n\n");
+
+    try {
+      await navigator.clipboard.writeText(logText);
+      setCopyFeedback(`${logs.length} log(s) copiado(s)`);
+    } catch (err) {
+      setCopyFeedback("Não foi possível copiar. Verifique a permissão da área de transferência.");
+      console.error("Erro ao copiar logs:", err);
+    }
+
+    window.setTimeout(() => setCopyFeedback(""), 4000);
+  };
+
+  const activeFilterCount = [
+    actionFilter !== "all",
+    search !== "",
+    ipFilter !== "",
+    Boolean(dateFrom || dateTo) || periodFilter !== "30",
+  ].filter(Boolean).length;
+
+  const clearFilters = () => {
+    setActionFilter("all");
+    setPeriodFilter("30");
+    setSearch("");
+    setSearchInput("");
+    setIpFilter("");
+    setIpInput("");
+    setDateFrom("");
+    setDateTo("");
+    setPage(1);
+  };
+
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
       <Sidebar />
@@ -249,7 +300,44 @@ const AuditLogs: React.FC = () => {
         <PageTitle>Logs de Auditoria</PageTitle>
 
         {/* Filtros */}
-        <FiltersSection>
+        <FiltersSection className="audit-filter-panel">
+          <div className="filter-panel-heading">
+            <div className="filter-panel-title">
+              <span className="filter-panel-icon" aria-hidden="true">☷</span>
+              <div>
+                <h2>Filtros</h2>
+                <p>Encontre registros por ação, usuário, IP ou período</p>
+              </div>
+              {activeFilterCount > 0 && (
+                <span className="active-filter-count">
+                  {activeFilterCount} ativo{activeFilterCount === 1 ? "" : "s"}
+                </span>
+              )}
+            </div>
+            <button
+              type="button"
+              className="filter-toggle"
+              aria-expanded={filtersOpen}
+              onClick={() => setFiltersOpen((open) => !open)}
+            >
+              {filtersOpen ? "Recolher" : "Abrir filtros"}
+              <span className={filtersOpen ? "filter-chevron is-open" : "filter-chevron"} aria-hidden="true">⌄</span>
+            </button>
+          </div>
+
+          {!filtersOpen && activeFilterCount > 0 && (
+            <div className="filter-summary" aria-label="Filtros aplicados">
+              {actionFilter !== "all" && <span>{getActionLabel(actionFilter)}</span>}
+              {search && <span>Usuário: {search}</span>}
+              {ipFilter && <span>IP: {ipFilter}</span>}
+              {(dateFrom || dateTo) && <span>{dateFrom || "…"} — {dateTo || "…"}</span>}
+              {!dateFrom && !dateTo && periodFilter !== "all" && (
+                <span>{PERIODS.find((period) => period.value === periodFilter)?.label}</span>
+              )}
+            </div>
+          )}
+
+          {filtersOpen && <div className="filter-panel-content">
           <div className="filters-group">
             <label>
               Ação:
@@ -319,14 +407,30 @@ const AuditLogs: React.FC = () => {
               Até:
               <input type="date" value={dateTo} min={dateFrom || undefined} onChange={(e) => { setDateTo(e.target.value); setPeriodFilter("all"); setPage(1); }} />
             </label>
-            <Button onClick={applyTextFilters} disabled={loading}>Filtrar</Button>
+            <div className="filter-actions">
+              <Button onClick={applyTextFilters} disabled={loading}>Aplicar filtros</Button>
+              {activeFilterCount > 0 && (
+                <button type="button" className="clear-filters" onClick={clearFilters}>
+                  Limpar
+                </button>
+              )}
+            </div>
           </div>
 
+          <div className="filter-panel-footer">
           {meta && (
             <div className="total-info">
-              {meta.total} registro(s)
+              <strong>{meta.total}</strong> registro(s) encontrado(s)
             </div>
           )}
+          <div className="copy-logs-control">
+            <Button onClick={handleCopyLogs} disabled={loading || logs.length === 0}>
+              Copiar logs desta página
+            </Button>
+            {copyFeedback && <span role="status">{copyFeedback}</span>}
+          </div>
+          </div>
+          </div>}
         </FiltersSection>
 
         {error && <ErrorMessage>{error}</ErrorMessage>}
