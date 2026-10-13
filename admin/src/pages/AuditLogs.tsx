@@ -96,6 +96,34 @@ const PERIODS = [
   { value: "30", label: "Últimos 30 dias" },
 ];
 
+const isValidIpAddress = (value: string) => {
+  const ipv4 = (address: string) => {
+    const octets = address.split(".");
+    return octets.length === 4 && octets.every((octet) => {
+      if (!/^\d{1,3}$/.test(octet)) return false;
+      const number = Number(octet);
+      return number >= 0 && number <= 255;
+    });
+  };
+
+  if (ipv4(value)) return true;
+  if (!value.includes(":") || value.includes("%")) return false;
+
+  let address = value;
+  if (address.includes(".")) {
+    const lastColon = address.lastIndexOf(":");
+    if (lastColon < 0 || !ipv4(address.slice(lastColon + 1))) return false;
+    address = `${address.slice(0, lastColon + 1)}0:0`;
+  }
+
+  const compressed = address.includes("::");
+  if (compressed && address.indexOf("::") !== address.lastIndexOf("::")) return false;
+
+  const groups = address.split(":").filter(Boolean);
+  if (groups.some((group) => !/^[\da-f]{1,4}$/i.test(group))) return false;
+  return compressed ? groups.length < 8 : groups.length === 8;
+};
+
 const AuditLogs: React.FC = () => {
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
   const [actions, setActions] = useState<string[]>([]);
@@ -108,6 +136,7 @@ const AuditLogs: React.FC = () => {
   const [searchInput, setSearchInput] = useState("");
   const [ipFilter, setIpFilter] = useState("");
   const [ipInput, setIpInput] = useState("");
+  const [ipError, setIpError] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
@@ -238,8 +267,14 @@ const AuditLogs: React.FC = () => {
   };
 
   const applyTextFilters = () => {
+    const trimmedIp = ipInput.trim();
+    if (trimmedIp && !isValidIpAddress(trimmedIp)) {
+      setIpError("Informe um endereço IPv4 ou IPv6 válido.");
+      return;
+    }
+    setIpError("");
     setSearch(searchInput.trim());
-    setIpFilter(ipInput.trim());
+    setIpFilter(trimmedIp);
     setPage(1);
   };
 
@@ -390,13 +425,24 @@ const AuditLogs: React.FC = () => {
               <input
                 type="text"
                 value={ipInput}
-                placeholder="Ex.: 192.168.0.1"
-                onChange={(e) => setIpInput(e.target.value)}
+                placeholder="IPv4 ou IPv6"
+                aria-invalid={Boolean(ipError)}
+                aria-describedby={ipError ? "ip-filter-error" : "ip-filter-hint"}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                onChange={(e) => {
+                  setIpInput(e.target.value.replace(/[^\da-f:.]/gi, "").toLowerCase());
+                  setIpError("");
+                }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") applyTextFilters();
                 }}
                 className="filter-input filter-ip"
               />
+              <span id={ipError ? "ip-filter-error" : "ip-filter-hint"} className={ipError ? "ip-filter-error" : "ip-filter-hint"} role={ipError ? "alert" : undefined}>
+                {ipError || "Aceita IPv4 e IPv6"}
+              </span>
             </label>
 
             <label>

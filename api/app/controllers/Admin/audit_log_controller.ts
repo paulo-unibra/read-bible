@@ -35,8 +35,8 @@ export default class AuditLogController {
         })
       }
 
-      if (ip && ip.trim()) {
-        query.where('ip_address', 'like', `%${ip.trim()}%`)
+      if (typeof ip === 'string' && ip.trim()) {
+        query.where('ip_address', ip.trim())
       }
 
       const logs = await query.paginate(page, limit)
