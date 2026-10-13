@@ -240,18 +240,22 @@ export default function ReadingPlansScreen() {
   };
 
   const getTodayReading = () => {
-    if (selectedPlan?.currentDay) {
-      const currentDay = planDays.find(
-        (day) => day.dayNumber === selectedPlan.currentDay,
-      );
+    if (!selectedPlan?.currentDay || isPlanScheduleCompleted) return null;
 
-      if (currentDay) {
-        return currentDay;
-      }
-    }
-
-    return planDays.find((day) => !day.isCompleted);
+    return planDays.find(
+      (day) => day.dayNumber === selectedPlan.currentDay && !day.isCompleted,
+    ) || null;
   };
+
+  const pendingDays = selectedPlan?.currentDay
+    ? planDays.filter(
+        (day) => day.dayNumber < selectedPlan.currentDay! && !day.isCompleted,
+      )
+    : [];
+  const isPlanScheduleCompleted = Boolean(
+    selectedPlan &&
+      (selectedPlan.isCompleted || selectedPlan.currentDay! > selectedPlan.totalDays),
+  );
 
   const getReadingSummary = (day: ReadingPlanDay) =>
     day.readings
@@ -626,9 +630,63 @@ export default function ReadingPlansScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* Today's Reading */}
+          {isPlanScheduleCompleted && (
+            <View style={styles.planFinishedNotice}>
+              <Ionicons name="checkmark-done-circle" size={26} color="#24834A" />
+              <View style={styles.pendingCopy}>
+                <Text style={styles.planFinishedTitle}>Cronograma concluído</Text>
+                <Text style={styles.pendingDescription}>
+                  O plano chegou ao último dia. Dias pendentes anteriores podem ser revisados abaixo.
+                </Text>
+              </View>
+            </View>
+          )}
+
           {todayReading && (
             <View style={styles.todaySection}>
               {renderTodayReading(todayReading)}
+            </View>
+          )}
+
+          {!isPlanScheduleCompleted && !todayReading && (
+            <View style={styles.planFinishedNotice}>
+              <Ionicons name="time-outline" size={25} color="#B7791F" />
+              <View style={styles.pendingCopy}>
+                <Text style={styles.planFinishedTitle}>Leitura de hoje indisponível</Text>
+                <Text style={styles.pendingDescription}>
+                  Não encontramos o dia atual do plano. Dias anteriores pendentes aparecem separados abaixo.
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {pendingDays.length > 0 && (
+            <View style={styles.pendingSection}>
+              <Text style={styles.pendingTitle}>Dias anteriores pendentes</Text>
+              <Text style={styles.pendingDescription}>
+                Estes dias ficaram para trás e não substituem a leitura atual.
+              </Text>
+              {pendingDays.map((day) => (
+                <TouchableOpacity
+                  key={day.id}
+                  style={styles.pendingDayRow}
+                  onPress={() => openDailyReading(day)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Revisar dia pendente ${day.dayNumber}: ${getReadingSummary(day)}`}
+                >
+                  <View style={styles.pendingDayNumber}>
+                    <Text style={styles.pendingDayNumberText}>{day.dayNumber}</Text>
+                  </View>
+                  <View style={styles.pendingCopy}>
+                    <Text style={styles.pendingDayHeading}>Dia {day.dayNumber}</Text>
+                    <Text style={styles.pendingDayReadings} numberOfLines={2}>
+                      {getReadingSummary(day)}
+                    </Text>
+                  </View>
+                  <Text style={styles.pendingReview}>Revisar</Text>
+                  <Ionicons name="chevron-forward" size={19} color="#64748B" />
+                </TouchableOpacity>
+              ))}
             </View>
           )}
           <View style={styles.modeSection}>
@@ -931,6 +989,83 @@ const styles = StyleSheet.create({
   todaySection: {
     paddingHorizontal: 16,
     paddingTop: 25,
+  },
+  planFinishedNotice: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    marginHorizontal: 16,
+    marginTop: 20,
+    padding: 16,
+    borderRadius: 14,
+    backgroundColor: "#EAF7EF",
+    borderWidth: 1,
+    borderColor: "#C5E8D0",
+  },
+  planFinishedTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#176B3A",
+    marginBottom: 4,
+  },
+  pendingSection: {
+    marginHorizontal: 16,
+    marginTop: 24,
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: "#FFF",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  pendingTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#1E293B",
+    marginBottom: 5,
+  },
+  pendingDescription: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 19,
+    color: "#64748B",
+  },
+  pendingDayRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#EDF1F5",
+  },
+  pendingDayNumber: {
+    width: 38,
+    height: 38,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    backgroundColor: "#FFF4DB",
+  },
+  pendingDayNumberText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#9A6700",
+  },
+  pendingCopy: { flex: 1 },
+  pendingDayHeading: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#334155",
+  },
+  pendingDayReadings: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: "#64748B",
+    marginTop: 2,
+  },
+  pendingReview: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#248BE0",
   },
   todaySummaryRow: {
     flexDirection: "row",

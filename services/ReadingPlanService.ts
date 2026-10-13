@@ -10,6 +10,7 @@ type BackendPlan = {
   currentDay?: number;
   totalDays?: number;
   completedDays?: number;
+  isCompleted?: boolean;
   completedChapters?: number;
   totalChapters?: number;
   progress?: number;
@@ -775,6 +776,7 @@ export class ReadingPlanService {
       createdDate: plan.startDate || new Date().toISOString(),
       totalDays: plan.totalDays || 0,
       completedDays: plan.completedDays || 0,
+      isCompleted: plan.isCompleted || false,
       currentDay: plan.currentDay,
       completedChapters: plan.completedChapters,
       totalChapters: plan.totalChapters,

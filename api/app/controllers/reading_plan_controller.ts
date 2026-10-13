@@ -2,6 +2,7 @@ import ReadingPlan from '#models/reading_plan'
 import ReadingProgress from '#models/reading_progress'
 import AuditLog from '#models/audit_log'
 import type { HttpContext } from '@adonisjs/core/http'
+import db from '@adonisjs/lucid/services/db'
 import { DateTime } from 'luxon'
 import { BIBLE_VERSES_PER_CHAPTER, getVersesInRange } from '../utils/bible_verses_per_chapter.js'
 
@@ -595,11 +596,15 @@ export default class ReadingPlanController {
         })
       }
 
-      // Buscar leitura do dia atual
-      const todayReading = await ReadingProgress.query()
-        .where('reading_plan_id', plan.id)
-        .where('day', plan.currentDay)
-        .where('is_completed', false)
+      const isCompleted = plan.currentDay > plan.totalDays
+
+      // Um plano encerrado não possui uma nova leitura de hoje.
+      const todayReading = isCompleted
+        ? []
+        : await ReadingProgress.query()
+            .where('reading_plan_id', plan.id)
+            .where('day', plan.currentDay)
+            .where('is_completed', false)
 
       console.log('Today reading count:', todayReading.length)
       console.log('Current day:', plan.currentDay)
@@ -625,6 +630,7 @@ export default class ReadingPlanController {
             name: plan.name,
             currentDay: plan.currentDay,
             totalDays: plan.totalDays,
+            isCompleted,
             chaptersPerDay: plan.chaptersPerDay,
             completedChapters: plan.completedChapters,
             totalChapters: plan.totalChapters,
@@ -665,125 +671,142 @@ export default class ReadingPlanController {
    */
   async completeDay({ auth, request, response }: HttpContext) {
     try {
-      console.log('TESTEE COMPLETE DAY')
       const user = auth.user!
-      const { day } = request.only(['day'])
+      const requestedDay = Number(request.input('day'))
 
-      console.log('DAY: ', day)
-
-      const plan = await ReadingPlan.query()
-        .where('user_id', user.id)
-        .where('is_active', true)
-        .whereNull('deleted_at')
-        .first()
-
-      if (!plan) {
-        return response.notFound({
-          success: false,
-          message: 'Plano de leitura não encontrado',
-        })
+      if (!Number.isInteger(requestedDay) || requestedDay < 1) {
+        return response.badRequest({ success: false, message: 'Dia de leitura inválido' })
       }
 
-      // Buscar leituras do dia
-      const readings = await ReadingProgress.query()
-        .where('reading_plan_id', plan.id)
-        .where('day', day)
+      const result = await db.transaction(async (trx) => {
+        const plan = await ReadingPlan.query({ client: trx })
+          .where('user_id', user.id)
+          .where('is_active', true)
+          .whereNull('deleted_at')
+          .forUpdate()
+          .first()
 
-      // Marcar como concluídas e calcular total de capítulos
-      const now = DateTime.now()
-      let chaptersCompleted = 0
+        if (!plan) {
+          return { error: 'Plano de leitura não encontrado', status: 404 as const }
+        }
 
-      for (const reading of readings) {
-        // Calcular quantos capítulos nesta leitura
-        const chaptersInReading = reading.endChapter - reading.startChapter + 1
-        chaptersCompleted += chaptersInReading
+        if (requestedDay > plan.totalDays) {
+          return { error: 'Dia de leitura fora do limite do plano', status: 400 as const }
+        }
 
-        reading.isCompleted = true
-        reading.completedAt = now
-        await reading.save()
-      }
+        const readings = await ReadingProgress.query({ client: trx })
+          .where('reading_plan_id', plan.id)
+          .where('day', requestedDay)
+          .forUpdate()
 
-      // Atualizar plano
-      plan.completedChapters += chaptersCompleted
-      plan.currentDay = day + 1
-      await plan.save()
+        if (readings.length === 0) {
+          return { error: 'Leitura não encontrada', status: 404 as const }
+        }
 
-      await AuditLog.create({
-        userId: user.id,
-        action: 'reading.complete_day',
-        entityType: 'reading_plan',
-        entityId: plan.id,
-        details: { day, chapters: chaptersCompleted, readings: readings.length },
-        ipAddress: request.ip(),
-        userAgent: request.header('user-agent') || null,
+        const now = DateTime.now()
+        let chaptersCompleted = 0
+        let newlyCompletedReadings = 0
+
+        for (const reading of readings) {
+          if (reading.isCompleted) continue
+
+          chaptersCompleted += reading.endChapter - reading.startChapter + 1
+          newlyCompletedReadings++
+          reading.isCompleted = true
+          reading.completedAt = now
+          reading.useTransaction(trx)
+          await reading.save()
+        }
+
+        plan.completedChapters += chaptersCompleted
+        plan.currentDay = Math.min(plan.totalDays + 1, Math.max(plan.currentDay, requestedDay + 1))
+        plan.useTransaction(trx)
+        await plan.save()
+
+        await AuditLog.create(
+          {
+            userId: user.id,
+            action: 'reading.complete_day',
+            entityType: 'reading_plan',
+            entityId: plan.id,
+            details: {
+              day: requestedDay,
+              chapters: chaptersCompleted,
+              readings: readings.length,
+              newlyCompletedReadings,
+              alreadyCompleted: newlyCompletedReadings === 0,
+              currentDay: plan.currentDay,
+              planCompleted: plan.currentDay > plan.totalDays,
+            },
+            ipAddress: request.ip(),
+            userAgent: request.header('user-agent') || null,
+          },
+          { client: trx }
+        )
+
+        return { plan, newlyCompletedReadings }
       })
+
+      if ('error' in result) {
+        return result.status === 404
+          ? response.notFound({ success: false, message: result.error })
+          : response.badRequest({ success: false, message: result.error })
+      }
+
+      const { plan } = result
+      const isPlanCompleted = plan.currentDay > plan.totalDays
 
       console.log('🔄 [API] Verificando se precisa criar próximos dias...')
 
-      // Buscar quantos dias estão criados à frente
-      const lastDay = await ReadingProgress.query()
-        .where('reading_plan_id', plan.id)
-        .max('day as maxDay')
-        .first()
+      if (!isPlanCompleted) {
+        const lastDay = await ReadingProgress.query()
+          .where('reading_plan_id', plan.id)
+          .max('day as maxDay')
+          .first()
 
-      const lastDayNumber = lastDay?.$extras?.maxDay ? Number(lastDay.$extras.maxDay) : 0
-      const daysAhead = lastDayNumber - plan.currentDay + 1
+        const lastDayNumber = lastDay?.$extras?.maxDay ? Number(lastDay.$extras.maxDay) : 0
+        const daysAhead = lastDayNumber - plan.currentDay + 1
 
-      console.log(
-        `📊 [API] Dias criados à frente: ${daysAhead} (último dia: ${lastDayNumber}, dia atual: ${plan.currentDay})`
-      )
+        if (daysAhead < 5 && lastDayNumber < plan.totalDays) {
+          const startDay = lastDayNumber + 1
+          const endDay = Math.min(startDay + (5 - daysAhead) - 1, plan.totalDays)
 
-      // Se temos menos de 5 dias à frente, criar mais
-      if (daysAhead < 5) {
-        const daysToCreate = 5 - daysAhead
-        console.log(`🔨 [API] Criando ${daysToCreate} novos dias automaticamente...`)
-
-        const startDay = lastDayNumber + 1
-        const endDay = Math.min(startDay + daysToCreate - 1, plan.totalDays)
-
-        for (let dayNumber = startDay; dayNumber <= endDay; dayNumber++) {
-          console.log(`   📖 Auto-gerando dia ${dayNumber}...`)
-
-          const dayReadings = await this.generateDayReadings(
-            plan.type,
-            dayNumber,
-            plan.chaptersPerDay,
-            plan.totalDays,
-            plan.id
-          )
-
-          if (!dayReadings || dayReadings.length === 0) {
-            console.log(`   ⚠️ Não foi possível gerar leituras para o dia ${dayNumber}`)
-            break
-          }
-
-          for (const bookReading of dayReadings) {
-            console.log(
-              `      💾 Auto-salvando: ${bookReading.bookName} cap ${bookReading.startChapter}-${bookReading.endChapter}`
+          for (let dayNumber = startDay; dayNumber <= endDay; dayNumber++) {
+            const dayReadings = await this.generateDayReadings(
+              plan.type,
+              dayNumber,
+              plan.chaptersPerDay,
+              plan.totalDays,
+              plan.id
             )
 
-            await ReadingProgress.create({
-              readingPlanId: plan.id,
-              day: dayNumber,
-              bookName: bookReading.bookName,
-              startChapter: bookReading.startChapter,
-              endChapter: bookReading.endChapter,
-              isCompleted: false,
-            })
+            if (!dayReadings?.length) break
+
+            for (const bookReading of dayReadings) {
+              await ReadingProgress.create({
+                readingPlanId: plan.id,
+                day: dayNumber,
+                bookName: bookReading.bookName,
+                startChapter: bookReading.startChapter,
+                endChapter: bookReading.endChapter,
+                isCompleted: false,
+              })
+            }
           }
         }
-
-        console.log(`✅ [API] ${endDay - startDay + 1} novos dias criados automaticamente`)
-      } else {
-        console.log(`✅ [API] Já tem ${daysAhead} dias à frente, não precisa criar mais`)
       }
 
       return response.ok({
         success: true,
-        message: 'Leitura do dia concluída!',
+        message:
+          result.newlyCompletedReadings === 0
+            ? 'Este dia já estava concluído.'
+            : 'Leitura do dia concluída!',
         data: {
           completedChapters: plan.completedChapters,
           progress: Math.round((plan.completedChapters / plan.totalChapters) * 100),
+          currentDay: plan.currentDay,
+          isCompleted: isPlanCompleted,
         },
       })
     } catch (error) {
@@ -819,6 +842,14 @@ export default class ReadingPlanController {
         return response.notFound({
           success: false,
           message: 'Plano de leitura não encontrado',
+        })
+      }
+
+      if (plan.currentDay > plan.totalDays) {
+        return response.ok({
+          success: true,
+          message: 'O cronograma deste plano já foi concluído.',
+          data: { addedDays: 0, addedRecords: 0, lastDayCreated: plan.totalDays },
         })
       }
 
@@ -1830,11 +1861,7 @@ export default class ReadingPlanController {
       // Atualizar plano
       plan.completedChapters = Math.max(0, plan.completedChapters - chaptersToUnmark)
 
-      // Se estávamos no dia seguinte, voltar para este dia
-      if (plan.currentDay > day) {
-        plan.currentDay = day
-      }
-
+      // A desmarcação de um dia antigo não deve retroceder o cursor do plano.
       await plan.save()
 
       await AuditLog.create({

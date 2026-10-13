@@ -51,6 +51,7 @@ export interface ReadingPlan {
   createdDate: string;
   totalDays: number;
   completedDays: number;
+  isCompleted?: boolean;
   currentDay?: number;
   completedChapters?: number;
   totalChapters?: number;
