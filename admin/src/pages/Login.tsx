@@ -30,10 +30,11 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 flex min-h-screen w-screen items-center justify-center bg-[var(--color-primary)] p-5">
-      <div className="w-full max-w-[420px] rounded-2xl bg-white p-8 shadow-[0_20px_60px_rgba(0,0,0,0.3)] sm:p-12">
-        <h1 className="mb-2 text-center text-[28px] font-bold text-[var(--color-text)]">Painel Administrativo</h1>
-        <p className="mb-8 text-center text-sm text-[var(--color-text-secondary)]">Bíblia em Foco</p>
+    <div className="fixed inset-0 flex min-h-screen w-screen items-center justify-center bg-[radial-gradient(ellipse_at_18%_12%,rgba(248,203,243,0.82),transparent_38%),radial-gradient(ellipse_at_85%_75%,rgba(184,119,238,0.55),transparent_42%),linear-gradient(135deg,#f5e4f5_0%,#eee3f7_55%,#e7e5fb_100%)] p-5">
+      <div className="w-full max-w-[440px] rounded-[28px] border border-white/80 bg-white/65 p-8 shadow-[0_22px_70px_rgba(91,41,125,0.18)] backdrop-blur-2xl sm:p-12">
+        <div className="mx-auto mb-5 grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-[#f47dcb] to-[#a55be5] text-2xl text-white shadow-lg">📖</div>
+        <h1 className="mb-2 text-center text-[28px] font-bold tracking-tight text-[#382747]">Painel Administrativo</h1>
+        <p className="mb-8 text-center text-sm text-[#846d93]">Bíblia em Foco</p>
 
         {error && (
           <div className="mb-5 rounded-lg border border-[var(--color-danger)] bg-[var(--color-danger-bg)] px-4 py-3 text-sm text-[var(--color-danger)]">

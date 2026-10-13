@@ -22,7 +22,7 @@ export const Container = ({ className, ...props }: DivProps) => (
 export const MainContent = ({ className, ...props }: SectionProps) => (
   <main
     className={mergeClasses(
-      "ml-[var(--sidebar-width)] w-[calc(100%_-_var(--sidebar-width))] flex-1 p-8",
+      "ml-[var(--sidebar-width)] min-h-screen w-[calc(100%_-_var(--sidebar-width))] flex-1 bg-[radial-gradient(ellipse_at_18%_12%,rgba(248,203,243,0.72),transparent_38%),linear-gradient(135deg,#f5e4f5_0%,#eee3f7_55%,#e7e5fb_100%)] px-6 py-7 sm:px-8",
       className
     )}
     {...props}
@@ -74,7 +74,7 @@ export const ActionButton = ({ className, ...props }: ButtonProps) => (
 export const Table = ({ className, ...props }: TableProps) => (
   <table
     className={mergeClasses(
-      "w-full overflow-hidden rounded-[var(--radius-md)] border border-collapse border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-sm)]",
+      "w-full overflow-hidden rounded-[var(--radius-md)] border border-collapse border-[var(--color-border)] bg-white/60 shadow-[var(--shadow-sm)] backdrop-blur-xl",
       className
     )}
     {...props}
@@ -83,7 +83,7 @@ export const Table = ({ className, ...props }: TableProps) => (
 
 export const Thead = ({ className, ...props }: HTMLAttributes<HTMLTableSectionElement>) => (
   <thead
-    className={mergeClasses("bg-[var(--color-surface-hover)] text-[var(--color-text-secondary)]", className)}
+    className={mergeClasses("bg-white/55 text-[var(--color-text-secondary)]", className)}
     {...props}
   />
 );
