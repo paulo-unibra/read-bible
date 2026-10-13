@@ -471,7 +471,7 @@ const Quizzes: React.FC = () => {
               </Tbody>
             </Table>
 
-            <Pagination className="!fixed !bottom-0 !left-[var(--sidebar-width)] !right-0 !z-[90] !m-0 !min-h-[72px] !justify-between !gap-3 !border-t !border-white/80 !bg-white/75 !px-8 !py-3 !shadow-[0_-8px_28px_rgba(110,69,135,0.12)] !backdrop-blur-2xl max-sm:!flex-col max-sm:!items-stretch max-sm:!px-3">
+            <Pagination className="!fixed !bottom-0 !left-[calc(var(--sidebar-width)_+_32px)] !right-8 !z-[90] !mx-auto !mt-0 !mb-0 !max-w-[1500px] !min-h-[72px] !justify-between !gap-3 !rounded-t-2xl !border-x !border-t !border-white/80 !bg-white/65 !px-8 !py-3 !shadow-[0_-8px_28px_rgba(110,69,135,0.12)] !backdrop-blur-2xl max-sm:!flex-col max-sm:!items-stretch max-sm:!px-3">
                 <div className="flex items-center gap-2 max-sm:justify-center">
                   <label htmlFor="quizzes-page-size" className="text-xs font-medium text-[#755c84]">Itens por página</label>
                   <Select
