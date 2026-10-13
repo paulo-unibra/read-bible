@@ -76,7 +76,10 @@ body {
 body {
   min-width: 320px;
   min-height: 100vh;
-  background: var(--color-bg);
+  background:
+    radial-gradient(ellipse at 12% 35%, rgba(222, 97, 203, 0.45), transparent 38%),
+    radial-gradient(ellipse at 85% 12%, rgba(184, 119, 238, 0.4), transparent 40%),
+    linear-gradient(135deg, #f3d9f0 0%, #f1e4f5 52%, #e7dcf7 100%);
   color: var(--color-text);
 }
 

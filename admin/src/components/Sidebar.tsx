@@ -63,21 +63,21 @@ const Sidebar: React.FC = () => {
   const initial = displayName.trim().charAt(0) || "?";
 
   return (
-    <aside className="fixed left-0 top-0 z-[100] flex h-screen w-[var(--sidebar-width)] flex-col overflow-y-auto bg-[var(--sidebar-bg)] text-[var(--sidebar-text)]">
-      <div className="flex shrink-0 items-center gap-2.5 border-b border-[var(--sidebar-border)] px-5 py-[22px]">
-        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px] bg-[var(--color-primary)] text-[15px] font-bold text-white">
+    <aside className="fixed bottom-6 left-6 top-6 z-[100] flex h-auto w-[240px] flex-col overflow-y-auto rounded-[26px] border border-white/70 bg-white/45 text-[#4b365a] shadow-[0_18px_55px_rgba(91,41,125,0.12)] backdrop-blur-2xl max-lg:left-4 max-lg:w-[224px] max-md:left-3 max-md:w-[208px]">
+      <div className="flex shrink-0 items-center gap-2.5 border-b border-white/60 px-5 py-5">
+        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[#f47dcb] to-[#a55be5] text-[15px] font-bold text-white shadow-md">
           📖
         </div>
         <div>
-          <h2 className="m-0 text-[15px] font-semibold leading-[1.3] text-white">ReadBible</h2>
-          <span className="block text-[11px] text-[var(--sidebar-text)]">Painel Administrativo</span>
+          <h2 className="m-0 text-[15px] font-semibold leading-[1.3] text-[#342441]">ReadBible</h2>
+          <span className="block text-[11px] text-[#846d93]">Painel Administrativo</span>
         </div>
       </div>
 
       <nav className="flex flex-1 flex-col overflow-y-auto px-3 py-4">
         {menuSections.map((section) => (
           <React.Fragment key={section.label}>
-            <p className="mx-2 mb-1.5 mt-4 text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-500 first:mt-0">
+            <p className="mx-2 mb-1.5 mt-4 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#9a83a7] first:mt-0">
               {section.label}
             </p>
             {section.items.map((item) => {
@@ -91,9 +91,9 @@ const Sidebar: React.FC = () => {
                   disabled={!permitted}
                   onClick={() => navigate(item.path)}
                   title={item.label}
-                  className={`mb-0.5 flex w-full items-center gap-2.5 rounded-[var(--radius-sm)] border-0 px-2.5 py-[9px] text-left text-[13.5px] transition-colors disabled:cursor-not-allowed disabled:opacity-35 ${active ? "bg-[rgba(79,70,229,0.16)] font-semibold text-white hover:bg-[rgba(79,70,229,0.22)]" : "bg-transparent font-medium text-[var(--sidebar-text)] hover:bg-[var(--sidebar-bg-hover)] hover:text-white"}`}
+                  className={`mb-0.5 flex w-full items-center gap-2.5 rounded-xl border-0 px-3 py-2.5 text-left text-[13px] transition-all disabled:cursor-not-allowed disabled:opacity-35 ${active ? "border border-white/80 bg-white/75 font-semibold text-[#6d3a9c] shadow-[0_5px_18px_rgba(143,75,181,0.1)]" : "bg-transparent font-medium text-[#665476] hover:bg-white/45 hover:text-[#4d2f68]"}`}
                 >
-                  <span className="w-[18px] shrink-0 text-center text-[15px]">{item.icon}</span>
+                  <span className="w-[18px] shrink-0 text-center text-[14px] grayscale">{item.icon}</span>
                   <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{item.label}</span>
                   {!permitted && <span className="text-[11px] opacity-60">🔒</span>}
                 </button>
@@ -103,21 +103,21 @@ const Sidebar: React.FC = () => {
         ))}
       </nav>
 
-      <div className="flex shrink-0 items-center gap-2.5 border-t border-[var(--sidebar-border)] p-3.5">
-        <div className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-full bg-[var(--color-primary)] text-[13px] font-bold uppercase text-white">
+      <div className="flex shrink-0 items-center gap-2.5 border-t border-white/60 p-3.5">
+        <div className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#f47dcb] to-[#a55be5] text-[13px] font-bold uppercase text-white">
           {initial}
         </div>
         <div className="min-w-0 flex-1">
-          <strong className="block overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-semibold text-white" title={displayName}>
+          <strong className="block overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-semibold text-[#342441]" title={displayName}>
             {displayName}
           </strong>
-          <span className="text-xs text-[var(--sidebar-text)]">Logado</span>
+          <span className="text-xs text-[#846d93]">Logado</span>
         </div>
         <button
           type="button"
           onClick={handleLogout}
           title="Sair"
-          className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--sidebar-border)] bg-transparent text-sm text-[var(--sidebar-text)] transition-colors hover:border-[var(--color-danger)] hover:bg-[var(--color-danger-bg)] hover:text-[var(--color-danger)]"
+          className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-lg border border-white/80 bg-white/35 text-sm text-[#846d93] transition-colors hover:border-[#e7a9ce] hover:bg-[#ffe3f1] hover:text-[#aa3e7a]"
         >
           ⏻
         </button>
