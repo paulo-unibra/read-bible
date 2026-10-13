@@ -1,203 +1,173 @@
-import styled from "styled-components";
+import type {
+  ButtonHTMLAttributes,
+  HTMLAttributes,
+  InputHTMLAttributes,
+  SelectHTMLAttributes,
+} from "react";
 
-export const Container = styled.div`
-  display: flex;
-  min-height: 100vh;
-  background: var(--color-bg);
-`;
+const mergeClasses = (...values: Array<string | undefined | false>) =>
+  values.filter(Boolean).join(" ");
 
-export const MainContent = styled.main`
-  flex: 1;
-  margin-left: var(--sidebar-width);
-  padding: 32px;
-  width: calc(100% - var(--sidebar-width));
-`;
+type DivProps = HTMLAttributes<HTMLDivElement>;
+type TableProps = HTMLAttributes<HTMLTableElement>;
+type SectionProps = HTMLAttributes<HTMLElement>;
+type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement>;
+type InputProps = InputHTMLAttributes<HTMLInputElement>;
+type SelectProps = SelectHTMLAttributes<HTMLSelectElement>;
 
-export const PageTitle = styled.h1`
-  font-size: 24px;
-  font-weight: 600;
-  color: var(--color-text);
-  margin-bottom: 28px;
-`;
+export const Container = ({ className, ...props }: DivProps) => (
+  <div className={mergeClasses("flex min-h-screen bg-[var(--color-bg)]", className)} {...props} />
+);
 
-export const FiltersSection = styled.div`
-  display: flex;
-  gap: 12px;
-  margin-bottom: 24px;
-  flex-wrap: wrap;
-`;
+export const MainContent = ({ className, ...props }: SectionProps) => (
+  <main
+    className={mergeClasses(
+      "ml-[var(--sidebar-width)] w-[calc(100%_-_var(--sidebar-width))] flex-1 p-8",
+      className
+    )}
+    {...props}
+  />
+);
 
-export const Input = styled.input`
-  padding: 10px 14px;
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-sm);
-  font-size: 14px;
-  flex: 1;
-  min-width: 250px;
-  background: var(--color-surface);
-  color: var(--color-text);
+export const PageTitle = ({ className, ...props }: HTMLAttributes<HTMLHeadingElement>) => (
+  <h1
+    className={mergeClasses("mb-7 text-2xl font-semibold text-[var(--color-text)]", className)}
+    {...props}
+  />
+);
 
-  &:focus {
-    outline: none;
-    border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px var(--color-primary-light);
-  }
-`;
+export const FiltersSection = ({ className, ...props }: DivProps) => (
+  <div className={mergeClasses("mb-6 flex flex-wrap gap-3", className)} {...props} />
+);
 
-export const Select = styled.select`
-  padding: 10px 14px;
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-sm);
-  font-size: 14px;
-  background: var(--color-surface);
-  color: var(--color-text);
-  cursor: pointer;
+export const Input = ({ className, ...props }: InputProps) => (
+  <input
+    className={mergeClasses(
+      "min-w-[250px] flex-1 rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3.5 py-2.5 text-sm text-[var(--color-text)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-[3px] focus:ring-[var(--color-primary-light)]",
+      className
+    )}
+    {...props}
+  />
+);
 
-  &:focus {
-    outline: none;
-    border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px var(--color-primary-light);
-  }
-`;
+export const Select = ({ className, ...props }: SelectProps) => (
+  <select
+    className={mergeClasses(
+      "cursor-pointer rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3.5 py-2.5 text-sm text-[var(--color-text)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-[3px] focus:ring-[var(--color-primary-light)]",
+      className
+    )}
+    {...props}
+  />
+);
 
-export const Button = styled.button`
-  padding: 10px 18px;
-  background: var(--color-primary);
-  color: white;
-  border: none;
-  border-radius: var(--radius-sm);
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.15s;
+const buttonClasses =
+  "inline-flex cursor-pointer items-center justify-center rounded-[var(--radius-sm)] border-0 bg-[var(--color-primary)] px-[18px] py-2.5 text-sm font-medium text-white transition-colors hover:bg-[var(--color-primary-hover)] disabled:cursor-not-allowed disabled:bg-[var(--color-border-strong)]";
 
-  &:hover {
-    background: var(--color-primary-hover);
-  }
+export const Button = ({ className, ...props }: ButtonProps) => (
+  <button className={mergeClasses(buttonClasses, className)} {...props} />
+);
 
-  &:disabled {
-    background: var(--color-border-strong);
-    cursor: not-allowed;
-  }
-`;
+export const ActionButton = ({ className, ...props }: ButtonProps) => (
+  <Button className={mergeClasses("px-4 py-2 text-[13px]", className)} {...props} />
+);
 
-export const ActionButton = styled(Button)`
-  padding: 8px 16px;
-  font-size: 13px;
-`;
+export const Table = ({ className, ...props }: TableProps) => (
+  <table
+    className={mergeClasses(
+      "w-full overflow-hidden rounded-[var(--radius-md)] border border-collapse border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-sm)]",
+      className
+    )}
+    {...props}
+  />
+);
 
-export const Table = styled.table`
-  width: 100%;
-  background: var(--color-surface);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  box-shadow: var(--shadow-sm);
-  border: 1px solid var(--color-border);
-  border-collapse: collapse;
-`;
+export const Thead = ({ className, ...props }: HTMLAttributes<HTMLTableSectionElement>) => (
+  <thead
+    className={mergeClasses("bg-[var(--color-surface-hover)] text-[var(--color-text-secondary)]", className)}
+    {...props}
+  />
+);
 
-export const Thead = styled.thead`
-  background: var(--color-surface-hover);
-  color: var(--color-text-secondary);
-`;
+export const Tbody = ({ className, ...props }: HTMLAttributes<HTMLTableSectionElement>) => (
+  <tbody className={className} {...props} />
+);
 
-export const Tbody = styled.tbody``;
+export const Tr = ({ className, ...props }: HTMLAttributes<HTMLTableRowElement>) => (
+  <tr
+    className={mergeClasses(
+      "border-b border-[var(--color-border)] last:border-b-0 hover:bg-[var(--color-surface-hover)]",
+      className
+    )}
+    {...props}
+  />
+);
 
-export const Tr = styled.tr`
-  &:not(:last-child) {
-    border-bottom: 1px solid var(--color-border);
-  }
+export const Th = ({ className, ...props }: HTMLAttributes<HTMLTableCellElement>) => (
+  <th
+    className={mergeClasses(
+      "px-[15px] py-3.5 text-left text-[12.5px] font-semibold uppercase tracking-[0.03em]",
+      className
+    )}
+    {...props}
+  />
+);
 
-  &:hover {
-    background: var(--color-surface-hover);
-  }
-`;
+export const Td = ({ className, ...props }: HTMLAttributes<HTMLTableCellElement>) => (
+  <td
+    className={mergeClasses("px-[15px] py-3.5 text-sm text-[var(--color-text)]", className)}
+    {...props}
+  />
+);
 
-export const Th = styled.th`
-  padding: 14px 15px;
-  text-align: left;
-  font-weight: 600;
-  font-size: 12.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-`;
-
-export const Td = styled.td`
-  padding: 14px 15px;
-  font-size: 14px;
-  color: var(--color-text);
-`;
-
-interface BadgeProps {
+type BadgeProps = HTMLAttributes<HTMLSpanElement> & {
   type?: "success" | "error" | "warning" | "info";
-}
+};
 
-export const Badge = styled.span<BadgeProps>`
-  display: inline-block;
-  padding: 4px 12px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
+const badgeColors = {
+  success: "bg-[var(--color-success-bg)] text-[var(--color-success)]",
+  error: "bg-[var(--color-danger-bg)] text-[var(--color-danger)]",
+  warning: "bg-[var(--color-warning-bg)] text-[var(--color-warning)]",
+  info: "bg-[var(--color-info-bg)] text-[var(--color-info)]",
+  neutral: "bg-[var(--color-primary-light)] text-[var(--color-primary-text)]",
+};
 
-  background: ${(props) => {
-    switch (props.type) {
-      case "success":
-        return "var(--color-success-bg)";
-      case "error":
-        return "var(--color-danger-bg)";
-      case "warning":
-        return "var(--color-warning-bg)";
-      case "info":
-        return "var(--color-info-bg)";
-      default:
-        return "var(--color-primary-light)";
-    }
-  }};
+export const Badge = ({ className, type, ...props }: BadgeProps) => (
+  <span
+    className={mergeClasses(
+      "inline-block rounded-full px-3 py-1 text-xs font-semibold",
+      badgeColors[type || "neutral"],
+      className
+    )}
+    {...props}
+  />
+);
 
-  color: ${(props) => {
-    switch (props.type) {
-      case "success":
-        return "var(--color-success)";
-      case "error":
-        return "var(--color-danger)";
-      case "warning":
-        return "var(--color-warning)";
-      case "info":
-        return "var(--color-info)";
-      default:
-        return "var(--color-primary-text)";
-    }
-  }};
-`;
+export const Pagination = ({ className, ...props }: DivProps) => (
+  <div
+    className={mergeClasses(
+      "mt-7 flex items-center justify-center gap-5 [&_span]:text-sm [&_span]:text-[var(--color-text-secondary)]",
+      className
+    )}
+    {...props}
+  />
+);
 
-export const Pagination = styled.div`
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 20px;
-  margin-top: 28px;
+export const EmptyState = ({ className, ...props }: DivProps) => (
+  <div
+    className={mergeClasses(
+      "rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-5 py-[60px] text-center text-[15px] text-[var(--color-text-muted)]",
+      className
+    )}
+    {...props}
+  />
+);
 
-  span {
-    color: var(--color-text-secondary);
-    font-size: 14px;
-  }
-`;
-
-export const EmptyState = styled.div`
-  background: var(--color-surface);
-  padding: 60px 20px;
-  text-align: center;
-  border-radius: var(--radius-md);
-  color: var(--color-text-muted);
-  font-size: 15px;
-  border: 1px solid var(--color-border);
-`;
-
-export const ErrorMessage = styled.div`
-  background: var(--color-danger-bg);
-  color: var(--color-danger);
-  padding: 14px 16px;
-  border-radius: var(--radius-sm);
-  margin-bottom: 20px;
-  border: 1px solid rgba(220, 38, 38, 0.2);
-`;
+export const ErrorMessage = ({ className, ...props }: DivProps) => (
+  <div
+    className={mergeClasses(
+      "mb-5 rounded-[var(--radius-sm)] border border-[rgba(220,38,38,0.2)] bg-[var(--color-danger-bg)] px-4 py-3.5 text-[var(--color-danger)]",
+      className
+    )}
+    {...props}
+  />
+);

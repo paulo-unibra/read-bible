@@ -146,7 +146,7 @@ function BulkEmail() {
   return (
     <>
       <Sidebar />
-      <div className="bulk-email-page">
+      <div className="bulk-email-page ml-[var(--sidebar-width)] min-h-screen max-w-[1400px] bg-[var(--color-bg)] px-8 py-6">
         <div className="bulk-email-header">
           <div>
             <button

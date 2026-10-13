@@ -565,7 +565,7 @@ const Reports: React.FC = () => {
   return (
     <>
       <Sidebar />
-      <div className="reports-page">
+      <div className="reports-page ml-[var(--sidebar-width)] min-h-screen bg-[var(--color-bg)]">
         <div className="reports-header">
           <div className="header-content">
             <button

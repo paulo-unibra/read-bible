@@ -201,7 +201,7 @@ const AudioSync: React.FC = () => {
   return (
     <>
       <Sidebar />
-      <div className="audio-sync-container">
+      <div className="audio-sync-container ml-[var(--sidebar-width)] min-h-screen max-w-[1400px] bg-[var(--color-bg)] px-8 py-6">
         <div className="audio-sync-header">
           <button
             className="back-button"

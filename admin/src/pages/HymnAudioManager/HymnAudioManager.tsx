@@ -417,7 +417,7 @@ export default function HymnAudioManager() {
   return (
     <>
       <Sidebar />
-      <div className="hymn-audio-manager-page">
+      <div className="hymn-audio-manager-page ml-[var(--sidebar-width)] min-h-screen bg-[var(--color-bg)]">
         <header className="hymn-audio-header">
           <div className="header-content">
             <button

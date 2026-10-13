@@ -331,52 +331,53 @@ const AuditLogs: React.FC = () => {
     <div style={{ display: "flex", minHeight: "100vh" }}>
       <Sidebar />
 
-      <MainContent className="audit-logs-main">
+      <MainContent className="!pb-[120px]">
         <PageTitle>Logs de Auditoria</PageTitle>
 
         {/* Filtros */}
-        <FiltersSection className="audit-filter-panel">
-          <div className="filter-panel-heading">
-            <div className="filter-panel-title">
-              <span className="filter-panel-icon" aria-hidden="true">☷</span>
+        <FiltersSection className="sticky top-3 z-50 mb-6 !flex-col !gap-0 rounded-[14px] border border-[var(--color-border)] bg-[var(--color-surface)] px-6 py-5 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <span className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-xl bg-[var(--color-primary-light)] text-2xl text-[var(--color-primary)]" aria-hidden="true">☷</span>
               <div>
-                <h2>Filtros</h2>
-                <p>Encontre registros por ação, usuário, IP ou período</p>
+                <h2 className="m-0 text-base font-semibold text-[var(--color-text)]">Filtros</h2>
+                <p className="mt-1 text-sm text-[var(--color-text-secondary)]">Encontre registros por ação, usuário, IP ou período</p>
               </div>
               {activeFilterCount > 0 && (
-                <span className="active-filter-count">
+                <span className="inline-flex whitespace-nowrap rounded-full bg-[var(--color-primary-light)] px-2.5 py-1 text-xs font-semibold text-[var(--color-primary)]">
                   {activeFilterCount} ativo{activeFilterCount === 1 ? "" : "s"}
                 </span>
               )}
             </div>
             <button
               type="button"
-              className="filter-toggle"
+              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-[var(--color-border-strong)] bg-transparent px-3 py-2 text-sm font-semibold text-[var(--color-text)] transition-colors hover:bg-[var(--color-bg)]"
               aria-expanded={filtersOpen}
               onClick={() => setFiltersOpen((open) => !open)}
             >
               {filtersOpen ? "Recolher" : "Abrir filtros"}
-              <span className={filtersOpen ? "filter-chevron is-open" : "filter-chevron"} aria-hidden="true">⌄</span>
+              <span className={`inline-block text-lg transition-transform ${filtersOpen ? "rotate-180" : ""}`} aria-hidden="true">⌄</span>
             </button>
           </div>
 
           {!filtersOpen && activeFilterCount > 0 && (
-            <div className="filter-summary" aria-label="Filtros aplicados">
-              {actionFilter !== "all" && <span>{getActionLabel(actionFilter)}</span>}
-              {search && <span>Usuário: {search}</span>}
-              {ipFilter && <span>IP: {ipFilter}</span>}
-              {(dateFrom || dateTo) && <span>{dateFrom || "…"} — {dateTo || "…"}</span>}
+            <div className="mt-4 flex flex-wrap gap-2" aria-label="Filtros aplicados">
+              {actionFilter !== "all" && <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-1 text-xs text-[var(--color-text-secondary)]">{getActionLabel(actionFilter)}</span>}
+              {search && <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-1 text-xs text-[var(--color-text-secondary)]">Usuário: {search}</span>}
+              {ipFilter && <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-1 text-xs text-[var(--color-text-secondary)]">IP: {ipFilter}</span>}
+              {(dateFrom || dateTo) && <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-1 text-xs text-[var(--color-text-secondary)]">{dateFrom || "…"} — {dateTo || "…"}</span>}
               {!dateFrom && !dateTo && periodFilter !== "all" && (
-                <span>{PERIODS.find((period) => period.value === periodFilter)?.label}</span>
+                <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-1 text-xs text-[var(--color-text-secondary)]">{PERIODS.find((period) => period.value === periodFilter)?.label}</span>
               )}
             </div>
           )}
 
-          {filtersOpen && <div className="filter-panel-content">
-          <div className="audit-filters-group">
-            <label>
+          {filtersOpen && <div className="mt-4 border-t border-[var(--color-border)] pt-5">
+          <div className="grid w-full grid-cols-1 items-end gap-4 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8">
+            <label className="2xl:col-span-1 flex min-w-0 flex-col items-stretch gap-2 text-left text-sm font-medium text-[var(--color-text-secondary)]">
               Ação:
               <select
+                className="min-h-10 w-full min-w-0 rounded border border-[var(--color-border-strong)] bg-[var(--color-bg)] px-2 py-2 text-[0.95rem] text-[var(--color-text)] focus:outline-2 focus:outline-offset-1 focus:outline-[var(--color-primary)]"
                 value={actionFilter}
                 onChange={(e) => {
                   setActionFilter(e.target.value);
@@ -392,9 +393,10 @@ const AuditLogs: React.FC = () => {
               </select>
             </label>
 
-            <label>
+            <label className="2xl:col-span-1 flex min-w-0 flex-col items-stretch gap-2 text-left text-sm font-medium text-[var(--color-text-secondary)]">
               Período:
               <select
+                className="min-h-10 w-full min-w-0 rounded border border-[var(--color-border-strong)] bg-[var(--color-bg)] px-2 py-2 text-[0.95rem] text-[var(--color-text)] focus:outline-2 focus:outline-offset-1 focus:outline-[var(--color-primary)]"
                 value={periodFilter}
                 onChange={(e) => handlePeriodChange(e.target.value)}
               >
@@ -406,9 +408,10 @@ const AuditLogs: React.FC = () => {
               </select>
             </label>
 
-            <label>
+            <label className="flex min-w-0 flex-col items-stretch gap-2 text-left text-sm font-medium text-[var(--color-text-secondary)] 2xl:col-span-2">
               Usuário (nome ou e-mail):
               <input
+                className="min-h-10 w-full min-w-0 rounded border border-[var(--color-border-strong)] bg-[var(--color-bg)] px-2 py-2 text-[0.95rem] text-[var(--color-text)] focus:outline-2 focus:outline-offset-1 focus:outline-[var(--color-primary)]"
                 type="text"
                 value={searchInput}
                 placeholder="Digite e pressione Enter"
@@ -416,13 +419,13 @@ const AuditLogs: React.FC = () => {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") applyTextFilters();
                 }}
-                className="audit-filter-input"
               />
             </label>
 
-            <label>
+            <label className="flex min-w-0 flex-col items-stretch gap-2 text-left text-sm font-medium text-[var(--color-text-secondary)] 2xl:col-span-1">
               IP:
               <input
+                className="min-h-10 w-full min-w-0 rounded border border-[var(--color-border-strong)] bg-[var(--color-bg)] px-2 py-2 font-mono text-[0.95rem] text-[var(--color-text)] focus:outline-2 focus:outline-offset-1 focus:outline-[var(--color-primary)]"
                 type="text"
                 value={ipInput}
                 placeholder="IPv4 ou IPv6"
@@ -438,42 +441,41 @@ const AuditLogs: React.FC = () => {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") applyTextFilters();
                 }}
-                className="audit-filter-input audit-filter-ip"
               />
               <span
                 id={ipError ? "ip-filter-error" : "ip-filter-hint"}
-                className={ipError ? "audit-ip-filter-error" : "audit-ip-filter-hint"}
+                className={`block text-xs font-normal ${ipError ? "break-words text-red-600" : "text-[var(--color-text-secondary)]"}`}
                 role={ipError ? "alert" : undefined}
               >
                 {ipError || "Aceita IPv4 e IPv6"}
               </span>
             </label>
 
-            <label>
+            <label className="flex min-w-0 flex-col items-stretch gap-2 text-left text-sm font-medium text-[var(--color-text-secondary)] 2xl:col-span-1">
               De:
-              <input type="date" value={dateFrom} max={dateTo || undefined} onChange={(e) => { setDateFrom(e.target.value); setPeriodFilter("all"); setPage(1); }} />
+              <input className="min-h-10 w-full min-w-0 rounded border border-[var(--color-border-strong)] bg-[var(--color-bg)] px-2 py-2 text-[0.95rem] text-[var(--color-text)] focus:outline-2 focus:outline-offset-1 focus:outline-[var(--color-primary)]" type="date" value={dateFrom} max={dateTo || undefined} onChange={(e) => { setDateFrom(e.target.value); setPeriodFilter("all"); setPage(1); }} />
             </label>
-            <label>
+            <label className="flex min-w-0 flex-col items-stretch gap-2 text-left text-sm font-medium text-[var(--color-text-secondary)] 2xl:col-span-1">
               Até:
-              <input type="date" value={dateTo} min={dateFrom || undefined} onChange={(e) => { setDateTo(e.target.value); setPeriodFilter("all"); setPage(1); }} />
+              <input className="min-h-10 w-full min-w-0 rounded border border-[var(--color-border-strong)] bg-[var(--color-bg)] px-2 py-2 text-[0.95rem] text-[var(--color-text)] focus:outline-2 focus:outline-offset-1 focus:outline-[var(--color-primary)]" type="date" value={dateTo} min={dateFrom || undefined} onChange={(e) => { setDateTo(e.target.value); setPeriodFilter("all"); setPage(1); }} />
             </label>
-            <div className="audit-filter-actions">
-              <Button onClick={applyTextFilters} disabled={loading}>Aplicar filtros</Button>
+            <div className="flex flex-wrap items-center gap-3 sm:col-span-2 xl:col-span-1 2xl:col-span-1">
+              <Button className="w-full" onClick={applyTextFilters} disabled={loading}>Aplicar filtros</Button>
               {activeFilterCount > 0 && (
-                <button type="button" className="audit-clear-filters" onClick={clearFilters}>
+                <button type="button" className="inline-flex items-center justify-center rounded-lg border border-[var(--color-border-strong)] bg-transparent px-3 py-2 text-sm font-semibold text-[var(--color-text)] hover:bg-[var(--color-bg)]" onClick={clearFilters}>
                   Limpar
                 </button>
               )}
             </div>
           </div>
 
-          <div className="filter-panel-footer">
+          <div className="mt-5 flex items-center justify-between gap-4 border-t border-[var(--color-border)] pt-4 max-md:flex-col max-md:items-start">
           {meta && (
             <div className="total-info">
               <strong>{meta.total}</strong> registro(s) encontrado(s)
             </div>
           )}
-          <div className="copy-logs-control">
+          <div className="flex items-center gap-3 text-sm text-[var(--color-text-secondary)]">
             <Button onClick={handleCopyLogs} disabled={loading || logs.length === 0}>
               Copiar logs desta página
             </Button>
@@ -538,7 +540,7 @@ const AuditLogs: React.FC = () => {
         )}
 
         {meta && meta.lastPage > 1 && (
-          <Pagination className="audit-list-footer">
+          <Pagination className="fixed bottom-0 left-[var(--sidebar-width)] right-0 z-[90] !m-0 min-h-[72px] border-t border-[var(--color-border)] bg-[var(--color-surface)] px-8 py-3 shadow-[0_-6px_20px_rgba(15,23,42,0.08)] max-sm:px-3">
             <Button
               onClick={() => setPage(page - 1)}
               disabled={page <= 1 || loading}

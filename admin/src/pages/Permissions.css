@@ -1,9 +1,3 @@
-.permissions-page {
-  min-height: 100vh;
-  background-color: var(--color-bg);
-  margin-left: var(--sidebar-width);
-}
-
 .permissions-header {
   background: var(--color-surface);
   color: var(--color-text);

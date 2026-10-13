@@ -231,7 +231,7 @@ const Permissions: React.FC = () => {
   return (
     <>
       <Sidebar />
-      <div className="permissions-page">
+      <div className="permissions-page ml-[var(--sidebar-width)] min-h-screen bg-[var(--color-bg)]">
         <div className="permissions-header">
           <div className="header-content">
             <button

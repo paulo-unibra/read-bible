@@ -37,7 +37,7 @@ export default function HymnAudioList() {
   return (
     <>
       <Sidebar />
-      <div className="hymn-audio-list">
+      <div className="hymn-audio-list ml-[var(--sidebar-width)] min-h-screen bg-[var(--color-bg)]">
         <header className="hymn-audio-list-header">
           <div className="header-content">
             <h1>🎵 Gerenciar Áudios de Hinos</h1>
