@@ -57,6 +57,7 @@ const Quizzes: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(20);
   const [totalPages, setTotalPages] = useState(1);
   const [search, setSearch] = useState("");
   const [testament, setTestament] = useState("");
@@ -97,7 +98,7 @@ const Quizzes: React.FC = () => {
 
     loadQuizzes();
     loadAvailableBooks();
-  }, [page, search, testament, bibleVersion, bookName]);
+  }, [page, perPage, search, testament, bibleVersion, bookName]);
 
   const loadAvailableBooks = async () => {
     try {
@@ -124,7 +125,7 @@ const Quizzes: React.FC = () => {
     try {
       const params = new URLSearchParams({
         page: page.toString(),
-        perPage: "20",
+        perPage: perPage.toString(),
         ...(search && { search }),
         ...(bookName && { bookName }),
         ...(testament && { testament }),
@@ -345,18 +346,21 @@ const Quizzes: React.FC = () => {
   return (
     <>
       <Sidebar />
-      <MainContent>
-        <PageTitle>Gerenciamento de Questionários</PageTitle>
+      <MainContent className="!min-h-screen !bg-transparent !px-6 !py-7 !pb-[140px] sm:!px-8">
+        <div className="mx-auto max-w-[1500px]">
+        <header className="mb-5 flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="mb-1 text-[11px] font-bold uppercase tracking-[0.16em] text-[#9b6db7]">Conteúdo bíblico</p>
+            <PageTitle className="!mb-0 !text-[28px] !tracking-[-0.03em] !text-[#382747]">Gerenciamento de Questionários</PageTitle>
+          </div>
+          <Button className="!rounded-xl !bg-gradient-to-r !from-[#b76bdd] !to-[#e276c5] !px-5 !py-3 !font-semibold shadow-[0_8px_20px_rgba(186,103,207,0.2)]" onClick={handleOpenCreateModal}>
+            + Criar Questionário
+          </Button>
+        </header>
 
-        <Button
-          onClick={handleOpenCreateModal}
-          style={{ marginBottom: "20px" }}
-        >
-          + Criar Questionário
-        </Button>
-
-        <FiltersSection>
+        <FiltersSection className="sticky top-3 z-50 !mb-5 !items-center !rounded-2xl !border !border-white/80 !bg-white/55 !p-4 !shadow-[0_8px_28px_rgba(110,69,135,0.08)] !backdrop-blur-xl">
           <Input
+            className="!min-w-0 !rounded-xl !border-white/80 !bg-white/65 !px-4 !py-3 placeholder:!text-[#a28eae]"
             type="text"
             placeholder="Buscar por livro..."
             value={search}
@@ -367,6 +371,7 @@ const Quizzes: React.FC = () => {
           />
 
           <Select
+            className="!rounded-xl !border-white/80 !bg-white/65 !px-4 !py-3 !text-[#665476]"
             value={bookName}
             onChange={(e) => {
               setBookName(e.target.value);
@@ -382,6 +387,7 @@ const Quizzes: React.FC = () => {
           </Select>
 
           <Select
+            className="!rounded-xl !border-white/80 !bg-white/65 !px-4 !py-3 !text-[#665476]"
             value={testament}
             onChange={(e) => setTestament(e.target.value)}
           >
@@ -391,6 +397,7 @@ const Quizzes: React.FC = () => {
           </Select>
 
           <Select
+            className="!rounded-xl !border-white/80 !bg-white/65 !px-4 !py-3 !text-[#665476]"
             value={bibleVersion}
             onChange={(e) => setBibleVersion(e.target.value)}
           >
@@ -402,30 +409,30 @@ const Quizzes: React.FC = () => {
           </Select>
         </FiltersSection>
 
-        {error && <ErrorMessage>{error}</ErrorMessage>}
+        {error && <ErrorMessage className="!rounded-xl !border-white/70 !bg-white/60 !backdrop-blur-xl">{error}</ErrorMessage>}
 
         {loading ? (
-          <EmptyState>Carregando questionários...</EmptyState>
+          <EmptyState className="!rounded-2xl !border-white/80 !bg-white/50 !backdrop-blur-xl">Carregando questionários...</EmptyState>
         ) : quizzes.length === 0 ? (
-          <EmptyState>Nenhum questionário encontrado</EmptyState>
+          <EmptyState className="!rounded-2xl !border-white/80 !bg-white/50 !backdrop-blur-xl">Nenhum questionário encontrado</EmptyState>
         ) : (
           <>
-            <Table>
-              <Thead>
+            <Table className="!rounded-2xl !border-white/80 !bg-white/55 !shadow-[0_10px_32px_rgba(110,69,135,0.08)]">
+              <Thead className="!bg-white/45">
                 <Tr>
-                  <Th>ID</Th>
-                  <Th>Livro</Th>
-                  <Th>Capítulo</Th>
-                  <Th>Versão</Th>
-                  <Th>Testamento</Th>
-                  <Th>Questões</Th>
-                  <Th>Criado em</Th>
-                  <Th>Ações</Th>
+                  <Th className="!border-b !border-[#e8dcef] !text-[#755c84]">ID</Th>
+                  <Th className="!border-b !border-[#e8dcef] !text-[#755c84]">Livro</Th>
+                  <Th className="!border-b !border-[#e8dcef] !text-[#755c84]">Capítulo</Th>
+                  <Th className="!border-b !border-[#e8dcef] !text-[#755c84]">Versão</Th>
+                  <Th className="!border-b !border-[#e8dcef] !text-[#755c84]">Testamento</Th>
+                  <Th className="!border-b !border-[#e8dcef] !text-[#755c84]">Questões</Th>
+                  <Th className="!border-b !border-[#e8dcef] !text-[#755c84]">Criado em</Th>
+                  <Th className="!border-b !border-[#e8dcef] !text-[#755c84]">Ações</Th>
                 </Tr>
               </Thead>
               <Tbody>
                 {quizzes.map((quiz) => (
-                  <Tr key={quiz.id}>
+                  <Tr key={quiz.id} className="!border-[#eee5f3] hover:!bg-white/65">
                     <Td>{quiz.id}</Td>
                     <Td>{quiz.bookName}</Td>
                     <Td>{quiz.chapter}</Td>
@@ -444,7 +451,7 @@ const Quizzes: React.FC = () => {
                       {new Date(quiz.createdAt).toLocaleDateString("pt-BR")}
                     </Td>
                     <Td>
-                      <div style={{ display: "flex", gap: "8px" }}>
+                      <div className="flex gap-2">
                         <ActionButton
                           onClick={() => loadQuizDetail(quiz.id)}
                           title="Visualizar"
@@ -464,27 +471,52 @@ const Quizzes: React.FC = () => {
               </Tbody>
             </Table>
 
-            {totalPages > 1 && (
-              <Pagination>
-                <Button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                >
-                  ← Anterior
-                </Button>
-                <span>
-                  Página {page} de {totalPages}
-                </span>
-                <Button
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages}
-                >
-                  Próxima →
-                </Button>
-              </Pagination>
-            )}
+            <Pagination className="!fixed !bottom-0 !left-[var(--sidebar-width)] !right-0 !z-[90] !m-0 !min-h-[72px] !justify-between !gap-3 !border-t !border-white/80 !bg-white/75 !px-8 !py-3 !shadow-[0_-8px_28px_rgba(110,69,135,0.12)] !backdrop-blur-2xl max-sm:!flex-col max-sm:!items-stretch max-sm:!px-3">
+                <div className="flex items-center gap-2 max-sm:justify-center">
+                  <label htmlFor="quizzes-page-size" className="text-xs font-medium text-[#755c84]">Itens por página</label>
+                  <Select
+                    id="quizzes-page-size"
+                    aria-label="Itens por página"
+                    value={perPage}
+                    onChange={(event) => {
+                      setPerPage(Number(event.target.value));
+                      setPage(1);
+                    }}
+                    className="!min-w-0 !flex-none !rounded-xl !border-white/80 !bg-white/70 !px-3 !py-2 !text-xs"
+                  >
+                    {[10, 20, 50, 100].map((count) => (
+                      <option key={count} value={count}>{count}</option>
+                    ))}
+                  </Select>
+                </div>
+                {totalPages > 1 ? (
+                  <div className="flex items-center gap-4 max-sm:justify-center">
+                    <Button
+                      className="!rounded-xl !bg-white/70 !px-4 !py-2 !text-xs !text-[#715487] hover:!bg-white"
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                    >
+                      ← Anterior
+                    </Button>
+                    <span className="whitespace-nowrap text-xs font-semibold text-[#755c84]">
+                      Página {page} de {totalPages}
+                    </span>
+                    <Button
+                      className="!rounded-xl !bg-white/70 !px-4 !py-2 !text-xs !text-[#715487] hover:!bg-white"
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={page === totalPages}
+                    >
+                      Próxima →
+                    </Button>
+                  </div>
+                ) : (
+                  <span className="text-xs font-semibold text-[#755c84]">Página 1 de 1</span>
+                )}
+            </Pagination>
           </>
         )}
+
+        </div>
 
         {/* Modal de Criação */}
         {showCreateModal && (
