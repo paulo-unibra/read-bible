@@ -1,0 +1,89 @@
+name: Deploy API
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - "api/**"
+      - "ops/deploy-read-bible-api"
+      - ".github/workflows/deploy-api.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-api
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --prefix api
+
+      - name: Typecheck API
+        run: npm run typecheck --prefix api
+
+      - name: Build API
+        run: npm run build --prefix api
+
+      - name: Configure SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ vars.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Prepare API release directory
+        env:
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+        run: >-
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes
+          "$DEPLOY_USER@$DEPLOY_HOST"
+          "mkdir -p /home/$DEPLOY_USER/read-bible-api-release && chmod 750 /home/$DEPLOY_USER/read-bible-api-release"
+
+      - name: Upload API source
+        env:
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+        run: >-
+          rsync -rzc --delete --no-perms
+          --exclude='.env'
+          --exclude='.env.*'
+          --exclude='node_modules/'
+          --exclude='build/'
+          --exclude='logs/'
+          --exclude='.git/'
+          --exclude='.expo/'
+          --exclude='.test-token'
+          --exclude='public/uploads/'
+          -e "ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes"
+          api/
+          "$DEPLOY_USER@$DEPLOY_HOST:/home/$DEPLOY_USER/read-bible-api-release/"
+
+      - name: Install release and reload API
+        env:
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+        run: >-
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes
+          "$DEPLOY_USER@$DEPLOY_HOST"
+          "sudo -n /usr/local/sbin/deploy-read-bible-api"

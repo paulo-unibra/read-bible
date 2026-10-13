@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+APP_DIR=/root/read-bible/api
+RELEASE_DIR=/home/rb-admin-deploy/read-bible-api-release
+
+if [[ ! -f "$RELEASE_DIR/package.json" || ! -f "$RELEASE_DIR/package-lock.json" ]]; then
+  echo "API release directory is incomplete" >&2
+  exit 1
+fi
+
+echo "Syncing API source while preserving production secrets and uploads..."
+/usr/bin/rsync -rlt \
+  --exclude='.env' \
+  --exclude='.env.*' \
+  --exclude='node_modules/' \
+  --exclude='build/' \
+  --exclude='logs/' \
+  --exclude='.git/' \
+  --exclude='.expo/' \
+  --exclude='.test-token' \
+  --exclude='public/uploads/' \
+  "$RELEASE_DIR/" "$APP_DIR/"
+
+cd "$APP_DIR"
+echo "Installing locked API dependencies..."
+/usr/bin/npm install --no-audit --no-fund
+
+echo "Applying database migrations..."
+/usr/bin/node ace.js migration:run --force
+
+echo "Reloading the API process..."
+/usr/bin/pm2 reload read-bible-api --update-env
+
+/usr/bin/pm2 jlist | /usr/bin/node -e '
+let output = ""
+process.stdin.on("data", (chunk) => (output += chunk))
+process.stdin.on("end", () => {
+  const processInfo = JSON.parse(output).find((item) => item.name === "read-bible-api")
+  if (!processInfo || processInfo.pm2_env.status !== "online") {
+    console.error("read-bible-api is not online after reload")
+    process.exit(1)
+  }
+  console.log("read-bible-api is online")
+})
+'
