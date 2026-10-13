@@ -373,7 +373,7 @@ const AuditLogs: React.FC = () => {
           )}
 
           {filtersOpen && <div className="filter-panel-content">
-          <div className="filters-group">
+          <div className="audit-filters-group">
             <label>
               Ação:
               <select
@@ -416,7 +416,7 @@ const AuditLogs: React.FC = () => {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") applyTextFilters();
                 }}
-                className="filter-input"
+                className="audit-filter-input"
               />
             </label>
 
@@ -438,9 +438,13 @@ const AuditLogs: React.FC = () => {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") applyTextFilters();
                 }}
-                className="filter-input filter-ip"
+                className="audit-filter-input audit-filter-ip"
               />
-              <span id={ipError ? "ip-filter-error" : "ip-filter-hint"} className={ipError ? "ip-filter-error" : "ip-filter-hint"} role={ipError ? "alert" : undefined}>
+              <span
+                id={ipError ? "ip-filter-error" : "ip-filter-hint"}
+                className={ipError ? "audit-ip-filter-error" : "audit-ip-filter-hint"}
+                role={ipError ? "alert" : undefined}
+              >
                 {ipError || "Aceita IPv4 e IPv6"}
               </span>
             </label>
@@ -453,10 +457,10 @@ const AuditLogs: React.FC = () => {
               Até:
               <input type="date" value={dateTo} min={dateFrom || undefined} onChange={(e) => { setDateTo(e.target.value); setPeriodFilter("all"); setPage(1); }} />
             </label>
-            <div className="filter-actions">
+            <div className="audit-filter-actions">
               <Button onClick={applyTextFilters} disabled={loading}>Aplicar filtros</Button>
               {activeFilterCount > 0 && (
-                <button type="button" className="clear-filters" onClick={clearFilters}>
+                <button type="button" className="audit-clear-filters" onClick={clearFilters}>
                   Limpar
                 </button>
               )}
