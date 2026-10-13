@@ -331,7 +331,7 @@ const AuditLogs: React.FC = () => {
     <div style={{ display: "flex", minHeight: "100vh" }}>
       <Sidebar />
 
-      <MainContent>
+      <MainContent className="audit-logs-main">
         <PageTitle>Logs de Auditoria</PageTitle>
 
         {/* Filtros */}
@@ -538,7 +538,7 @@ const AuditLogs: React.FC = () => {
         )}
 
         {meta && meta.lastPage > 1 && (
-          <Pagination>
+          <Pagination className="audit-list-footer">
             <Button
               onClick={() => setPage(page - 1)}
               disabled={page <= 1 || loading}
