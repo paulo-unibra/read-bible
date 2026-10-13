@@ -292,11 +292,13 @@
   justify-content: center;
   align-items: center;
   gap: 1rem;
-  margin-top: 2rem;
-  padding: 1.5rem;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  margin-top: 1.25rem;
+  padding: 1rem 1.25rem;
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(110, 69, 135, 0.08);
+  backdrop-filter: blur(18px);
 }
 
 .page-info {

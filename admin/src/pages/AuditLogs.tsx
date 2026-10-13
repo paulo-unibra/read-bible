@@ -140,6 +140,7 @@ const AuditLogs: React.FC = () => {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(50);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedLog, setSelectedLog] = useState<AuditLogEntry | null>(null);
   const [copyFeedback, setCopyFeedback] = useState("");
@@ -175,7 +176,7 @@ const AuditLogs: React.FC = () => {
     try {
       const params: Record<string, string | number> = {
         page,
-        limit: 50,
+        limit: perPage,
       };
 
       if (actionFilter !== "all") {
@@ -220,7 +221,7 @@ const AuditLogs: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [actionFilter, periodFilter, search, ipFilter, dateFrom, dateTo, page]);
+  }, [actionFilter, periodFilter, search, ipFilter, dateFrom, dateTo, page, perPage]);
 
   useEffect(() => {
     loadLogs();
@@ -539,23 +540,35 @@ const AuditLogs: React.FC = () => {
           </Table>
         )}
 
-        {meta && meta.lastPage > 1 && (
-          <Pagination className="fixed bottom-0 left-[var(--sidebar-width)] right-0 z-[90] !m-0 min-h-[72px] border-t border-[var(--color-border)] bg-[var(--color-surface)] px-8 py-3 shadow-[0_-6px_20px_rgba(15,23,42,0.08)] max-sm:px-3">
-            <Button
-              onClick={() => setPage(page - 1)}
-              disabled={page <= 1 || loading}
-            >
-              ← Anterior
-            </Button>
-            <span className="page-info">
-              Página {meta.currentPage} de {meta.lastPage}
-            </span>
-            <Button
-              onClick={() => setPage(page + 1)}
-              disabled={page >= meta.lastPage || loading}
-            >
-              Próxima →
-            </Button>
+        {meta && (
+          <Pagination className="fixed bottom-0 left-[var(--sidebar-width)] right-0 z-[90] !m-0 min-h-[72px] justify-between border-t border-[var(--color-border)] bg-white/75 px-8 py-3 shadow-[0_-6px_20px_rgba(15,23,42,0.08)] backdrop-blur-2xl max-sm:px-3">
+            <label className="flex items-center gap-2 text-xs font-medium text-[var(--color-text-secondary)]">
+              Itens por página
+              <select
+                aria-label="Itens por página"
+                value={perPage}
+                onChange={(event) => {
+                  setPerPage(Number(event.target.value));
+                  setPage(1);
+                }}
+                className="rounded-lg border border-[var(--color-border-strong)] bg-white/80 px-3 py-2 text-xs"
+              >
+                {[20, 50, 100].map((count) => (
+                  <option key={count} value={count}>{count}</option>
+                ))}
+              </select>
+            </label>
+            {meta.lastPage > 1 && (
+              <div className="flex items-center gap-3">
+                <Button onClick={() => setPage(page - 1)} disabled={page <= 1 || loading}>
+                  ← Anterior
+                </Button>
+                <span className="page-info">Página {meta.currentPage} de {meta.lastPage}</span>
+                <Button onClick={() => setPage(page + 1)} disabled={page >= meta.lastPage || loading}>
+                  Próxima →
+                </Button>
+              </div>
+            )}
           </Pagination>
         )}
       </MainContent>

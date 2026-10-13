@@ -35,6 +35,7 @@ export default function BibleCuriosities() {
   const [curiosities, setCuriosities] = useState<BibleCuriosity[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [perPage, setPerPage] = useState(20);
   const [filter, setFilter] = useState<FilterStatus>("all");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState({
@@ -61,7 +62,7 @@ export default function BibleCuriosities() {
 
   useEffect(() => {
     loadCuriosities();
-  }, [currentPage, filter]);
+  }, [currentPage, filter, perPage]);
 
   const loadCuriosities = async () => {
     try {
@@ -70,7 +71,7 @@ export default function BibleCuriosities() {
         filter === "all" ? undefined : filter === "active" ? "true" : "false";
       const data = await bibleCuriositiesService.listAll(
         currentPage,
-        20,
+        perPage,
         isActiveParam,
       );
       setCuriosities(data.data);
@@ -293,7 +294,7 @@ export default function BibleCuriosities() {
         </div>
 
         {/* Filtros */}
-        <div className="filters">
+        <div className="filters sticky top-3 z-40 rounded-2xl border border-white/80 bg-white/60 p-4 shadow-[0_8px_28px_rgba(110,69,135,0.08)] backdrop-blur-xl">
           <div className="filter-group">
             <label>Status:</label>
             <Select
@@ -490,8 +491,25 @@ export default function BibleCuriosities() {
             </Table>
 
             {/* Paginação */}
-            {totalPages > 1 && (
-              <div className="pagination">
+            <div className="pagination">
+              <label className="flex items-center gap-2 text-xs font-medium text-[var(--color-text-secondary)]">
+                Itens por página
+                <select
+                  aria-label="Itens por página"
+                  value={perPage}
+                  onChange={(event) => {
+                    setPerPage(Number(event.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="rounded-lg border border-[var(--color-border-strong)] bg-white/75 px-3 py-2 text-xs"
+                >
+                  {[10, 20, 50, 100].map((count) => (
+                    <option key={count} value={count}>{count}</option>
+                  ))}
+                </select>
+              </label>
+              {totalPages > 1 && (
+              <>
                 <Button
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
@@ -509,8 +527,9 @@ export default function BibleCuriosities() {
                 >
                   Próxima →
                 </Button>
-              </div>
-            )}
+              </>
+              )}
+            </div>
           </>
         )}
 

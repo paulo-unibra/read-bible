@@ -189,6 +189,7 @@ export default function BibleBrainManager() {
   const [bibles, setBibles] = useState<BibleBrainBible[]>([]);
   const [currentPage, setCurrentPage] = useState(Number(saved?.page) || 1);
   const [totalPages, setTotalPages] = useState(1);
+  const [perPage, setPerPage] = useState(20);
   const savedSearch = saved?.search || "";
   const [searchInput, setSearchInput] = useState(savedSearch);
   const search = useDebouncedValue(searchInput, 400);
@@ -217,7 +218,7 @@ export default function BibleBrainManager() {
   const loadBibles = useCallback(async (options: { silent?: boolean } = {}) => {
     try {
       if (!options.silent) setLoading(true);
-      const params: any = { page: currentPage, perPage: 20 };
+      const params: any = { page: currentPage, perPage };
       if (enabledFilter !== "all") params.enabled = enabledFilter;
       if (mediaFilter !== "all") params.media = mediaFilter;
       if (search.trim()) params.search = search.trim();
@@ -232,7 +233,7 @@ export default function BibleBrainManager() {
     } finally {
       if (!options.silent) setLoading(false);
     }
-  }, [currentPage, enabledFilter, languageIso, mediaFilter, search]);
+  }, [currentPage, enabledFilter, languageIso, mediaFilter, perPage, search]);
 
   const hasPackageInProgress = bibles.some(
     (bible) => bible.packageStatus === "generating" || bible.audioPackageStatus === "generating",
@@ -486,7 +487,7 @@ export default function BibleBrainManager() {
 
         {syncStatus && <div className="sync-status">{syncStatus}</div>}
 
-        <div className="filters">
+        <div className="filters sticky top-3 z-40 rounded-2xl border border-white/80 bg-white/60 p-4 shadow-[0_8px_28px_rgba(110,69,135,0.08)] backdrop-blur-xl">
           <div className="filter-group">
             <label>Busca:</label>
             <Input
@@ -583,8 +584,24 @@ export default function BibleBrainManager() {
               </Tbody>
             </Table>
 
-            {totalPages > 1 && (
-              <div className="pagination">
+            <div className="pagination flex-wrap rounded-2xl border border-white/80 bg-white/60 p-4 shadow-[var(--shadow-sm)] backdrop-blur-xl">
+              <label className="flex items-center gap-2 text-xs font-medium text-[var(--color-text-secondary)]">
+                Itens por página
+                <Select
+                  aria-label="Itens por página"
+                  value={perPage}
+                  onChange={(event: React.ChangeEvent<HTMLSelectElement>) => {
+                    setPerPage(Number(event.target.value));
+                    setCurrentPage(1);
+                  }}
+                >
+                  {[10, 20, 50, 100].map((count) => (
+                    <option key={count} value={count}>{count}</option>
+                  ))}
+                </Select>
+              </label>
+              {totalPages > 1 && (
+              <>
                 <Button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}>
                   ← Anterior
                 </Button>
@@ -592,8 +609,9 @@ export default function BibleBrainManager() {
                 <Button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>
                   Próxima →
                 </Button>
-              </div>
-            )}
+              </>
+              )}
+            </div>
           </>
         )}
       </MainContent>

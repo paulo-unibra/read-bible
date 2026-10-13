@@ -63,6 +63,7 @@ const ActivePlans = () => {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [perPage, setPerPage] = useState(20);
   const [meta, setMeta] = useState<PaginationMeta | null>(null);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
 
@@ -73,7 +74,7 @@ const ActivePlans = () => {
 
       const params: any = {
         page,
-        limit: 20,
+        limit: perPage,
       };
 
       if (search) params.search = search;
@@ -96,7 +97,7 @@ const ActivePlans = () => {
 
   useEffect(() => {
     fetchPlans(1);
-  }, [search, statusFilter]);
+  }, [search, statusFilter, perPage]);
 
   const handleDisablePlan = async (planId: number) => {
     if (!confirm("Tem certeza que deseja desabilitar este plano?")) return;
@@ -159,7 +160,7 @@ const ActivePlans = () => {
       <MainContent>
         <PageTitle>Gerenciar Planos de Leitura</PageTitle>
 
-        <FiltersSection>
+        <FiltersSection className="sticky top-3 z-40 rounded-2xl border border-white/80 bg-white/60 p-4 shadow-[0_8px_28px_rgba(110,69,135,0.08)] backdrop-blur-xl">
           <Input
             type="text"
             placeholder="Buscar por nome, email do usuário ou nome do plano..."
@@ -270,23 +271,33 @@ const ActivePlans = () => {
               </Tbody>
             </Table>
 
-            {meta && meta.lastPage > 1 && (
-              <Pagination>
-                <Button
-                  onClick={() => fetchPlans(currentPage - 1)}
-                  disabled={currentPage === 1}
-                >
-                  Anterior
-                </Button>
-                <span>
-                  Página {currentPage} de {meta.lastPage}
-                </span>
-                <Button
-                  onClick={() => fetchPlans(currentPage + 1)}
-                  disabled={currentPage === meta.lastPage}
-                >
-                  Próxima
-                </Button>
+            {meta && (
+              <Pagination className="justify-between rounded-2xl border border-white/80 bg-white/60 px-5 py-3 shadow-[var(--shadow-sm)] backdrop-blur-xl">
+                <label className="flex items-center gap-2 text-xs font-medium text-[var(--color-text-secondary)]">
+                  Itens por página
+                  <select
+                    aria-label="Itens por página"
+                    value={perPage}
+                    onChange={(event) => {
+                      setPerPage(Number(event.target.value));
+                      setCurrentPage(1);
+                    }}
+                    className="rounded-lg border border-[var(--color-border-strong)] bg-white/75 px-3 py-2 text-xs"
+                  >
+                    {[10, 20, 50, 100].map((count) => (
+                      <option key={count} value={count}>{count}</option>
+                    ))}
+                  </select>
+                </label>
+                <div className="flex items-center gap-4">
+                  <Button onClick={() => fetchPlans(currentPage - 1)} disabled={currentPage === 1}>
+                    Anterior
+                  </Button>
+                  <span>Página {currentPage} de {meta.lastPage}</span>
+                  <Button onClick={() => fetchPlans(currentPage + 1)} disabled={currentPage === meta.lastPage}>
+                    Próxima
+                  </Button>
+                </div>
               </Pagination>
             )}
           </>

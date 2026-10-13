@@ -367,6 +367,7 @@ const Quizzes: React.FC = () => {
             onChange={(e) => {
               setSearch(e.target.value);
               setBookName("");
+              setPage(1);
             }}
           />
 
@@ -376,6 +377,7 @@ const Quizzes: React.FC = () => {
             onChange={(e) => {
               setBookName(e.target.value);
               setSearch("");
+              setPage(1);
             }}
           >
             <option value="">Selecionar Livro</option>
@@ -389,7 +391,10 @@ const Quizzes: React.FC = () => {
           <Select
             className="!rounded-xl !border-white/80 !bg-white/65 !px-4 !py-3 !text-[#665476]"
             value={testament}
-            onChange={(e) => setTestament(e.target.value)}
+            onChange={(e) => {
+              setTestament(e.target.value);
+              setPage(1);
+            }}
           >
             <option value="">Todos os Testamentos</option>
             <option value="old">Antigo Testamento</option>
@@ -399,7 +404,10 @@ const Quizzes: React.FC = () => {
           <Select
             className="!rounded-xl !border-white/80 !bg-white/65 !px-4 !py-3 !text-[#665476]"
             value={bibleVersion}
-            onChange={(e) => setBibleVersion(e.target.value)}
+            onChange={(e) => {
+              setBibleVersion(e.target.value);
+              setPage(1);
+            }}
           >
             <option value="">Todas as Versões</option>
             <option value="NVI">NVI</option>
