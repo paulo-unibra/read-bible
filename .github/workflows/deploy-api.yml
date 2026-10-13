@@ -6,7 +6,6 @@ on:
       - master
     paths:
       - "api/**"
-      - "ops/deploy-read-bible-api"
       - ".github/workflows/deploy-api.yml"
   workflow_dispatch:
 
