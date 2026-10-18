@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../hooks/theme-context";
 import readingPlanService from "../services/ReadingPlanService";
+import { getAnnualReadingPeriod } from "../utils/annualReadingPeriod";
 
 interface PlanTemplate {
   id: number;
@@ -41,19 +42,12 @@ export default function SelectPlanTemplateScreen() {
     loadTemplates();
   }, []);
 
-  const getDaysUntilEndOfYear = () => {
-    const today = new Date();
-    const endOfYear = new Date(today.getFullYear(), 11, 31, 23, 59, 59);
-    const diffTime = endOfYear.getTime() - today.getTime();
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  };
-
   const createDefaultTemplate = (): PlanTemplate => {
-    const daysRemaining = getDaysUntilEndOfYear();
+    const { totalDays: daysRemaining, planYear } = getAnnualReadingPeriod();
     return {
       id: -1, // ID negativo para indicar que é o template padrão
-      name: `Plano Sequencial ${new Date().getFullYear()}`,
-      description: `Leia toda a Bíblia de forma sequencial até o final do ano. Faltam ${daysRemaining} dias para completar sua jornada espiritual.`,
+      name: `Plano Sequencial ${planYear}`,
+      description: `Leia toda a Bíblia de forma sequencial até 31/12/${planYear}. Faltam ${daysRemaining} dias para completar sua jornada espiritual.`,
       type: "sequential",
       duration: daysRemaining,
       testament: "both",
@@ -63,11 +57,11 @@ export default function SelectPlanTemplateScreen() {
   };
 
   const createInterleavedTemplate = (): PlanTemplate => {
-    const daysRemaining = getDaysUntilEndOfYear();
+    const { totalDays: daysRemaining, planYear } = getAnnualReadingPeriod();
     return {
       id: -2, // ID -2 para o template intercalado
-      name: `Plano Intercalado ${new Date().getFullYear()}`,
-      description: `Leia Antigo e Novo Testamento juntos até o fim do ano. Faltam ${daysRemaining} dias para completar sua jornada espiritual.`,
+      name: `Plano Intercalado ${planYear}`,
+      description: `Leia Antigo e Novo Testamento juntos até 31/12/${planYear}. Faltam ${daysRemaining} dias para completar sua jornada espiritual.`,
       type: "custom",
       duration: daysRemaining,
       testament: "both",
@@ -77,13 +71,13 @@ export default function SelectPlanTemplateScreen() {
   };
 
   const createBeginnerTemplate = (): PlanTemplate => {
-    const daysRemaining = getDaysUntilEndOfYear();
+    const { totalDays: daysRemaining, planYear } = getAnnualReadingPeriod();
     const totalVerses = 31102;
     const versesPerDay = Math.ceil(totalVerses / daysRemaining);
     return {
       id: -3, // ID -3 para o template iniciante
-      name: `Plano Fácil de Ler ${new Date().getFullYear()}`,
-      description: `Leia toda a Bíblia até o fim do ano de forma leve. ${versesPerDay} versículos por dia durante ${daysRemaining} dias.`,
+      name: `Plano Fácil de Ler ${planYear}`,
+      description: `Leia toda a Bíblia até 31/12/${planYear} de forma leve. ${versesPerDay} versículos por dia durante ${daysRemaining} dias.`,
       type: "custom",
       duration: daysRemaining,
       testament: "both",

@@ -4,6 +4,7 @@ import AuditLog from '#models/audit_log'
 import type { HttpContext } from '@adonisjs/core/http'
 import db from '@adonisjs/lucid/services/db'
 import { DateTime } from 'luxon'
+import { getAnnualReadingPeriod } from '../utils/annual_reading_period.js'
 import { BIBLE_VERSES_PER_CHAPTER, getVersesInRange } from '../utils/bible_verses_per_chapter.js'
 
 // Estrutura completa da Bíblia com todos os capítulos e versículos
@@ -100,25 +101,7 @@ export default class ReadingPlanController {
         })
       }
 
-      const now = DateTime.now()
-      let endDate: DateTime
-      let planYear: number
-
-      // Calcular fim do ano atual
-      const endOfCurrentYear = DateTime.local(now.year, 12, 31, 23, 59, 59)
-      const daysUntilEndOfCurrentYear = Math.ceil(endOfCurrentYear.diff(now, 'days').days)
-
-      // Se há menos de 90 dias para o fim do ano atual, criar plano até o fim do próximo ano
-      if (daysUntilEndOfCurrentYear < 90) {
-        endDate = DateTime.local(now.year + 1, 12, 31, 23, 59, 59)
-        planYear = now.year + 1
-      } else {
-        endDate = endOfCurrentYear
-        planYear = now.year
-      }
-
-      // Calcular dias totais do plano
-      const totalDays = Math.ceil(endDate.diff(now, 'days').days)
+      const { startDate: now, endDate, totalDays, planYear } = getAnnualReadingPeriod()
 
       // Calcular total de capítulos da Bíblia
       const totalChapters = BIBLE_STRUCTURE.reduce((sum, book) => sum + book.chapters, 0)
@@ -189,13 +172,36 @@ export default class ReadingPlanController {
       const user = auth.user!
       console.log('👤 [API] Usuário autenticado:', { id: user.id })
 
-      const { name, type, startDate, endDate, totalDays } = request.only([
+      let { name, type, startDate, endDate, totalDays } = request.only([
         'name',
         'type',
         'startDate',
         'endDate',
         'totalDays',
       ])
+
+      // Compatibilidade com clientes antigos, incluindo datas locais serializadas em UTC.
+      // Um fim de ano pode chegar como 01/01 UTC em fusos a oeste de Greenwich.
+      const requestedStart = DateTime.fromISO(startDate, { setZone: true })
+      const requestedEnd = DateTime.fromISO(endDate, { setZone: true })
+      const isCalendarYearEnd =
+        (requestedEnd.month === 12 &&
+          requestedEnd.day === 31 &&
+          requestedEnd.year === requestedStart.year) ||
+        (requestedEnd.month === 1 &&
+          requestedEnd.day === 1 &&
+          requestedEnd.year === requestedStart.year + 1)
+      if (
+        ['sequential', 'interleaved', 'annual'].includes(type) &&
+        requestedStart.isValid &&
+        requestedEnd.isValid &&
+        isCalendarYearEnd &&
+        Math.ceil(requestedEnd.diff(requestedStart, 'days').days) < 90
+      ) {
+        const extendedEnd = requestedEnd.plus({ years: 1 })
+        endDate = extendedEnd.toISO()
+        totalDays = Math.ceil(extendedEnd.diff(requestedStart, 'days').days)
+      }
 
       console.log('📦 [API] Dados recebidos:')
       console.log('   name:', name)
@@ -409,9 +415,7 @@ export default class ReadingPlanController {
       console.log('✅ [API] Nenhum plano ativo encontrado, criando novo...')
 
       // Calcular dias até o fim do ano
-      const now = DateTime.now()
-      const endOfYear = DateTime.local(now.year, 12, 31, 23, 59, 59)
-      const totalDays = Math.ceil(endOfYear.diff(now, 'days').days)
+      const { startDate: now, endDate: endOfYear, totalDays, planYear } = getAnnualReadingPeriod()
 
       if (totalDays <= 0) {
         return response.badRequest({
@@ -421,7 +425,7 @@ export default class ReadingPlanController {
         })
       }
 
-      console.log(`📅 [API] Dias restantes até 31/12/${now.year}: ${totalDays}`)
+      console.log(`📅 [API] Dias restantes até 31/12/${planYear}: ${totalDays}`)
 
       // Calcular total de versículos da Bíblia
       const totalVerses = BIBLE_STRUCTURE.reduce((sum, book) => sum + book.verses, 0)
@@ -439,7 +443,7 @@ export default class ReadingPlanController {
       // Criar plano para iniciantes
       const planData = {
         userId: user.id,
-        name: `Plano para Iniciantes ${now.year}`,
+        name: `Plano para Iniciantes ${planYear}`,
         type: 'beginner' as const,
         startDate: now,
         endDate: endOfYear,

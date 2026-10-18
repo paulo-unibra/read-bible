@@ -1,5 +1,6 @@
 import { Reading, ReadingPlan, ReadingPlanDay } from "../types";
 import DatabaseService from "./DatabaseService";
+import { getAnnualReadingPeriod } from "../utils/annualReadingPeriod";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:1999";
 
@@ -48,12 +49,7 @@ export class ReadingPlanService {
 
       console.log("👤 Usuário autenticado:", user.email);
 
-      const startDate = new Date();
-      startDate.setHours(0, 0, 0, 0);
-      const endDate = new Date(startDate.getFullYear(), 11, 31, 23, 59, 59);
-      const totalDays = Math.ceil(
-        (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
-      );
+      const { startDate, endDate, totalDays } = getAnnualReadingPeriod();
 
       console.log("📅 Datas:", { startDate, endDate, totalDays });
 
@@ -128,12 +124,7 @@ export class ReadingPlanService {
 
       console.log("👤 Usuário autenticado:", user.email);
 
-      const startDate = new Date();
-      startDate.setHours(0, 0, 0, 0);
-      const endDate = new Date(startDate.getFullYear(), 11, 31, 23, 59, 59);
-      const totalDays = Math.ceil(
-        (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
-      );
+      const { startDate, endDate, totalDays } = getAnnualReadingPeriod();
 
       console.log("📅 Datas:", { startDate, endDate, totalDays });
 
@@ -419,12 +410,14 @@ export class ReadingPlanService {
 
       // Calculate end date based on template type
       if (template.type === "annual") {
-        endDate = new Date(startDate.getFullYear(), 11, 31, 23, 59, 59);
+        endDate = getAnnualReadingPeriod(startDate).endDate;
       } else {
         endDate.setDate(endDate.getDate() + template.duration);
       }
 
-      const totalDays = template.readings.length;
+      const totalDays = template.type === "annual"
+        ? getAnnualReadingPeriod(startDate).totalDays
+        : template.readings.length;
       console.log("📅 [createPlanFromTemplate] Datas calculadas:", {
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
