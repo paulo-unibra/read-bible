@@ -52,6 +52,11 @@ export default function ReadingCompanion({ userId }: {
 
   useFocusEffect(useCallback(() => {
     let active = true;
+    const unsubscribe = tamagoshiService.subscribe(userId, pet => {
+      if (!active) return;
+      setPetData(pet);
+      setClock(new Date());
+    });
     (async () => {
       try {
         const savedPet = await tamagoshiService.get(userId);
@@ -63,7 +68,7 @@ export default function ReadingCompanion({ userId }: {
         // Keep the last server-confirmed monthly score available offline.
       }
     })();
-    return () => { active = false;  };
+    return () => { active = false; unsubscribe(); };
   }, [userId]));
 
   useFocusEffect(useCallback(() => {

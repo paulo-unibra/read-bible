@@ -163,3 +163,31 @@ test('reset no servidor limpa cache do Tamagoshi e permite nova ativação expl�
   assert.ok(await api.sync(1));
   assert.equal(requests.filter(row => row.url.endsWith('/activate')).length, activations + 1);
 });
+test('painel recebe pontos sincronizados sem reabrir, inclusive remoções, e respeita conta e inscrição', async () => {
+  const { api, server } = service();
+  await api.activate(1);
+  await api.sync(1);
+  const updates = [];
+  const otherAccount = [];
+  const unsubscribe = api.subscribe(1, pet => updates.push(pet?.monthlyScore?.points ?? null));
+  const unsubscribeOther = api.subscribe(2, pet => otherAccount.push(pet));
+  // The plan marks a reading remotely and syncs while the home panel remains mounted.
+  const row = server.get(1);
+  row.score = { ...row.score, points: 6, readingDays: [dayKey()], readingHistory: [dayKey()], readToday: true };
+  await api.sync(1);
+  assert.deepEqual(updates, [6]);
+  assert.deepEqual(otherAccount, []);
+  await api.get(1);
+  assert.deepEqual(updates, [6]);
+  row.score = { ...row.score, points: 0, readingDays: [], readingHistory: [], readToday: false };
+  await api.sync(1);
+  assert.deepEqual(updates, [6, 0]);
+  server.delete(1);
+  await api.sync(1);
+  assert.deepEqual(updates, [6, 0, null]);
+  unsubscribe();
+  unsubscribeOther();
+  await api.activate(1);
+  await api.sync(1);
+  assert.deepEqual(updates, [6, 0, null]);
+});

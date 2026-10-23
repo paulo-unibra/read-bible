@@ -18,6 +18,21 @@ interface RemotePet {
 
 class TamagoshiService {
   private queue: Promise<unknown> = Promise.resolve();
+  private listeners = new Map<number, Set<(pet: Tamagoshi | null) => void>>();
+  subscribe(userId: number, listener: (pet: Tamagoshi | null) => void) {
+    const listeners = this.listeners.get(userId) ?? new Set();
+    listeners.add(listener);
+    this.listeners.set(userId, listeners);
+    return () => {
+      listeners.delete(listener);
+      if (!listeners.size) this.listeners.delete(userId);
+    };
+  }
+  private notify(userId: number, pet: Tamagoshi | null) {
+    this.listeners.get(userId)?.forEach(listener => {
+      try { listener(pet); } catch { /* One observer must not interrupt synchronization. */ }
+    });
+  }
   private key(userId: number) { return `@readbible/tamagoshi/v1/${userId}`; }
   private run<T>(work: () => Promise<T>): Promise<T> {
     const task = this.queue.then(work); this.queue = task.catch(() => {}); return task;
@@ -29,8 +44,12 @@ class TamagoshiService {
     if (pet.version !== 1 || !pet.activatedAt || !pet.days || !pet.name || !Number.isSafeInteger(pet.seed)) throw new Error('Não foi possível carregar seu Tamagoshi.');
     return settleTamagoshi(pet);
   }
-  private async save(userId: number, pet: Tamagoshi) { await AsyncStorage.setItem(this.key(userId), JSON.stringify(pet)); return pet; }
-  get(userId: number) { return this.run(async () => { const pet = await this.read(userId); return pet ? this.save(userId, pet) : null; }); }
+  private async save(userId: number, pet: Tamagoshi, notify = true) {
+    await AsyncStorage.setItem(this.key(userId), JSON.stringify(pet));
+    if (notify) this.notify(userId, pet);
+    return pet;
+  }
+  get(userId: number) { return this.run(async () => { const pet = await this.read(userId); return pet ? this.save(userId, pet, false) : null; }); }
   activate(userId: number) {
     return this.run(async () => {
       const existing = await this.read(userId); if (existing) return existing;
@@ -69,7 +88,10 @@ class TamagoshiService {
     const local = await this.get(userId);
     let data = await this.request(userId);
     if (!data.profile && local?.monthlyScore) {
-      await this.run(() => AsyncStorage.removeItem(this.key(userId)));
+      await this.run(async () => {
+        await AsyncStorage.removeItem(this.key(userId));
+        this.notify(userId, null);
+      });
       return null;
     }
     if (!data.profile && local) data = await this.request(userId, '/activate', 'POST', { name: local.name, seed: local.seed, catalogVersion: local.catalogVersion ?? 1 });
