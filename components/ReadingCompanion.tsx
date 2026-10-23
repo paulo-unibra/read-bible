@@ -18,6 +18,7 @@ export default function ReadingCompanion({ userId, days }: {
   const [tipIndex, setTipIndex] = useState(0);
   const [reducedMotion, setReducedMotion] = useState(true);
   const [bounce] = useState(() => new Animated.Value(0));
+  const [tipOpacity] = useState(() => new Animated.Value(1));
   const pet = getCompanion(petData?.seed ?? userId, petData?.catalogVersion ?? 1);
   const status = petData ? tamagoshiStatus(petData, clock) : null;
   const mood = status?.mood;
@@ -26,9 +27,28 @@ export default function ReadingCompanion({ userId, days }: {
 
   useFocusEffect(useCallback(() => {
     if (!enabled) return;
-    const timer = setInterval(() => setTipIndex(index => (index + 1) % 3), 7000);
-    return () => clearInterval(timer);
-  }, [enabled]));
+    let active = true;
+    let transition: Animated.CompositeAnimation | undefined;
+    const timer = setInterval(() => {
+      if (reducedMotion) {
+        setTipIndex(index => (index + 1) % 3);
+        return;
+      }
+      transition = Animated.timing(tipOpacity, { toValue: 0, duration: 300, useNativeDriver: true });
+      transition.start(({ finished }) => {
+        if (!finished || !active) return;
+        setTipIndex(index => (index + 1) % 3);
+        transition = Animated.timing(tipOpacity, { toValue: 1, duration: 450, useNativeDriver: true });
+        transition.start();
+      });
+    }, 7000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+      transition?.stop();
+      tipOpacity.setValue(1);
+    };
+  }, [enabled, reducedMotion, tipOpacity]));
 
   useFocusEffect(useCallback(() => {
     const controller = new AbortController();
@@ -114,7 +134,7 @@ export default function ReadingCompanion({ userId, days }: {
       </View>
       <Ionicons name="chevron-forward" size={18} color="#496271" />
       </View>
-      <Text style={styles.tip} numberOfLines={2}>{tips[tipIndex]}</Text>
+      <Animated.Text style={[styles.tip, { opacity: tipOpacity }]} numberOfLines={2}>{tips[tipIndex]}</Animated.Text>
     </TouchableOpacity>
   );
 }
@@ -122,7 +142,7 @@ export default function ReadingCompanion({ userId, days }: {
 const styles = StyleSheet.create({
   container: { marginHorizontal: 16, marginTop: 8, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#DCE6E8' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 72 },
-  tip: { color: '#496271', fontSize: 12, lineHeight: 17, marginTop: 2 },
+  tip: { color: '#496271', fontSize: 12, lineHeight: 17, minHeight: 34, marginTop: 2 },
   petStage: { width: 68, alignItems: 'center' },
   copy: { flex: 1, minWidth: 0 },
   title: { fontSize: 16, lineHeight: 22, fontWeight: '700', color: '#203947' },
