@@ -2,7 +2,12 @@ import React from 'react';
 import { Circle, Ellipse, G, Path } from 'react-native-svg';
 import type { CompanionMood } from '../utils/readingCompanion';
 
-export default function CompanionFace({ mood }: { mood: CompanionMood }) {
+export default function CompanionFace({ mood, sleeping = false }: { mood: CompanionMood; sleeping?: boolean }) {
+  if (sleeping) return <G stroke="#302D39" strokeWidth={0.8} fill="none" strokeLinecap="round">
+    <Path d="M6.5 12.5Q8 14 9.5 12.5M14.5 12.5Q16 14 17.5 12.5" />
+    <Ellipse cx={12} cy={15.7} rx={0.7} ry={0.9} />
+    <Path d="M18 4H21L18 7H21M15 2H17L15 4H17" />
+  </G>;
   return (
     <G stroke="#302D39" strokeWidth={0.75} strokeLinecap="round" strokeLinejoin="round">
       {mood === 'curious' && <>

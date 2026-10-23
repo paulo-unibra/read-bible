@@ -1,3 +1,4 @@
+import TamagoshiMenuOption from "../components/TamagoshiMenuOption";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
@@ -578,6 +579,8 @@ export default function ProfileScreen() {
             <Ionicons name="pencil" size={20} color={colors.accent} />
           </TouchableOpacity>
         </View>
+
+        {authService.getUser()?.id != null && <TamagoshiMenuOption userId={authService.getUser()!.id} dark={isDark} />}
 
         {/* Reading Status */}
         {stats && stats.readingStatus !== "sem-plano" && (

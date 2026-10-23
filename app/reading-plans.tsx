@@ -16,6 +16,9 @@ import {
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import AdBanner from "../components/AdBanner";
+import TamagoshiMenuOption from "../components/TamagoshiMenuOption";
+import tamagoshiService from "../services/TamagoshiService";
+import ReadingCompanion from "../components/ReadingCompanion";
 import FocusBottomNav, {
   FOCUS_BOTTOM_NAV_HEIGHT,
 } from "../components/FocusBottomNav";
@@ -23,6 +26,7 @@ import authService, { API_URL } from "../services/AuthService";
 import readingPlanService from "../services/ReadingPlanService";
 import { ReadingPlan, ReadingPlanDay } from "../types";
 import { getNextPlanReading } from "../utils/nextPlanReading";
+import { isReadingPlanLate } from "../utils/readingPlanStatus";
 
 export default function ReadingPlansScreen() {
   const router = useRouter();
@@ -34,6 +38,7 @@ export default function ReadingPlansScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isMarkingComplete, setIsMarkingComplete] = useState(false);
   const [userName, setUserName] = useState("");
+  const [userId, setUserId] = useState<number | null>(null);
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
   const [profileImageUrlIndex, setProfileImageUrlIndex] = useState(0);
   const [profileImageLoadError, setProfileImageLoadError] = useState(false);
@@ -54,6 +59,7 @@ export default function ReadingPlansScreen() {
       const authenticated = authService.isAuthenticated();
       const user = authService.getUser();
       setIsAuthenticated(authenticated);
+      setUserId(authenticated ? user?.id ?? null : null);
       setUserName(
         authenticated ? user?.name?.trim().split(/\s+/)[0] || "Usuário" : "",
       );
@@ -178,6 +184,10 @@ export default function ReadingPlansScreen() {
     try {
       const activePlans = await readingPlanService.getActivePlans();
       setPlans(activePlans);
+      if (activePlans.length === 0) {
+        setSelectedPlan(null);
+        setPlanDays([]);
+      }
 
       if (activePlans.length > 0) {
         const planToSelect =
@@ -207,6 +217,7 @@ export default function ReadingPlansScreen() {
     setIsMarkingComplete(true);
     try {
       await readingPlanService.markDayAsCompleted(day.id);
+      if (userId !== null) await tamagoshiService.record(userId, "reading").catch(() => {});
 
       await loadPlans();
 
@@ -287,6 +298,8 @@ export default function ReadingPlansScreen() {
       `${Math.min(100, Math.max(0, progressPercent))}%` as const;
     const totalDays = selectedPlan?.totalDays || 0;
     const readingSummary = getReadingSummary(item);
+    const isLate = selectedPlan ? isReadingPlanLate(selectedPlan, planDays) : false;
+    const statusColor = isLate ? "#C2410C" : "#43A047";
 
     return (
       <View style={styles.readingCard}>
@@ -295,9 +308,9 @@ export default function ReadingPlansScreen() {
             Leitura de Hoje - Dia {item.dayNumber}/{totalDays || "-"}
           </Text>
           <View style={styles.statusPill}>
-            <Ionicons name="checkmark-circle" size={18} color="#43A047" />
-            <Text style={styles.statusPillText}>
-              {item.isCompleted ? "Concluída" : "Em dia"}
+            <Ionicons name={isLate ? "alert-circle" : "checkmark-circle"} size={18} color={statusColor} />
+            <Text style={[styles.statusPillText, { color: statusColor }]}>
+              {isLate ? "Atrasado" : item.isCompleted ? "Concluída" : "Em dia"}
             </Text>
           </View>
         </View>
@@ -392,7 +405,7 @@ export default function ReadingPlansScreen() {
     >
       <View style={styles.menuOverlay}>
         <Pressable
-          style={StyleSheet.absoluteFillObject}
+          style={StyleSheet.absoluteFill}
           onPress={() => setAccountMenu(null)}
           accessibilityLabel="Fechar opções da conta"
         />
@@ -438,6 +451,7 @@ export default function ReadingPlansScreen() {
           {accountMenu === "account" && (
             <View style={styles.menuOptions}>
               {renderMenuOption("camera-outline", "Alterar foto", "Câmera ou galeria", () => setAccountMenu("photo"))}
+              {userId !== null && <TamagoshiMenuOption userId={userId} onOpen={() => setAccountMenu(null)} />}
               {renderMenuOption("log-out-outline", "Sair", "Encerrar sessão neste aparelho", () => setAccountMenu("logout"), true)}
             </View>
           )}
@@ -587,6 +601,7 @@ export default function ReadingPlansScreen() {
             </TouchableOpacity>
           </View>
         </ScrollView>
+        {renderAccountMenu()}
         <FocusBottomNav active="plan" />
       </SafeAreaView>
     );
@@ -598,7 +613,9 @@ export default function ReadingPlansScreen() {
       <AdBanner />
 
       {plans.length === 0 ? (
-        <View style={styles.emptyState}>
+        <ScrollView contentContainerStyle={styles.contentInner}>
+          {userId !== null && <ReadingCompanion key={userId} userId={userId} plan={null} days={[]} />}
+          <View style={styles.emptyState}>
           <Ionicons name="calendar-outline" size={64} color="#ccc" />
           <Text style={styles.emptyTitle}>Nenhum Plano Ativo</Text>
           <Text style={styles.emptyText}>
@@ -610,7 +627,8 @@ export default function ReadingPlansScreen() {
           >
             <Text style={styles.createFirstPlanButtonText}>Criar Plano</Text>
           </TouchableOpacity>
-        </View>
+          </View>
+        </ScrollView>
       ) : (
         <ScrollView
           style={styles.content}
@@ -618,6 +636,7 @@ export default function ReadingPlansScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* Today's Reading */}
+          {userId !== null && <ReadingCompanion key={userId} userId={userId} plan={selectedPlan} days={planDays} />}
           {isPlanScheduleCompleted && (
             <View style={styles.planFinishedNotice}>
               <Ionicons name="checkmark-done-circle" size={26} color="#24834A" />
@@ -652,16 +671,16 @@ export default function ReadingPlansScreen() {
             <Text style={styles.modeTitle}>Modo de Leitura</Text>
             <TouchableOpacity
               style={styles.modeCard}
-              onPress={() => router.push("/?tab=bible")}
+              onPress={() => router.push("/reading-history")}
               accessibilityRole="button"
             >
               <View style={styles.modeIcon}>
-                <Ionicons name="book-outline" size={30} color="#248BE0" />
+                <Ionicons name="calendar-outline" size={30} color="#248BE0" />
               </View>
               <View style={styles.modeDescription}>
-                <Text style={styles.modeCardTitle}>Bíblia</Text>
+                <Text style={styles.modeCardTitle}>Seu Plano</Text>
                 <Text style={styles.modeSubtitle}>
-                  Leia livros, capítulos e versículos
+                  Histórico, próximas leituras e mais
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={22} color="#888" />

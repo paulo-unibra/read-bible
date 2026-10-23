@@ -1,3 +1,5 @@
+import tamagoshiService from './TamagoshiService';
+import authService from './AuthService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 
@@ -376,6 +378,8 @@ class QuizService {
       }
 
       const result = await response.json();
+      const companionUserId = authService.getUser()?.id;
+      if (result.success && companionUserId != null) await tamagoshiService.record(companionUserId, 'quiz').catch(() => {});
       console.log('[QuizService] Result submitted successfully:', result);
     } catch (error) {
       console.error('[QuizService] Error submitting quiz result:', error);

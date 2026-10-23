@@ -1,3 +1,5 @@
+import CompleteChapterButton from "../components/CompleteChapterButton";
+import tamagoshiService from "../services/TamagoshiService";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -287,6 +289,9 @@ export default function DailyReadingScreen() {
         setMarkingComplete(false);
         return;
       }
+
+      const companionUserId = authService.getUser()?.id;
+      if (companionUserId != null) await tamagoshiService.record(companionUserId, 'reading').catch(() => {});
 
       console.log('🎉 [handleMarkComplete] Leitura marcada com sucesso, voltando...');
       
@@ -633,6 +638,7 @@ export default function DailyReadingScreen() {
             </View>
             )}
 
+            {chapter.chapterNumber > 0 && <CompleteChapterButton chapterKey={`${chapter.bookName}-${chapter.chapterNumber}`} dark={isDark} />}
             {/* Divider between chapters */}
             {index < chapters.length - 1 && (
               <View

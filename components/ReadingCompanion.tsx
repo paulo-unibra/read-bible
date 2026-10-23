@@ -1,21 +1,28 @@
-import { useFocusEffect } from 'expo-router';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, StyleSheet, Text, View } from 'react-native';
-import Svg, { Circle, Ellipse, Path, Rect } from 'react-native-svg';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useState } from 'react';
+import { AccessibilityInfo, Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import authService, { API_URL } from '../services/AuthService';
 import type { ReadingPlan, ReadingPlanDay } from '../types';
 import { CompanionQuizResult, getCompanion, getCompanionState } from '../utils/readingCompanion';
-import CompanionFace from './CompanionFace';
+import CompanionAvatar from './CompanionAvatar';
+import tamagoshiService from '../services/TamagoshiService';
+import { Tamagoshi, tamagoshiStatus } from '../utils/tamagoshi';
 
 export default function ReadingCompanion({ userId, plan, days }: {
   userId: number; plan: ReadingPlan | null; days: ReadingPlanDay[];
 }) {
+  const router = useRouter();
+  const [petData, setPetData] = useState<Tamagoshi | null>(null);
+  const [clock, setClock] = useState(new Date());
   const [results, setResults] = useState<CompanionQuizResult[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [reducedMotion, setReducedMotion] = useState(true);
-  const bounce = useRef(new Animated.Value(0)).current;
-  const pet = getCompanion(userId);
+  const [bounce] = useState(() => new Animated.Value(0));
+  const pet = getCompanion(petData?.seed ?? userId);
   const state = getCompanionState(plan, days, results);
+  const status = petData ? tamagoshiStatus(petData, clock) : null;
+  const mood = status?.mood;
+  const sleeping = status?.sleeping;
 
   useFocusEffect(useCallback(() => {
     const controller = new AbortController();
@@ -25,6 +32,10 @@ export default function ReadingCompanion({ userId, plan, days }: {
     const timeout = setTimeout(() => controller.abort(), 10000);
     (async () => {
       try {
+        const savedPet = await tamagoshiService.get(userId);
+        if (active) setPetData(savedPet);
+        if (!savedPet) return;
+        await tamagoshiService.record(userId, 'reading', days.filter(day => day.isCompleted && day.completedDate).map(day => day.completedDate!));
         const token = authService.getToken();
         if (!token || authService.getUser()?.id !== userId) throw new Error('Sessão indisponível');
         const response = await fetch(`${API_URL}/quiz-results/me`, {
@@ -33,7 +44,9 @@ export default function ReadingCompanion({ userId, plan, days }: {
         if (!response.ok) throw new Error('Questionários indisponíveis');
         const data = await response.json();
         if (!data.success || !Array.isArray(data.results)) throw new Error('Resposta inválida');
-        if (active) setResults(data.results);
+        await tamagoshiService.record(userId, 'quiz', data.results.map((result: CompanionQuizResult) => result.lastCompletedAt ?? result.createdAt));
+        const updated = await tamagoshiService.get(userId);
+        if (active) { setResults(data.results); setPetData(updated); }
       } catch {
         if (active) setResults(null);
       } finally {
@@ -42,7 +55,13 @@ export default function ReadingCompanion({ userId, plan, days }: {
       }
     })();
     return () => { active = false; clearTimeout(timeout); controller.abort(); };
-  }, [userId]));
+  }, [userId, days]));
+
+  useFocusEffect(useCallback(() => {
+    const timer = setInterval(() => setClock(new Date()), 60000);
+    setClock(new Date());
+    return () => clearInterval(timer);
+  }, []));
 
   useEffect(() => {
     let active = true;
@@ -52,48 +71,34 @@ export default function ReadingCompanion({ userId, plan, days }: {
   }, []);
 
   useFocusEffect(useCallback(() => {
-    if (reducedMotion) return;
+    if (reducedMotion || !mood || sleeping) return;
     const animation = Animated.loop(Animated.sequence([
-      Animated.timing(bounce, { toValue: state.mood === 'joyful' ? -6 : -3, duration: 1100, useNativeDriver: true }),
+      Animated.timing(bounce, { toValue: mood === 'joyful' ? -6 : -3, duration: 1100, useNativeDriver: true }),
       Animated.timing(bounce, { toValue: 0, duration: 1100, useNativeDriver: true }),
     ]));
     animation.start();
     return () => { animation.stop(); bounce.setValue(0); };
-  }, [bounce, reducedMotion, state.mood]));
+  }, [bounce, reducedMotion, mood, sleeping]));
 
+  if (!petData || !status) return null;
+  const moodLabels = { joyful: 'Radiante', happy: 'Feliz', hopeful: 'Esperançoso', sleepy: 'Precisando de cuidado', curious: 'Curioso' };
   return (
     <View style={styles.container}>
       <View style={styles.top}>
-        <View style={styles.petStage} accessible accessibilityLabel={`${pet.species} ${pet.name}, ${state.label.toLowerCase()}`}>
+        <View style={styles.petStage} accessible accessibilityLabel={`${pet.species} ${petData.name}, ${status.sleeping ? "dormindo" : moodLabels[status.mood].toLowerCase()}`}>
           <Animated.View style={{ transform: [{ translateY: bounce }] }}>
-            <Svg width={88} height={96} viewBox="0 0 24 26">
-              <Ellipse cx={12} cy={24} rx={8} ry={1} fill="#DCE6E8" />
-              {/* Rounded ears overlap the head so the silhouette stays connected. */}
-              {pet.kind !== 'chick' && <>
-                <Circle cx={6} cy={7} r={2.8} fill={pet.color} />
-                <Circle cx={18} cy={7} r={2.8} fill={pet.color} />
-                <Circle cx={6} cy={7} r={1.4} fill="#FFF3DC" />
-                <Circle cx={18} cy={7} r={1.4} fill="#FFF3DC" />
-              </>}
-              <Rect x={6} y={15} width={12} height={7} rx={3} fill={pet.color} />
-              <Rect x={6.5} y={20} width={3.5} height={3} rx={1.5} fill={pet.color} />
-              <Rect x={14} y={20} width={3.5} height={3} rx={1.5} fill={pet.color} />
-              <Rect x={3} y={13} width={4} height={6} rx={2} fill={pet.color} />
-              <Rect x={17} y={13} width={4} height={6} rx={2} fill={pet.color} />
-              <Rect x={7.5} y={17} width={9} height={4} rx={2} fill="#FFF3DC" />
-              <Rect x={3} y={7} width={18} height={11} rx={2.5} fill={pet.color} />
-              <Ellipse cx={6.5} cy={15} rx={1.5} ry={0.6} fill="#D47773" />
-              <Ellipse cx={17.5} cy={15} rx={1.5} ry={0.6} fill="#D47773" />
-              <CompanionFace mood={state.mood} />
-              {pet.kind === 'chick' && <Path d="M11 13.8H13L12 14.8Z" fill="#C97922" />}
-            </Svg>
+            <CompanionAvatar seed={petData.seed} mood={status.mood} sleeping={status.sleeping} />
           </Animated.View>
         </View>
         <View style={styles.copy}>
-          <Text style={styles.title}>{pet.name} <Text style={styles.mood}>· {state.label}</Text></Text>
-          <Text style={styles.message}>{loading ? 'Estou vendo como foi nossa jornada…' : state.message}</Text>
+          <Text style={styles.title}>{petData.name} <Text style={styles.mood}>· {status.sleeping ? "Dormindo" : moodLabels[status.mood]}</Text></Text>
+          <Text style={styles.message}>{status.sleeping ? `Estou descansando até ${petData.sleepEnd}. A leitura pode continuar no seu ritmo.` : status.readToday ? 'Você leu hoje! Voltar amanhã é o que me mantém saudável.' : 'Um capítulo hoje já cuida de mim. Vamos manter nossa constância?'}</Text>
         </View>
       </View>
+      <TouchableOpacity style={styles.healthButton} onPress={() => router.push('/tamagoshi')} accessibilityRole="button" accessibilityLabel={`Ver saúde do Tamagoshi: ${status.health} de 100`}>
+        <Text style={styles.healthTitle}>Saúde {status.health}/100 · Ver cuidados</Text>
+        <Text style={styles.detail}>{status.streak} {status.streak === 1 ? 'dia seguido' : 'dias seguidos'} de leitura · {status.readToday ? 'Leitura de hoje concluída' : 'Leia 1 capítulo hoje'}</Text>
+      </TouchableOpacity>
       <View style={styles.details}>
         <Text style={styles.detail}>{state.planText}</Text>
         <Text style={styles.detail}>{loading ? 'Consultando questionários…' : state.quizText}</Text>
@@ -103,6 +108,8 @@ export default function ReadingCompanion({ userId, plan, days }: {
 }
 
 const styles = StyleSheet.create({
+  healthButton: { marginTop: 12, paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#DCE6E8' },
+  healthTitle: { color: '#203947', fontWeight: '700', fontSize: 15, marginBottom: 4 },
   container: { marginHorizontal: 16, marginTop: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#DCE6E8', alignSelf: 'stretch' },
   top: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   petStage: { width: 88, alignItems: 'center' },

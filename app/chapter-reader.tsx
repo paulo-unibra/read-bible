@@ -1,3 +1,4 @@
+import CompleteChapterButton from "../components/CompleteChapterButton";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
@@ -2738,6 +2739,7 @@ ${deepLink}`;
                 paddingBottom: FOCUS_BOTTOM_NAV_HEIGHT + 108 + insets.bottom,
               },
             ]}
+            ListFooterComponent={currentChapter > 0 && verses.length > 0 && !chapterLoading ? <CompleteChapterButton chapterKey={`${bibleId}-${currentBookId}-${currentChapter}`} dark={isDark} /> : null}
             ListHeaderComponent={
               <View style={styles.chapterTitleContainer}>
                 <Text
