@@ -55,7 +55,15 @@ async function findPublicFileInFolder(fileId: string, folderName: Parameters<typ
     parents?: string[]
     trashed?: boolean
   }
-  if (file.id !== fileId || file.trashed || !file.parents?.includes(folder)) return null
+  if (file.id !== fileId || file.trashed || !file.name) return null
+
+  // Public API-key metadata may omit parents. Verify membership through a
+  // folder-scoped query instead of rejecting every publicly readable file.
+  const membership = await driveList(
+    `'${escapeDriveQuery(folder)}' in parents and name='${escapeDriveQuery(file.name)}' and trashed=false`,
+    'files(id)'
+  )
+  if (!membership.files?.some((candidate) => candidate.id === fileId)) return null
   return file
 }
 
