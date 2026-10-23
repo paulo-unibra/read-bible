@@ -16,6 +16,7 @@ export interface User {
 export interface AuthResponse {
   success: boolean;
   message: string;
+  requiresEmailVerification?: boolean;
   data?: {
     user: User;
     token: string;
@@ -75,25 +76,18 @@ class AuthService {
     name: string,
     email: string,
     password: string,
+    inviteCode?: string,
   ): Promise<AuthResponse> {
     try {
-      console.log("📝 Tentando registrar...");
-      console.log("📡 API_URL:", API_URL);
-      console.log("📧 Email:", email);
-
       const response = await fetch(`${API_URL}/auth/register`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ name, email, password, ...(inviteCode?.trim() ? { inviteCode: inviteCode.trim().toUpperCase() } : {}) }),
       });
 
-      console.log("📨 Response status:", response.status);
-      console.log("📨 Response ok:", response.ok);
-
       const data: AuthResponse = await response.json();
-      console.log("📦 Response data:", JSON.stringify(data, null, 2));
 
       if (data.success && data.data) {
         this.token = data.data.token;
@@ -127,15 +121,20 @@ class AuthService {
     }
   }
 
+  async verifyEmail(email: string, code: string): Promise<AuthResponse> {
+    const response = await fetch(`${API_URL}/auth/verify-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, code }),
+    });
+    return (await response.json()) as AuthResponse;
+  }
+
   /**
    * Fazer login
    */
   async login(email: string, password: string): Promise<AuthResponse> {
     try {
-      console.log("🔐 Tentando login...");
-      console.log("📡 API_URL:", API_URL);
-      console.log("📧 Email:", email);
-
       const response = await fetch(`${API_URL}/auth/login`, {
         method: "POST",
         headers: {
@@ -144,11 +143,7 @@ class AuthService {
         body: JSON.stringify({ email, password }),
       });
 
-      console.log("📨 Response status:", response.status);
-      console.log("📨 Response ok:", response.ok);
-
       const data: AuthResponse = await response.json();
-      console.log("📦 Response data:", JSON.stringify(data, null, 2));
 
       if (data.success && data.data) {
         this.token = data.data.token;

@@ -17,6 +17,7 @@ export default await Env.create(new URL('../', import.meta.url), {
   APP_KEY: Env.schema.string(),
   HOST: Env.schema.string({ format: 'host' }),
   ADMIN_ORIGIN: Env.schema.string.optional(),
+  PUBLIC_API_URL: Env.schema.string.optional(),
   LOG_LEVEL: Env.schema.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']),
   GOOGLE_API_KEY: Env.schema.string(),
   GOOGLE_BIBLE_DRIVE_FOLDER_ID: Env.schema.string(),

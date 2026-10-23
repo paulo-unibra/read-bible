@@ -128,3 +128,32 @@ test('mascotes antigos sem versão de catálogo não são migrados para outra ap
   assert.equal(restored.seed, pet.seed);
   assert.equal(restored.name, pet.name);
 });
+test('bônus de convite é aplicado uma única vez e não vaza entre contas', async () => {
+  const { api } = service();
+  await api.activate(1);
+  await api.activate(2);
+  await Promise.all([api.applyInviteRewards(1, 5), api.applyInviteRewards(1, 5)]);
+  assert.equal(tamagoshiStatus(await api.get(1)).health, 65);
+  assert.equal(tamagoshiStatus(await api.get(2)).health, 60);
+  await api.applyInviteRewards(1, 10);
+  assert.equal(tamagoshiStatus(await api.get(1)).health, 70);
+  await api.applyInviteRewards(1, 5);
+  assert.equal(tamagoshiStatus(await api.get(1)).health, 70);
+});
+test('pontos de convites só são consumidos após ativar e respeitam o limite de saúde', async () => {
+  const { api, store } = service();
+  await api.applyInviteRewards(1, 5);
+  assert.equal(store.size, 0);
+  await api.activate(1);
+  await api.applyInviteRewards(1, 500);
+  const pet = await api.get(1);
+  assert.equal(pet.health, 100);
+  assert.equal(pet.claimedInvitePoints, 500);
+  // After losing health later, fetching the same reward cannot restore it again.
+  pet.health = 40;
+  store.set('@readbible/tamagoshi/v1/1', JSON.stringify(pet));
+  await api.applyInviteRewards(1, 500);
+  assert.equal((await api.get(1)).health, 40);
+  await assert.rejects(api.applyInviteRewards(1, -5));
+  await assert.rejects(api.applyInviteRewards(1, 1.5));
+});

@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -11,9 +12,27 @@ export default function AuthScreen() {
   const params = useLocalSearchParams();
   const [isLogin, setIsLogin] = useState(params.mode !== 'register');
   const [name, setName] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [awaitingVerification, setAwaitingVerification] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const linkedCode = typeof params.invite === 'string' ? params.invite.trim().toUpperCase() : '';
+      if (/^[A-F0-9]{12}$/.test(linkedCode)) {
+        await AsyncStorage.setItem('@pending_invite', linkedCode).catch(() => {});
+        if (active) { setInviteCode(linkedCode); setIsLogin(false); }
+      } else {
+        const code = await AsyncStorage.getItem('@pending_invite').catch(() => null);
+        if (active && code && /^[A-F0-9]{12}$/.test(code)) setInviteCode(current => current || code);
+      }
+    })();
+    return () => { active = false; };
+  }, [params.invite]);
 
   // Mostrar mensagem se veio dos params
   useEffect(() => {
@@ -23,6 +42,35 @@ export default function AuthScreen() {
   }, [params.message]);
 
   const handleAuth = async () => {
+    if (awaitingVerification) {
+      if (!email || !/^\d{8}$/.test(verificationCode.trim())) {
+        Alert.alert('Atenção', 'Informe o código de 8 dígitos enviado ao seu e-mail');
+        return;
+      }
+
+      setLoading(true);
+      try {
+        await authService.verifyEmail(email, verificationCode.trim());
+        const loginResponse = await authService.login(email, password);
+        if (!loginResponse.success) {
+          Alert.alert(
+            'Não foi possível entrar',
+            'Confira o código e os dados da conta. Se já possui uma conta, volte para a tela de login.'
+          );
+          return;
+        }
+
+        Alert.alert('Conta confirmada', 'Seu e-mail foi confirmado com sucesso.', [
+          { text: 'OK', onPress: () => router.replace('/') },
+        ]);
+      } catch {
+        Alert.alert('Não foi possível confirmar', 'Confira o código e tente novamente.');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     if (!email || !password || (!isLogin && !name)) {
       Alert.alert('Atenção', 'Preencha todos os campos');
       return;
@@ -44,19 +92,21 @@ export default function AuthScreen() {
       return;
     }
 
+    if (!isLogin && inviteCode.trim() && !/^[A-F0-9]{12}$/.test(inviteCode.trim().toUpperCase())) {
+      Alert.alert('Código de convite inválido', 'Confira o código de 12 caracteres ou deixe o campo em branco.');
+      return;
+    }
     setLoading(true);
     try {
-      console.log('🚀 Iniciando autenticação...');
-      console.log('📧 Email:', email);
-      console.log('🔐 Modo:', isLogin ? 'Login' : 'Registro');
-      
       const response = isLogin
         ? await authService.login(email, password)
-        : await authService.register(name, email, password);
+        : await authService.register(name, email, password, inviteCode);
 
-      console.log('✅ Resposta recebida:', response);
-
-      if (response.success) {
+      if (response.requiresEmailVerification || response.success) await AsyncStorage.removeItem('@pending_invite').catch(() => {});
+      if (response.requiresEmailVerification) {
+        setAwaitingVerification(true);
+        Alert.alert('Confirme seu e-mail', response.message);
+      } else if (response.success) {
         Alert.alert('Sucesso', response.message, [
           {
             text: 'OK',
@@ -114,12 +164,16 @@ export default function AuthScreen() {
             <Ionicons name="book" size={64} color={colors.primary} />
             <Text style={[styles.title, { color: colors.textPrimary }]}>Bíblia em Foco</Text>
             <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-              {isLogin ? 'Entre para continuar' : 'Crie sua conta e comece hoje'}
+              {awaitingVerification
+                ? 'Confirme seu endereço de e-mail'
+                : isLogin
+                  ? 'Entre para continuar'
+                  : 'Crie sua conta e comece hoje'}
             </Text>
           </View>
 
           <View style={styles.form}>
-            {!isLogin && (
+            {!isLogin && !awaitingVerification && (
               <View style={[styles.inputContainer, { backgroundColor: colors.card }]}>
                 <Ionicons name="person-outline" size={20} color={colors.iconMuted} style={styles.inputIcon} />
                 <TextInput
@@ -143,20 +197,45 @@ export default function AuthScreen() {
                 onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                editable={!awaitingVerification}
               />
             </View>
 
-            <View style={[styles.inputContainer, { backgroundColor: colors.card }]}>
-              <Ionicons name="lock-closed-outline" size={20} color={colors.iconMuted} style={styles.inputIcon} />
-              <TextInput
-                style={[styles.input, { color: colors.textPrimary }]}
+            {awaitingVerification ? (
+              <View style={[styles.inputContainer, { backgroundColor: colors.card }]}>
+                <Ionicons name="key-outline" size={20} color={colors.iconMuted} style={styles.inputIcon} />
+                <TextInput
+                  style={[styles.input, { color: colors.textPrimary }]}
+                  placeholder="Código de 8 dígitos"
+                  placeholderTextColor={colors.textSecondary}
+                  value={verificationCode}
+                  onChangeText={setVerificationCode}
+                  keyboardType="number-pad"
+                  maxLength={8}
+                  autoCapitalize="none"
+                />
+              </View>
+            ) : (
+              <View style={[styles.inputContainer, { backgroundColor: colors.card }]}>
+                <Ionicons name="lock-closed-outline" size={20} color={colors.iconMuted} style={styles.inputIcon} />
+                <TextInput
+                  style={[styles.input, { color: colors.textPrimary }]}
                 placeholder="Senha"
                 placeholderTextColor={colors.textSecondary}
                 value={password}
                 onChangeText={setPassword}
-                secureTextEntry
-              />
-            </View>
+                  secureTextEntry
+                />
+              </View>
+            )}
+
+            {!isLogin && !awaitingVerification && <>
+              <Text style={{ color: colors.textSecondary, fontSize: 13, marginBottom: 8 }}>Código de convite (opcional)</Text>
+              <View style={[styles.inputContainer, { backgroundColor: colors.card }]}>
+                <Ionicons name="gift-outline" size={20} color={colors.iconMuted} style={styles.inputIcon} />
+                <TextInput accessibilityLabel="Código de convite, opcional" style={[styles.input, { color: colors.textPrimary }]} placeholder="Ex.: A1B2C3D4E5F6" placeholderTextColor={colors.textSecondary} value={inviteCode} onChangeText={text => setInviteCode(text.toUpperCase())} autoCapitalize="characters" autoCorrect={false} maxLength={12} />
+              </View>
+            </>}
 
             <TouchableOpacity
               style={[styles.button, { backgroundColor: colors.primary }, loading && styles.buttonDisabled]}
@@ -164,9 +243,35 @@ export default function AuthScreen() {
               disabled={loading}
             >
               <Text style={styles.buttonText}>
-                {loading ? 'Aguarde...' : isLogin ? 'Entrar' : 'Criar Conta'}
+                {loading
+                  ? 'Aguarde...'
+                  : awaitingVerification
+                    ? 'Confirmar e entrar'
+                    : isLogin
+                      ? 'Entrar'
+                      : 'Criar Conta'}
               </Text>
             </TouchableOpacity>
+
+            {awaitingVerification && (
+              <TouchableOpacity
+                style={styles.forgotButton}
+                disabled={loading}
+                onPress={async () => {
+                  setLoading(true);
+                  try {
+                    const response = await authService.register(name || 'Usuário', email, password, inviteCode);
+                    Alert.alert('Verifique seu e-mail', response.message);
+                  } catch {
+                    Alert.alert('Não foi possível enviar', 'Tente novamente em alguns instantes.');
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+              >
+                <Text style={[styles.forgotText, { color: colors.primary }]}>Reenviar código</Text>
+              </TouchableOpacity>
+            )}
 
             {isLogin && (
               <TouchableOpacity
@@ -179,10 +284,22 @@ export default function AuthScreen() {
 
             <TouchableOpacity
               style={styles.switchButton}
-              onPress={() => setIsLogin(!isLogin)}
+              onPress={() => {
+                if (awaitingVerification) {
+                  setAwaitingVerification(false);
+                  setVerificationCode('');
+                  setIsLogin(true);
+                } else {
+                  setIsLogin(!isLogin);
+                }
+              }}
             >
               <Text style={[styles.switchText, { color: colors.primary }]}>
-                {isLogin ? 'Não tem conta? Cadastre-se' : 'Já tem conta? Entre'}
+                {awaitingVerification
+                  ? 'Já tem conta? Entre'
+                  : isLogin
+                    ? 'Não tem conta? Cadastre-se'
+                    : 'Já tem conta? Entre'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -190,7 +307,9 @@ export default function AuthScreen() {
           <View style={styles.info}>
             <Ionicons name="information-circle-outline" size={20} color="#666" />
             <Text style={styles.infoText}>
-              {isLogin
+              {awaitingVerification
+                ? 'O código expira em 15 minutos. Você pode solicitar outro após 5 minutos. Se já possui conta, volte para entrar.'
+                : isLogin
                 ? 'Entre para acessar seu plano de leitura'
                 : 'Crie sua conta para ter acesso ao plano de leitura anual da Bíblia'}
             </Text>

@@ -1,4 +1,6 @@
 import User from '#models/user'
+import db from '@adonisjs/lucid/services/db'
+import { INVITE_HEALTH_REWARD } from '#controllers/referrals_controller'
 import AuditLog from '#models/audit_log'
 import EmailVerification from '#models/email_verification'
 import emailService from '#services/email_service'
@@ -30,7 +32,7 @@ export default class AuthController {
         'Se o cadastro puder ser concluído, enviaremos um código de confirmação. Se já possui conta, entre com seus dados.',
     }
 
-    let data: { name: string; email: string; password: string }
+    let data: { name: string; email: string; password: string; inviteCode?: string }
     try {
       data = await request.validateUsing(registerValidator)
     } catch {
@@ -38,17 +40,46 @@ export default class AuthController {
     }
 
     try {
+      const invitation = data.inviteCode
+        ? await db
+            .from('invite_codes')
+            .join('users', 'users.id', 'invite_codes.user_id')
+            .where('invite_codes.code', data.inviteCode.toUpperCase())
+            .where('users.email_verified', true)
+            .select('invite_codes.user_id')
+            .first()
+        : null
+      if (data.inviteCode && !invitation) {
+        return response.badRequest({
+          success: false,
+          message: 'Código de convite inválido. Confira o código ou cadastre-se sem ele.',
+        })
+      }
       const existingUser = await User.findBy('email', data.email)
       if (existingUser) {
         if (!existingUser.emailVerified) await this.sendVerificationCode(existingUser)
         return response.status(202).send(genericResponse)
       }
 
-      const user = await User.create({
-        fullName: data.name,
-        email: data.email,
-        password: data.password,
-        emailVerified: false,
+      const user = await db.transaction(async (trx) => {
+        const created = await User.create(
+          {
+            fullName: data.name,
+            email: data.email,
+            password: data.password,
+            emailVerified: false,
+          },
+          { client: trx }
+        )
+        if (invitation && invitation.user_id !== created.id) {
+          await trx.table('user_referrals').insert({
+            referrer_id: invitation.user_id,
+            referred_user_id: created.id,
+            reward_points: INVITE_HEALTH_REWARD,
+            created_at: DateTime.now().toSQL({ includeOffset: false }),
+          })
+        }
+        return created
       })
 
       await AuditLog.create({
@@ -144,12 +175,32 @@ export default class AuthController {
         return response.ok(genericResponse)
       }
 
-      user.emailVerified = true
-      await user.save()
-      await EmailVerification.query()
-        .where('user_id', user.id)
-        .where('used', false)
-        .update({ used: true })
+      await db.transaction(async (trx) => {
+        const locked = await User.query({ client: trx })
+          .where('id', user.id)
+          .forUpdate()
+          .firstOrFail()
+        if (locked.emailVerified) return
+        const current = await EmailVerification.query({ client: trx })
+          .where('id', verification.id)
+          .where('used', false)
+          .where('attempts', '<', 5)
+          .where('expires_at', '>', DateTime.now().toSQL()!)
+          .forUpdate()
+          .first()
+        if (!current || !matchesPublicToken(current.tokenHash, data.code)) return
+        locked.emailVerified = true
+        await locked.save()
+        await EmailVerification.query({ client: trx })
+          .where('user_id', user.id)
+          .where('used', false)
+          .update({ used: true })
+        await trx
+          .from('user_referrals')
+          .where('referred_user_id', user.id)
+          .whereNull('rewarded_at')
+          .update({ rewarded_at: DateTime.now().toSQL({ includeOffset: false }) })
+      })
 
       return response.ok(genericResponse)
     } catch (error) {
@@ -308,7 +359,6 @@ export default class AuthController {
 
       if (activePlan) {
         // Buscar todas as leituras do plano
-        const { default: db } = await import('@adonisjs/lucid/services/db')
 
         const planReadings = await db
           .from('reading_progress')
@@ -363,7 +413,6 @@ export default class AuthController {
       }
 
       // Buscar questionários completados (score >= 7)
-      const { default: db } = await import('@adonisjs/lucid/services/db')
       const quizResults = await db
         .from('quiz_results')
         .where('user_id', user.id)

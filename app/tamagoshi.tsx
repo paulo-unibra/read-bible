@@ -7,6 +7,7 @@ import CompanionAvatar from '../components/CompanionAvatar';
 import authService from '../services/AuthService';
 import DatabaseService from '../services/DatabaseService';
 import tamagoshiService from '../services/TamagoshiService';
+import referralService from '../services/ReferralService';
 import { getFocusColors } from '../constants/design';
 import { sleepMinutes, Tamagoshi, tamagoshiStatus } from '../utils/tamagoshi';
 
@@ -36,7 +37,10 @@ export default function TamagoshiScreen() {
         const userId = authService.getUser()?.id;
         if (!userId) { router.replace('/auth?mode=login'); return; }
         const [saved, theme] = await Promise.all([tamagoshiService.get(userId), DatabaseService.getSetting('theme')]);
-        if (active) { if (saved) populate(saved); setDark(theme === 'dark'); }
+        if (active) { if (saved) populate(saved); setDark(theme === 'dark'); setLoading(false); }
+        await referralService.getMine().catch(() => {});
+        const rewarded = await tamagoshiService.get(userId);
+        if (active && rewarded) setPet(rewarded);
       } catch { if (active) setError(true); }
       finally { if (active) setLoading(false); }
     })();
@@ -49,6 +53,11 @@ export default function TamagoshiScreen() {
     try {
       const saved = pet ? await tamagoshiService.configure(userId, { name, sleepStart: start, sleepEnd: end }) : await tamagoshiService.activate(userId);
       populate(saved);
+      if (!pet) {
+        await referralService.getMine().catch(() => {});
+        const rewarded = await tamagoshiService.get(userId);
+        if (rewarded) setPet(rewarded);
+      }
       if (pet) Alert.alert('Cuidados salvos', 'Seu Tamagoshi seguirá o novo horário de sono.');
     } catch (e) { Alert.alert('Não foi possível salvar', e instanceof Error ? e.message : 'Tente novamente.'); }
     finally { setSaving(false); }
@@ -85,6 +94,7 @@ export default function TamagoshiScreen() {
         <Text style={[styles.body, { color: colors.muted }]}>Ao ativar, você recebe seu próprio Tamagoshi, com nome, expressão e saúde. Ele começa com 60 pontos e dorme das 22h às 6h.</Text>
       </>}
       <TouchableOpacity accessibilityRole="button" disabled={saving} style={[styles.button, { backgroundColor: colors.blueDark, opacity: saving ? 0.6 : 1 }]} onPress={submit}><Text style={styles.buttonText}>{saving ? 'Salvando…' : pet ? 'Salvar cuidados' : 'Ativar meu Tamagoshi'}</Text></TouchableOpacity>
+      <TouchableOpacity accessibilityRole="button" onPress={() => router.push('/invite-friends')} style={{ paddingVertical: 12 }}><Text style={{ color: colors.blueDark, fontWeight: '600', fontSize: 15 }}>Convidar amigos e ganhar saúde</Text></TouchableOpacity>
       <Text style={[styles.sectionTitle, { color: colors.text }]}>Um pouco a cada dia</Text>
       <Text style={[styles.body, { color: colors.text }]}>Concluir 1 ou mais capítulos no dia: +6 de saúde. Vários capítulos no mesmo dia não substituem a leitura dos dias seguintes.</Text>
       <Text style={[styles.body, { color: colors.text }]}>Concluir um questionário no dia: +2 de saúde. Ele ajuda, mas não substitui a leitura.</Text>

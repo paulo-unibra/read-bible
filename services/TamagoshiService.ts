@@ -50,6 +50,19 @@ class TamagoshiService {
       return updated;
     });
   }
+  applyInviteRewards(userId: number, totalPoints: number) {
+    return this.run(async () => {
+      if (!Number.isSafeInteger(totalPoints) || totalPoints < 0) throw new Error('Pontos de convite inválidos.');
+      const pet = await this.read(userId);
+      if (!pet) return;
+      const previous = pet.claimedInvitePoints ?? 0;
+      if (totalPoints <= previous) return;
+      // Consume the full award even at the health cap; repeat fetches grant nothing.
+      pet.health = Math.min(100, pet.health + totalPoints - previous);
+      pet.claimedInvitePoints = totalPoints;
+      await AsyncStorage.setItem(this.key(userId), JSON.stringify(pet));
+    });
+  }
   record(userId: number, kind: 'reading' | 'quiz', dates: string[] = [new Date().toISOString()]) {
     return this.run(async () => {
       const pet = await this.read(userId);

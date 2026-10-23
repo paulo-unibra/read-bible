@@ -7,6 +7,7 @@ import type { ReadingPlan, ReadingPlanDay } from '../types';
 import { CompanionQuizResult, getCompanion } from '../utils/readingCompanion';
 import CompanionAvatar from './CompanionAvatar';
 import tamagoshiService from '../services/TamagoshiService';
+import referralService from '../services/ReferralService';
 import { TAMAGOSHI_REWARDS, Tamagoshi, tamagoshiStatus } from '../utils/tamagoshi';
 
 export default function ReadingCompanion({ userId, days }: {
@@ -59,6 +60,10 @@ export default function ReadingCompanion({ userId, days }: {
         const savedPet = await tamagoshiService.get(userId);
         if (active) setPetData(savedPet);
         if (!savedPet) return;
+        void referralService.getMine().then(async () => {
+          const rewardedPet = await tamagoshiService.get(userId);
+          if (active) setPetData(rewardedPet);
+        }).catch(() => {});
         await tamagoshiService.record(userId, 'reading', days.filter(day => day.isCompleted && day.completedDate).map(day => day.completedDate!));
         const token = authService.getToken();
         if (!token || authService.getUser()?.id !== userId) throw new Error('Sessão indisponível');
