@@ -299,7 +299,7 @@ export default function ReadingPlansScreen() {
     const totalDays = selectedPlan?.totalDays || 0;
     const readingSummary = getReadingSummary(item);
     const isLate = selectedPlan ? isReadingPlanLate(selectedPlan, planDays) : false;
-    const statusColor = isLate ? "#C2410C" : "#43A047";
+    const statusColor = isLate ? "#C2410C" : item.isCompleted ? "#43A047" : "#55616A";
 
     return (
       <View style={styles.readingCard}>
@@ -308,9 +308,9 @@ export default function ReadingPlansScreen() {
             Leitura de Hoje - Dia {item.dayNumber}/{totalDays || "-"}
           </Text>
           <View style={styles.statusPill}>
-            <Ionicons name={isLate ? "alert-circle" : "checkmark-circle"} size={18} color={statusColor} />
+            <Ionicons name={isLate ? "alert-circle" : item.isCompleted ? "checkmark-circle" : "time-outline"} size={18} color={statusColor} />
             <Text style={[styles.statusPillText, { color: statusColor }]}>
-              {isLate ? "Atrasado" : item.isCompleted ? "Concluída" : "Em dia"}
+              {isLate ? "Atrasado" : item.isCompleted ? "Concluída" : "Pendente"}
             </Text>
           </View>
         </View>
