@@ -87,6 +87,9 @@ test.group('Public quiz security', () => {
         },
       })
 
+      const storedResult = await QuizResult.query().where('user_id', user.id).firstOrFail()
+      storedResult.updatedAt = DateTime.now().minus({ days: 30 })
+      await storedResult.save()
       const repeatedSubmission = await client
         .post('/quiz-results')
         .header('Authorization', `Bearer ${tokenValue}`)
@@ -103,6 +106,11 @@ test.group('Public quiz security', () => {
         alreadyRecorded: true,
         result: { correctAnswers: 1, score: 50 },
       })
+      await storedResult.refresh()
+      assert.isTrue(storedResult.updatedAt.toMillis() > DateTime.now().minus({ minutes: 1 }).toMillis())
+      const history = await client.get('/quiz-results/me').header('Authorization', `Bearer ${tokenValue}`)
+      history.assertStatus(200)
+      assert.equal(history.body().results[0].lastCompletedAt, storedResult.updatedAt.toISO())
     } finally {
       await QuizResult.query().where('user_id', user.id).delete()
       await QuizQuestion.query().where('quiz_id', quiz.id).delete()

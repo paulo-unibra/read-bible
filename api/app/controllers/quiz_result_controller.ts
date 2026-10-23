@@ -2,6 +2,7 @@ import Quiz from '#models/quiz'
 import QuizResult from '#models/quiz_result'
 import User from '#models/user'
 import db from '@adonisjs/lucid/services/db'
+import { DateTime } from 'luxon'
 import type { HttpContext } from '@adonisjs/core/http'
 
 export default class QuizResultController {
@@ -54,10 +55,6 @@ export default class QuizResultController {
           .where('quiz_id', quizId)
           .first()
 
-        if (previousResult) {
-          return { result: previousResult, alreadyRecorded: true, invalidAnswers: false }
-        }
-
         const questionById = new Map(questions.map((question) => [question.questionId, question]))
         const seenQuestionIds = new Set<string>()
         let correctAnswers = 0
@@ -88,6 +85,13 @@ export default class QuizResultController {
 
         if (seenQuestionIds.size !== questions.length) {
           return { result: null, alreadyRecorded: false, invalidAnswers: true }
+        }
+
+        if (previousResult) {
+          // Preserve the original ranking score while recording recent activity.
+          previousResult.updatedAt = DateTime.now()
+          await previousResult.save()
+          return { result: previousResult, alreadyRecorded: true, invalidAnswers: false }
         }
 
         const totalQuestions = questions.length
@@ -164,6 +168,7 @@ export default class QuizResultController {
           score: r.score,
           timeSeconds: r.timeSeconds,
           createdAt: r.createdAt,
+          lastCompletedAt: r.updatedAt ?? r.createdAt,
         })),
       })
     } catch (error) {
