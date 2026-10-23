@@ -236,6 +236,63 @@ test.group('Tamagoshi monthly points', () => {
     }
   })
 
+  test('first authenticated access creates one default pet, and a first plan receives its bonus', async ({
+    client,
+    assert,
+  }) => {
+    const user = await User.create({
+      fullName: 'Automatic Pet',
+      email: `auto-pet-${Date.now()}@example.invalid`,
+      password: 'TemporaryTest12345',
+      emailVerified: true,
+    })
+    try {
+      const token = await User.accessTokens.create(user)
+      const auth = `Bearer ${token.value!.release()}`
+      // No explicit activation, including when the user's first action is creating a plan.
+      const created = await client
+        .post('/reading-plans/custom')
+        .header('Authorization', auth)
+        .json({
+          name: 'First plan',
+          type: 'sequential',
+          startDate: DateTime.utc().toISODate(),
+          endDate: DateTime.utc().plus({ days: 99 }).toISODate(),
+          totalDays: 100,
+        })
+      created.assertStatus(201)
+      const [one, two] = await Promise.all(
+        [0, 1].map(() => client.get('/tamagoshi').header('Authorization', auth))
+      )
+      one.assertStatus(200)
+      two.assertStatus(200)
+      assert.equal(one.body().data.score.points, 10)
+      assert.deepEqual(one.body().data.profile, two.body().data.profile)
+      assert.equal(one.body().data.profile.catalogVersion, 2)
+      const count = await db
+        .from('tamagoshi_profiles')
+        .where('user_id', user.id)
+        .count('* as count')
+        .first()
+      assert.equal(Number(count!.count), 1)
+      // Reset: the next authenticated access creates a new empty pet, without old plan bonuses.
+      await db.from('tamagoshi_profiles').where('user_id', user.id).delete()
+      await db
+        .from('reading_plans')
+        .where('user_id', user.id)
+        .update({
+          created_at: DateTime.utc().minus({ minutes: 1 }).toSQL({ includeOffset: false }),
+        })
+      const [reset, concurrentReset] = await Promise.all([0, 1].map(() => client.get('/tamagoshi').header('Authorization', auth)))
+      assert.deepEqual(reset.body().data.profile, concurrentReset.body().data.profile)
+      assert.isNotNull(reset.body().data.profile)
+      assert.equal(reset.body().data.score.points, 0)
+    } finally {
+      await db.from('audit_logs').where('user_id', user.id).delete()
+      await user.delete()
+    }
+  })
+
   test('authenticated daily points, concurrency, ranking, monthly reset and no score cap', async ({
     client,
     assert,
@@ -255,11 +312,10 @@ test.group('Tamagoshi monthly points', () => {
       const auth = tokens.map((token) => `Bearer ${token.value!.release()}`)
       const unauthorized = await client.get('/tamagoshi/ranking')
       unauthorized.assertStatus(401)
-      const inactive = await client
-        .post('/tamagoshi/reading')
-        .header('Authorization', auth[0])
-        .json({ day: scorePeriod().day })
-      inactive.assertStatus(400)
+      const automatic = await client.get('/tamagoshi').header('Authorization', auth[0])
+      automatic.assertStatus(200)
+      assert.isNotNull(automatic.body().data.profile)
+      assert.equal(automatic.body().data.score.points, 0)
       for (let i = 0; i < 2; i++) {
         const activation = await client
           .post('/tamagoshi/activate')

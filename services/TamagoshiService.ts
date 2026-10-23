@@ -85,8 +85,17 @@ class TamagoshiService {
     return this.request<MonthlyRanking>(userId, `/ranking?page=${page}`);
   }
   async sync(userId: number): Promise<Tamagoshi | null> {
-    const local = await this.get(userId);
+    let local = await this.get(userId);
     let data = await this.request(userId);
+    if (data.profile && local?.monthlyScore && (
+      local.seed !== data.profile.seed || Date.parse(local.activatedAt) !== Date.parse(data.profile.activatedAt)
+    )) {
+      await this.run(async () => {
+        await AsyncStorage.removeItem(this.key(userId));
+        this.notify(userId, null);
+      });
+      local = null;
+    }
     if (!data.profile && local?.monthlyScore) {
       await this.run(async () => {
         await AsyncStorage.removeItem(this.key(userId));
@@ -94,6 +103,7 @@ class TamagoshiService {
       });
       return null;
     }
+    if (!data.profile && !local) local = await this.activate(userId);
     if (!data.profile && local) data = await this.request(userId, '/activate', 'POST', { name: local.name, seed: local.seed, catalogVersion: local.catalogVersion ?? 1 });
     if (!data.profile) return null;
     if (local?.pendingName) data = await this.request(userId, '', 'PUT', { name: local.pendingName });
@@ -114,11 +124,12 @@ class TamagoshiService {
       return this.save(userId, pet);
     });
   }
-  async record(userId: number, kind: 'reading' | 'quiz', dates: string[] = [new Date().toISOString()]) {
+  async record(userId: number, kind: 'reading' | 'quiz', dates?: string[]) {
+    if (!await this.get(userId)) await this.sync(userId).catch(() => null);
     const active = await this.run(async () => {
       const pet = await this.read(userId); if (!pet) return false;
       const today = dayKey();
-      const valid = dates.some(value => { const date = new Date(value); return Number.isFinite(date.getTime()) && date.getTime() >= Date.parse(pet.activatedAt) && date.getTime() <= Date.now() && dayKey(date) === today; });
+      const valid = (dates ?? [new Date().toISOString()]).some(value => { const date = new Date(value); return Number.isFinite(date.getTime()) && date.getTime() >= Date.parse(pet.activatedAt) && date.getTime() <= Date.now() && dayKey(date) === today; });
       if (!valid) return false;
       pet.days[today] = { ...(pet.days[today] ?? { reading: false, quiz: false }), [kind]: true };
       if (kind === 'reading') pet.pendingReadingDay = today;

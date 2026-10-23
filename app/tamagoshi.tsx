@@ -34,9 +34,10 @@ export default function TamagoshiScreen() {
         const userId = authService.getUser()?.id;
         if (!userId) { router.replace('/auth?mode=login'); return; }
         const [saved, theme] = await Promise.all([tamagoshiService.get(userId), DatabaseService.getSetting('theme')]);
-        if (active) { if (saved) populate(saved); setDark(theme === 'dark'); setLoading(false); }
+        if (active) { if (saved) { populate(saved); setLoading(false); } setDark(theme === 'dark'); }
         const rewarded = await tamagoshiService.sync(userId).catch(() => saved);
-        if (active && rewarded) { if (!saved) populate(rewarded); else setPet(rewarded); }
+        if (!rewarded) throw new Error('Não foi possível criar seu Tamagoshi.');
+        if (active && rewarded) { if (!saved || saved.seed !== rewarded.seed || saved.activatedAt !== rewarded.activatedAt) populate(rewarded); else setPet(rewarded); }
       } catch { if (active) setError(true); }
       finally { if (active) setLoading(false); }
     })();
@@ -47,13 +48,10 @@ export default function TamagoshiScreen() {
     if (!userId || saving) return;
     setSaving(true);
     try {
-      const saved = pet ? await tamagoshiService.configure(userId, { name }) : await tamagoshiService.activate(userId);
+      if (!pet) return;
+      const saved = await tamagoshiService.configure(userId, { name });
       populate(saved);
-      if (!pet) {
-        const rewarded = await tamagoshiService.sync(userId).catch(() => saved);
-        if (rewarded) setPet(rewarded);
-      }
-      if (pet) Alert.alert('Salvo', 'Nome do Tamagoshi atualizado.');
+      Alert.alert('Salvo', 'Nome do Tamagoshi atualizado.');
     } catch (e) { Alert.alert('Não foi possível salvar', e instanceof Error ? e.message : 'Tente novamente.'); }
     finally { setSaving(false); }
   };
@@ -62,7 +60,7 @@ export default function TamagoshiScreen() {
   return <SafeAreaView style={[styles.screen, { backgroundColor: colors.screen }]}>
     <View style={[styles.header, { borderBottomColor: colors.line }]}>
       <TouchableOpacity onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Voltar" style={styles.back}><Ionicons name="arrow-back" size={24} color={colors.text} /></TouchableOpacity>
-      <Text style={[styles.title, { color: colors.text }]}>{pet ? 'Configurar Tamagoshi' : 'Ativar Tamagoshi'}</Text>
+      <Text style={[styles.title, { color: colors.text }]}>Configurar Tamagoshi</Text>
     </View>
     {loading ? <ActivityIndicator style={styles.loading} color={colors.blue} /> : error ? <Text style={[styles.body, styles.content, { color: colors.danger }]}>Não foi possível carregar seu Tamagoshi. Volte e tente novamente.</Text> : <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       {pet && status ? <>
@@ -75,12 +73,8 @@ export default function TamagoshiScreen() {
         </View>
         <Text style={[styles.label, { color: colors.text }]}>Nome</Text>
         <TextInput accessibilityLabel="Nome do Tamagoshi" style={inputStyle} value={name} onChangeText={setName} maxLength={24} />
-      </> : <>
-        <Ionicons name="paw-outline" size={56} color={colors.blueDark} style={styles.activationIcon} />
-        <Text style={[styles.hero, { color: colors.text }]}>Seu companheiro de leitura.</Text>
-        <Text style={[styles.body, { color: colors.muted }]}>Cuide dele com uma leitura por dia. Sono automático: 22h às 6h.</Text>
-      </>}
-      <TouchableOpacity accessibilityRole="button" disabled={saving} style={[styles.button, { backgroundColor: colors.blueDark, opacity: saving ? 0.6 : 1 }]} onPress={submit}><Text style={styles.buttonText}>{saving ? 'Salvando…' : pet ? 'Salvar' : 'Ativar meu Tamagoshi'}</Text></TouchableOpacity>
+      </> : null}
+      <TouchableOpacity accessibilityRole="button" disabled={saving} style={[styles.button, { backgroundColor: colors.blueDark, opacity: saving ? 0.6 : 1 }]} onPress={submit}><Text style={styles.buttonText}>{saving ? 'Salvando…' : 'Salvar'}</Text></TouchableOpacity>
       <TouchableOpacity accessibilityRole="button" onPress={() => router.push('/tamagoshi-ranking')} style={{ paddingVertical: 12 }}><Text style={{ color: colors.blueDark, fontWeight: '600', fontSize: 15 }}>Ver ranking do mês</Text></TouchableOpacity>
       <TouchableOpacity accessibilityRole="button" onPress={() => router.push('/invite-friends')} style={{ paddingVertical: 12 }}><Text style={{ color: colors.blueDark, fontWeight: '600', fontSize: 15 }}>Convidar amigos</Text></TouchableOpacity>
       <Text style={[styles.footnote, { color: colors.muted }]}>Pontuação zera no dia 1º de cada mês.</Text>

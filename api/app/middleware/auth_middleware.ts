@@ -1,3 +1,4 @@
+import pointsService from '#services/tamagoshi_points_service'
 import type { Authenticators } from '@adonisjs/auth/types'
 import type { HttpContext } from '@adonisjs/core/http'
 import type { NextFn } from '@adonisjs/core/types/http'
@@ -25,6 +26,10 @@ export default class AuthMiddleware {
       throw error
     }
 
+    // Preserve profile migration from older clients using explicit activation.
+    if (!(ctx.request.method() === 'POST' && ctx.request.url().endsWith('/tamagoshi/activate'))) {
+      await pointsService.ensureProfile(ctx.auth.user!.id)
+    }
     return next()
   }
 }

@@ -1,6 +1,6 @@
 # Tamagoshi: pontuação mensal
 
-O Tamagoshi começa inativo. O menu do perfil permite ativar, editar o nome, convidar amigos e abrir os cuidados. O nome exibido combina o nome-base com o primeiro nome do usuário, como **Lumi Paulo**.
+O Tamagoshi começa ativo por padrão e com zero pontos. No primeiro acesso autenticado, a API gera automaticamente nome e aparência; acessos simultâneos preservam um único perfil. O menu do perfil mostra Configurar Tamagoshi para editar o nome, convidar amigos e abrir o ranking. O nome exibido combina o nome-base com o primeiro nome do usuário, como **Lumi Paulo**.
 
 ## Pontos e ranking
 

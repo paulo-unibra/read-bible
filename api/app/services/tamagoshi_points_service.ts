@@ -1,4 +1,6 @@
 import db from '@adonisjs/lucid/services/db'
+import User from '#models/user'
+import { defaultTamagoshi } from '#utils/default_tamagoshi'
 import type { TransactionClientContract } from '@adonisjs/lucid/types/database'
 import { DateTime } from 'luxon'
 
@@ -21,6 +23,21 @@ function dateOf(value: Date | string) {
     : DateTime.fromSQL(value, { zone: 'utc' })
 }
 class TamagoshiPointsService {
+  async ensureProfile(userId: number) {
+    const existing = await db.from('tamagoshi_profiles').where('user_id', userId).first()
+    if (existing) return existing
+    return db.transaction(async (trx) => {
+      await User.query({ client: trx }).where('id', userId).forUpdate().firstOrFail()
+      const profile = await trx.from('tamagoshi_profiles').where('user_id', userId).first()
+      if (profile) return profile
+      await trx.table('tamagoshi_profiles').insert({
+        user_id: userId,
+        ...defaultTamagoshi(),
+        activated_at: DateTime.utc().startOf('second').toSQL({ includeOffset: false }),
+      })
+      return trx.from('tamagoshi_profiles').where('user_id', userId).first()
+    })
+  }
   async award(
     userId: number,
     source: PointSource,

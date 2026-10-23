@@ -84,7 +84,7 @@ function service() {
   }, fetcher);
   return { api: loaded.default, store, server, session, requests };
 }
-test('começa inativo, ativação é idempotente, contas isoladas e zero pontos iniciais', async () => {
+test('cache isolado por conta, criação idempotente e zero pontos iniciais', async () => {
   const { api } = service();
   assert.equal(await api.get(1), null);
   const pet = await api.activate(1);
@@ -190,4 +190,50 @@ test('painel recebe pontos sincronizados sem reabrir, inclusive remoções, e re
   await api.activate(1);
   await api.sync(1);
   assert.deepEqual(updates, [6, 0, null]);
+});
+
+test('primeira sincronização já cria o Tamagoshi ativo com zero pontos', async () => {
+  const { api, requests } = service();
+  const pet = await api.sync(1);
+  assert.ok(pet);
+  assert.equal(tamagoshiStatus(pet).points, 0);
+  await api.sync(1);
+  assert.equal(requests.filter(row => row.url.endsWith('/activate')).length, 1);
+});
+test('perfil automaticamente recriado no servidor descarta histórico e pendências do pet anterior', async () => {
+  const { api, server, store, requests } = service();
+  await api.sync(1);
+  await api.record(1, 'reading');
+  const old = await api.get(1);
+  old.pendingReadingDay = dayKey();
+  old.pendingName = 'Nome antigo pendente';
+  store.set('@readbible/tamagoshi/v1/1', JSON.stringify(old));
+  const row = server.get(1);
+  row.profile = { ...row.profile, seed: old.seed + 1, name: 'Pingo', activatedAt: new Date().toISOString() };
+  row.score = { ...row.score, points: 0, readingDays: [], readingHistory: [], readToday: false };
+  const count = requests.length;
+  const fresh = await api.sync(1);
+  assert.equal(fresh.name, 'Pingo');
+  assert.equal(fresh.monthlyScore.points, 0);
+  assert.deepEqual(fresh.days, {});
+  assert.equal(fresh.pendingReadingDay, undefined);
+  assert.equal(fresh.pendingName, undefined);
+  assert.equal(requests.slice(count).some(row => row.url.endsWith('/reading')), false);
+});
+test('catálogo automático do servidor mantém o nome correspondente à aparência do app', () => {
+  const catalog = compile('utils/readingCompanion.ts', { './readingPlanStatus': { isReadingPlanLate: () => false } });
+  for (const seed of [0, 1, 12, 53, 100, 2147483646]) {
+    const server = compile('api/app/utils/default_tamagoshi.ts', { 'node:crypto': { randomInt: () => seed } });
+    const pet = server.defaultTamagoshi();
+    assert.equal(pet.name, catalog.getCompanion(seed, 2).name);
+    assert.equal(pet.catalog_version, 2);
+  }
+});
+
+test('primeiro capítulo livre também inicializa automaticamente antes de pontuar', async () => {
+  const { api } = service();
+  assert.equal((await api.record(1, 'reading')).synced, true);
+  const pet = await api.get(1);
+  assert.ok(pet);
+  assert.equal(pet.monthlyScore.points, 6);
 });
