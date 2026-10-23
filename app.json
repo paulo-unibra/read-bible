@@ -2,7 +2,7 @@
   "expo": {
     "name": "Bíblia em Foco",
     "slug": "ReadBible",
-    "version": "1.0.33",
+    "version": "1.1.2",
     "orientation": "portrait",
     "icon": "./assets/images/icon-v2.png",
     "scheme": "readbible",
@@ -22,7 +22,7 @@
     },
     "android": {
       "package": "com.readbible.app",
-      "versionCode": 29,
+      "versionCode": 30,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/icon-v2.png",
