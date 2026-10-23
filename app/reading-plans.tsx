@@ -22,6 +22,7 @@ import FocusBottomNav, {
 import authService, { API_URL } from "../services/AuthService";
 import readingPlanService from "../services/ReadingPlanService";
 import { ReadingPlan, ReadingPlanDay } from "../types";
+import { getNextPlanReading } from "../utils/nextPlanReading";
 
 export default function ReadingPlansScreen() {
   const router = useRouter();
@@ -239,22 +240,9 @@ export default function ReadingPlansScreen() {
     });
   };
 
-  const getTodayReading = () => {
-    if (!selectedPlan?.currentDay || isPlanScheduleCompleted) return null;
-
-    return planDays.find(
-      (day) => day.dayNumber === selectedPlan.currentDay && !day.isCompleted,
-    ) || null;
-  };
-
-  const pendingDays = selectedPlan?.currentDay
-    ? planDays.filter(
-        (day) => day.dayNumber < selectedPlan.currentDay! && !day.isCompleted,
-      )
-    : [];
+  const getTodayReading = () => getNextPlanReading(planDays);
   const isPlanScheduleCompleted = Boolean(
-    selectedPlan &&
-      (selectedPlan.isCompleted || selectedPlan.currentDay! > selectedPlan.totalDays),
+    selectedPlan && planDays.length > 0 && planDays.every((day) => day.isCompleted),
   );
 
   const getReadingSummary = (day: ReadingPlanDay) =>
@@ -634,9 +622,9 @@ export default function ReadingPlansScreen() {
             <View style={styles.planFinishedNotice}>
               <Ionicons name="checkmark-done-circle" size={26} color="#24834A" />
               <View style={styles.pendingCopy}>
-                <Text style={styles.planFinishedTitle}>Cronograma concluído</Text>
+                <Text style={styles.planFinishedTitle}>Leituras concluídas</Text>
                 <Text style={styles.pendingDescription}>
-                  O plano chegou ao último dia. Dias pendentes anteriores podem ser revisados abaixo.
+                  Todas as leituras disponíveis deste plano foram concluídas.
                 </Text>
               </View>
             </View>
@@ -654,41 +642,12 @@ export default function ReadingPlansScreen() {
               <View style={styles.pendingCopy}>
                 <Text style={styles.planFinishedTitle}>Leitura de hoje indisponível</Text>
                 <Text style={styles.pendingDescription}>
-                  Não encontramos o dia atual do plano. Dias anteriores pendentes aparecem separados abaixo.
+                  Não encontramos leituras disponíveis para este plano.
                 </Text>
               </View>
             </View>
           )}
 
-          {pendingDays.length > 0 && (
-            <View style={styles.pendingSection}>
-              <Text style={styles.pendingTitle}>Dias anteriores pendentes</Text>
-              <Text style={styles.pendingDescription}>
-                Estes dias ficaram para trás e não substituem a leitura atual.
-              </Text>
-              {pendingDays.map((day) => (
-                <TouchableOpacity
-                  key={day.id}
-                  style={styles.pendingDayRow}
-                  onPress={() => openDailyReading(day)}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Revisar dia pendente ${day.dayNumber}: ${getReadingSummary(day)}`}
-                >
-                  <View style={styles.pendingDayNumber}>
-                    <Text style={styles.pendingDayNumberText}>{day.dayNumber}</Text>
-                  </View>
-                  <View style={styles.pendingCopy}>
-                    <Text style={styles.pendingDayHeading}>Dia {day.dayNumber}</Text>
-                    <Text style={styles.pendingDayReadings} numberOfLines={2}>
-                      {getReadingSummary(day)}
-                    </Text>
-                  </View>
-                  <Text style={styles.pendingReview}>Revisar</Text>
-                  <Ionicons name="chevron-forward" size={19} color="#64748B" />
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
           <View style={styles.modeSection}>
             <Text style={styles.modeTitle}>Modo de Leitura</Text>
             <TouchableOpacity
