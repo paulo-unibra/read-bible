@@ -39,6 +39,7 @@ test.group('Tamagoshi monthly points', () => {
         updatedAt: before,
       })
       const plan = await ReadingPlan.create({
+        createdAt: DateTime.utc().minus({ minutes: 10 }),
         userId: user.id,
         name: 'Existing readings',
         type: 'custom',
@@ -110,6 +111,7 @@ test.group('Tamagoshi monthly points', () => {
       const plans: ReadingPlan[] = []
       for (let i = 0; i < 2; i++) {
         const plan = await ReadingPlan.create({
+          createdAt: DateTime.utc().minus({ minutes: 10 }),
           userId: user.id,
           name: 'Reading plan',
           type: 'custom',
@@ -167,6 +169,67 @@ test.group('Tamagoshi monthly points', () => {
         .header('Authorization', auth)
         .json({ day: scorePeriod().day, origin: 'chapter' })
       assert.equal(free.body().data.score.points, 8)
+    } finally {
+      await db.from('audit_logs').where('user_id', user.id).delete()
+      await user.delete()
+    }
+  })
+
+  test('all plan creation routes award ten points once per plan and remove the bonus on deletion', async ({
+    client,
+    assert,
+  }) => {
+    const user = await User.create({
+      fullName: 'Plan Creator',
+      email: `plan-bonus-${Date.now()}@example.invalid`,
+      password: 'TemporaryTest12345',
+      emailVerified: true,
+    })
+    try {
+      const token = await User.accessTokens.create(user)
+      const auth = `Bearer ${token.value!.release()}`
+      await client
+        .post('/tamagoshi/activate')
+        .header('Authorization', auth)
+        .json({ name: 'Lumi', seed: 42, catalogVersion: 2 })
+      const routes = ['/reading-plans', '/reading-plans/custom', '/reading-plans/beginner']
+      for (let i = 0; i < routes.length; i++) {
+        const payload = {
+          name: 'Test bonus',
+          type: 'sequential',
+          startDate: DateTime.utc().toISODate(),
+          endDate: DateTime.utc().plus({ days: 99 }).toISODate(),
+          totalDays: 100,
+        }
+        const created = await client.post(routes[i]).header('Authorization', auth).json(payload)
+        created.assertStatus(201)
+        const immediate = await pointsService.summary(user.id)
+        assert.equal(immediate.points, (i + 1) * 10)
+        for (let repeat = 0; repeat < 2; repeat++) {
+          const synced = await client.get('/tamagoshi').header('Authorization', auth)
+          assert.equal(synced.body().data.score.points, (i + 1) * 10)
+          assert.deepEqual(synced.body().data.score.readingDays, [])
+        }
+        const conflict = await client.post(routes[i]).header('Authorization', auth).json(payload)
+        conflict.assertStatus(409)
+        if (i < routes.length - 1)
+          await db
+            .from('reading_plans')
+            .where('id', created.body().data.plan.id)
+            .update({ is_active: false })
+      }
+      const deleted = await client.delete('/reading-plans').header('Authorization', auth)
+      deleted.assertStatus(200)
+      const remaining = await pointsService.summary(user.id)
+      assert.equal(remaining.points, 20)
+      await db
+        .from('reading_plans')
+        .where('user_id', user.id)
+        .update({ deleted_at: DateTime.utc().toSQL({ includeOffset: false }), is_active: false })
+      const repaired = await client.get('/tamagoshi').header('Authorization', auth)
+      assert.equal(repaired.body().data.score.points, 0)
+      const ranking = await client.get('/tamagoshi/ranking').header('Authorization', auth)
+      assert.equal(ranking.body().data.own.points, 0)
     } finally {
       await db.from('audit_logs').where('user_id', user.id).delete()
       await user.delete()
@@ -280,6 +343,7 @@ test.group('Tamagoshi monthly points', () => {
       const token = await User.accessTokens.create(user)
       const auth = `Bearer ${token.value!.release()}`
       const plan = await ReadingPlan.create({
+        createdAt: DateTime.utc().minus({ minutes: 10 }),
         userId: user.id,
         name: 'Test',
         type: 'custom',

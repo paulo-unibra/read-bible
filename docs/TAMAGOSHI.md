@@ -4,6 +4,7 @@ O Tamagoshi começa inativo. O menu do perfil permite ativar, editar o nome, con
 
 ## Pontos e ranking
 
+- Plano criado com Tamagoshi ativo: **10 pontos por plano**, sem duplicar na sincronização. Excluir o plano retira o bônus. Planos anteriores à ativação não pontuam.
 - Leitura confirmada: **6 pontos por dia**, independentemente da quantidade de capítulos ou planos.
 - Desmarcar a última leitura concluída de uma data retira os 6 pontos daquele dia e atualiza a constância/expressão. Excluir um plano também retira créditos que dependam apenas dele. Outra leitura válida do mesmo dia mantém o crédito, inclusive capítulo livre confirmado separadamente. Pontos de quizzes e convites permanecem.
 - Questionário concluído e validado pela API: **2 pontos por dia**, independentemente das tentativas ou questionários.
@@ -16,7 +17,7 @@ O ranking mostra a lista paginada, o mês e a própria posição/pontuação, me
 
 ## Registro e sincronização
 
-A API mantém `tamagoshi_profiles` e um livro de eventos em `tamagoshi_points`. Cada usuário possui uma entrada única por fonte e dia (leitura/quiz), ou por convite confirmado. O cliente nunca informa valores de pontos ou meses para ganhar pontuação. O registro de leitura é uma confirmação do usuário, limitada ao dia atual do servidor. O app exige conexão para participar do ranking.
+A API mantém `tamagoshi_profiles` e um livro de eventos em `tamagoshi_points`. Cada usuário possui uma entrada única por fonte e dia (leitura/quiz), ou por convite confirmado/plano criado. O cliente nunca informa valores de pontos ou meses para ganhar pontuação. O registro de leitura é uma confirmação do usuário, limitada ao dia atual do servidor. O app exige conexão para participar do ranking.
 
 A conclusão da leitura do plano, do quiz e do convite registra pontos dentro da transação original. O Tamagoshi começa com zero pontos. Ao sincronizar, apenas atividades confirmadas no servidor no mês corrente e realizadas desde a ativação são recuperadas, sem duplicação. Leituras, questionários e convites anteriores à criação não pontuam. Saúde antiga e histórico exclusivamente local não são convertidos em pontos.
 

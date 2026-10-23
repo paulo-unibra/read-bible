@@ -151,6 +151,8 @@ export default class ReadingPlanController {
         userAgent: request.header('user-agent') || null,
       })
 
+      await pointsService.award(user.id, 'plan', plan.createdAt, plan.id)
+
       return response.created({
         success: true,
         message: 'Plano de leitura criado com sucesso',
@@ -383,6 +385,8 @@ export default class ReadingPlanController {
       console.log('📤 [API] Resposta:', JSON.stringify(responseData, null, 2))
       console.log('🔵 [API] createCustom - FIM')
 
+      await pointsService.award(user.id, 'plan', plan.createdAt, plan.id)
+
       return response.created(responseData)
     } catch (error) {
       console.error('❌ [API] ERRO FATAL ao criar plano customizado!')
@@ -561,6 +565,8 @@ export default class ReadingPlanController {
 
       console.log('📤 [API] Resposta:', JSON.stringify(responseData, null, 2))
       console.log('🔵 [API] createBeginner - FIM')
+
+      await pointsService.award(user.id, 'plan', plan.createdAt, plan.id)
 
       return response.created(responseData)
     } catch (error) {
