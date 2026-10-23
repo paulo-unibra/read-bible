@@ -9,7 +9,7 @@ import DatabaseService from '../services/DatabaseService';
 import tamagoshiService from '../services/TamagoshiService';
 import referralService from '../services/ReferralService';
 import { getFocusColors } from '../constants/design';
-import { sleepMinutes, Tamagoshi, tamagoshiStatus } from '../utils/tamagoshi';
+import { Tamagoshi, tamagoshiStatus } from '../utils/tamagoshi';
 
 export default function TamagoshiScreen() {
   const router = useRouter();
@@ -18,8 +18,6 @@ export default function TamagoshiScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(false);
   const [name, setName] = useState('');
-  const [start, setStart] = useState('22:00');
-  const [end, setEnd] = useState('06:00');
   const [dark, setDark] = useState(false);
   const [clock, setClock] = useState(new Date());
   useFocusEffect(useCallback(() => {
@@ -28,7 +26,7 @@ export default function TamagoshiScreen() {
     return () => clearInterval(timer);
   }, []));
   const colors = getFocusColors(dark);
-  const populate = (value: Tamagoshi) => { setPet(value); setName(value.name); setStart(value.sleepStart); setEnd(value.sleepEnd); };
+  const populate = (value: Tamagoshi) => { setPet(value); setName(value.name); };
   useFocusEffect(useCallback(() => {
     let active = true;
     (async () => {
@@ -51,20 +49,18 @@ export default function TamagoshiScreen() {
     if (!userId || saving) return;
     setSaving(true);
     try {
-      const saved = pet ? await tamagoshiService.configure(userId, { name, sleepStart: start, sleepEnd: end }) : await tamagoshiService.activate(userId);
+      const saved = pet ? await tamagoshiService.configure(userId, { name }) : await tamagoshiService.activate(userId);
       populate(saved);
       if (!pet) {
         await referralService.getMine().catch(() => {});
         const rewarded = await tamagoshiService.get(userId);
         if (rewarded) setPet(rewarded);
       }
-      if (pet) Alert.alert('Cuidados salvos', 'Seu Tamagoshi seguirá o novo horário de sono.');
+      if (pet) Alert.alert('Salvo', 'Nome do Tamagoshi atualizado.');
     } catch (e) { Alert.alert('Não foi possível salvar', e instanceof Error ? e.message : 'Tente novamente.'); }
     finally { setSaving(false); }
   };
   const status = pet ? tamagoshiStatus(pet, clock) : null;
-  let minutes: number | null = null;
-  try { minutes = sleepMinutes(start, end); } catch {}
   const inputStyle = [styles.input, { color: colors.text, borderColor: colors.line, backgroundColor: colors.surface }];
   return <SafeAreaView style={[styles.screen, { backgroundColor: colors.screen }]}>
     <View style={[styles.header, { borderBottomColor: colors.line }]}>
@@ -82,16 +78,10 @@ export default function TamagoshiScreen() {
         </View>
         <Text style={[styles.label, { color: colors.text }]}>Nome</Text>
         <TextInput accessibilityLabel="Nome do Tamagoshi" style={inputStyle} value={name} onChangeText={setName} maxLength={24} />
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Sono</Text>
-        <View style={styles.row}>
-          <View style={styles.field}><Text style={[styles.label, { color: colors.text }]}>Dormir às</Text><TextInput accessibilityLabel="Horário de dormir, HH:mm" style={inputStyle} value={start} onChangeText={setStart} placeholder="22:00" placeholderTextColor={colors.muted} maxLength={5} keyboardType="numbers-and-punctuation" /></View>
-          <View style={styles.field}><Text style={[styles.label, { color: colors.text }]}>Acordar às</Text><TextInput accessibilityLabel="Horário de acordar, HH:mm" style={inputStyle} value={end} onChangeText={setEnd} placeholder="06:00" placeholderTextColor={colors.muted} maxLength={5} keyboardType="numbers-and-punctuation" /></View>
-        </View>
-        <Text accessibilityLiveRegion="polite" style={[styles.body, { color: minutes !== null && minutes >= 420 ? colors.muted : colors.danger }]}>{minutes === null ? 'Informe os horários no formato HH:mm.' : `${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, '0')} de sono · ${minutes < 420 ? '−8 de saúde/dia. Mínimo: 7h.' : 'Mínimo recomendado: 7h.'}`}</Text>
       </> : <>
         <Ionicons name="paw-outline" size={56} color={colors.blueDark} style={styles.activationIcon} />
         <Text style={[styles.hero, { color: colors.text }]}>Seu companheiro de leitura.</Text>
-        <Text style={[styles.body, { color: colors.muted }]}>Cuide dele com uma leitura por dia. Sono padrão: 22h às 6h.</Text>
+        <Text style={[styles.body, { color: colors.muted }]}>Cuide dele com uma leitura por dia. Sono automático: 22h às 6h.</Text>
       </>}
       <TouchableOpacity accessibilityRole="button" disabled={saving} style={[styles.button, { backgroundColor: colors.blueDark, opacity: saving ? 0.6 : 1 }]} onPress={submit}><Text style={styles.buttonText}>{saving ? 'Salvando…' : pet ? 'Salvar' : 'Ativar meu Tamagoshi'}</Text></TouchableOpacity>
       <TouchableOpacity accessibilityRole="button" onPress={() => router.push('/invite-friends')} style={{ paddingVertical: 12 }}><Text style={{ color: colors.blueDark, fontWeight: '600', fontSize: 15 }}>Convidar amigos</Text></TouchableOpacity>
@@ -99,4 +89,4 @@ export default function TamagoshiScreen() {
     </ScrollView>}
   </SafeAreaView>;
 }
-const styles = StyleSheet.create({ screen: { flex: 1 }, header: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, paddingVertical: 12, paddingHorizontal: 16, gap: 12 }, back: { minWidth: 44, minHeight: 44, justifyContent: 'center' }, title: { fontSize: 19, fontWeight: '700', flex: 1 }, loading: { marginTop: 60 }, content: { padding: 24, paddingBottom: 48, gap: 12 }, pet: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingBottom: 8 }, petSummary: { flex: 1, minWidth: 0 }, petName: { fontSize: 21, fontWeight: '700', marginBottom: 4 }, label: { fontSize: 15, fontWeight: '600', marginBottom: 8 }, input: { borderWidth: 1, borderRadius: 12, padding: 14, fontSize: 17, minHeight: 52 }, sectionTitle: { fontSize: 19, fontWeight: '700', marginTop: 16 }, row: { flexDirection: 'row', gap: 16, marginTop: 8 }, field: { flex: 1 }, body: { fontSize: 15, lineHeight: 23 }, button: { borderRadius: 14, padding: 17, alignItems: 'center', marginTop: 16, minHeight: 52 }, buttonText: { color: '#fff', fontWeight: '700', fontSize: 16 }, footnote: { fontSize: 12, lineHeight: 18, marginTop: 6 }, hero: { fontSize: 28, lineHeight: 35, fontWeight: '700', marginBottom: 8 }, activationIcon: { marginVertical: 12 } });
+const styles = StyleSheet.create({ screen: { flex: 1 }, header: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, paddingVertical: 12, paddingHorizontal: 16, gap: 12 }, back: { minWidth: 44, minHeight: 44, justifyContent: 'center' }, title: { fontSize: 19, fontWeight: '700', flex: 1 }, loading: { marginTop: 60 }, content: { padding: 24, paddingBottom: 48, gap: 12 }, pet: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingBottom: 8 }, petSummary: { flex: 1, minWidth: 0 }, petName: { fontSize: 21, fontWeight: '700', marginBottom: 4 }, label: { fontSize: 15, fontWeight: '600', marginBottom: 8 }, input: { borderWidth: 1, borderRadius: 12, padding: 14, fontSize: 17, minHeight: 52 }, body: { fontSize: 15, lineHeight: 23 }, button: { borderRadius: 14, padding: 17, alignItems: 'center', marginTop: 16, minHeight: 52 }, buttonText: { color: '#fff', fontWeight: '700', fontSize: 16 }, footnote: { fontSize: 12, lineHeight: 18, marginTop: 6 }, hero: { fontSize: 28, lineHeight: 35, fontWeight: '700', marginBottom: 8 }, activationIcon: { marginVertical: 12 } });

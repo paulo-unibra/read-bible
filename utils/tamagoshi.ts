@@ -20,19 +20,9 @@ export function nextDay(key: string, offset = 1) {
   date.setDate(date.getDate() + offset);
   return dayKey(date);
 }
-export function clockMinutes(time: string): number {
-  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) throw new Error('Use horários no formato HH:mm, como 22:00.');
-  const [hours, minutes] = time.split(':').map(Number);
-  return hours * 60 + minutes;
-}
-export function sleepMinutes(start: string, end: string) {
-  return (clockMinutes(end) - clockMinutes(start) + 1440) % 1440;
-}
-export function isSleeping(pet: Tamagoshi, now = new Date()) {
-  const start = clockMinutes(pet.sleepStart);
-  const duration = sleepMinutes(pet.sleepStart, pet.sleepEnd);
-  const elapsed = (now.getHours() * 60 + now.getMinutes() - start + 1440) % 1440;
-  return elapsed < duration;
+export const TAMAGOSHI_SLEEP = { start: '22:00', end: '06:00' } as const;
+export function isSleeping(now = new Date()) {
+  return now.getHours() >= 22 || now.getHours() < 6;
 }
 const clamp = (value: number) => Math.min(100, Math.max(0, value));
 export const TAMAGOSHI_REWARDS = { reading: 6, quiz: 2 } as const;
@@ -40,8 +30,7 @@ function dailyChange(pet: Tamagoshi, key: string, closed: boolean) {
   const activity = pet.days[key];
   // The activation day is partial; missed reading is only charged on full days.
   return (activity?.reading ? TAMAGOSHI_REWARDS.reading : closed && key !== dayKey(new Date(pet.activatedAt)) ? -5 : 0)
-    + (activity?.quiz ? TAMAGOSHI_REWARDS.quiz : 0)
-    + (closed && sleepMinutes(pet.sleepStart, pet.sleepEnd) < 420 ? -8 : 0);
+    + (activity?.quiz ? TAMAGOSHI_REWARDS.quiz : 0);
 }
 export function settleTamagoshi(pet: Tamagoshi, now = new Date()): Tamagoshi {
   const today = dayKey(now);
@@ -60,7 +49,7 @@ export function tamagoshiStatus(pet: Tamagoshi, now = new Date()) {
   let streak = 0;
   let key = pet.days[today]?.reading ? today : nextDay(today, -1);
   while (pet.days[key]?.reading) { streak++; key = nextDay(key, -1); }
-  const sleeping = isSleeping(pet, now);
+  const sleeping = isSleeping(now);
   const mood: CompanionMood = health >= 85 ? 'joyful' : health >= 60 ? 'happy' : health >= 35 ? 'hopeful' : 'sleepy';
   return { health, streak, sleeping, mood, readToday: Boolean(pet.days[today]?.reading), quizToday: Boolean(pet.days[today]?.quiz) };
 }

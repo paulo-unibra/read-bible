@@ -114,7 +114,7 @@ export default function ReadingCompanion({ userId, days }: {
   const tips = [
     status.readToday ? `Leitura concluída: +${TAMAGOSHI_REWARDS.reading} de saúde hoje.` : `Leia 1 capítulo e conquiste +${TAMAGOSHI_REWARDS.reading} de saúde por dia.`,
     status.quizToday ? `Questionário concluído: +${TAMAGOSHI_REWARDS.quiz} de saúde hoje.` : `Faça um questionário: +${TAMAGOSHI_REWARDS.quiz} de saúde por dia.`,
-    'Durma 7h ou mais para preservar sua saúde.',
+    'Descanso automático: das 22h às 6h.',
   ];
   return (
     <TouchableOpacity

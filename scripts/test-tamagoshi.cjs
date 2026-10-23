@@ -12,18 +12,17 @@ function compile(file, dependencies = {}) {
   return module.exports;
 }
 const engine = compile('utils/tamagoshi.ts');
-const { dayKey, nextDay, sleepMinutes, isSleeping, settleTamagoshi, tamagoshiStatus } = engine;
+const { dayKey, nextDay, TAMAGOSHI_SLEEP, isSleeping, settleTamagoshi, tamagoshiStatus } = engine;
 const today = new Date(2026, 9, 23, 12);
 const base = () => ({ version: 1, seed: 123, name: 'Lumi', activatedAt: new Date(2026, 9, 20, 10).toISOString(), sleepStart: '22:00', sleepEnd: '06:00', settledThrough: '2026-10-19', health: 60, days: {} });
-test('sono atravessa a meia-noite e acorda exatamente no horário', () => {
-  assert.equal(sleepMinutes('22:00', '06:00'), 480);
-  assert.equal(sleepMinutes('23:30', '06:30'), 420);
-  assert.equal(isSleeping(base(), new Date(2026, 9, 23, 22)), true);
-  assert.equal(isSleeping(base(), new Date(2026, 9, 24, 5, 59)), true);
-  assert.equal(isSleeping(base(), new Date(2026, 9, 24, 6)), false);
-  assert.equal(isSleeping({ ...base(), sleepStart: '08:00', sleepEnd: '15:00' }, today), true);
-  assert.throws(() => sleepMinutes('25:00', '06:00'));
-  assert.throws(() => sleepMinutes('22:99', '06:00'));
+test('sono fixo começa às 22h e termina às 6h no relógio local', () => {
+  assert.deepEqual(TAMAGOSHI_SLEEP, { start: '22:00', end: '06:00' });
+  assert.equal(isSleeping(new Date(2026, 9, 23, 21, 59)), false);
+  assert.equal(isSleeping(new Date(2026, 9, 23, 22)), true);
+  assert.equal(isSleeping(new Date(2026, 9, 24, 0)), true);
+  assert.equal(isSleeping(new Date(2026, 9, 24, 5, 59)), true);
+  assert.equal(isSleeping(new Date(2026, 9, 24, 6)), false);
+  assert.equal(isSleeping(today), false);
 });
 test('constância recompensa cada dia, volume no mesmo dia não compensa faltas', () => {
   const consistent = base();
@@ -35,12 +34,13 @@ test('constância recompensa cada dia, volume no mesmo dia não compensa faltas'
   assert.equal(tamagoshiStatus(concentrated, today).health, 56);
   assert.equal(tamagoshiStatus(concentrated, today).streak, 0);
 });
-test('quiz ajuda mas não substitui leitura e sete horas não perde saúde', () => {
+test('quiz ajuda mas não substitui leitura; horários antigos não afetam a saúde', () => {
   const pet = { ...base(), sleepStart: '23:00', sleepEnd: '06:00' };
   pet.days['2026-10-21'] = { reading: false, quiz: true };
   assert.equal(tamagoshiStatus(pet, today).health, 52);
   const shortSleep = { ...pet, sleepEnd: '05:59' };
-  assert.equal(tamagoshiStatus(shortSleep, today).health, 28);
+  assert.equal(tamagoshiStatus(shortSleep, today).health, 52);
+  assert.equal(tamagoshiStatus({ ...pet, sleepStart: '08:00', sleepEnd: '15:00' }, today).sleeping, false);
 });
 test('hoje não é penalizado, ativação não cobra leitura e liquidação não duplica ganhos', () => {
   const pet = base();
@@ -77,7 +77,8 @@ test('começa inativo, ativação é idempotente e contas são isoladas', async 
   assert.equal(pet.catalogVersion, 2);
   assert.deepEqual(await api.activate(1), pet);
   assert.equal(await api.get(2), null);
-  assert.equal(sleepMinutes(pet.sleepStart, pet.sleepEnd), 480);
+  assert.equal(pet.sleepStart, '22:00');
+  assert.equal(pet.sleepEnd, '06:00');
 });
 test('leituras e quizzes concorrentes persistem, duplicados dão um único bônus diário', async () => {
   const { api } = service();
@@ -94,25 +95,29 @@ test('histórico anterior à ativação e datas futuras não criam atividade', a
   await api.record(1, 'reading', ['2020-01-01T12:00:00Z', 'invalid', '2099-01-01T00:00:00Z']);
   assert.deepEqual((await api.get(1)).days, {});
 });
-test('configurações persistem sem trocar mascote ou aceitar horários inválidos', async () => {
+test('nome persiste sem trocar mascote nem permitir alterações no sono', async () => {
   const { api } = service();
   const pet = await api.activate(1);
   await api.configure(1, { name: ' Pipo ', sleepStart: '23:00', sleepEnd: '05:00' });
   assert.equal((await api.get(1)).name, 'Pipo');
   assert.equal((await api.get(1)).seed, pet.seed);
   await assert.rejects(api.configure(1, { name: '', sleepStart: '22:00', sleepEnd: '06:00' }));
-  await assert.rejects(api.configure(1, { name: 'Pipo', sleepStart: '22:00', sleepEnd: '22:00' }));
+  assert.equal((await api.get(1)).sleepStart, '22:00');
+  assert.equal((await api.get(1)).sleepEnd, '06:00');
 });
-test('trocar horário não recalcula os dias passados e reiniciar preserva o diário', async () => {
+test('horários antigos são normalizados sem penalidade de sono e diário persiste', async () => {
   const { api, store } = service();
   const pet = await api.activate(1);
   const activation = new Date(); activation.setDate(activation.getDate() - 3);
   pet.activatedAt = activation.toISOString();
+  pet.sleepStart = '23:00'; pet.sleepEnd = '02:00';
   pet.settledThrough = nextDay(dayKey(activation), -1);
   store.set('@readbible/tamagoshi/v1/1', JSON.stringify(pet));
   await api.configure(1, { name: 'Lumi', sleepStart: '23:00', sleepEnd: '05:00' });
   const saved = await api.get(1);
-  assert.equal(saved.health, 50); // two full missed days, previous eight-hour schedule
+  assert.equal(saved.sleepStart, '22:00');
+  assert.equal(saved.sleepEnd, '06:00');
+  assert.equal(saved.health, 50); // only two full missed reading days
   assert.equal(tamagoshiStatus(saved).health, 50); // no advance penalty for today
   const restored = JSON.parse(store.get('@readbible/tamagoshi/v1/1'));
   assert.deepEqual(settleTamagoshi(restored), saved);
