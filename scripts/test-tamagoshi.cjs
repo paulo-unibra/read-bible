@@ -62,7 +62,7 @@ test('nome completo usa só o primeiro nome do usuário e não duplica sufixo', 
 function service() {
   const store = new Map(); const server = new Map(); const requests = [];
   const session = { id: 1, offline: false };
-  const storage = { getItem: async key => store.get(key) ?? null, setItem: async (key, value) => store.set(key, value) };
+  const storage = { getItem: async key => store.get(key) ?? null, setItem: async (key, value) => store.set(key, value), removeItem: async key => store.delete(key) };
   const fetcher = async (url, options) => {
     if (session.offline) throw new Error('offline');
     const id = Number(options.headers.Authorization.split('-')[1]);
@@ -149,4 +149,17 @@ test('sincronização retira do armazenamento leituras desmarcadas no servidor',
   assert.equal(tamagoshiStatus(saved).streak, 0);
   assert.equal(tamagoshiStatus(saved).points, 0);
   assert.equal(JSON.parse(store.get('@readbible/tamagoshi/v1/1')).days[dayKey()].reading, false);
+});
+test('reset no servidor limpa cache do Tamagoshi e permite nova ativação explícita', async () => {
+  const { api, server, requests } = service();
+  await api.activate(1);
+  await api.sync(1);
+  server.delete(1);
+  const activations = requests.filter(row => row.url.endsWith('/activate')).length;
+  assert.equal(await api.sync(1), null);
+  assert.equal(await api.get(1), null);
+  assert.equal(requests.filter(row => row.url.endsWith('/activate')).length, activations);
+  await api.activate(1);
+  assert.ok(await api.sync(1));
+  assert.equal(requests.filter(row => row.url.endsWith('/activate')).length, activations + 1);
 });

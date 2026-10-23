@@ -68,6 +68,10 @@ class TamagoshiService {
   async sync(userId: number): Promise<Tamagoshi | null> {
     const local = await this.get(userId);
     let data = await this.request(userId);
+    if (!data.profile && local?.monthlyScore) {
+      await this.run(() => AsyncStorage.removeItem(this.key(userId)));
+      return null;
+    }
     if (!data.profile && local) data = await this.request(userId, '/activate', 'POST', { name: local.name, seed: local.seed, catalogVersion: local.catalogVersion ?? 1 });
     if (!data.profile) return null;
     if (local?.pendingName) data = await this.request(userId, '', 'PUT', { name: local.pendingName });
