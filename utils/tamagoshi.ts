@@ -34,11 +34,12 @@ export function isSleeping(pet: Tamagoshi, now = new Date()) {
   return elapsed < duration;
 }
 const clamp = (value: number) => Math.min(100, Math.max(0, value));
+export const TAMAGOSHI_REWARDS = { reading: 6, quiz: 2 } as const;
 function dailyChange(pet: Tamagoshi, key: string, closed: boolean) {
   const activity = pet.days[key];
   // The activation day is partial; missed reading is only charged on full days.
-  return (activity?.reading ? 6 : closed && key !== dayKey(new Date(pet.activatedAt)) ? -5 : 0)
-    + (activity?.quiz ? 2 : 0)
+  return (activity?.reading ? TAMAGOSHI_REWARDS.reading : closed && key !== dayKey(new Date(pet.activatedAt)) ? -5 : 0)
+    + (activity?.quiz ? TAMAGOSHI_REWARDS.quiz : 0)
     + (closed && sleepMinutes(pet.sleepStart, pet.sleepEnd) < 420 ? -8 : 0);
 }
 export function settleTamagoshi(pet: Tamagoshi, now = new Date()): Tamagoshi {

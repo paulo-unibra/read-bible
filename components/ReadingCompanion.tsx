@@ -7,7 +7,7 @@ import type { ReadingPlan, ReadingPlanDay } from '../types';
 import { CompanionQuizResult, getCompanion } from '../utils/readingCompanion';
 import CompanionAvatar from './CompanionAvatar';
 import tamagoshiService from '../services/TamagoshiService';
-import { Tamagoshi, tamagoshiStatus } from '../utils/tamagoshi';
+import { TAMAGOSHI_REWARDS, Tamagoshi, tamagoshiStatus } from '../utils/tamagoshi';
 
 export default function ReadingCompanion({ userId, days }: {
   userId: number; plan: ReadingPlan | null; days: ReadingPlanDay[];
@@ -15,12 +15,20 @@ export default function ReadingCompanion({ userId, days }: {
   const router = useRouter();
   const [petData, setPetData] = useState<Tamagoshi | null>(null);
   const [clock, setClock] = useState(new Date());
+  const [tipIndex, setTipIndex] = useState(0);
   const [reducedMotion, setReducedMotion] = useState(true);
   const [bounce] = useState(() => new Animated.Value(0));
   const pet = getCompanion(petData?.seed ?? userId, petData?.catalogVersion ?? 1);
   const status = petData ? tamagoshiStatus(petData, clock) : null;
   const mood = status?.mood;
   const sleeping = status?.sleeping;
+  const enabled = petData !== null;
+
+  useFocusEffect(useCallback(() => {
+    if (!enabled) return;
+    const timer = setInterval(() => setTipIndex(index => (index + 1) % 3), 7000);
+    return () => clearInterval(timer);
+  }, [enabled]));
 
   useFocusEffect(useCallback(() => {
     const controller = new AbortController();
@@ -78,13 +86,19 @@ export default function ReadingCompanion({ userId, days }: {
   if (!petData || !status) return null;
   const moodLabels = { joyful: 'Radiante', happy: 'Feliz', hopeful: 'Esperançoso', sleepy: 'Precisando de cuidado', curious: 'Curioso' };
   const feeling = status.sleeping ? 'Dormindo' : moodLabels[status.mood];
+  const tips = [
+    status.readToday ? `Leitura concluída: +${TAMAGOSHI_REWARDS.reading} de saúde hoje.` : `Leia 1 capítulo e conquiste +${TAMAGOSHI_REWARDS.reading} de saúde por dia.`,
+    status.quizToday ? `Questionário concluído: +${TAMAGOSHI_REWARDS.quiz} de saúde hoje.` : `Faça um questionário: +${TAMAGOSHI_REWARDS.quiz} de saúde por dia.`,
+    'Durma 7h ou mais para preservar sua saúde.',
+  ];
   return (
     <TouchableOpacity
       style={styles.container}
       onPress={() => router.push('/tamagoshi')}
       accessibilityRole="button"
-      accessibilityLabel={`${pet.species} ${petData.name}, ${feeling.toLowerCase()}. Saúde ${status.health} de 100. Ver cuidados do Tamagoshi`}
+      accessibilityLabel={`${pet.species} ${petData.name}, ${feeling.toLowerCase()}. Saúde ${status.health} de 100. Leitura: até ${TAMAGOSHI_REWARDS.reading} pontos por dia. Questionário: até ${TAMAGOSHI_REWARDS.quiz} pontos por dia. Ver cuidados do Tamagoshi`}
     >
+      <View style={styles.row}>
       <View style={styles.petStage} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
         <Animated.View style={{ transform: [{ translateY: bounce }] }}>
           <CompanionAvatar size={64} catalogVersion={petData.catalogVersion ?? 1} seed={petData.seed} mood={status.mood} sleeping={status.sleeping} />
@@ -99,12 +113,16 @@ export default function ReadingCompanion({ userId, days }: {
         <Text style={styles.healthValue}>{status.health}/100</Text>
       </View>
       <Ionicons name="chevron-forward" size={18} color="#496271" />
+      </View>
+      <Text style={styles.tip} numberOfLines={2}>{tips[tipIndex]}</Text>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 16, marginTop: 8, paddingVertical: 8, minHeight: 72, borderBottomWidth: 1, borderBottomColor: '#DCE6E8' },
+  container: { marginHorizontal: 16, marginTop: 8, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#DCE6E8' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 72 },
+  tip: { color: '#496271', fontSize: 12, lineHeight: 17, marginTop: 2 },
   petStage: { width: 68, alignItems: 'center' },
   copy: { flex: 1, minWidth: 0 },
   title: { fontSize: 16, lineHeight: 22, fontWeight: '700', color: '#203947' },
