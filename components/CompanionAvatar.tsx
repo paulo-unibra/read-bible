@@ -3,14 +3,14 @@ import Svg, { Circle, Ellipse, Path, Rect } from 'react-native-svg';
 import CompanionFace from './CompanionFace';
 import { CompanionMood, getCompanion } from '../utils/readingCompanion';
 
-export default function CompanionAvatar({ seed, mood, sleeping = false, catalogVersion = 1 }: {
-  seed: number; mood: CompanionMood; sleeping?: boolean; catalogVersion?: 1 | 2;
+export default function CompanionAvatar({ seed, mood, sleeping = false, catalogVersion = 1, size = 88 }: {
+  seed: number; mood: CompanionMood; sleeping?: boolean; catalogVersion?: 1 | 2; size?: number;
 }) {
   const pet = getCompanion(seed, catalogVersion);
   const modern = catalogVersion === 2;
   const roundEars = !modern || pet.kind === 'bear' || pet.kind === 'panda';
   return (
-    <Svg width={88} height={96} viewBox="0 0 24 26">
+    <Svg width={size} height={size * 96 / 88} viewBox="0 0 24 26">
       <Ellipse cx={12} cy={24} rx={8} ry={1} fill="#DCE6E8" />
       {roundEars && pet.kind !== 'chick' && <>
         <Circle cx={6} cy={7} r={2.8} fill={pet.kind === 'panda' ? '#59656F' : pet.color} />

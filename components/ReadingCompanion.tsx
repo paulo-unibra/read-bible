@@ -1,25 +1,23 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { AccessibilityInfo, Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import authService, { API_URL } from '../services/AuthService';
 import type { ReadingPlan, ReadingPlanDay } from '../types';
-import { CompanionQuizResult, getCompanion, getCompanionState } from '../utils/readingCompanion';
+import { CompanionQuizResult, getCompanion } from '../utils/readingCompanion';
 import CompanionAvatar from './CompanionAvatar';
 import tamagoshiService from '../services/TamagoshiService';
 import { Tamagoshi, tamagoshiStatus } from '../utils/tamagoshi';
 
-export default function ReadingCompanion({ userId, plan, days }: {
+export default function ReadingCompanion({ userId, days }: {
   userId: number; plan: ReadingPlan | null; days: ReadingPlanDay[];
 }) {
   const router = useRouter();
   const [petData, setPetData] = useState<Tamagoshi | null>(null);
   const [clock, setClock] = useState(new Date());
-  const [results, setResults] = useState<CompanionQuizResult[] | null>(null);
-  const [loading, setLoading] = useState(true);
   const [reducedMotion, setReducedMotion] = useState(true);
   const [bounce] = useState(() => new Animated.Value(0));
   const pet = getCompanion(petData?.seed ?? userId, petData?.catalogVersion ?? 1);
-  const state = getCompanionState(plan, days, results);
   const status = petData ? tamagoshiStatus(petData, clock) : null;
   const mood = status?.mood;
   const sleeping = status?.sleeping;
@@ -27,8 +25,6 @@ export default function ReadingCompanion({ userId, plan, days }: {
   useFocusEffect(useCallback(() => {
     const controller = new AbortController();
     let active = true;
-    setLoading(true);
-    setResults(null);
     const timeout = setTimeout(() => controller.abort(), 10000);
     (async () => {
       try {
@@ -46,12 +42,11 @@ export default function ReadingCompanion({ userId, plan, days }: {
         if (!data.success || !Array.isArray(data.results)) throw new Error('Resposta inválida');
         await tamagoshiService.record(userId, 'quiz', data.results.map((result: CompanionQuizResult) => result.lastCompletedAt ?? result.createdAt));
         const updated = await tamagoshiService.get(userId);
-        if (active) { setResults(data.results); setPetData(updated); }
+        if (active) setPetData(updated);
       } catch {
-        if (active) setResults(null);
+        // Keep the locally stored health available when the network is offline.
       } finally {
         clearTimeout(timeout);
-        if (active) setLoading(false);
       }
     })();
     return () => { active = false; clearTimeout(timeout); controller.abort(); };
@@ -82,41 +77,39 @@ export default function ReadingCompanion({ userId, plan, days }: {
 
   if (!petData || !status) return null;
   const moodLabels = { joyful: 'Radiante', happy: 'Feliz', hopeful: 'Esperançoso', sleepy: 'Precisando de cuidado', curious: 'Curioso' };
+  const feeling = status.sleeping ? 'Dormindo' : moodLabels[status.mood];
   return (
-    <View style={styles.container}>
-      <View style={styles.top}>
-        <View style={styles.petStage} accessible accessibilityLabel={`${pet.species} ${petData.name}, ${status.sleeping ? "dormindo" : moodLabels[status.mood].toLowerCase()}`}>
-          <Animated.View style={{ transform: [{ translateY: bounce }] }}>
-            <CompanionAvatar catalogVersion={petData.catalogVersion ?? 1} seed={petData.seed} mood={status.mood} sleeping={status.sleeping} />
-          </Animated.View>
-        </View>
-        <View style={styles.copy}>
-          <Text style={styles.title}>{petData.name} <Text style={styles.mood}>· {status.sleeping ? "Dormindo" : moodLabels[status.mood]}</Text></Text>
-          <Text style={styles.message}>{status.sleeping ? `Estou descansando até ${petData.sleepEnd}. A leitura pode continuar no seu ritmo.` : status.readToday ? 'Você leu hoje! Voltar amanhã é o que me mantém saudável.' : 'Um capítulo hoje já cuida de mim. Vamos manter nossa constância?'}</Text>
-        </View>
+    <TouchableOpacity
+      style={styles.container}
+      onPress={() => router.push('/tamagoshi')}
+      accessibilityRole="button"
+      accessibilityLabel={`${pet.species} ${petData.name}, ${feeling.toLowerCase()}. Saúde ${status.health} de 100. Ver cuidados do Tamagoshi`}
+    >
+      <View style={styles.petStage} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+        <Animated.View style={{ transform: [{ translateY: bounce }] }}>
+          <CompanionAvatar size={52} catalogVersion={petData.catalogVersion ?? 1} seed={petData.seed} mood={status.mood} sleeping={status.sleeping} />
+        </Animated.View>
       </View>
-      <TouchableOpacity style={styles.healthButton} onPress={() => router.push('/tamagoshi')} accessibilityRole="button" accessibilityLabel={`Ver saúde do Tamagoshi: ${status.health} de 100`}>
-        <Text style={styles.healthTitle}>Saúde {status.health}/100 · Ver cuidados</Text>
-        <Text style={styles.detail}>{status.streak} {status.streak === 1 ? 'dia seguido' : 'dias seguidos'} de leitura · {status.readToday ? 'Leitura de hoje concluída' : 'Leia 1 capítulo hoje'}</Text>
-      </TouchableOpacity>
-      <View style={styles.details}>
-        <Text style={styles.detail}>{state.planText}</Text>
-        <Text style={styles.detail}>{loading ? 'Consultando questionários…' : state.quizText}</Text>
+      <View style={styles.copy}>
+        <Text style={styles.title} numberOfLines={1}>{petData.name}</Text>
+        <Text style={styles.mood} numberOfLines={1}>{feeling}</Text>
       </View>
-    </View>
+      <View style={styles.health}>
+        <Text style={styles.healthLabel}>Saúde</Text>
+        <Text style={styles.healthValue}>{status.health}/100</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color="#496271" />
+    </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  healthButton: { marginTop: 12, paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#DCE6E8' },
-  healthTitle: { color: '#203947', fontWeight: '700', fontSize: 15, marginBottom: 4 },
-  container: { marginHorizontal: 16, marginTop: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#DCE6E8', alignSelf: 'stretch' },
-  top: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  petStage: { width: 88, alignItems: 'center' },
-  copy: { flex: 1 },
-  title: { fontSize: 19, fontWeight: '700', color: '#203947' },
-  mood: { fontSize: 14, fontWeight: '500', color: '#496271' },
-  message: { fontSize: 14, lineHeight: 21, color: '#344F5C', marginTop: 6 },
-  details: { marginTop: 10, gap: 4 },
-  detail: { color: '#496271', fontSize: 12, lineHeight: 18 },
+  container: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 16, marginTop: 8, paddingVertical: 8, minHeight: 72, borderBottomWidth: 1, borderBottomColor: '#DCE6E8' },
+  petStage: { width: 56, alignItems: 'center' },
+  copy: { flex: 1, minWidth: 0 },
+  title: { fontSize: 16, lineHeight: 22, fontWeight: '700', color: '#203947' },
+  mood: { fontSize: 13, lineHeight: 19, color: '#496271' },
+  health: { alignItems: 'flex-end' },
+  healthLabel: { fontSize: 12, lineHeight: 18, color: '#496271' },
+  healthValue: { fontSize: 16, lineHeight: 22, fontWeight: '700', color: '#203947' },
 });
