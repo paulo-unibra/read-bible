@@ -26,7 +26,7 @@ import authService, { API_URL } from "../services/AuthService";
 import readingPlanService from "../services/ReadingPlanService";
 import { ReadingPlan, ReadingPlanDay } from "../types";
 import { getNextPlanReading } from "../utils/nextPlanReading";
-import { isReadingPlanLate } from "../utils/readingPlanStatus";
+import { getReadingPlanLateDays } from "../utils/readingPlanStatus";
 
 export default function ReadingPlansScreen() {
   const router = useRouter();
@@ -298,7 +298,8 @@ export default function ReadingPlansScreen() {
       `${Math.min(100, Math.max(0, progressPercent))}%` as const;
     const totalDays = selectedPlan?.totalDays || 0;
     const readingSummary = getReadingSummary(item);
-    const isLate = selectedPlan ? isReadingPlanLate(selectedPlan, planDays) : false;
+    const lateDays = selectedPlan ? getReadingPlanLateDays(selectedPlan, planDays) : 0;
+    const isLate = lateDays > 0;
     const statusColor = isLate ? "#C2410C" : item.isCompleted ? "#43A047" : "#55616A";
 
     return (
@@ -310,7 +311,7 @@ export default function ReadingPlansScreen() {
           <View style={styles.statusPill}>
             <Ionicons name={isLate ? "alert-circle" : item.isCompleted ? "checkmark-circle" : "time-outline"} size={18} color={statusColor} />
             <Text style={[styles.statusPillText, { color: statusColor }]}>
-              {isLate ? "Atrasado" : item.isCompleted ? "Concluída" : "Pendente"}
+              {isLate ? `Atrasado · ${lateDays} ${lateDays === 1 ? "dia" : "dias"}` : item.isCompleted ? "Concluída" : "Pendente"}
             </Text>
           </View>
         </View>
