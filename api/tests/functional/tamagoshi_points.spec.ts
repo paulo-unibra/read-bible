@@ -1,5 +1,7 @@
 import { test } from '@japa/runner'
 import User from '#models/user'
+import Quiz from '#models/quiz'
+import QuizResult from '#models/quiz_result'
 import ReadingPlan from '#models/reading_plan'
 import ReadingProgress from '#models/reading_progress'
 import db from '@adonisjs/lucid/services/db'
@@ -7,6 +9,87 @@ import pointsService, { scorePeriod } from '#services/tamagoshi_points_service'
 import { DateTime } from 'luxon'
 
 test.group('Tamagoshi monthly points', () => {
+  test('activation starts at zero and ignores pre-activation activity on every sync', async ({
+    client,
+    assert,
+  }) => {
+    const user = await User.create({
+      fullName: 'New Pet',
+      email: `zero-pet-${Date.now()}@example.invalid`,
+      password: 'TemporaryTest12345',
+      emailVerified: true,
+    })
+    const quiz = await Quiz.create({
+      bookName: 'Salmos',
+      chapter: 1,
+      bibleVersion: 'ARC',
+      testament: 'old',
+      category: 'test',
+      cloudStorageUrl: null,
+    })
+    try {
+      const before = DateTime.utc().minus({ minutes: 5 })
+      const result = await QuizResult.create({
+        userId: user.id,
+        quizId: quiz.id,
+        correctAnswers: 1,
+        totalQuestions: 1,
+        score: 100,
+        createdAt: before,
+        updatedAt: before,
+      })
+      const plan = await ReadingPlan.create({
+        userId: user.id,
+        name: 'Existing readings',
+        type: 'custom',
+        startDate: before,
+        endDate: before.plus({ days: 2 }),
+        isActive: true,
+        currentDay: 1,
+        totalDays: 2,
+        chaptersPerDay: 1,
+        totalChapters: 2,
+        completedChapters: 1,
+      })
+      await ReadingProgress.create({
+        readingPlanId: plan.id,
+        day: 1,
+        bookName: 'Gênesis',
+        startChapter: 1,
+        endChapter: 1,
+        isCompleted: true,
+        completedAt: before,
+      })
+      const token = await User.accessTokens.create(user)
+      const auth = `Bearer ${token.value!.release()}`
+      const activation = await client
+        .post('/tamagoshi/activate')
+        .header('Authorization', auth)
+        .json({ name: 'Lumi', seed: 42, catalogVersion: 2 })
+      activation.assertStatus(200)
+      assert.equal(activation.body().data.score.points, 0)
+      for (const source of ['reading', 'quiz', 'invite'] as const)
+        await pointsService.award(user.id, source, before, 123)
+      for (let i = 0; i < 2; i++) {
+        const summary = await client.get('/tamagoshi').header('Authorization', auth)
+        assert.equal(summary.body().data.score.points, 0)
+        assert.deepEqual(summary.body().data.score.readingHistory, [])
+      }
+      // Repeating an old quiz after activation is new activity, worth two points.
+      await db
+        .from('quiz_results')
+        .where('id', result.id)
+        .update({ updated_at: DateTime.utc().startOf('second').toSQL({ includeOffset: false }) })
+      const after = await client.get('/tamagoshi').header('Authorization', auth)
+      assert.equal(after.body().data.score.points, 2)
+      const again = await client.get('/tamagoshi').header('Authorization', auth)
+      assert.equal(again.body().data.score.points, 2)
+    } finally {
+      await user.delete()
+      await quiz.delete()
+    }
+  })
+
   test('authenticated daily points, concurrency, ranking, monthly reset and no score cap', async ({
     client,
     assert,

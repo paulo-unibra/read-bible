@@ -49,7 +49,7 @@ export default class TamagoshiController {
           name: data.name,
           seed: data.seed,
           catalog_version: data.catalogVersion,
-          activated_at: DateTime.utc().toSQL({ includeOffset: false }),
+          activated_at: DateTime.utc().startOf('second').toSQL({ includeOffset: false }),
         })
       }
     })

@@ -18,7 +18,7 @@ O ranking mostra a lista paginada, o mês e a própria posição/pontuação, me
 
 A API mantém `tamagoshi_profiles` e um livro de eventos em `tamagoshi_points`. Cada usuário possui uma entrada única por fonte e dia (leitura/quiz), ou por convite confirmado. O cliente nunca informa valores de pontos ou meses para ganhar pontuação. O registro de leitura é uma confirmação do usuário, limitada ao dia atual do servidor. O app exige conexão para participar do ranking.
 
-A conclusão da leitura do plano, do quiz e do convite registra pontos dentro da transação original. Ao sincronizar, atividades confirmadas no servidor durante o mês corrente também são recuperadas, sem duplicação. Saúde antiga e histórico exclusivamente local não são convertidos em pontos.
+A conclusão da leitura do plano, do quiz e do convite registra pontos dentro da transação original. O Tamagoshi começa com zero pontos. Ao sincronizar, apenas atividades confirmadas no servidor no mês corrente e realizadas desde a ativação são recuperadas, sem duplicação. Leituras, questionários e convites anteriores à criação não pontuam. Saúde antiga e histórico exclusivamente local não são convertidos em pontos.
 
 A migração `1793200000001_track_free_reading_points` distingue confirmação de capítulo livre de conclusão de plano. O app não registra conclusão de plano como capítulo livre. Ao desmarcar, a API reconcilia os créditos na mesma transação; na sincronização também remove créditos sem leitura que os sustente. `readingHistory` substitui o histórico local de constância, incluindo meses anteriores, para que leituras removidas não mantenham a expressão feliz.
 

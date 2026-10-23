@@ -29,7 +29,8 @@ class TamagoshiPointsService {
     trx?: TransactionClientContract
   ) {
     const client = trx || db
-    if (!(await client.from('tamagoshi_profiles').where('user_id', userId).first())) return
+    const profile = await client.from('tamagoshi_profiles').where('user_id', userId).first()
+    if (!profile || at < dateOf(profile.activated_at)) return
     const period = scorePeriod(at)
     try {
       await client.table('tamagoshi_points').insert({
@@ -90,14 +91,20 @@ class TamagoshiPointsService {
   }
   // Only server-confirmed activity is eligible for the leaderboard.
   async backfill(userId: number, now: DateTime = DateTime.utc()) {
+    const profile = await db.from('tamagoshi_profiles').where('user_id', userId).first()
+    if (!profile) return
+    const activatedAt = dateOf(profile.activated_at)
     const period = scorePeriod(now)
+    const since = DateTime.max(activatedAt, dateOf(period.start))
+      .toUTC()
+      .toSQL({ includeOffset: false })!
     const quizzes = await db
       .from('quiz_results')
       .where('user_id', userId)
       .where((query) => {
         query
-          .whereBetween('created_at', [period.start, period.end])
-          .orWhereBetween('updated_at', [period.start, period.end])
+          .whereBetween('created_at', [since, period.end])
+          .orWhereBetween('updated_at', [since, period.end])
       })
       .select('created_at', 'updated_at')
     const readings = await db
@@ -105,13 +112,13 @@ class TamagoshiPointsService {
       .join('reading_plans', 'reading_plans.id', 'reading_progress.reading_plan_id')
       .where('reading_plans.user_id', userId)
       .where('reading_progress.is_completed', true)
-      .where('reading_progress.completed_at', '>=', period.start)
+      .where('reading_progress.completed_at', '>=', since)
       .where('reading_progress.completed_at', '<', period.end)
       .select('reading_progress.completed_at')
     const invitations = await db
       .from('user_referrals')
       .where('referrer_id', userId)
-      .where('rewarded_at', '>=', period.start)
+      .where('rewarded_at', '>=', since)
       .where('rewarded_at', '<', period.end)
       .select('id', 'rewarded_at')
     const existing = await db
@@ -130,7 +137,13 @@ class TamagoshiPointsService {
       if (!item.at) continue
       const at = dateOf(item.at)
       const key = `${item.source}:${scorePeriod(at).day}`
-      if (!at.isValid || at > now || scorePeriod(at).month !== period.month || seen.has(key))
+      if (
+        !at.isValid ||
+        at < activatedAt ||
+        at > now ||
+        scorePeriod(at).month !== period.month ||
+        seen.has(key)
+      )
         continue
       seen.add(key)
       await this.award(userId, item.source, at)
