@@ -162,3 +162,13 @@ test('pontos de convites só são consumidos após ativar e respeitam o limite d
   await assert.rejects(api.applyInviteRewards(1, -5));
   await assert.rejects(api.applyInviteRewards(1, 1.5));
 });
+test('nome completo une o Tamagoshi ao primeiro nome do dono, sem duplicação', () => {
+  const { tamagoshiDisplayName } = engine;
+  assert.equal(tamagoshiDisplayName('Lumi', 'Paulo Roberto'), 'Lumi Paulo');
+  assert.equal(tamagoshiDisplayName('Pipo', '  Ana   Maria  '), 'Pipo Ana');
+  assert.equal(tamagoshiDisplayName('Lumi Paulo', 'Paulo Roberto'), 'Lumi Paulo');
+  assert.equal(tamagoshiDisplayName('Pérola', 'Érica Silva'), 'Pérola Érica');
+  assert.equal(tamagoshiDisplayName('Lumi', null), 'Lumi');
+  assert.equal(tamagoshiDisplayName('Lumi', '   '), 'Lumi');
+  assert.equal(tamagoshiDisplayName('Paulo', 'Paulo Roberto'), 'Paulo Paulo');
+});

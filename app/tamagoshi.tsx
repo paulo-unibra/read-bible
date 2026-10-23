@@ -9,7 +9,7 @@ import DatabaseService from '../services/DatabaseService';
 import tamagoshiService from '../services/TamagoshiService';
 import referralService from '../services/ReferralService';
 import { getFocusColors } from '../constants/design';
-import { Tamagoshi, tamagoshiStatus } from '../utils/tamagoshi';
+import { Tamagoshi, tamagoshiDisplayName, tamagoshiStatus } from '../utils/tamagoshi';
 
 export default function TamagoshiScreen() {
   const router = useRouter();
@@ -72,7 +72,7 @@ export default function TamagoshiScreen() {
         <View style={styles.pet}>
           <CompanionAvatar size={64} catalogVersion={pet.catalogVersion ?? 1} seed={pet.seed} mood={status.mood} sleeping={status.sleeping} />
           <View style={styles.petSummary}>
-            <Text style={[styles.petName, { color: colors.text }]} numberOfLines={1}>{pet.name}</Text>
+            <Text style={[styles.petName, { color: colors.text }]} numberOfLines={1}>{tamagoshiDisplayName(pet.name, authService.getUser()?.name)}</Text>
             <Text style={[styles.body, { color: colors.muted }]}>Saúde {status.health}/100{status.sleeping ? ' · Dormindo' : ''}</Text>
           </View>
         </View>

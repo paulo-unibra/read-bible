@@ -1,6 +1,6 @@
 # Tamagoshi
 
-Começa desativado. No menu da foto do perfil, **Ativar Tamagoshi** abre a ativação. Depois de ativado, a opção passa a **Configurar Tamagoshi**. Também pode ser acessado pelo perfil. Ativação gera uma espécie/nome inicial persistentes; o usuário pode alterar o nome.
+Começa desativado. No menu da foto do perfil, **Ativar Tamagoshi** abre a ativação. Depois de ativado, a opção passa a **Configurar Tamagoshi**. Também pode ser acessado pelo perfil. Ativação gera uma espécie/nome inicial persistentes; o usuário pode alterar o nome. Na tela inicial e nos cuidados, o nome exibido combina o nome do mascote com o primeiro nome do usuário (por exemplo, **Lumi Paulo**). O primeiro nome é obtido do perfil na exibição, sem alterar o nome-base salvo do mascote.
 
 Os dados ficam no AsyncStorage, separados pelo ID da conta. Esta versão não sincroniza cuidados ou constância entre dispositivos. Não altera a API nem precisa de deploy do backend.
 

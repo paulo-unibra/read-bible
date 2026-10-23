@@ -8,7 +8,7 @@ import { CompanionQuizResult, getCompanion } from '../utils/readingCompanion';
 import CompanionAvatar from './CompanionAvatar';
 import tamagoshiService from '../services/TamagoshiService';
 import referralService from '../services/ReferralService';
-import { TAMAGOSHI_REWARDS, Tamagoshi, tamagoshiStatus } from '../utils/tamagoshi';
+import { TAMAGOSHI_REWARDS, Tamagoshi, tamagoshiDisplayName, tamagoshiStatus } from '../utils/tamagoshi';
 
 export default function ReadingCompanion({ userId, days }: {
   userId: number; plan: ReadingPlan | null; days: ReadingPlanDay[];
@@ -109,6 +109,8 @@ export default function ReadingCompanion({ userId, days }: {
   }, [bounce, reducedMotion, mood, sleeping]));
 
   if (!petData || !status) return null;
+  const owner = authService.getUser();
+  const displayName = tamagoshiDisplayName(petData.name, owner?.id === userId ? owner.name : null);
   const moodLabels = { joyful: 'Radiante', happy: 'Feliz', hopeful: 'Esperançoso', sleepy: 'Precisando de cuidado', curious: 'Curioso' };
   const feeling = status.sleeping ? 'Dormindo' : moodLabels[status.mood];
   const tips = [
@@ -121,7 +123,7 @@ export default function ReadingCompanion({ userId, days }: {
       style={styles.container}
       onPress={() => router.push('/tamagoshi')}
       accessibilityRole="button"
-      accessibilityLabel={`${pet.species} ${petData.name}, ${feeling.toLowerCase()}. Saúde ${status.health} de 100. Leitura: até ${TAMAGOSHI_REWARDS.reading} pontos por dia. Questionário: até ${TAMAGOSHI_REWARDS.quiz} pontos por dia. Ver cuidados do Tamagoshi`}
+      accessibilityLabel={`${pet.species} ${displayName}, ${feeling.toLowerCase()}. Saúde ${status.health} de 100. Leitura: até ${TAMAGOSHI_REWARDS.reading} pontos por dia. Questionário: até ${TAMAGOSHI_REWARDS.quiz} pontos por dia. Ver cuidados do Tamagoshi`}
     >
       <View style={styles.row}>
       <View style={styles.petStage} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
@@ -130,7 +132,7 @@ export default function ReadingCompanion({ userId, days }: {
         </Animated.View>
       </View>
       <View style={styles.copy}>
-        <Text style={styles.title} numberOfLines={1}>{petData.name}</Text>
+        <Text style={styles.title} numberOfLines={1}>{displayName}</Text>
         <Text style={styles.mood} numberOfLines={1}>{feeling}</Text>
       </View>
       <View style={styles.health}>

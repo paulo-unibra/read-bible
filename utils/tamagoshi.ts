@@ -1,6 +1,14 @@
 import type { CompanionMood } from './readingCompanion';
 
 export interface TamagoshiDay { reading: boolean; quiz: boolean }
+export function tamagoshiDisplayName(petName: string, userName?: string | null): string {
+  const base = petName.trim().replace(/\s+/g, ' ');
+  const firstName = userName?.trim().split(/\s+/)[0];
+  if (!firstName) return base;
+  const parts = base.split(' ');
+  if (parts.length > 1 && parts[parts.length - 1].toLocaleLowerCase('pt-BR') === firstName.toLocaleLowerCase('pt-BR')) return base;
+  return `${base} ${firstName}`.trim();
+}
 export interface Tamagoshi {
   version: 1;
   catalogVersion?: 1 | 2;
