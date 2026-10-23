@@ -147,6 +147,48 @@ test.group('Tamagoshi monthly points', () => {
       await pointsService.backfill(user.id)
       const pointSummary3 = await pointsService.summary(user.id)
       assert.equal(pointSummary3.points, 6)
+      await ReadingProgress.create({
+        readingPlanId: plan.id,
+        day: 2,
+        bookName: 'Gênesis',
+        startChapter: 2,
+        endChapter: 2,
+        isCompleted: true,
+        completedAt: DateTime.utc(),
+      })
+      // Legacy app versions also notified this endpoint after plan completion.
+      await client
+        .post('/tamagoshi/reading')
+        .header('Authorization', auth)
+        .json({ day: scorePeriod().day })
+      const unmark = (day: number) =>
+        client.post('/reading-plans/unmark').header('Authorization', auth).json({ day })
+      const firstUnmark = await unmark(1)
+      firstUnmark.assertStatus(200)
+      let summary = await client.get('/tamagoshi').header('Authorization', auth)
+      assert.equal(summary.body().data.score.points, 6)
+      await pointsService.award(user.id, 'quiz')
+      const lastUnmark = await unmark(2)
+      lastUnmark.assertStatus(200)
+      summary = await client.get('/tamagoshi').header('Authorization', auth)
+      assert.equal(summary.body().data.score.points, 2)
+      assert.deepEqual(summary.body().data.score.readingHistory, [])
+      assert.isFalse(summary.body().data.score.readToday)
+      const rank = await client.get('/tamagoshi/ranking').header('Authorization', auth)
+      assert.equal(rank.body().data.own.points, 2)
+      // Repair stale awards left behind by the previous version.
+      await pointsService.award(user.id, 'reading')
+      summary = await client.get('/tamagoshi').header('Authorization', auth)
+      assert.equal(summary.body().data.score.points, 2)
+      const free = await client
+        .post('/tamagoshi/reading')
+        .header('Authorization', auth)
+        .json({ day: scorePeriod().day, origin: 'chapter' })
+      free.assertStatus(200)
+      await unmark(2)
+      summary = await client.get('/tamagoshi').header('Authorization', auth)
+      assert.equal(summary.body().data.score.points, 8)
+      assert.deepEqual(summary.body().data.score.readingHistory, [scorePeriod().day])
     } finally {
       await db.from('audit_logs').where('user_id', user.id).delete()
       await user.delete()

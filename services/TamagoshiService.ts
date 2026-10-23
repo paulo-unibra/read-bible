@@ -71,7 +71,7 @@ class TamagoshiService {
     if (!data.profile && local) data = await this.request(userId, '/activate', 'POST', { name: local.name, seed: local.seed, catalogVersion: local.catalogVersion ?? 1 });
     if (!data.profile) return null;
     if (local?.pendingName) data = await this.request(userId, '', 'PUT', { name: local.pendingName });
-    if (local?.pendingReadingDay === dayKey()) data = await this.request(userId, '/reading', 'POST', { day: local.pendingReadingDay });
+    if (local?.pendingReadingDay === dayKey()) data = await this.request(userId, '/reading', 'POST', { day: local.pendingReadingDay, origin: 'chapter' });
     if (!Number.isSafeInteger(data.score?.points) || data.score.points < 0 || !/^\d{4}-\d{2}$/.test(data.score.month)) throw new Error('Pontuação inválida.');
     const profile = data.profile!;
     return this.run(async () => {
@@ -79,7 +79,9 @@ class TamagoshiService {
       const pet: Tamagoshi = { version: 1, days: {}, ...current, seed: profile.seed, catalogVersion: profile.catalogVersion,
         name: current?.pendingName && current.pendingName !== local?.pendingName ? current.name : profile.name,
         activatedAt: profile.activatedAt, sleepStart: TAMAGOSHI_SLEEP.start, sleepEnd: TAMAGOSHI_SLEEP.end, monthlyScore: data.score };
-      for (const date of data.score.readingDays) pet.days[date] = { ...(pet.days[date] ?? { reading: false, quiz: false }), reading: true };
+      // Replace confirmed reading history: a removed completion must not survive in cache.
+      for (const date of Object.keys(pet.days)) pet.days[date] = { ...pet.days[date], reading: false };
+      for (const date of data.score.readingHistory ?? data.score.readingDays) pet.days[date] = { ...(pet.days[date] ?? { reading: false, quiz: false }), reading: true };
       for (const date of data.score.quizDays) pet.days[date] = { ...(pet.days[date] ?? { reading: false, quiz: false }), quiz: true };
       if (pet.pendingName === local?.pendingName) delete pet.pendingName;
       if (pet.pendingReadingDay && (data.score.readingDays.includes(pet.pendingReadingDay) || pet.pendingReadingDay < dayKey())) delete pet.pendingReadingDay;

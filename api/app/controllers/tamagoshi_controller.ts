@@ -19,7 +19,10 @@ export default class TamagoshiController {
   async me({ auth, response }: HttpContext) {
     const userId = auth.user!.id
     const profile = await db.from('tamagoshi_profiles').where('user_id', userId).first()
-    if (profile) await pointsService.backfill(userId)
+    if (profile) {
+      await pointsService.reconcileReadings(userId)
+      await pointsService.backfill(userId)
+    }
     return response.ok({
       success: true,
       data: {
@@ -68,7 +71,10 @@ export default class TamagoshiController {
         success: false,
         message: 'A data mudou. Registre a leitura de hoje para pontuar.',
       })
-    await pointsService.award(ctx.auth.user!.id, 'reading')
+    await pointsService.recordFreeReading(
+      ctx.auth.user!.id,
+      ctx.request.input('origin') === 'chapter'
+    )
     return this.me(ctx)
   }
   async ranking({ auth, request, response }: HttpContext) {

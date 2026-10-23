@@ -217,7 +217,7 @@ export default function ReadingPlansScreen() {
     setIsMarkingComplete(true);
     try {
       await readingPlanService.markDayAsCompleted(day.id);
-      if (userId !== null) await tamagoshiService.record(userId, "reading").catch(() => {});
+      if (userId !== null) await tamagoshiService.sync(userId).catch(() => {});
 
       await loadPlans();
 

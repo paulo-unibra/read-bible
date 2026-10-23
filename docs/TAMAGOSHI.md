@@ -5,6 +5,7 @@ O Tamagoshi começa inativo. O menu do perfil permite ativar, editar o nome, con
 ## Pontos e ranking
 
 - Leitura confirmada: **6 pontos por dia**, independentemente da quantidade de capítulos ou planos.
+- Desmarcar a última leitura concluída de uma data retira os 6 pontos daquele dia e atualiza a constância/expressão. Outra leitura do mesmo dia mantém o crédito, inclusive capítulo livre confirmado separadamente. Pontos de quizzes e convites permanecem.
 - Questionário concluído e validado pela API: **2 pontos por dia**, independentemente das tentativas ou questionários.
 - Convite de nova conta com e-mail confirmado: **5 pontos por conta**, no mês da confirmação.
 - Não há limite de 100, pontos iniciais nem perda de pontos por inatividade.
@@ -18,6 +19,8 @@ O ranking mostra a lista paginada, o mês e a própria posição/pontuação, me
 A API mantém `tamagoshi_profiles` e um livro de eventos em `tamagoshi_points`. Cada usuário possui uma entrada única por fonte e dia (leitura/quiz), ou por convite confirmado. O cliente nunca informa valores de pontos ou meses para ganhar pontuação. O registro de leitura é uma confirmação do usuário, limitada ao dia atual do servidor. O app exige conexão para participar do ranking.
 
 A conclusão da leitura do plano, do quiz e do convite registra pontos dentro da transação original. Ao sincronizar, atividades confirmadas no servidor durante o mês corrente também são recuperadas, sem duplicação. Saúde antiga e histórico exclusivamente local não são convertidos em pontos.
+
+A migração `1793200000001_track_free_reading_points` distingue confirmação de capítulo livre de conclusão de plano. O app não registra conclusão de plano como capítulo livre. Ao desmarcar, a API reconcilia os créditos na mesma transação; na sincronização também remove créditos sem leitura que os sustente. `readingHistory` substitui o histórico local de constância, incluindo meses anteriores, para que leituras removidas não mantenham a expressão feliz.
 
 Leituras livres feitas offline ficam pendentes no aparelho. Precisam ser sincronizadas ainda no mesmo dia de Recife; o app informa essa condição. Pendências anteriores não são creditadas em outro dia ou mês. Um total em cache de mês anterior é exibido como zero após a virada, inclusive offline.
 

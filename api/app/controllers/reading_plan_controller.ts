@@ -1836,67 +1836,78 @@ export default class ReadingPlanController {
    */
   async unmarkDay({ auth, request, response }: HttpContext) {
     try {
-      const user = auth.user!
-      const { day } = request.only(['day'])
+      return await db.transaction(async (trx) => {
+        const user = auth.user!
+        const { day } = request.only(['day'])
 
-      const plan = await ReadingPlan.query()
-        .where('user_id', user.id)
-        .where('is_active', true)
-        .whereNull('deleted_at')
-        .first()
+        const plan = await ReadingPlan.query({ client: trx })
+          .where('user_id', user.id)
+          .where('is_active', true)
+          .whereNull('deleted_at')
+          .forUpdate()
+          .first()
 
-      if (!plan) {
-        return response.notFound({
-          success: false,
-          message: 'Plano de leitura não encontrado',
-        })
-      }
-
-      // Buscar leituras do dia
-      const readings = await ReadingProgress.query()
-        .where('reading_plan_id', plan.id)
-        .where('day', day)
-
-      if (readings.length === 0) {
-        return response.notFound({
-          success: false,
-          message: 'Leitura não encontrada',
-        })
-      }
-
-      // Calcular quantos capítulos serão desmarcados
-      let chaptersToUnmark = 0
-      for (const reading of readings) {
-        if (reading.isCompleted) {
-          chaptersToUnmark += reading.endChapter - reading.startChapter + 1
+        if (!plan) {
+          return response.notFound({
+            success: false,
+            message: 'Plano de leitura não encontrado',
+          })
         }
-      }
 
-      // Desmarcar as leituras
-      await ReadingProgress.query().where('reading_plan_id', plan.id).where('day', day).update({
-        isCompleted: false,
-        completedAt: null,
-      })
+        // Buscar leituras do dia
+        const readings = await ReadingProgress.query({ client: trx })
+          .where('reading_plan_id', plan.id)
+          .where('day', day)
 
-      // Atualizar plano
-      plan.completedChapters = Math.max(0, plan.completedChapters - chaptersToUnmark)
+        if (readings.length === 0) {
+          return response.notFound({
+            success: false,
+            message: 'Leitura não encontrada',
+          })
+        }
 
-      // A desmarcação de um dia antigo não deve retroceder o cursor do plano.
-      await plan.save()
+        // Calcular quantos capítulos serão desmarcados
+        let chaptersToUnmark = 0
+        for (const reading of readings) {
+          if (reading.isCompleted) {
+            chaptersToUnmark += reading.endChapter - reading.startChapter + 1
+          }
+        }
 
-      await AuditLog.create({
-        userId: user.id,
-        action: 'reading.unmark_day',
-        entityType: 'reading_plan',
-        entityId: plan.id,
-        details: { day, chapters: chaptersToUnmark },
-        ipAddress: request.ip(),
-        userAgent: request.header('user-agent') || null,
-      })
+        // Desmarcar as leituras
+        await ReadingProgress.query({ client: trx })
+          .where('reading_plan_id', plan.id)
+          .where('day', day)
+          .update({
+            isCompleted: false,
+            completedAt: null,
+          })
 
-      return response.ok({
-        success: true,
-        message: 'Leitura desmarcada com sucesso',
+        // Atualizar plano
+        plan.completedChapters = Math.max(0, plan.completedChapters - chaptersToUnmark)
+
+        // A desmarcação de um dia antigo não deve retroceder o cursor do plano.
+        await plan.save()
+
+        await pointsService.reconcileReadings(user.id, trx)
+
+        await AuditLog.create(
+          {
+            userId: user.id,
+            action: 'reading.unmark_day',
+            entityType: 'reading_plan',
+            entityId: plan.id,
+            details: { day, chapters: chaptersToUnmark },
+            ipAddress: request.ip(),
+            userAgent: request.header('user-agent') || null,
+          },
+          { client: trx }
+        )
+
+        return response.ok({
+          success: true,
+          message: 'Leitura desmarcada com sucesso',
+        })
       })
     } catch (error) {
       console.error('Erro ao desmarcar leitura:', error)

@@ -13,6 +13,7 @@ export interface MonthlyScore {
   month: string;
   points: number;
   readingDays: string[];
+  readingHistory?: string[];
   quizDays: string[];
   readToday: boolean;
   quizToday: boolean;
@@ -57,7 +58,8 @@ export function tamagoshiStatus(pet: Tamagoshi, now = new Date()) {
   const today = dayKey(now);
   const month = today.slice(0, 7);
   const score = pet.monthlyScore?.month === month ? pet.monthlyScore : null;
-  const readingDates = new Set([...Object.keys(pet.days).filter(key => pet.days[key].reading), ...(score?.readingDays ?? [])]);
+  const readingDates = new Set(pet.monthlyScore?.readingHistory ?? [...Object.keys(pet.days).filter(key => pet.days[key].reading), ...(score?.readingDays ?? [])]);
+  if (pet.pendingReadingDay === today) readingDates.add(today);
   const readToday = readingDates.has(today);
   const quizToday = Boolean(pet.days[today]?.quiz || score?.quizDays.includes(today));
   let streak = 0;

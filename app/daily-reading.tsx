@@ -291,7 +291,7 @@ export default function DailyReadingScreen() {
       }
 
       const companionUserId = authService.getUser()?.id;
-      if (companionUserId != null) await tamagoshiService.record(companionUserId, 'reading').catch(() => {});
+      if (companionUserId != null) await tamagoshiService.sync(companionUserId).catch(() => {});
 
       console.log('🎉 [handleMarkComplete] Leitura marcada com sucesso, voltando...');
       

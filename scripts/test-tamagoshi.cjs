@@ -15,6 +15,16 @@ const engine = compile('utils/tamagoshi.ts');
 const { dayKey, nextDay, TAMAGOSHI_SLEEP, isSleeping, settleTamagoshi, tamagoshiStatus, tamagoshiDisplayName } = engine;
 const base = () => ({ version: 1, seed: 123, name: 'Lumi', activatedAt: '2026-10-20T15:00:00Z', sleepStart: '22:00', sleepEnd: '06:00', health: 100, days: {} });
 const score = { month: '2026-10', points: 126, readingDays: ['2026-10-31'], quizDays: [], readToday: true, quizToday: false };
+test('leituras removidas não sobrevivem no cache nem mantêm a expressão feliz', () => {
+  const pet = { ...base(), days: { '2026-10-31': { reading: true, quiz: false } },
+    monthlyScore: { ...score, points: 2, readingDays: [], readingHistory: [], readToday: false } };
+  const status = tamagoshiStatus(pet, new Date('2026-10-31T15:00:00Z'));
+  assert.equal(status.points, 2);
+  assert.equal(status.readToday, false);
+  assert.equal(status.streak, 0);
+  assert.notEqual(status.mood, 'happy');
+  assert.notEqual(status.mood, 'joyful');
+});
 test('sono fixo começa às 22h e termina às 6h no relógio local', () => {
   assert.deepEqual(TAMAGOSHI_SLEEP, { start: '22:00', end: '06:00' });
   assert.equal(isSleeping(new Date(2026, 9, 23, 21, 59)), false);
@@ -127,4 +137,16 @@ test('perfil remoto é recuperado em outro aparelho e nome continua editável', 
   assert.equal(restored.seed, pet.seed);
   assert.equal((await api.configure(1, { name: ' Pipo ' })).name, 'Pipo');
   await assert.rejects(api.configure(1, { name: '' }));
+});
+test('sincronização retira do armazenamento leituras desmarcadas no servidor', async () => {
+  const { api, store, server } = service();
+  await api.activate(1);
+  await api.record(1, 'reading');
+  const row = server.get(1);
+  row.score = { ...row.score, points: 0, readingDays: [], readingHistory: [], readToday: false };
+  const saved = await api.sync(1);
+  assert.equal(saved.days[dayKey()].reading, false);
+  assert.equal(tamagoshiStatus(saved).streak, 0);
+  assert.equal(tamagoshiStatus(saved).points, 0);
+  assert.equal(JSON.parse(store.get('@readbible/tamagoshi/v1/1')).days[dayKey()].reading, false);
 });

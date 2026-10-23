@@ -45,8 +45,50 @@ class TamagoshiPointsService {
       if ((error as { code?: string }).code !== 'ER_DUP_ENTRY') throw error
     }
   }
-  // Existing server-confirmed activity in this month is eligible. Never import
-  // client health, point totals or client-provided dates into the leaderboard.
+  async recordFreeReading(userId: number, explicitChapter = false) {
+    // Older app versions also call this endpoint after completing a plan day.
+    // Those calls must not turn a reversible plan award into a free-reading award.
+    if (!explicitChapter) {
+      const completed = await db
+        .from('reading_progress')
+        .join('reading_plans', 'reading_plans.id', 'reading_progress.reading_plan_id')
+        .where('reading_plans.user_id', userId)
+        .where('reading_progress.is_completed', true)
+        .whereNotNull('reading_progress.completed_at')
+        .select('reading_progress.completed_at')
+      if (completed.some((row) => scorePeriod(dateOf(row.completed_at)).day === scorePeriod().day))
+        return
+    }
+    await db.transaction(async (trx) => {
+      await this.award(userId, 'reading', DateTime.utc(), undefined, trx)
+      await trx
+        .from('tamagoshi_points')
+        .where('user_id', userId)
+        .where('source', 'reading')
+        .where('score_day', scorePeriod().day)
+        .update({ free_reading: true })
+    })
+  }
+  async reconcileReadings(userId: number, trx?: TransactionClientContract) {
+    const client = trx || db
+    const completed = await client
+      .from('reading_progress')
+      .join('reading_plans', 'reading_plans.id', 'reading_progress.reading_plan_id')
+      .where('reading_plans.user_id', userId)
+      .where('reading_progress.is_completed', true)
+      .whereNotNull('reading_progress.completed_at')
+      .select('reading_progress.completed_at')
+    const validDays = new Set(completed.map((row) => scorePeriod(dateOf(row.completed_at)).day))
+    const awards = await client
+      .from('tamagoshi_points')
+      .where('user_id', userId)
+      .where('source', 'reading')
+      .where('free_reading', false)
+      .select('id', 'score_day')
+    const invalidIds = awards.filter((row) => !validDays.has(row.score_day)).map((row) => row.id)
+    if (invalidIds.length) await client.from('tamagoshi_points').whereIn('id', invalidIds).delete()
+  }
+  // Only server-confirmed activity is eligible for the leaderboard.
   async backfill(userId: number, now: DateTime = DateTime.utc()) {
     const period = scorePeriod(now)
     const quizzes = await db
@@ -101,6 +143,11 @@ class TamagoshiPointsService {
   }
   async summary(userId: number, now: DateTime = DateTime.utc()) {
     const period = scorePeriod(now)
+    const readingHistory = await db
+      .from('tamagoshi_points')
+      .where('user_id', userId)
+      .where('source', 'reading')
+      .select('score_day')
     const rows = await db
       .from('tamagoshi_points')
       .where('user_id', userId)
@@ -108,6 +155,7 @@ class TamagoshiPointsService {
       .select('source', 'score_day', 'points')
     return {
       month: period.month,
+      readingHistory: readingHistory.map((row) => row.score_day as string),
       points: rows.reduce((sum, row) => sum + Number(row.points), 0),
       readingDays: rows
         .filter((row) => row.source === 'reading')
