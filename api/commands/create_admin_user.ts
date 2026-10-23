@@ -1,5 +1,6 @@
 import Role from '#models/role'
 import User from '#models/user'
+import env from '#start/env'
 import { BaseCommand } from '@adonisjs/core/ace'
 import { CommandOptions } from '@adonisjs/core/types/ace'
 
@@ -14,10 +15,16 @@ export default class CreateAdminUser extends BaseCommand {
   async run() {
     this.logger.info('Criando usuário administrador...')
 
-    // Dados do usuário
-    const email = 'admin@readbible.com'
-    const password = 'Admin@123'
-    const fullName = 'Administrador Sistema'
+    const email = env.get('BOOTSTRAP_ADMIN_EMAIL')?.trim().toLowerCase()
+    const password = env.get('BOOTSTRAP_ADMIN_PASSWORD')
+    const fullName = env.get('BOOTSTRAP_ADMIN_NAME')?.trim() || 'Administrador Sistema'
+
+    if (!email || !password || password.length < 12) {
+      this.logger.error(
+        'Defina BOOTSTRAP_ADMIN_EMAIL e uma BOOTSTRAP_ADMIN_PASSWORD com pelo menos 12 caracteres no ambiente desta execução.'
+      )
+      return
+    }
 
     try {
       // Verificar se o usuário já existe
@@ -73,10 +80,8 @@ export default class CreateAdminUser extends BaseCommand {
       this.logger.success(`Role "Administrador" associada ao usuário`)
 
       this.logger.info('\n✅ Usuário administrador criado com sucesso!')
-      this.logger.info(`\nCredenciais:`)
-      this.logger.info(`Email: ${email}`)
-      this.logger.info(`Senha: ${password}`)
-      this.logger.info(`\nUse estas credenciais para fazer login no painel administrativo.`)
+      this.logger.info(`Conta: ${email}`)
+      this.logger.info('A senha não será exibida nos logs.')
     } catch (error) {
       this.logger.error('Erro ao criar usuário administrador:')
       this.logger.error(error.message)

@@ -24,6 +24,9 @@ export default class User extends compose(BaseModel, AuthFinder) {
   @column()
   declare email: string
 
+  @column({ consume: (value: boolean | number) => Boolean(value) })
+  declare emailVerified: boolean
+
   @column({ serializeAs: null })
   declare password: string
 

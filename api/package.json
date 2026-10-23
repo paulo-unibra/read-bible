@@ -42,6 +42,7 @@
     "@adonisjs/tsconfig": "^1.4.0",
     "@japa/api-client": "^3.1.0",
     "@japa/assert": "^4.0.1",
+    "@japa/core": "10.3.0",
     "@japa/plugin-adonisjs": "^4.0.0",
     "@japa/runner": "^4.2.0",
     "@swc/core": "1.11.24",
@@ -75,6 +76,9 @@
       "./app/controllers/**/*.ts",
       "./app/middleware/*.ts"
     ]
+  },
+  "overrides": {
+    "@japa/core": "10.3.0"
   },
   "prettier": "@adonisjs/prettier-config"
 }

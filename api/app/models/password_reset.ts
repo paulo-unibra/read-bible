@@ -17,6 +17,9 @@ export default class PasswordReset extends BaseModel {
   @column()
   declare used: boolean
 
+  @column()
+  declare attempts: number
+
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
 

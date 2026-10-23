@@ -9,11 +9,56 @@ import type { HttpContext } from '@adonisjs/core/http'
 import app from '@adonisjs/core/services/app'
 import { createReadStream, existsSync, promises as fsPromises } from 'node:fs'
 import path from 'node:path'
+import { Readable } from 'node:stream'
 
-function toPublicBible(bible: BibleBrainBible, request?: HttpContext['request']) {
+function normalizeHlsResource(value: string) {
+  let decoded: string
+  try {
+    decoded = decodeURIComponent(value)
+  } catch {
+    return null
+  }
+
+  if (!decoded || decoded.length > 512 || decoded.startsWith('/') || decoded.includes('\\')) {
+    return null
+  }
+
+  const segments = decoded.split('/')
+  if (
+    segments.some(
+      (segment) =>
+        !segment || segment === '.' || segment === '..' || !/^[A-Za-z0-9._ -]+$/.test(segment)
+    )
+  ) {
+    return null
+  }
+
+  return segments.map((segment) => encodeURIComponent(segment)).join('/')
+}
+
+function resolveHlsResource(value: string, playlistDirectory: URL) {
+  let target: URL
+  try {
+    target = new URL(value, playlistDirectory)
+  } catch {
+    return null
+  }
+
+  if (
+    target.origin !== playlistDirectory.origin ||
+    !target.pathname.startsWith(playlistDirectory.pathname)
+  ) {
+    return null
+  }
+
+  const relative = target.pathname.slice(playlistDirectory.pathname.length)
+  return normalizeHlsResource(relative)
+}
+
+function toPublicBible(bible: BibleBrainBible) {
   let downloadUrl: string | null = null
-  if (bible.packageStatus === 'ready' && request) {
-    downloadUrl = `${request.protocol()}://${request.host()}/bible-brain/bibles/${bible.bibleId}/package/download`
+  if (bible.packageStatus === 'ready') {
+    downloadUrl = `/bible-brain/bibles/${encodeURIComponent(bible.bibleId)}/package/download`
   }
 
   return {
@@ -72,7 +117,7 @@ export default class BibleBrainController {
 
       return response.ok({
         success: true,
-        data: bibles.all().map((b) => toPublicBible(b, request)),
+        data: bibles.all().map((b) => toPublicBible(b)),
         meta: bibles.getMeta(),
       })
     } catch (error) {
@@ -129,7 +174,7 @@ export default class BibleBrainController {
     }
   }
 
-  async show({ params, request, response }: HttpContext) {
+  async show({ params, response }: HttpContext) {
     try {
       const bible = await BibleBrainBible.query()
         .where('bible_id', params.bibleId)
@@ -150,7 +195,7 @@ export default class BibleBrainController {
         return response.notFound({ success: false, message: 'Bíblia não encontrada' })
       }
 
-      return response.ok({ success: true, data: toPublicBible(bible, request) })
+      return response.ok({ success: true, data: toPublicBible(bible) })
     } catch (error) {
       console.error('[BibleBrainController] Erro ao buscar bíblia:', error)
       return response.internalServerError({
@@ -161,7 +206,7 @@ export default class BibleBrainController {
     }
   }
 
-  async requestPackage({ params, request, response }: HttpContext) {
+  async requestPackage({ params, response }: HttpContext) {
     try {
       const existing = await BibleBrainBible.query()
         .where('bible_id', params.bibleId)
@@ -179,7 +224,7 @@ export default class BibleBrainController {
       }
 
       const bible = await BibleBrainBible.findByOrFail('bibleId', params.bibleId)
-      return response.ok({ success: true, data: toPublicBible(bible, request) })
+      return response.ok({ success: true, data: toPublicBible(bible) })
     } catch (error) {
       console.error('[BibleBrainController] Erro ao solicitar pacote:', error)
       return response.badRequest({
@@ -189,7 +234,7 @@ export default class BibleBrainController {
     }
   }
 
-  async packageStatus({ params, request, response }: HttpContext) {
+  async packageStatus({ params, response }: HttpContext) {
     try {
       const bible = await BibleBrainBible.query()
         .where('bible_id', params.bibleId)
@@ -200,7 +245,7 @@ export default class BibleBrainController {
         return response.notFound({ success: false, message: 'Bíblia não encontrada' })
       }
 
-      return response.ok({ success: true, data: toPublicBible(bible, request) })
+      return response.ok({ success: true, data: toPublicBible(bible) })
     } catch (error) {
       console.error('[BibleBrainController] Erro ao consultar status do pacote:', error)
       return response.internalServerError({
@@ -253,7 +298,7 @@ export default class BibleBrainController {
     }
   }
 
-  async videoChapter({ params, request, response }: HttpContext) {
+  async videoChapter({ params, response }: HttpContext) {
     try {
       let videoFilesetId: string | null = null
 
@@ -307,15 +352,30 @@ export default class BibleBrainController {
       }
 
       const apiKey = bibleBrainService.getKey()
-      const directUrl = String(chapter.path)
-      const sep = directUrl.includes('?') ? '&' : '?'
-      const fullPlaylistUrl = `${directUrl}${sep}key=${apiKey}&v=4`
-      const masterContent = await (await fetch(fullPlaylistUrl)).text()
-      const childLine = masterContent.split('\n').map(l => l.trim()).find(l => l && !l.startsWith('#'))
-      const childUrlWithParams = childLine || ''
+      const directUrl = new URL(String(chapter.path))
+      if (directUrl.protocol !== 'https:') {
+        return response.badRequest({ success: false, message: 'Playlist inválida' })
+      }
+      directUrl.searchParams.set('key', apiKey)
+      directUrl.searchParams.set('v', '4')
+      const masterResponse = await fetch(directUrl, { signal: AbortSignal.timeout(15_000) })
+      if (!masterResponse.ok) {
+        return response.badRequest({ success: false, message: 'Falha ao obter playlist do BibleBrain' })
+      }
+      const masterContent = await masterResponse.text()
+      if (masterContent.length > 1_000_000) {
+        return response.status(413).send({ success: false, message: 'Playlist muito grande' })
+      }
+      const childLine = masterContent
+        .split('\n')
+        .map((line) => line.trim())
+        .find((line) => line && !line.startsWith('#'))
+      const safeChild = childLine
+        ? resolveHlsResource(childLine, new URL('.', directUrl))
+        : null
 
-      const proxyBase = `${request.protocol()}://${request.host()}/bible-brain/video-proxy/${videoFilesetId}/${params.bookId}/${params.chapterNumber}`
-      const proxyUrl = childUrlWithParams ? `${proxyBase}/${childUrlWithParams}` : proxyBase
+      const proxyBase = `/bible-brain/video-proxy/${encodeURIComponent(videoFilesetId)}/${encodeURIComponent(params.bookId)}/${encodeURIComponent(params.chapterNumber)}`
+      const proxyUrl = safeChild ? `${proxyBase}/${safeChild}` : proxyBase
 
       return response.ok({
         success: true,
@@ -554,14 +614,24 @@ export default class BibleBrainController {
     }
   }
 
-  async videoProxyPlaylist({ params, request, response }: HttpContext) {
+  async videoProxyPlaylist({ params, response }: HttpContext) {
     try {
       const { filesetId, bookId, chapterNumber } = params
       const apiKey = bibleBrainService.getKey()
-      const resource = Array.isArray(params['*']) ? params['*'].join('/') : (params['*'] || '')
+      const resource = Array.isArray(params['*']) ? params['*'].join('/') : params['*'] || ''
+
+      if (
+        !/^[A-Z0-9_-]{1,100}$/i.test(String(filesetId)) ||
+        !/^[A-Z0-9]{2,4}$/i.test(String(bookId)) ||
+        !/^\d{1,4}$/.test(String(chapterNumber))
+      ) {
+        return response.badRequest({ success: false, message: 'Parâmetros inválidos' })
+      }
 
       const chapterData = await bibleBrainService.getChapterContent(
-        filesetId, bookId, parseInt(chapterNumber)
+        filesetId,
+        bookId,
+        Number.parseInt(chapterNumber)
       )
 
       if (!chapterData.data || chapterData.data.length === 0) {
@@ -569,40 +639,87 @@ export default class BibleBrainController {
       }
 
       const chapter = chapterData.data[0]
-      const playlistUrl = String(chapter.path)
-      const playlistBase = playlistUrl.substring(0, playlistUrl.lastIndexOf('/') + 1)
+      const playlistUrl = new URL(String(chapter.path))
+      if (playlistUrl.protocol !== 'https:') {
+        return response.badRequest({ success: false, message: 'Playlist inválida' })
+      }
+      const playlistDirectory = new URL('.', playlistUrl)
 
       if (resource && resource !== 'playlist.m3u8') {
-        const sep = resource.includes('?') ? '&' : '?'
-        const fullUrl = `${playlistBase}${resource}${sep}key=${apiKey}&v=4`
-        const resourceResponse = await fetch(fullUrl)
-        if (!resourceResponse.ok) {
-          return response.badRequest({ success: false, message: 'Falha ao obter recurso do BibleBrain' })
+        const safeResource = normalizeHlsResource(resource)
+        if (!safeResource) {
+          return response.badRequest({ success: false, message: 'Recurso de playlist inválido' })
         }
-        const contentType = resource.endsWith('.m3u8')
+
+        const fullUrl = new URL(safeResource, playlistDirectory)
+        if (
+          fullUrl.origin !== playlistDirectory.origin ||
+          !fullUrl.pathname.startsWith(playlistDirectory.pathname)
+        ) {
+          return response.badRequest({ success: false, message: 'Recurso de playlist inválido' })
+        }
+        fullUrl.searchParams.set('key', apiKey)
+        fullUrl.searchParams.set('v', '4')
+
+        const resourceResponse = await fetch(fullUrl, { signal: AbortSignal.timeout(15_000) })
+        if (!resourceResponse.ok) {
+          return response.badRequest({
+            success: false,
+            message: 'Falha ao obter recurso do BibleBrain',
+          })
+        }
+        const contentType = safeResource.endsWith('.m3u8')
           ? 'application/vnd.apple.mpegurl'
-          : (resourceResponse.headers.get('content-type') || 'application/octet-stream')
+          : resourceResponse.headers.get('content-type') || 'application/octet-stream'
         response.header('Content-Type', contentType)
-        const text = await resourceResponse.text()
-        return response.send(text)
+        const contentLength = Number(resourceResponse.headers.get('content-length'))
+        if (Number.isFinite(contentLength) && contentLength > 100 * 1024 * 1024) {
+          return response.status(413).send({ success: false, message: 'Recurso muito grande' })
+        }
+
+        if (safeResource.endsWith('.m3u8')) {
+          const text = await resourceResponse.text()
+          if (text.length > 1_000_000) {
+            return response.status(413).send({ success: false, message: 'Playlist muito grande' })
+          }
+          return response.send(text)
+        }
+
+        if (!resourceResponse.body) {
+          return response.badRequest({ success: false, message: 'Recurso vazio' })
+        }
+        if (resourceResponse.headers.get('content-length')) {
+          response.header('Content-Length', resourceResponse.headers.get('content-length')!)
+        }
+        return response.stream(Readable.fromWeb(resourceResponse.body as any))
       }
 
-      const sep = playlistUrl.includes('?') ? '&' : '?'
-      const fullUrl = `${playlistUrl}${sep}key=${apiKey}&v=4`
+      const fullUrl = new URL(playlistUrl)
+      fullUrl.searchParams.set('key', apiKey)
+      fullUrl.searchParams.set('v', '4')
 
-      const playlistResponse = await fetch(fullUrl)
+      const playlistResponse = await fetch(fullUrl, { signal: AbortSignal.timeout(15_000) })
       if (!playlistResponse.ok) {
-        return response.badRequest({ success: false, message: 'Falha ao obter playlist do BibleBrain' })
+        return response.badRequest({
+          success: false,
+          message: 'Falha ao obter playlist do BibleBrain',
+        })
       }
 
       const playlistContent = await playlistResponse.text()
-      const proxyBase = `${request.protocol()}://${request.host()}/bible-brain/video-proxy/${filesetId}/${bookId}/${chapterNumber}`
+      if (playlistContent.length > 1_000_000) {
+        return response.status(413).send({ success: false, message: 'Playlist muito grande' })
+      }
 
-      const rewritten = playlistContent.split('\n').map(line => {
-        const trimmed = line.trim()
-        if (!trimmed || trimmed.startsWith('#')) return line
-        return `${proxyBase}/${trimmed}`
-      }).join('\n')
+      const rewritten = playlistContent
+        .split('\n')
+        .map((line) => {
+          const trimmed = line.trim()
+          if (!trimmed || trimmed.startsWith('#')) return line
+          const safeResource = resolveHlsResource(trimmed, playlistDirectory)
+          return safeResource || ''
+        })
+        .join('\n')
 
       response.header('Content-Type', 'application/vnd.apple.mpegurl')
       return response.send(rewritten)
@@ -654,8 +771,20 @@ export default class BibleBrainController {
 
   async audioChapter({ params, response }: HttpContext) {
     try {
+      const bibleId = String(params.bibleId || '')
+      const bookId = String(params.bookId || '')
+      const chapterNumber = String(params.chapterNumber || '')
+
+      if (
+        !/^[A-Z0-9_-]+$/i.test(bibleId) ||
+        !/^[A-Z0-9]{2,4}$/i.test(bookId) ||
+        !/^\d+$/.test(chapterNumber)
+      ) {
+        return response.badRequest({ success: false, message: 'Parâmetros inválidos' })
+      }
+
       const bible = await BibleBrainBible.query()
-        .where('bible_id', params.bibleId)
+        .where('bible_id', bibleId)
         .where('is_enabled', true)
         .first()
 
@@ -663,12 +792,11 @@ export default class BibleBrainController {
         return response.notFound({ success: false, message: 'Bíblia não encontrada' })
       }
 
-      const localFile = path.join(
-        app.publicPath('uploads/bible-brain-audio'),
-        params.bibleId,
-        params.bookId,
-        `${params.chapterNumber}.mp3`
-      )
+      const audioRoot = path.resolve(app.publicPath('uploads/bible-brain-audio'))
+      const localFile = path.resolve(audioRoot, bibleId, bookId, `${chapterNumber}.mp3`)
+      if (!localFile.startsWith(`${audioRoot}${path.sep}`)) {
+        return response.badRequest({ success: false, message: 'Parâmetros inválidos' })
+      }
 
       if (existsSync(localFile)) {
         const stat = await fsPromises.stat(localFile)
@@ -677,7 +805,7 @@ export default class BibleBrainController {
         // Construir uma URL absoluta aqui geraria um link quebrado (sem
         // "/api"). O cliente resolve o caminho relativo usando sua própria
         // base de API.
-        const url = `/bible-brain/bibles/${params.bibleId}/audio-file/${params.bookId}/${params.chapterNumber}`
+        const url = `/bible-brain/bibles/${bibleId}/audio-file/${bookId}/${chapterNumber}`
         return response.ok({
           success: true,
           data: { url, duration: 0, filesize: stat.size, filesetId: null },
@@ -696,8 +824,8 @@ export default class BibleBrainController {
         try {
           const audioData = await bibleBrainService.getAudioChapterInfo(
             audioFileset.id,
-            params.bookId,
-            parseInt(params.chapterNumber)
+            bookId,
+            Number.parseInt(chapterNumber)
           )
 
           if (!audioData.data || audioData.data.length === 0) {
@@ -717,10 +845,10 @@ export default class BibleBrainController {
           })
         } catch (error) {
           console.log('[BibleBrainController] Fileset sem áudio para capítulo:', {
-            bibleId: params.bibleId,
+            bibleId,
             filesetId: audioFileset.id,
-            bookId: params.bookId,
-            chapterNumber: params.chapterNumber,
+            bookId,
+            chapterNumber,
             error: error instanceof Error ? error.message : String(error),
           })
         }

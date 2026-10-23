@@ -47,7 +47,7 @@ export default class HymnAudiosController {
    * GET /api/hymn-audios/:hymnNumber
    * Query param: ?direct=true para URLs diretas do Drive (mobile app)
    */
-  async getByHymnNumber({ params, response, request }: HttpContext) {
+  async getByHymnNumber({ params, response }: HttpContext) {
     try {
       const { hymnNumber } = params
 
@@ -57,11 +57,9 @@ export default class HymnAudiosController {
         .orderBy('display_order', 'asc')
         .orderBy('instrument', 'asc')
 
-      const baseUrl = `${request.protocol()}://${request.host()}`
-
       let audiosWithUrl = audios.map((audio) => ({
         ...audio.serialize(),
-        downloadUrl: `${baseUrl}/hymn-audios/stream/${audio.fileId}`,
+        downloadUrl: `/hymn-audios/stream/${encodeURIComponent(audio.fileId)}`,
       }))
 
       if (audiosWithUrl.length === 0) {

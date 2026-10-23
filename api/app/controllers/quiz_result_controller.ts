@@ -1,6 +1,7 @@
 import Quiz from '#models/quiz'
 import QuizResult from '#models/quiz_result'
 import User from '#models/user'
+import db from '@adonisjs/lucid/services/db'
 import type { HttpContext } from '@adonisjs/core/http'
 
 export default class QuizResultController {
@@ -11,29 +12,25 @@ export default class QuizResultController {
   async store({ request, response, auth }: HttpContext) {
     try {
       const user = auth.user!
-      const { quizId, correctAnswers, totalQuestions, timeSeconds } = request.only([
-        'quizId',
-        'correctAnswers',
-        'totalQuestions',
-        'timeSeconds',
-      ])
+      const quizId = Number(request.input('quizId'))
+      const answers = request.input('answers')
+      const timeSeconds = Number(request.input('timeSeconds'))
 
-      console.log('[QuizResultController] Salvando resultado:', {
-        userId: user.id,
-        quizId,
-        correctAnswers,
-        totalQuestions,
-      })
-
-      if (!quizId || correctAnswers === undefined || !totalQuestions) {
+      if (
+        !Number.isSafeInteger(quizId) ||
+        quizId <= 0 ||
+        !Array.isArray(answers) ||
+        !Number.isInteger(timeSeconds) ||
+        timeSeconds < 0 ||
+        timeSeconds > 7200
+      ) {
         return response.badRequest({
           success: false,
-          message: 'quizId, correctAnswers e totalQuestions são obrigatórios',
+          message: 'Dados do resultado inválidos',
         })
       }
 
-      // Verificar se o quiz existe
-      const quiz = await Quiz.find(quizId)
+      const quiz = await Quiz.query().where('id', quizId).preload('questions').first()
       if (!quiz) {
         return response.notFound({
           success: false,
@@ -41,39 +38,100 @@ export default class QuizResultController {
         })
       }
 
-      // Calcular score (0-100)
-      const score = Math.round((correctAnswers / totalQuestions) * 100)
+      const questions = quiz.questions
+      if (questions.length === 0 || answers.length !== questions.length) {
+        return response.badRequest({
+          success: false,
+          message: 'É necessário enviar uma resposta para cada questão',
+        })
+      }
 
-      const result = await QuizResult.create({
-        userId: user.id,
-        quizId,
-        correctAnswers,
-        totalQuestions,
-        score,
-        timeSeconds: timeSeconds || null,
+      const outcome = await db.transaction(async (trx) => {
+        await User.query({ client: trx }).where('id', user.id).forUpdate().firstOrFail()
+
+        const previousResult = await QuizResult.query({ client: trx })
+          .where('user_id', user.id)
+          .where('quiz_id', quizId)
+          .first()
+
+        if (previousResult) {
+          return { result: previousResult, alreadyRecorded: true, invalidAnswers: false }
+        }
+
+        const questionById = new Map(questions.map((question) => [question.questionId, question]))
+        const seenQuestionIds = new Set<string>()
+        let correctAnswers = 0
+
+        for (const submitted of answers) {
+          if (
+            !submitted ||
+            typeof submitted.questionId !== 'string' ||
+            typeof submitted.answer !== 'string' ||
+            seenQuestionIds.has(submitted.questionId)
+          ) {
+            return { result: null, alreadyRecorded: false, invalidAnswers: true }
+          }
+
+          const question = questionById.get(submitted.questionId)
+          if (
+            !question ||
+            (submitted.answer !== '' && !question.alternativas.includes(submitted.answer))
+          ) {
+            return { result: null, alreadyRecorded: false, invalidAnswers: true }
+          }
+
+          seenQuestionIds.add(submitted.questionId)
+          if (submitted.answer !== '' && submitted.answer === question.respostaCorreta) {
+            correctAnswers += 1
+          }
+        }
+
+        if (seenQuestionIds.size !== questions.length) {
+          return { result: null, alreadyRecorded: false, invalidAnswers: true }
+        }
+
+        const totalQuestions = questions.length
+        const score = Math.round((correctAnswers / totalQuestions) * 100)
+        const result = await QuizResult.create(
+          {
+            userId: user.id,
+            quizId,
+            correctAnswers,
+            totalQuestions,
+            score,
+            timeSeconds,
+          },
+          { client: trx }
+        )
+
+        return { result, alreadyRecorded: false, invalidAnswers: false }
       })
 
-      console.log('[QuizResultController] Resultado salvo com ID:', result.id)
+      if (outcome.invalidAnswers || !outcome.result) {
+        return response.badRequest({ success: false, message: 'Respostas inválidas' })
+      }
 
-      return response.created({
+      const responseBody = {
         success: true,
         result: {
-          id: result.id,
-          quizId: result.quizId,
-          correctAnswers: result.correctAnswers,
-          totalQuestions: result.totalQuestions,
-          score: result.score,
-          timeSeconds: result.timeSeconds,
-          createdAt: result.createdAt,
+          id: outcome.result.id,
+          quizId: outcome.result.quizId,
+          correctAnswers: outcome.result.correctAnswers,
+          totalQuestions: outcome.result.totalQuestions,
+          score: outcome.result.score,
+          timeSeconds: outcome.result.timeSeconds,
+          createdAt: outcome.result.createdAt,
         },
         message: 'Resultado salvo com sucesso',
-      })
+        alreadyRecorded: outcome.alreadyRecorded,
+      }
+
+      return outcome.alreadyRecorded ? response.ok(responseBody) : response.created(responseBody)
     } catch (error) {
       console.error('[QuizResultController] Erro ao salvar resultado:', error)
       return response.internalServerError({
         success: false,
         message: 'Erro ao salvar resultado',
-        error: error.message,
       })
     }
   }
@@ -140,38 +198,17 @@ export default class QuizResultController {
         .orderBy('avg_score', 'desc')
         .limit(limit)
 
-      console.log('[QuizResultController] Results raw:', JSON.stringify(results[0]))
-
-      // Se não há resultados, retornar ranking vazio
       if (results.length === 0) {
-        console.log('[QuizResultController] Nenhum resultado encontrado, retornando ranking vazio')
         return response.ok({
           success: true,
           ranking: [],
         })
       }
-
-      // Buscar dados dos usuários
-      const userIds = results.map((r) => r.userId || r.$extras.user_id)
-      console.log('[QuizResultController] UserIds encontrados:', userIds)
-
-      if (userIds.length === 0) {
-        console.log('[QuizResultController] UserIds vazio, retornando ranking vazio')
-        return response.ok({
-          success: true,
-          ranking: [],
-        })
-      }
-
-      const users = await User.query().whereIn('id', userIds)
 
       const ranking = results.map((r, index) => {
-        const userId = r.userId || r.$extras.user_id
-        const user = users.find((u) => u.id === userId)
         return {
           position: index + 1,
-          userId: userId,
-          userName: user?.fullName || 'Usuário',
+          userName: `Leitor ${index + 1}`,
           avgScore: Math.round(r.$extras.avg_score),
           totalQuizzes: r.$extras.total_quizzes,
           totalCorrect: r.$extras.total_correct,

@@ -45,7 +45,6 @@ export default class QuizController {
               id: q.questionId,
               pergunta: q.pergunta,
               alternativas: q.alternativas,
-              respostaCorreta: q.respostaCorreta,
             })),
           },
           message: 'Quiz recuperado do banco de dados',
@@ -66,7 +65,7 @@ export default class QuizController {
 
       const quiz = await Quiz.create({
         bookName,
-        chapter: parseInt(chapter),
+        chapter: Number.parseInt(chapter),
         bibleVersion,
         testament,
         category: quizData.category,
@@ -91,7 +90,15 @@ export default class QuizController {
       console.log('[QuizController] Preparando resposta...')
       return response.ok({
         success: true,
-        quiz: quizData,
+        quiz: {
+          name: quizData.name,
+          category: quizData.category,
+          questions: quizData.questions.map((question) => ({
+            id: question.id,
+            pergunta: question.pergunta,
+            alternativas: question.alternativas,
+          })),
+        },
         quizId: quiz.id,
         message: 'Quiz gerado e salvo no banco de dados',
       })
@@ -222,7 +229,6 @@ export default class QuizController {
             id: q.questionId,
             pergunta: q.pergunta,
             alternativas: q.alternativas,
-            respostaCorreta: q.respostaCorreta,
           })),
           createdAt: quiz.createdAt,
         },

@@ -3,6 +3,7 @@ import { Readable } from 'node:stream'
 import type { HttpContext } from '@adonisjs/core/http'
 
 const DRIVE_API = 'https://www.googleapis.com/drive/v3'
+const MAX_PUBLIC_DRIVE_FILE_BYTES = 250 * 1024 * 1024
 
 function googleApiKey() {
   const apiKey = env.get('GOOGLE_API_KEY')
@@ -32,9 +33,54 @@ async function driveList(q: string, fields: string) {
   return (await response.json()) as { files?: any[] }
 }
 
-async function streamDriveFile(fileId: string, response: HttpContext['response']) {
+async function findPublicFileInFolder(fileId: string, folderName: Parameters<typeof folderId>[0]) {
+  if (!/^[A-Za-z0-9_-]{1,200}$/.test(fileId)) return null
+
+  const folder = folderId(folderName)
+  const params = new URLSearchParams({
+    fields: 'id,name,mimeType,size,parents,trashed',
+    key: googleApiKey(),
+  })
+  const result = await fetch(`${DRIVE_API}/files/${encodeURIComponent(fileId)}?${params}`, {
+    signal: AbortSignal.timeout(10_000),
+  })
+  if (result.status === 404) return null
+  if (!result.ok) throw new Error(`Drive API error: ${result.status}`)
+
+  const file = (await result.json()) as {
+    id?: string
+    name?: string
+    mimeType?: string
+    size?: string
+    parents?: string[]
+    trashed?: boolean
+  }
+  if (file.id !== fileId || file.trashed || !file.parents?.includes(folder)) return null
+  return file
+}
+
+async function streamDriveFile(
+  fileId: string,
+  folderName: Parameters<typeof folderId>[0],
+  response: HttpContext['response'],
+  isAllowedFile: (name: string) => boolean
+) {
+  const file = await findPublicFileInFolder(fileId, folderName)
+  if (!file || !isAllowedFile(String(file.name || ''))) {
+    return response.notFound({ success: false, message: 'Arquivo não encontrado' })
+  }
+
+  const size = Number(file.size)
+  if (!Number.isSafeInteger(size) || size < 0 || size > MAX_PUBLIC_DRIVE_FILE_BYTES) {
+    return response
+      .status(413)
+      .send({ success: false, message: 'Arquivo indisponível para download' })
+  }
+
   const params = new URLSearchParams({ alt: 'media', key: googleApiKey() })
-  const fileResponse = await fetch(`${DRIVE_API}/files/${encodeURIComponent(fileId)}?${params}`)
+  const fileResponse = await fetch(`${DRIVE_API}/files/${encodeURIComponent(fileId)}?${params}`, {
+    signal: AbortSignal.timeout(30_000),
+  })
 
   if (!fileResponse.ok || !fileResponse.body) {
     return response.status(fileResponse.status).send({
@@ -54,7 +100,7 @@ async function streamDriveFile(fileId: string, response: HttpContext['response']
 }
 
 export default class DriveAssetsController {
-  async listBibles({ request, response }: HttpContext) {
+  async listBibles({ response }: HttpContext) {
     try {
       const folder = folderId('GOOGLE_BIBLE_DRIVE_FOLDER_ID')
       const data = await driveList(
@@ -62,13 +108,12 @@ export default class DriveAssetsController {
         'files(id,name,webContentLink,size,modifiedTime)'
       )
 
-      const baseUrl = `${request.protocol()}://${request.host()}`
       const files = (data.files || [])
         .filter((file) => file.name?.endsWith('.db'))
         .map((file) => ({
           id: file.id,
           name: file.name,
-          webContentLink: `${baseUrl}/drive/bibles/${file.id}/download`,
+          webContentLink: `/drive/bibles/${encodeURIComponent(file.id)}/download`,
           size: file.size,
           modifiedTime: file.modifiedTime,
         }))
@@ -85,7 +130,12 @@ export default class DriveAssetsController {
   }
 
   async downloadBible({ params, response }: HttpContext) {
-    return streamDriveFile(params.fileId, response)
+    return streamDriveFile(
+      String(params.fileId || ''),
+      'GOOGLE_BIBLE_DRIVE_FOLDER_ID',
+      response,
+      (name) => name.toLowerCase().endsWith('.db')
+    )
   }
 
   async audioMetadata({ params, response }: HttpContext) {
@@ -127,7 +177,9 @@ export default class DriveAssetsController {
         return response.notFound({ success: false, message: 'Áudio não encontrado' })
       }
 
-      return streamDriveFile(file.id, response)
+      return streamDriveFile(file.id, 'GOOGLE_AUDIO_DRIVE_FOLDER_ID', response, (name) =>
+        name.toLowerCase().endsWith('.mp3')
+      )
     } catch (error) {
       console.error('[DriveAssetsController] Erro ao baixar áudio:', error)
       return response.internalServerError({
@@ -168,6 +220,11 @@ export default class DriveAssetsController {
   }
 
   async downloadHarpa({ params, response }: HttpContext) {
-    return streamDriveFile(params.fileId, response)
+    return streamDriveFile(
+      String(params.fileId || ''),
+      'GOOGLE_HARPA_DRIVE_FOLDER_ID',
+      response,
+      (name) => name.startsWith('HC ') && name.toLowerCase().endsWith('.xml')
+    )
   }
 }

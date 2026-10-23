@@ -1,39 +1,55 @@
 import User from '#models/user'
 import AuditLog from '#models/audit_log'
-import { loginValidator, registerValidator, updateProfileValidator } from '#validators/auth'
+import EmailVerification from '#models/email_verification'
+import emailService from '#services/email_service'
+import {
+  loginValidator,
+  registerValidator,
+  updateProfileValidator,
+  verifyEmailValidator,
+} from '#validators/auth'
 import type { HttpContext } from '@adonisjs/core/http'
 import { cuid } from '@adonisjs/core/helpers'
 import app from '@adonisjs/core/services/app'
 import { unlink } from 'node:fs/promises'
 import { createReadStream, existsSync } from 'node:fs'
 import path from 'node:path'
+import { randomInt } from 'node:crypto'
+import { DateTime } from 'luxon'
+import { matchesPublicToken, hashPublicToken } from '#utils/public_token'
 
 export default class AuthController {
   /**
    * Registrar novo usuário
    */
   async register({ request, response }: HttpContext) {
-    try {
-      const data = await request.validateUsing(registerValidator)
+    const genericResponse = {
+      success: false,
+      requiresEmailVerification: true,
+      message:
+        'Se o cadastro puder ser concluído, enviaremos um código de confirmação. Se já possui conta, entre com seus dados.',
+    }
 
-      // Verificar se email já existe
+    let data: { name: string; email: string; password: string }
+    try {
+      data = await request.validateUsing(registerValidator)
+    } catch {
+      return response.badRequest({ success: false, message: 'Dados de cadastro inválidos' })
+    }
+
+    try {
       const existingUser = await User.findBy('email', data.email)
       if (existingUser) {
-        return response.conflict({
-          success: false,
-          message: 'Email já cadastrado',
-        })
+        if (!existingUser.emailVerified) await this.sendVerificationCode(existingUser)
+        return response.status(202).send(genericResponse)
       }
 
-      // Criar usuário
       const user = await User.create({
         fullName: data.name,
         email: data.email,
         password: data.password,
+        emailVerified: false,
       })
-
-      // Gerar token de acesso
-      const token = await User.accessTokens.create(user)
 
       await AuditLog.create({
         userId: user.id,
@@ -45,24 +61,100 @@ export default class AuthController {
         userAgent: request.header('user-agent') || null,
       })
 
-      return response.created({
-        success: true,
-        message: 'Usuário cadastrado com sucesso',
-        data: {
-          user: {
-            id: user.id,
-            name: user.fullName,
-            email: user.email,
-          },
-          token: token.value!.release(),
-        },
-      })
+      await this.sendVerificationCode(user)
+      return response.status(202).send(genericResponse)
     } catch (error) {
-      return response.badRequest({
-        success: false,
-        message: 'Erro ao cadastrar usuário',
-        error: error.messages || error.message,
-      })
+      const errorCode = error.code || error.cause?.code
+      if (errorCode === 'ER_DUP_ENTRY' || errorCode === 'E_UNIQUE_VIOLATION') {
+        return response.status(202).send(genericResponse)
+      }
+      console.error('Erro ao cadastrar usuário:', error)
+      return response.internalServerError({ success: false, message: 'Erro ao processar cadastro' })
+    }
+  }
+
+  private async sendVerificationCode(user: User) {
+    const latest = await EmailVerification.query()
+      .where('user_id', user.id)
+      .orderBy('created_at', 'desc')
+      .first()
+
+    if (latest && Date.now() - latest.createdAt.toMillis() < 5 * 60_000) return
+
+    await EmailVerification.query()
+      .where('user_id', user.id)
+      .where('used', false)
+      .update({ used: true })
+
+    const code = randomInt(10_000_000, 100_000_000).toString()
+    await EmailVerification.create({
+      userId: user.id,
+      tokenHash: hashPublicToken(code),
+      attempts: 0,
+      used: false,
+      expiresAt: DateTime.now().plus({ minutes: 15 }),
+    })
+
+    void emailService
+      .sendEmailVerificationCode(user.email, code, user.fullName || 'Usuário')
+      .catch((error) =>
+        console.error('[AuthController] Falha ao enviar código de verificação:', error)
+      )
+  }
+
+  async verifyEmail({ request, response }: HttpContext) {
+    const genericResponse = {
+      success: true,
+      message: 'Se os dados forem válidos, a confirmação será concluída. Tente entrar na conta.',
+    }
+
+    let data: { email: string; code: string }
+    try {
+      data = await request.validateUsing(verifyEmailValidator)
+    } catch {
+      return response.ok(genericResponse)
+    }
+
+    try {
+      const user = await User.findBy('email', data.email)
+      if (!user || user.emailVerified) return response.ok(genericResponse)
+
+      const verification = await EmailVerification.query()
+        .where('user_id', user.id)
+        .where('used', false)
+        .where('expires_at', '>', DateTime.now().toSQL()!)
+        .orderBy('created_at', 'desc')
+        .first()
+
+      if (!verification || verification.attempts >= 5) return response.ok(genericResponse)
+
+      if (!matchesPublicToken(verification.tokenHash, data.code)) {
+        const updated = await EmailVerification.query()
+          .where('id', verification.id)
+          .where('used', false)
+          .where('attempts', '<', 5)
+          .increment('attempts', 1)
+        if (updated) {
+          const current = await EmailVerification.find(verification.id)
+          if (current && current.attempts >= 5) {
+            current.used = true
+            await current.save()
+          }
+        }
+        return response.ok(genericResponse)
+      }
+
+      user.emailVerified = true
+      await user.save()
+      await EmailVerification.query()
+        .where('user_id', user.id)
+        .where('used', false)
+        .update({ used: true })
+
+      return response.ok(genericResponse)
+    } catch (error) {
+      console.error('[AuthController] Erro ao confirmar e-mail:', error)
+      return response.ok(genericResponse)
     }
   }
 
@@ -89,6 +181,13 @@ export default class AuthController {
           userAgent: request.header('user-agent') || null,
         }).catch(() => {})
 
+        return response.unauthorized({
+          success: false,
+          message: 'Email ou senha incorretos',
+        })
+      }
+
+      if (!user.emailVerified) {
         return response.unauthorized({
           success: false,
           message: 'Email ou senha incorretos',

@@ -43,3 +43,13 @@ export const loginValidator = vine.compile(
     password: vine.string(),
   })
 )
+
+export const verifyEmailValidator = vine.compile(
+  vine.object({
+    email: vine.string().trim().email().normalizeEmail(),
+    code: vine
+      .string()
+      .trim()
+      .regex(/^\d{8}$/),
+  })
+)

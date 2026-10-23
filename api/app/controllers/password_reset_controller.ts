@@ -4,11 +4,11 @@ import User from '#models/user'
 import emailService from '#services/email_service'
 import type { HttpContext } from '@adonisjs/core/http'
 import { DateTime } from 'luxon'
-import { createHash, randomInt } from 'node:crypto'
+import { randomInt } from 'node:crypto'
+import { matchesPublicToken, hashPublicToken } from '#utils/public_token'
 
-function hashResetToken(token: string): string {
-  return createHash('sha256').update(token).digest('hex')
-}
+const genericResetMessage =
+  'Se o email estiver cadastrado, você receberá instruções para redefinir sua senha.'
 
 export default class PasswordResetController {
   /**
@@ -17,7 +17,7 @@ export default class PasswordResetController {
    */
   async requestReset({ request, response }: HttpContext) {
     try {
-      const { email } = request.only(['email'])
+      const email = String(request.input('email', '')).trim().toLowerCase()
 
       if (!email) {
         return response.badRequest({
@@ -28,17 +28,19 @@ export default class PasswordResetController {
 
       // Verificar se usuário existe
       const user = await User.findBy('email', email)
-      if (!user) {
-        // Por segurança, não revelar se o email existe
-        return response.ok({
-          success: true,
-          message: 'Se o email existir, você receberá instruções para redefinir sua senha.',
-        })
+      if (!user) return response.ok({ success: true, message: genericResetMessage })
+
+      const recentRequest = await PasswordReset.query()
+        .where('email', email)
+        .orderBy('created_at', 'desc')
+        .first()
+      if (recentRequest && Date.now() - recentRequest.createdAt.toMillis() < 2 * 60_000) {
+        return response.ok({ success: true, message: genericResetMessage })
       }
 
       // Gerar token aleatório de 6 dígitos usando CSPRNG.
       const token = randomInt(100000, 1000000).toString()
-      const hashedToken = hashResetToken(token)
+      const hashedToken = hashPublicToken(token)
 
       // Invalidar tokens anteriores não usados
       await PasswordReset.query().where('email', email).where('used', false).update({ used: true })
@@ -59,21 +61,14 @@ export default class PasswordResetController {
         token: hashedToken,
         expiresAt: DateTime.now().plus({ minutes: 15 }),
         used: false,
+        attempts: 0,
       })
 
-      // Enviar email com o token
-      try {
-        await emailService.sendPasswordResetToken(email, token, user.fullName || 'Usuário')
-        console.log(`[PasswordReset] E-mail enviado para ${email}`)
-      } catch (emailError) {
-        console.error('[PasswordReset] Erro ao enviar e-mail:', emailError)
-        // Continua mesmo se o e-mail falhar, para não bloquear o usuário
-      }
+      void emailService
+        .sendPasswordResetToken(email, token, user.fullName || 'Usuário')
+        .catch((emailError) => console.error('[PasswordReset] Erro ao enviar e-mail:', emailError))
 
-      return response.ok({
-        success: true,
-        message: 'Token de recuperação enviado para seu email.',
-      })
+      return response.ok({ success: true, message: genericResetMessage })
     } catch (error) {
       console.error('[PasswordResetController] Erro ao solicitar reset:', error)
       return response.internalServerError({
@@ -89,7 +84,8 @@ export default class PasswordResetController {
    */
   async verifyToken({ request, response }: HttpContext) {
     try {
-      const { email, token } = request.only(['email', 'token'])
+      const email = String(request.input('email', '')).trim().toLowerCase()
+      const token = String(request.input('token', '')).trim()
 
       if (!email || !token) {
         return response.badRequest({
@@ -98,21 +94,34 @@ export default class PasswordResetController {
         })
       }
 
-      const hashedToken = hashResetToken(token)
-
-      // Buscar token válido
       const resetToken = await PasswordReset.query()
         .where('email', email)
-        .where('token', hashedToken)
         .where('used', false)
         .where('expires_at', '>', DateTime.now().toSQL())
+        .orderBy('created_at', 'desc')
         .first()
 
-      if (!resetToken) {
+      if (!resetToken || resetToken.attempts >= 5) {
         return response.badRequest({
           success: false,
           message: 'Token inválido ou expirado',
         })
+      }
+
+      if (!matchesPublicToken(resetToken.token, token)) {
+        const updated = await PasswordReset.query()
+          .where('id', resetToken.id)
+          .where('used', false)
+          .where('attempts', '<', 5)
+          .increment('attempts', 1)
+        if (updated) {
+          const current = await PasswordReset.find(resetToken.id)
+          if (current && current.attempts >= 5) {
+            current.used = true
+            await current.save()
+          }
+        }
+        return response.badRequest({ success: false, message: 'Token inválido ou expirado' })
       }
 
       return response.ok({
@@ -134,7 +143,9 @@ export default class PasswordResetController {
    */
   async resetPassword({ request, response }: HttpContext) {
     try {
-      const { email, token, newPassword } = request.only(['email', 'token', 'newPassword'])
+      const email = String(request.input('email', '')).trim().toLowerCase()
+      const token = String(request.input('token', '')).trim()
+      const newPassword = String(request.input('newPassword', ''))
 
       if (!email || !token || !newPassword) {
         return response.badRequest({
@@ -150,21 +161,34 @@ export default class PasswordResetController {
         })
       }
 
-      const hashedToken = hashResetToken(token)
-
-      // Buscar token válido
       const resetToken = await PasswordReset.query()
         .where('email', email)
-        .where('token', hashedToken)
         .where('used', false)
         .where('expires_at', '>', DateTime.now().toSQL())
+        .orderBy('created_at', 'desc')
         .first()
 
-      if (!resetToken) {
+      if (!resetToken || resetToken.attempts >= 5) {
         return response.badRequest({
           success: false,
           message: 'Token inválido ou expirado',
         })
+      }
+
+      if (!matchesPublicToken(resetToken.token, token)) {
+        const updated = await PasswordReset.query()
+          .where('id', resetToken.id)
+          .where('used', false)
+          .where('attempts', '<', 5)
+          .increment('attempts', 1)
+        if (updated) {
+          const current = await PasswordReset.find(resetToken.id)
+          if (current && current.attempts >= 5) {
+            current.used = true
+            await current.save()
+          }
+        }
+        return response.badRequest({ success: false, message: 'Token inválido ou expirado' })
       }
 
       // Buscar usuário
@@ -193,8 +217,6 @@ export default class PasswordResetController {
       // Marcar token como usado
       resetToken.used = true
       await resetToken.save()
-
-      console.log(`[PasswordReset] Senha redefinida para ${email}`)
 
       return response.ok({
         success: true,

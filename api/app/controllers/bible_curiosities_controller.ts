@@ -258,23 +258,24 @@ export default class BibleCuriositiesController {
   async registerShare({ params, response }: HttpContext) {
     try {
       const curiosityId = params.id
-      const curiosity = await BibleCuriosity.find(curiosityId)
+      const affectedRows = await BibleCuriosity.query()
+        .where('id', curiosityId)
+        .increment('shares_count', 1)
 
-      if (!curiosity) {
+      if (!affectedRows) {
         return response.notFound({
           success: false,
           message: 'Curiosidade não encontrada',
         })
       }
 
-      curiosity.sharesCount = (curiosity.sharesCount || 0) + 1
-      await curiosity.save()
+      const curiosity = await BibleCuriosity.find(curiosityId)
 
       return response.ok({
         success: true,
         message: 'Compartilhamento registrado',
         data: {
-          sharesCount: curiosity.sharesCount,
+          sharesCount: curiosity?.sharesCount || 0,
         },
       })
     } catch (error) {

@@ -7,6 +7,19 @@ import { DateTime } from 'luxon'
 import { getAnnualReadingPeriod } from '../utils/annual_reading_period.js'
 import { BIBLE_VERSES_PER_CHAPTER, getVersesInRange } from '../utils/bible_verses_per_chapter.js'
 
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (character) => {
+    const entities: Record<string, string> = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    }
+    return entities[character]
+  })
+}
+
 // Estrutura completa da Bíblia com todos os capítulos e versículos
 const BIBLE_STRUCTURE = [
   // Antigo Testamento
@@ -1956,79 +1969,23 @@ export default class ReadingPlanController {
     try {
       const plans = await ReadingPlan.query()
         .whereNull('deleted_at')
-        .preload('user')
-        .preload('progress', (query) => {
-          query.where('is_completed', true).orderBy('completed_at', 'asc')
-        })
         .where('is_active', true)
         .orderBy('completed_chapters', 'desc')
+        .limit(100)
 
       const ranking = plans.map((plan, index) => {
-        const user = plan.user
-        const progress = plan.progress
-
-        // Calcular estatísticas
-        const totalDaysRead = progress.length
-        const averageChaptersPerDay =
-          totalDaysRead > 0 ? (plan.completedChapters / totalDaysRead).toFixed(1) : '0.0'
-
-        // Encontrar horário mais comum de leitura
-        const readingHours = progress
-          .map((p) => {
-            if (p.completedAt) {
-              const dt =
-                p.completedAt instanceof DateTime
-                  ? p.completedAt
-                  : DateTime.fromJSDate(p.completedAt)
-              return dt.hour
-            }
-            return null
-          })
-          .filter((h) => h !== null)
-
-        const mostCommonHour =
-          readingHours.length > 0
-            ? Math.round(readingHours.reduce((a, b) => a + b, 0) / readingHours.length)
-            : null
-
-        // Calcular sequência atual (streak)
-        let currentStreak = 0
-
-        for (let i = 0; i < plan.totalDays; i++) {
-          const dayProgress = progress.find((p) => p.day === plan.currentDay - i)
-          if (dayProgress && dayProgress.isCompleted) {
-            currentStreak++
-          } else {
-            break
-          }
-        }
-
-        // Última leitura
-        const lastProgress = progress.length > 0 ? progress[progress.length - 1] : null
-        const lastReading = lastProgress?.completedAt
-          ? (lastProgress.completedAt instanceof DateTime
-              ? lastProgress.completedAt
-              : DateTime.fromJSDate(lastProgress.completedAt)
-            ).toFormat('dd/MM/yyyy HH:mm')
-          : null
-
         return {
           position: index + 1,
-          userName: user?.fullName || 'Usuário',
-          userEmail: user?.email || '',
-          planName: plan.name,
+          userName: `Leitor ${index + 1}`,
           completedChapters: plan.completedChapters,
           totalChapters: plan.totalChapters,
-          progressPercentage: Math.round((plan.completedChapters / plan.totalChapters) * 100),
-          currentDay: plan.currentDay,
-          totalDays: plan.totalDays,
-          totalDaysRead,
-          averageChaptersPerDay: Number.parseFloat(averageChaptersPerDay),
-          currentStreak,
-          mostCommonHour,
-          lastReading,
-          startDate: plan.startDate.toFormat('dd/MM/yyyy'),
-          endDate: plan.endDate.toFormat('dd/MM/yyyy'),
+          progressPercentage:
+            plan.totalChapters > 0
+              ? Math.min(
+                  100,
+                  Math.max(0, Math.round((plan.completedChapters / plan.totalChapters) * 100))
+                )
+              : 0,
         }
       })
 
@@ -2052,70 +2009,23 @@ export default class ReadingPlanController {
     try {
       const plans = await ReadingPlan.query()
         .whereNull('deleted_at')
-        .preload('user')
-        .preload('progress', (query) => {
-          query.where('is_completed', true).orderBy('completed_at', 'asc')
-        })
         .where('is_active', true)
         .orderBy('completed_chapters', 'desc')
+        .limit(100)
 
       const ranking = plans.map((plan, index) => {
-        const user = plan.user
-        const progress = plan.progress
-
-        const totalDaysRead = progress.length
-        const averageChaptersPerDay =
-          totalDaysRead > 0 ? (plan.completedChapters / totalDaysRead).toFixed(1) : '0.0'
-
-        const readingHours = progress
-          .map((p) => {
-            if (p.completedAt) {
-              const dt =
-                p.completedAt instanceof DateTime
-                  ? p.completedAt
-                  : DateTime.fromJSDate(p.completedAt)
-              return dt.hour
-            }
-            return null
-          })
-          .filter((h) => h !== null)
-
-        const mostCommonHour =
-          readingHours.length > 0
-            ? Math.round(readingHours.reduce((a, b) => a + b, 0) / readingHours.length)
-            : null
-
-        let currentStreak = 0
-        for (let i = 0; i < plan.totalDays; i++) {
-          const dayProgress = progress.find((p) => p.day === plan.currentDay - i)
-          if (dayProgress && dayProgress.isCompleted) {
-            currentStreak++
-          } else {
-            break
-          }
-        }
-
-        const lastProgressItem = progress.length > 0 ? progress[progress.length - 1] : null
-        const lastReading = lastProgressItem?.completedAt
-          ? (lastProgressItem.completedAt instanceof DateTime
-              ? lastProgressItem.completedAt
-              : DateTime.fromJSDate(lastProgressItem.completedAt)
-            ).toFormat('dd/MM/yyyy HH:mm')
-          : 'Nunca'
-
         return {
           position: index + 1,
-          userName: user?.fullName || 'Usuário',
+          userName: `Leitor ${index + 1}`,
           completedChapters: plan.completedChapters,
           totalChapters: plan.totalChapters,
-          progressPercentage: Math.round((plan.completedChapters / plan.totalChapters) * 100),
-          currentDay: plan.currentDay,
-          totalDays: plan.totalDays,
-          totalDaysRead,
-          averageChaptersPerDay,
-          currentStreak,
-          mostCommonHour: mostCommonHour ? `${mostCommonHour}:00` : 'N/A',
-          lastReading,
+          progressPercentage:
+            plan.totalChapters > 0
+              ? Math.min(
+                  100,
+                  Math.max(0, Math.round((plan.completedChapters / plan.totalChapters) * 100))
+                )
+              : 0,
         }
       })
 
@@ -2328,8 +2238,8 @@ export default class ReadingPlanController {
         <p>${ranking.length > 0 ? Math.round(ranking.reduce((sum, r) => sum + r.progressPercentage, 0) / ranking.length) : 0}%</p>
       </div>
       <div class="stat-card">
-        <h3>Maior Sequência</h3>
-        <p>${ranking.length > 0 ? Math.max(...ranking.map((r) => r.currentStreak)) : 0} dias</p>
+        <h3>Maior Progresso</h3>
+        <p>${ranking.length > 0 ? Math.max(...ranking.map((r) => r.progressPercentage)) : 0}%</p>
       </div>
     </div>
 
@@ -2340,11 +2250,7 @@ export default class ReadingPlanController {
             <th>#</th>
             <th>Usuário</th>
             <th>Progresso</th>
-            <th class="hide-mobile">Dias de Leitura</th>
-            <th class="hide-mobile">Média/Dia</th>
-            <th class="hide-mobile">Sequência</th>
-            <th class="hide-mobile">Horário Comum</th>
-            <th>Última Leitura</th>
+            <th>Capítulos lidos</th>
           </tr>
         </thead>
         <tbody>
@@ -2354,29 +2260,16 @@ export default class ReadingPlanController {
             <tr>
               <td class="position ${r.position === 1 ? 'gold' : r.position === 2 ? 'silver' : r.position === 3 ? 'bronze' : ''}">${r.position}º</td>
               <td>
-                <div class="user-name">${r.userName}</div>
-                <div class="stat-value">${r.currentDay}/${r.totalDays} dias</div>
+                <div class="user-name">${escapeHtml(r.userName)}</div>
               </td>
               <td>
-                <div class="stat-value">${r.completedChapters}/${r.totalChapters} capítulos</div>
+                <div class="stat-value">${r.progressPercentage}%</div>
                 <div class="progress-bar">
                   <div class="progress-fill" style="width: ${r.progressPercentage}%"></div>
                 </div>
               </td>
-              <td class="hide-mobile">
-                <span class="badge">${r.totalDaysRead} dias</span>
-              </td>
-              <td class="hide-mobile">
-                <span class="stat-value">${r.averageChaptersPerDay} cap/dia</span>
-              </td>
-              <td class="hide-mobile">
-                <span class="badge streak">🔥 ${r.currentStreak}</span>
-              </td>
-              <td class="hide-mobile">
-                <span class="badge time">🕐 ${r.mostCommonHour}</span>
-              </td>
               <td>
-                <span class="stat-value">${r.lastReading}</span>
+                <span class="stat-value">${r.completedChapters}/${r.totalChapters}</span>
               </td>
             </tr>
           `

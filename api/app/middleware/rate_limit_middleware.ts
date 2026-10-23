@@ -13,6 +13,7 @@ interface Attempt {
  */
 export default class RateLimitMiddleware {
   private static store = new Map<string, Attempt>()
+  private static readonly maxKeys = 10_000
 
   private static cleanup(): void {
     const now = Date.now()
@@ -27,13 +28,18 @@ export default class RateLimitMiddleware {
     const limit = options?.limit ?? 10
     const windowMs = options?.windowMs ?? 15 * 60 * 1000
 
-    const key = `${ctx.request.ip()}:${ctx.request.url()}`
+    const routeKey = ctx.route?.pattern || ctx.request.url()
+    const key = `${ctx.request.ip()}:${routeKey}`
     const now = Date.now()
 
     RateLimitMiddleware.cleanup()
 
     const current = RateLimitMiddleware.store.get(key)
     if (!current || now > current.resetAt) {
+      if (!current && RateLimitMiddleware.store.size >= RateLimitMiddleware.maxKeys) {
+        const oldestKey = RateLimitMiddleware.store.keys().next().value
+        if (oldestKey) RateLimitMiddleware.store.delete(oldestKey)
+      }
       RateLimitMiddleware.store.set(key, { count: 1, resetAt: now + windowMs })
     } else if (current.count >= limit) {
       return ctx.response.tooManyRequests({

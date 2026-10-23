@@ -33,4 +33,7 @@ export default await Env.create(new URL('../', import.meta.url), {
   RESEND_FROM_EMAIL: Env.schema.string(),
   RESEND_FROM_NAME: Env.schema.string.optional(),
   TEST_EMAIL_RECIPIENT: Env.schema.string.optional(),
+  BOOTSTRAP_ADMIN_EMAIL: Env.schema.string.optional(),
+  BOOTSTRAP_ADMIN_PASSWORD: Env.schema.string.optional(),
+  BOOTSTRAP_ADMIN_NAME: Env.schema.string.optional(),
 })

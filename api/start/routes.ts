@@ -36,6 +36,8 @@ const AdminBibleBrainController = () => import('#controllers/Admin/bible_brain_c
 import router from '@adonisjs/core/services/router'
 import { middleware } from './kernel.js'
 
+const publicRateLimit = (limit: number) => middleware.rateLimit({ limit, windowMs: 60_000 })
+
 router.get('/', async () => {
   return {
     hello: 'world',
@@ -45,6 +47,9 @@ router.get('/', async () => {
 // Auth routes
 router.post('/auth/register', [AuthController, 'register']).use(middleware.rateLimit({ limit: 10 }))
 router.post('/auth/login', [AuthController, 'login']).use(middleware.rateLimit({ limit: 10 }))
+router
+  .post('/auth/verify-email', [AuthController, 'verifyEmail'])
+  .use(middleware.rateLimit({ limit: 5 }))
 router.post('/auth/logout', [AuthController, 'logout']).use(middleware.auth())
 router.get('/auth/me', [AuthController, 'me']).use(middleware.auth())
 router.get('/auth/stats', [AuthController, 'stats']).use(middleware.auth())
@@ -93,8 +98,12 @@ router
 router.delete('/reading-plans', [ReadingPlanController, 'deletePlan']).use(middleware.auth())
 
 // Ranking routes (public)
-router.get('/ranking', [ReadingPlanController, 'getRanking'])
-router.get('/ranking/page', [ReadingPlanController, 'getRankingPage'])
+router
+  .get('/ranking', [ReadingPlanController, 'getRanking'])
+  .use(middleware.rateLimit({ limit: 20, windowMs: 60_000 }))
+router
+  .get('/ranking/page', [ReadingPlanController, 'getRankingPage'])
+  .use(middleware.rateLimit({ limit: 10, windowMs: 60_000 }))
 
 // Reading Plan Templates (public - for mobile app)
 router.get('/reading-plan-templates', [ReadingPlanTemplateController, 'index'])
@@ -118,13 +127,18 @@ router
   .post('/generate-quiz', [QuizController, 'generate'])
   .use(middleware.auth())
   .use(middleware.rateLimit({ limit: 10 }))
-router.get('/quizzes', [QuizController, 'list'])
-router.get('/quizzes/:id', [QuizController, 'show'])
+router.get('/quizzes', [QuizController, 'list']).use(publicRateLimit(60))
+router.get('/quizzes/:id', [QuizController, 'show']).use(publicRateLimit(60))
 
 // Quiz Results routes
-router.post('/quiz-results', [QuizResultController, 'store']).use(middleware.auth())
+router
+  .post('/quiz-results', [QuizResultController, 'store'])
+  .use(middleware.auth())
+  .use(middleware.rateLimit({ limit: 10, windowMs: 60_000 }))
 router.get('/quiz-results/me', [QuizResultController, 'myResults']).use(middleware.auth())
-router.get('/quiz-results/ranking', [QuizResultController, 'ranking'])
+router
+  .get('/quiz-results/ranking', [QuizResultController, 'ranking'])
+  .use(middleware.rateLimit({ limit: 20, windowMs: 60_000 }))
 router.get('/quiz-results/stats', [QuizResultController, 'stats']).use(middleware.auth())
 
 // Fila para livros completos
@@ -158,7 +172,9 @@ router
   .use(middleware.admin())
 // Rota pública para visualizar curiosidade (não requer login)
 router.get('/curiosities/today', [BibleCuriositiesController, 'getToday'])
-router.post('/curiosities/:id/share', [BibleCuriositiesController, 'registerShare'])
+router
+  .post('/curiosities/:id/share', [BibleCuriositiesController, 'registerShare'])
+  .use(middleware.rateLimit({ limit: 20, windowMs: 60_000 }))
 // Rota protegida - requer login para curtir
 router
   .post('/curiosities/:id/favorite', [BibleCuriositiesController, 'toggleFavorite'])
@@ -169,83 +185,129 @@ router
 
 // Hymn Audio routes (public para o app, admin para gerenciamento)
 // IMPORTANTE: Rota específica ANTES da rota com parâmetro
-router.get('/hymn-audios/stream/:fileId', [HymnAudiosController, 'streamAudio'])
-router.get('/hymn-audios/:hymnNumber', [HymnAudiosController, 'getByHymnNumber'])
+router
+  .get('/hymn-audios/stream/:fileId', [HymnAudiosController, 'streamAudio'])
+  .use(middleware.rateLimit({ limit: 30, windowMs: 60_000 }))
+router
+  .get('/hymn-audios/:hymnNumber', [HymnAudiosController, 'getByHymnNumber'])
+  .use(middleware.rateLimit({ limit: 60, windowMs: 60_000 }))
 
 // Google Drive assets proxied by the API so keys never go to the mobile bundle
-router.get('/drive/bibles', [DriveAssetsController, 'listBibles'])
-router.get('/drive/bibles/:fileId/download', [DriveAssetsController, 'downloadBible'])
-router.get('/drive/audio/:fileName/metadata', [DriveAssetsController, 'audioMetadata'])
-router.get('/drive/audio/:fileName', [DriveAssetsController, 'downloadAudio'])
-router.get('/drive/harpa/:hymnNumber/metadata', [DriveAssetsController, 'harpaMetadata'])
-router.get('/drive/harpa/:fileId/download', [DriveAssetsController, 'downloadHarpa'])
+router.get('/drive/bibles', [DriveAssetsController, 'listBibles']).use(publicRateLimit(30))
+router
+  .get('/drive/bibles/:fileId/download', [DriveAssetsController, 'downloadBible'])
+  .use(middleware.rateLimit({ limit: 10, windowMs: 60_000 }))
+router
+  .get('/drive/audio/:fileName/metadata', [DriveAssetsController, 'audioMetadata'])
+  .use(middleware.rateLimit({ limit: 60, windowMs: 60_000 }))
+router
+  .get('/drive/audio/:fileName', [DriveAssetsController, 'downloadAudio'])
+  .use(middleware.rateLimit({ limit: 30, windowMs: 60_000 }))
+router
+  .get('/drive/harpa/:hymnNumber/metadata', [DriveAssetsController, 'harpaMetadata'])
+  .use(middleware.rateLimit({ limit: 60, windowMs: 60_000 }))
+router
+  .get('/drive/harpa/:fileId/download', [DriveAssetsController, 'downloadHarpa'])
+  .use(middleware.rateLimit({ limit: 10, windowMs: 60_000 }))
 
 // Audio Sync Timestamps routes (public para o app)
 router.get('/audio-sync/:bookId/:chapterNumber', [AudioSyncTimestampsController, 'show'])
 
 // BibleBrain routes (público para o app) — acréscimo em paralelo ao fluxo do Google Drive
 // IMPORTANTE: rotas específicas ANTES da rota com parâmetro
-router.get('/bible-brain/bibles', [BibleBrainController, 'index'])
-router.get('/bible-brain/languages', [BibleBrainController, 'languages'])
-router.get('/bible-brain/video-bibles', [BibleBrainController, 'videoBibles'])
+router.get('/bible-brain/bibles', [BibleBrainController, 'index']).use(publicRateLimit(60))
+router.get('/bible-brain/languages', [BibleBrainController, 'languages']).use(publicRateLimit(60))
+router
+  .get('/bible-brain/video-bibles', [BibleBrainController, 'videoBibles'])
+  .use(publicRateLimit(60))
 // Dictionary routes
-router.get('/dictionary/search', [DictionaryController, 'search'])
-router.get('/dictionary/word', [DictionaryController, 'word'])
+router.get('/dictionary/search', [DictionaryController, 'search']).use(publicRateLimit(60))
+router.get('/dictionary/word', [DictionaryController, 'word']).use(publicRateLimit(60))
 router
   .get('/dictionary/refresh', [DictionaryController, 'refresh'])
   .use(middleware.auth())
   .use(middleware.admin())
-router.get('/dictionary/stats', [DictionaryController, 'stats'])
-router.get('/dictionary/files', [DictionaryController, 'files'])
-router.get('/dictionary/files/download/:dictKey', [DictionaryController, 'download'])
+router.get('/dictionary/stats', [DictionaryController, 'stats']).use(publicRateLimit(60))
+router.get('/dictionary/files', [DictionaryController, 'files']).use(publicRateLimit(60))
+router
+  .get('/dictionary/files/download/:dictKey', [DictionaryController, 'download'])
+  .use(middleware.rateLimit({ limit: 10, windowMs: 60_000 }))
 
-router.get('/bible-brain/bibles/:bibleId/package/download', [BibleBrainController, 'download'])
-router.get('/bible-brain/video-proxy/:filesetId/:bookId/:chapterNumber/*', [
-  BibleBrainController,
-  'videoProxyPlaylist',
-])
-router.get('/bible-brain/video-proxy/:filesetId/:bookId/:chapterNumber', [
-  BibleBrainController,
-  'videoProxyPlaylist',
-])
-router.get('/bible-brain/bibles/:bibleId/video-books', [BibleBrainController, 'videoBooks'])
-router.get('/bible-brain/bibles/:bibleId/audio-books', [BibleBrainController, 'audioBooks'])
-router.get('/bible-brain/bibles/:bibleId/video-segments/:bookId/:chapterNumber', [
-  BibleBrainController,
-  'videoSegments',
-])
-router.get('/bible-brain/bibles/:bibleId/video-thumbnail/:bookId/:chapterNumber', [
-  BibleBrainController,
-  'videoThumbnail',
-])
-router.get('/bible-brain/bibles/:bibleId/video/:bookId/:chapterNumber', [
-  BibleBrainController,
-  'videoChapter',
-])
-router.get('/bible-brain/bibles/:bibleId/audio/:bookId/:chapterNumber', [
-  BibleBrainController,
-  'audioChapter',
-])
-router.get('/bible-brain/bibles/:bibleId/audio-file/:bookId/:chapterNumber', [
-  BibleBrainController,
-  'audioFile',
-])
-router.get('/bible-brain/bibles/:bibleId/audio-timestamps/:bookId/:chapterNumber', [
-  BibleBrainController,
-  'audioTimestamps',
-])
-router.get('/bible-brain/bibles/:bibleId/package', [BibleBrainController, 'packageStatus'])
+router
+  .get('/bible-brain/bibles/:bibleId/package/download', [BibleBrainController, 'download'])
+  .use(middleware.rateLimit({ limit: 10, windowMs: 60_000 }))
+router
+  .get('/bible-brain/video-proxy/:filesetId/:bookId/:chapterNumber/*', [
+    BibleBrainController,
+    'videoProxyPlaylist',
+  ])
+  .use(publicRateLimit(30))
+router
+  .get('/bible-brain/video-proxy/:filesetId/:bookId/:chapterNumber', [
+    BibleBrainController,
+    'videoProxyPlaylist',
+  ])
+  .use(publicRateLimit(30))
+router
+  .get('/bible-brain/bibles/:bibleId/video-books', [BibleBrainController, 'videoBooks'])
+  .use(publicRateLimit(60))
+router
+  .get('/bible-brain/bibles/:bibleId/audio-books', [BibleBrainController, 'audioBooks'])
+  .use(publicRateLimit(60))
+router
+  .get('/bible-brain/bibles/:bibleId/video-segments/:bookId/:chapterNumber', [
+    BibleBrainController,
+    'videoSegments',
+  ])
+  .use(publicRateLimit(60))
+router
+  .get('/bible-brain/bibles/:bibleId/video-thumbnail/:bookId/:chapterNumber', [
+    BibleBrainController,
+    'videoThumbnail',
+  ])
+  .use(publicRateLimit(60))
+router
+  .get('/bible-brain/bibles/:bibleId/video/:bookId/:chapterNumber', [
+    BibleBrainController,
+    'videoChapter',
+  ])
+  .use(publicRateLimit(60))
+router
+  .get('/bible-brain/bibles/:bibleId/audio/:bookId/:chapterNumber', [
+    BibleBrainController,
+    'audioChapter',
+  ])
+  .use(publicRateLimit(60))
+router
+  .get('/bible-brain/bibles/:bibleId/audio-file/:bookId/:chapterNumber', [
+    BibleBrainController,
+    'audioFile',
+  ])
+  .use(publicRateLimit(30))
+router
+  .get('/bible-brain/bibles/:bibleId/audio-timestamps/:bookId/:chapterNumber', [
+    BibleBrainController,
+    'audioTimestamps',
+  ])
+  .use(publicRateLimit(60))
+router
+  .get('/bible-brain/bibles/:bibleId/package', [BibleBrainController, 'packageStatus'])
+  .use(publicRateLimit(60))
 router
   .post('/bible-brain/bibles/:bibleId/package', [BibleBrainController, 'requestPackage'])
   .use(middleware.auth())
   .use(middleware.rateLimit({ limit: 5 }))
-router.get('/bible-brain/bibles/:bibleId', [BibleBrainController, 'show'])
+router
+  .get('/bible-brain/bibles/:bibleId', [BibleBrainController, 'show'])
+  .use(middleware.rateLimit({ limit: 60, windowMs: 60_000 }))
 
 // Admin routes
 router
   .group(() => {
     // Auth
-    router.post('/login', [AdminAuthController, 'login'])
+    router
+      .post('/login', [AdminAuthController, 'login'])
+      .use(middleware.rateLimit({ limit: 5, windowMs: 15 * 60 * 1000 }))
     router
       .post('/logout', [AdminAuthController, 'logout'])
       .use(middleware.auth({ guards: ['api'] }))

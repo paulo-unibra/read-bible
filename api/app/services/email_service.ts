@@ -1,6 +1,19 @@
 import env from '#start/env'
 import { Resend } from 'resend'
 
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (character) => {
+    const entities: Record<string, string> = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    }
+    return entities[character]
+  })
+}
+
 class EmailService {
   private resend: Resend
 
@@ -81,7 +94,7 @@ class EmailService {
               <h1>📖 Bíblia em Foco</h1>
             </div>
 
-            <p>Olá, <strong>${userName}</strong>!</p>
+            <p>Olá, <strong>${escapeHtml(userName)}</strong>!</p>
 
             <p>Você solicitou a recuperação de senha da sua conta no aplicativo <strong>Bíblia em Foco</strong>.</p>
 
@@ -91,7 +104,7 @@ class EmailService {
             </div>
 
             <div class="info">
-              <p style="margin: 0;"><strong>⏰ Atenção:</strong> Este código expira em <strong>30 minutos</strong>.</p>
+              <p style="margin: 0;"><strong>⏰ Atenção:</strong> Este código expira em <strong>15 minutos</strong>.</p>
             </div>
 
             <p>Digite este código no aplicativo para redefinir sua senha.</p>
@@ -114,7 +127,7 @@ Você solicitou a recuperação de senha da sua conta no aplicativo Bíblia em F
 
 Seu código de recuperação é: ${token}
 
-ATENÇÃO: Este código expira em 30 minutos.
+ATENÇÃO: Este código expira em 15 minutos.
 
 Digite este código no aplicativo para redefinir sua senha.
 
@@ -145,6 +158,39 @@ Este é um e-mail automático, por favor não responda.
       console.error('❌ Erro ao enviar e-mail:', error)
       throw error
     }
+  }
+
+  async sendEmailVerificationCode(email: string, token: string, userName: string) {
+    const fromEmail = env.get('RESEND_FROM_EMAIL')
+    const fromName = env.get('RESEND_FROM_NAME', 'Bíblia em Foco')
+    const recipient =
+      env.get('NODE_ENV') === 'production' ? email : env.get('TEST_EMAIL_RECIPIENT', email)
+    const safeName = escapeHtml(userName)
+    const html = `
+      <!DOCTYPE html>
+      <html lang="pt-BR">
+      <head><meta charset="UTF-8"><title>Confirme seu e-mail</title></head>
+      <body style="font-family:Arial,sans-serif;line-height:1.6;color:#333;max-width:600px;margin:auto;padding:24px">
+        <h1>Bíblia em Foco</h1>
+        <p>Olá, <strong>${safeName}</strong>.</p>
+        <p>Use este código para confirmar seu endereço de e-mail:</p>
+        <p style="font-size:32px;font-weight:bold;letter-spacing:8px;color:#2196F3">${token}</p>
+        <p>O código expira em 15 minutos. Se você não iniciou este cadastro, ignore esta mensagem.</p>
+      </body>
+      </html>
+    `
+    const text = `Olá, ${userName}! Seu código de confirmação da Bíblia em Foco é ${token}. Ele expira em 15 minutos. Se você não iniciou este cadastro, ignore esta mensagem.`
+
+    const { data, error } = await this.resend.emails.send({
+      from: `${fromName} <${fromEmail}>`,
+      to: recipient,
+      subject: 'Confirme seu e-mail - Bíblia em Foco',
+      html,
+      text,
+    })
+
+    if (error) throw error
+    return { success: true, messageId: data?.id }
   }
 
   async verifyConnection() {
@@ -367,7 +413,7 @@ Este é um e-mail automático, por favor não responda.
             </div>
 
             <div class="greeting">
-              <p>Olá, <strong>${userName}</strong>! 👋</p>
+              <p>Olá, <strong>${escapeHtml(userName)}</strong>! 👋</p>
             </div>
 
             <div class="status-box">
@@ -409,7 +455,7 @@ Este é um e-mail automático, por favor não responda.
             </div>
 
             <div class="footer">
-              <p><strong>Plano de Leitura:</strong> ${statusDetails.planName}</p>
+              <p><strong>Plano de Leitura:</strong> ${escapeHtml(statusDetails.planName)}</p>
               <p style="margin-top: 20px;">Este é um e-mail automático, por favor não responda.</p>
               <p>© ${new Date().getFullYear()} Bíblia em Foco - Todos os direitos reservados</p>
             </div>
@@ -533,7 +579,7 @@ Este é um e-mail automático, por favor não responda.
             <h1>📖 Bíblia em Foco</h1>
           </div>
 
-          <p>Olá, <strong>${userName}</strong>!</p>
+          <p>Olá, <strong>${escapeHtml(userName)}</strong>!</p>
 
           <div class="content">
             ${message.replace(/\n/g, '<br>')}
