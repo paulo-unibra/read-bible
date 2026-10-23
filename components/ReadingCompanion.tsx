@@ -87,7 +87,7 @@ export default function ReadingCompanion({ userId, days }: {
     >
       <View style={styles.petStage} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
         <Animated.View style={{ transform: [{ translateY: bounce }] }}>
-          <CompanionAvatar size={52} catalogVersion={petData.catalogVersion ?? 1} seed={petData.seed} mood={status.mood} sleeping={status.sleeping} />
+          <CompanionAvatar size={64} catalogVersion={petData.catalogVersion ?? 1} seed={petData.seed} mood={status.mood} sleeping={status.sleeping} />
         </Animated.View>
       </View>
       <View style={styles.copy}>
@@ -105,7 +105,7 @@ export default function ReadingCompanion({ userId, days }: {
 
 const styles = StyleSheet.create({
   container: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 16, marginTop: 8, paddingVertical: 8, minHeight: 72, borderBottomWidth: 1, borderBottomColor: '#DCE6E8' },
-  petStage: { width: 56, alignItems: 'center' },
+  petStage: { width: 68, alignItems: 'center' },
   copy: { flex: 1, minWidth: 0 },
   title: { fontSize: 16, lineHeight: 22, fontWeight: '700', color: '#203947' },
   mood: { fontSize: 13, lineHeight: 19, color: '#496271' },
