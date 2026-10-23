@@ -90,6 +90,89 @@ test.group('Tamagoshi monthly points', () => {
     }
   })
 
+  test('deleted plans cannot preserve or recreate reading points; other valid readings still count', async ({
+    client,
+    assert,
+  }) => {
+    const user = await User.create({
+      fullName: 'Deleted Plan Reader',
+      email: `deleted-plan-${Date.now()}@example.invalid`,
+      password: 'TemporaryTest12345',
+      emailVerified: true,
+    })
+    try {
+      const token = await User.accessTokens.create(user)
+      const auth = `Bearer ${token.value!.release()}`
+      await client
+        .post('/tamagoshi/activate')
+        .header('Authorization', auth)
+        .json({ name: 'Pingo', seed: 42, catalogVersion: 2 })
+      const plans: ReadingPlan[] = []
+      for (let i = 0; i < 2; i++) {
+        const plan = await ReadingPlan.create({
+          userId: user.id,
+          name: 'Reading plan',
+          type: 'custom',
+          startDate: DateTime.utc(),
+          endDate: DateTime.utc().plus({ days: 1 }),
+          isActive: i === 0,
+          currentDay: 1,
+          totalDays: 1,
+          chaptersPerDay: 1,
+          totalChapters: 1,
+          completedChapters: 1,
+        })
+        plans.push(plan)
+        await ReadingProgress.create({
+          readingPlanId: plan.id,
+          day: 1,
+          bookName: 'Gênesis',
+          startChapter: 1,
+          endChapter: 1,
+          isCompleted: true,
+          completedAt: DateTime.utc().startOf('second'),
+        })
+      }
+      await pointsService.backfill(user.id)
+      await pointsService.award(user.id, 'quiz')
+      let score = await pointsService.summary(user.id)
+      assert.equal(score.points, 8)
+      const firstDelete = await client.delete('/reading-plans').header('Authorization', auth)
+      firstDelete.assertStatus(200)
+      score = await pointsService.summary(user.id)
+      assert.equal(score.points, 8)
+      // Historical records remain for audit, but only the other non-deleted plan supports points.
+      const historicalReading = await ReadingProgress.query()
+        .where('reading_plan_id', plans[0].id)
+        .firstOrFail()
+      assert.isTrue(Boolean(historicalReading.isCompleted))
+      await db.from('reading_plans').where('id', plans[1].id).update({ is_active: true })
+      const secondDelete = await client.delete('/reading-plans').header('Authorization', auth)
+      secondDelete.assertStatus(200)
+      score = await pointsService.summary(user.id)
+      assert.equal(score.points, 2)
+      assert.deepEqual(score.readingHistory, [])
+      await pointsService.backfill(user.id)
+      await pointsService.backfill(user.id)
+      const synced = await client.get('/tamagoshi').header('Authorization', auth)
+      assert.equal(synced.body().data.score.points, 2)
+      // Stale plan awards from older releases are removed on synchronization too.
+      await pointsService.award(user.id, 'reading')
+      const repaired = await client.get('/tamagoshi').header('Authorization', auth)
+      assert.equal(repaired.body().data.score.points, 2)
+      const ranking = await client.get('/tamagoshi/ranking').header('Authorization', auth)
+      assert.equal(ranking.body().data.own.points, 2)
+      const free = await client
+        .post('/tamagoshi/reading')
+        .header('Authorization', auth)
+        .json({ day: scorePeriod().day, origin: 'chapter' })
+      assert.equal(free.body().data.score.points, 8)
+    } finally {
+      await db.from('audit_logs').where('user_id', user.id).delete()
+      await user.delete()
+    }
+  })
+
   test('authenticated daily points, concurrency, ranking, monthly reset and no score cap', async ({
     client,
     assert,

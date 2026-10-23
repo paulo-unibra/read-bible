@@ -1923,49 +1923,56 @@ export default class ReadingPlanController {
    */
   async deletePlan({ auth, request, response }: HttpContext) {
     try {
-      const user = auth.user!
+      return await db.transaction(async (trx) => {
+        const user = auth.user!
 
-      const plan = await ReadingPlan.query()
-        .where('user_id', user.id)
-        .where('is_active', true)
-        .whereNull('deleted_at')
-        .first()
+        const plan = await ReadingPlan.query({ client: trx })
+          .where('user_id', user.id)
+          .where('is_active', true)
+          .whereNull('deleted_at')
+          .forUpdate()
+          .first()
 
-      if (!plan) {
-        return response.notFound({
-          success: false,
-          message: 'Plano de leitura não encontrado',
+        if (!plan) {
+          return response.notFound({
+            success: false,
+            message: 'Plano de leitura não encontrado',
+          })
+        }
+
+        // Soft delete: manter o plano e o progresso no banco para auditoria/restauração
+        plan.isActive = false
+        plan.deletedAt = DateTime.now()
+        await plan.save()
+        await pointsService.reconcileReadings(user.id, trx)
+
+        await AuditLog.create(
+          {
+            userId: user.id,
+            action: 'plan.delete',
+            entityType: 'reading_plan',
+            entityId: plan.id,
+            details: {
+              name: plan.name,
+              type: plan.type,
+              totalDays: plan.totalDays,
+              chaptersPerDay: plan.chaptersPerDay,
+              currentDay: plan.currentDay,
+              completedChapters: plan.completedChapters,
+              startDate: plan.startDate?.toISO(),
+              endDate: plan.endDate?.toISO(),
+            },
+            ipAddress: request.ip(),
+            userAgent: request.header('user-agent') || null,
+          },
+          { client: trx }
+        )
+
+        return response.ok({
+          success: true,
+          message: 'Plano de leitura excluído com sucesso',
+          data: { planId: plan.id },
         })
-      }
-
-      // Soft delete: manter o plano e o progresso no banco para auditoria/restauração
-      plan.isActive = false
-      plan.deletedAt = DateTime.now()
-      await plan.save()
-
-      await AuditLog.create({
-        userId: user.id,
-        action: 'plan.delete',
-        entityType: 'reading_plan',
-        entityId: plan.id,
-        details: {
-          name: plan.name,
-          type: plan.type,
-          totalDays: plan.totalDays,
-          chaptersPerDay: plan.chaptersPerDay,
-          currentDay: plan.currentDay,
-          completedChapters: plan.completedChapters,
-          startDate: plan.startDate?.toISO(),
-          endDate: plan.endDate?.toISO(),
-        },
-        ipAddress: request.ip(),
-        userAgent: request.header('user-agent') || null,
-      })
-
-      return response.ok({
-        success: true,
-        message: 'Plano de leitura excluído com sucesso',
-        data: { planId: plan.id },
       })
     } catch (error) {
       console.error('Erro ao excluir plano:', error)
