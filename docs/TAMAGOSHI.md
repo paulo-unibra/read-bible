@@ -1,41 +1,40 @@
-# Tamagoshi
+# Tamagoshi: pontuação mensal
 
-Começa desativado. No menu da foto do perfil, **Ativar Tamagoshi** abre a ativação. Depois de ativado, a opção passa a **Configurar Tamagoshi**. Também pode ser acessado pelo perfil. Ativação gera uma espécie/nome inicial persistentes; o usuário pode alterar o nome. Na tela inicial e nos cuidados, o nome exibido combina o nome do mascote com o primeiro nome do usuário (por exemplo, **Lumi Paulo**). O primeiro nome é obtido do perfil na exibição, sem alterar o nome-base salvo do mascote.
+O Tamagoshi começa inativo. O menu do perfil permite ativar, editar o nome, convidar amigos e abrir os cuidados. O nome exibido combina o nome-base com o primeiro nome do usuário, como **Lumi Paulo**.
 
-Os dados ficam no AsyncStorage, separados pelo ID da conta. Esta versão não sincroniza cuidados ou constância entre dispositivos. Não altera a API nem precisa de deploy do backend.
+## Pontos e ranking
 
-## Constância e saúde
+- Leitura confirmada: **6 pontos por dia**, independentemente da quantidade de capítulos ou planos.
+- Questionário concluído e validado pela API: **2 pontos por dia**, independentemente das tentativas ou questionários.
+- Convite de nova conta com e-mail confirmado: **5 pontos por conta**, no mês da confirmação.
+- Não há limite de 100, pontos iniciais nem perda de pontos por inatividade.
+- O ranking exige login e considera apenas Tamagoshis ativados com pontos no mês corrente. Empates são ordenados pelo ID da conta para garantir paginação estável.
+- A pontuação reinicia em **todo dia 1º, às 00:00 de America/Recife**. O filtro mensal é aplicado no servidor, sem depender do app aberto ou de tarefa agendada. O histórico dos meses anteriores é preservado.
 
-- Saúde inicial 60; limite 0–100.
-- Pelo menos um capítulo confirmado no dia: +6, uma única vez por dia.
-- Pelo menos um questionário confirmado pela API no dia: +2, uma única vez por dia.
-- Dia inteiro sem leitura: −5. O dia da ativação é isento dessa perda.
-- Sono automático fixo de 22:00 a 06:00, sem perda de saúde por sono insuficiente.
-- O dia atual não recebe perdas antecipadas.
-- Quizzes não substituem a leitura. Vários capítulos no mesmo dia não compensam dias sem leitura.
-- A sequência considera datas locais consecutivas, permitindo que o usuário ainda conclua a leitura de hoje.
+O ranking mostra a lista paginada, o mês e a própria posição/pontuação, mesmo fora da página atual. Fica disponível em **Configurar Tamagoshi → Ver ranking do mês**, separado do antigo ranking de quizzes.
 
-A conclusão é explícita: **Concluí este capítulo** no fim da leitura na Bíblia ou no plano, ou **Marcar como Lida** ao concluir a leitura do plano. Só abrir o capítulo não registra constância. Leituras e quizzes anteriores à ativação não criam ganhos retroativos.
+## Registro e sincronização
 
-O diário guarda no máximo uma marca de leitura e uma de quiz por data. As operações de armazenamento são serializadas para não perder atividades concorrentes. Dias anteriores são liquidados uma vez, inclusive após períodos com o app fechado.
+A API mantém `tamagoshi_profiles` e um livro de eventos em `tamagoshi_points`. Cada usuário possui uma entrada única por fonte e dia (leitura/quiz), ou por convite confirmado. O cliente nunca informa valores de pontos ou meses para ganhar pontuação. O registro de leitura é uma confirmação do usuário, limitada ao dia atual do servidor. O app exige conexão para participar do ranking.
 
-## Sono
+A conclusão da leitura do plano, do quiz e do convite registra pontos dentro da transação original. Ao sincronizar, atividades confirmadas no servidor durante o mês corrente também são recuperadas, sem duplicação. Saúde antiga e histórico exclusivamente local não são convertidos em pontos.
 
-O sono é fixo das **22:00 às 06:00**, seguindo o relógio local, sem campos de configuração. Nesse período o mascote aparece com olhos fechados e Zs. A leitura continua disponível enquanto ele dorme.
+Leituras livres feitas offline ficam pendentes no aparelho. Precisam ser sincronizadas ainda no mesmo dia de Recife; o app informa essa condição. Pendências anteriores não são creditadas em outro dia ou mês. Um total em cache de mês anterior é exibido como zero após a virada, inclusive offline.
 
-Os horários personalizados anteriormente salvos são normalizados na próxima leitura dos dados, preservando nome, aparência, saúde já registrada e diário. O cálculo ignora horários antigos e não aplica novas perdas por sono insuficiente. A configuração permite apenas alterar o nome.
+Nome e aparência são sincronizados por conta, permitindo recuperar o Tamagoshi em outro aparelho. Ao migrar os dados locais antigos, preservam-se nome, aparência e diário; descartam-se saúde e contadores antigos de bônus. O catálogo original continua preservado para mascotes antigos. O catálogo novo contém 50 nomes/aparências em 10 espécies.
 
-## Validação
+## Sono e expressões
 
-```sh
-node scripts/test-tamagoshi.cjs
-npx expo export --platform android --output-dir /tmp/readbible-tamagoshi
-```
+Sono automático fixo **22:00–06:00 no relógio local**, sem configuração. As expressões dependem da constância de leitura e não do total mensal, então a virada do mês não apaga a sequência. Quizzes e convites ajudam nos pontos; vários capítulos no mesmo dia não substituem a constância.
 
-Os testes cobrem fronteiras do sono, constância versus volume, limites de saúde, dia atual/ativação, idempotência, isolamento de contas, escrita concorrente, datas inválidas e validação de configurações.
+## API e validação
 
-## Catálogo de companheiros
+- `GET /tamagoshi`: perfil e pontuação do mês.
+- `POST /tamagoshi/activate`: ativação idempotente.
+- `PUT /tamagoshi`: alteração do nome.
+- `POST /tamagoshi/reading`: confirmação da leitura no dia atual.
+- `GET /tamagoshi/ranking?page=1`: classificação mensal paginada.
 
-São 50 nomes e aparências iniciais, distribuídos em dez espécies (cinco por espécie): gato, coelho, urso, pintinho, raposa, cachorro, panda, coala, sapo e pinguim. Cada opção possui nome e combinação de espécie/cor únicos, além de detalhes específicos de orelhas e rosto.
+Todos exigem autenticação. Publicar a API e aplicar `1793200000000_create_tamagoshi_points` antes de usar os endpoints em produção.
 
-Novas ativações usam `catalogVersion: 2`. Mascotes antigos sem esse campo continuam no catálogo original de quatro opções (`catalogVersion: 1`), preservando a aparência vinculada à semente, o nome escolhido e os cuidados. A seleção usa uma semente persistida e inclui todas as 50 opções.
+Testes: `scripts/test-tamagoshi.cjs`, `scripts/test-referral-service.cjs` e os testes funcionais da API `tamagoshi_points`, `public_quiz_security` e `referrals`. Os funcionais usam um MySQL temporário, nunca produção.

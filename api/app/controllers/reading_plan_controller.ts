@@ -1,3 +1,4 @@
+import pointsService from '#services/tamagoshi_points_service'
 import ReadingPlan from '#models/reading_plan'
 import ReadingProgress from '#models/reading_progress'
 import AuditLog from '#models/audit_log'
@@ -761,6 +762,8 @@ export default class ReadingPlanController {
           { client: trx }
         )
 
+        if (newlyCompletedReadings > 0)
+          await pointsService.award(user.id, 'reading', DateTime.utc(), undefined, trx)
         return { plan, newlyCompletedReadings }
       })
 

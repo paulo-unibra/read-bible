@@ -1,3 +1,4 @@
+import pointsService from '#services/tamagoshi_points_service'
 import Quiz from '#models/quiz'
 import QuizResult from '#models/quiz_result'
 import User from '#models/user'
@@ -91,6 +92,7 @@ export default class QuizResultController {
           // Preserve the original ranking score while recording recent activity.
           previousResult.updatedAt = DateTime.now()
           await previousResult.save()
+          await pointsService.award(user.id, 'quiz', DateTime.utc(), undefined, trx)
           return { result: previousResult, alreadyRecorded: true, invalidAnswers: false }
         }
 
@@ -108,6 +110,7 @@ export default class QuizResultController {
           { client: trx }
         )
 
+        await pointsService.award(user.id, 'quiz', DateTime.utc(), undefined, trx)
         return { result, alreadyRecorded: false, invalidAnswers: false }
       })
 

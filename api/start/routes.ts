@@ -8,6 +8,7 @@
 */
 
 const AuthController = () => import('#controllers/auth_controller')
+const TamagoshiController = () => import('#controllers/tamagoshi_controller')
 const ReferralsController = () => import('#controllers/referrals_controller')
 const AdminAuthController = () => import('#controllers/Admin/auth_controller')
 const AdminAuditLogController = () => import('#controllers/Admin/audit_log_controller')
@@ -54,6 +55,14 @@ router
 router.post('/auth/logout', [AuthController, 'logout']).use(middleware.auth())
 router.get('/auth/me', [AuthController, 'me']).use(middleware.auth())
 router.get('/auth/stats', [AuthController, 'stats']).use(middleware.auth())
+router.get('/tamagoshi', [TamagoshiController, 'me']).use(middleware.auth())
+router.post('/tamagoshi/activate', [TamagoshiController, 'activate']).use(middleware.auth())
+router.put('/tamagoshi', [TamagoshiController, 'rename']).use(middleware.auth())
+router
+  .post('/tamagoshi/reading', [TamagoshiController, 'reading'])
+  .use(middleware.auth())
+  .use(publicRateLimit(30))
+router.get('/tamagoshi/ranking', [TamagoshiController, 'ranking']).use(middleware.auth())
 router.get('/referrals/me', [ReferralsController, 'me']).use(middleware.auth())
 router.get('/invite/:code', [ReferralsController, 'landing']).use(publicRateLimit(30))
 router.put('/auth/profile', [AuthController, 'updateProfile']).use(middleware.auth())

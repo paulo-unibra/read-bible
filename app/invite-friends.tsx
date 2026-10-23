@@ -42,7 +42,7 @@ export default function InviteFriendsScreen() {
         <Text style={[styles.body, { color: colors.text }]}>Não foi possível carregar seu convite. Confira a conexão e tente novamente.</Text>
         <TouchableOpacity style={[styles.button, { backgroundColor: colors.blueDark }]} onPress={() => setAttempt(value => value + 1)} accessibilityRole="button"><Text style={styles.buttonText}>Tentar novamente</Text></TouchableOpacity>
       </> : <>
-        <Text style={[styles.body, { color: colors.muted }]}>Ganhe +{summary.rewardPerInvite} de saúde por cadastro com seu código e e-mail confirmado.</Text>
+        <Text style={[styles.body, { color: colors.muted }]}>Ganhe +{summary.rewardPerInvite} pontos por cadastro com seu código e e-mail confirmado.</Text>
         <Text style={[styles.label, { color: colors.muted }]}>Seu código</Text>
         <Text selectable style={[styles.code, { color: colors.text, backgroundColor: colors.surface }]}>{summary.code}</Text>
         <TouchableOpacity style={[styles.button, { backgroundColor: colors.blueDark }]} accessibilityRole="button" onPress={async () => {
@@ -54,7 +54,7 @@ export default function InviteFriendsScreen() {
           catch { Alert.alert('Não foi possível copiar', 'Você pode selecionar o código e copiá-lo manualmente.'); }
         }}><Text style={[styles.copyText, { color: colors.blueDark }]}>Copiar código</Text></TouchableOpacity>
         <View style={[styles.stats, { borderColor: colors.line }]}>
-          <Text style={[styles.note, { color: colors.muted }]}>{summary.confirmedInvites} confirmados · {summary.pendingInvites} {summary.pendingInvites === 1 ? 'pendente' : 'pendentes'} · +{summary.totalHealthPoints} pontos</Text>
+          <Text style={[styles.note, { color: colors.muted }]}>{summary.monthlyConfirmedInvites} confirmados · {summary.pendingInvites} {summary.pendingInvites === 1 ? 'pendente' : 'pendentes'} · +{summary.monthlyPoints} pontos</Text>
         </View>
         <TouchableOpacity accessibilityRole="button" onPress={() => router.push('/tamagoshi')} style={styles.petLink}><Text style={[styles.copyText, { color: colors.blueDark }]}>Ver meu Tamagoshi</Text></TouchableOpacity>
       </>}

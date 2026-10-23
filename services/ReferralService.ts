@@ -6,7 +6,9 @@ export interface ReferralSummary {
   inviteUrl: string;
   confirmedInvites: number;
   pendingInvites: number;
-  totalHealthPoints: number;
+  month: string;
+  monthlyConfirmedInvites: number;
+  monthlyPoints: number;
   rewardPerInvite: number;
 }
 class ReferralService {
@@ -21,10 +23,10 @@ class ReferralService {
       const body = await response.json();
       if (!response.ok || !body.success || !body.data) throw new Error('Não foi possível consultar os convites. Tente novamente.');
       const data = body.data as ReferralSummary;
-      if (!Number.isSafeInteger(data.totalHealthPoints) || data.totalHealthPoints < 0 || !/^[A-F0-9]{12}$/.test(data.code)) throw new Error('Resposta de convites inválida.');
+      if (!Number.isSafeInteger(data.monthlyPoints) || data.monthlyPoints < 0 || !/^[A-F0-9]{12}$/.test(data.code)) throw new Error('Resposta de convites inválida.');
       // A delayed response must never credit another account after logout/login.
       if (authService.getUser()?.id !== userId || authService.getToken() !== token) throw new Error('A sessão mudou. Tente novamente.');
-      await tamagoshiService.applyInviteRewards(userId, data.totalHealthPoints);
+      await tamagoshiService.sync(userId);
       return data;
     } finally { clearTimeout(timer); }
   }

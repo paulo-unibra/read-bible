@@ -16,7 +16,7 @@ export default function TamagoshiMenuOption({ userId, onOpen, dark = false }: { 
     <Ionicons name="paw-outline" size={23} color={dark ? '#83cfff' : '#0879b6'} />
     <View style={styles.copy}>
       <Text style={[styles.title, { color: dark ? '#f2f5f7' : '#203947' }]}>{enabled === null ? 'Tamagoshi' : enabled ? 'Configurar Tamagoshi' : 'Ativar Tamagoshi'}</Text>
-      <Text style={[styles.subtitle, { color: dark ? '#aab4bb' : '#496271' }]}>{enabled ? 'Nome e saúde do seu companheiro' : 'Um companheiro para sua constância de leitura'}</Text>
+      <Text style={[styles.subtitle, { color: dark ? '#aab4bb' : '#496271' }]}>{enabled ? 'Nome e pontuação do seu companheiro' : 'Um companheiro para sua constância de leitura'}</Text>
     </View>
     <Ionicons name="chevron-forward" size={18} color={dark ? '#aab4bb' : '#496271'} />
   </TouchableOpacity>
@@ -24,7 +24,7 @@ export default function TamagoshiMenuOption({ userId, onOpen, dark = false }: { 
     <Ionicons name="gift-outline" size={23} color={dark ? '#83cfff' : '#0879b6'} />
     <View style={styles.copy}>
       <Text style={[styles.title, { color: dark ? '#f2f5f7' : '#203947' }]}>Convidar amigos</Text>
-      <Text style={[styles.subtitle, { color: dark ? '#aab4bb' : '#496271' }]}>Compartilhe seu código e ganhe saúde</Text>
+      <Text style={[styles.subtitle, { color: dark ? '#aab4bb' : '#496271' }]}>Compartilhe seu código e ganhe pontos</Text>
     </View>
     <Ionicons name="chevron-forward" size={18} color={dark ? '#aab4bb' : '#496271'} />
   </TouchableOpacity></>;

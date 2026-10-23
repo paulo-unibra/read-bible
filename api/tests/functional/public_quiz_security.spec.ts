@@ -53,6 +53,10 @@ test.group('Public quiz security', () => {
 
       const token = await User.accessTokens.create(user)
       const tokenValue = token.value!.release()
+      await client
+        .post('/tamagoshi/activate')
+        .header('Authorization', `Bearer ${tokenValue}`)
+        .json({ name: 'Pipo', seed: 42, catalogVersion: 2 })
       const generatedQuizResponse = await client
         .post('/generate-quiz')
         .header('Authorization', `Bearer ${tokenValue}`)
@@ -106,9 +110,15 @@ test.group('Public quiz security', () => {
         alreadyRecorded: true,
         result: { correctAnswers: 1, score: 50 },
       })
+      const monthly = await client.get('/tamagoshi').header('Authorization', `Bearer ${tokenValue}`)
+      assert.equal(monthly.body().data.score.points, 2)
       await storedResult.refresh()
-      assert.isTrue(storedResult.updatedAt.toMillis() > DateTime.now().minus({ minutes: 1 }).toMillis())
-      const history = await client.get('/quiz-results/me').header('Authorization', `Bearer ${tokenValue}`)
+      assert.isTrue(
+        storedResult.updatedAt.toMillis() > DateTime.now().minus({ minutes: 1 }).toMillis()
+      )
+      const history = await client
+        .get('/quiz-results/me')
+        .header('Authorization', `Bearer ${tokenValue}`)
       history.assertStatus(200)
       assert.equal(history.body().results[0].lastCompletedAt, storedResult.updatedAt.toISO())
     } finally {

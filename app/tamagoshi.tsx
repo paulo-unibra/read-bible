@@ -7,7 +7,6 @@ import CompanionAvatar from '../components/CompanionAvatar';
 import authService from '../services/AuthService';
 import DatabaseService from '../services/DatabaseService';
 import tamagoshiService from '../services/TamagoshiService';
-import referralService from '../services/ReferralService';
 import { getFocusColors } from '../constants/design';
 import { Tamagoshi, tamagoshiDisplayName, tamagoshiStatus } from '../utils/tamagoshi';
 
@@ -36,9 +35,8 @@ export default function TamagoshiScreen() {
         if (!userId) { router.replace('/auth?mode=login'); return; }
         const [saved, theme] = await Promise.all([tamagoshiService.get(userId), DatabaseService.getSetting('theme')]);
         if (active) { if (saved) populate(saved); setDark(theme === 'dark'); setLoading(false); }
-        await referralService.getMine().catch(() => {});
-        const rewarded = await tamagoshiService.get(userId);
-        if (active && rewarded) setPet(rewarded);
+        const rewarded = await tamagoshiService.sync(userId).catch(() => saved);
+        if (active && rewarded) { if (!saved) populate(rewarded); else setPet(rewarded); }
       } catch { if (active) setError(true); }
       finally { if (active) setLoading(false); }
     })();
@@ -52,8 +50,7 @@ export default function TamagoshiScreen() {
       const saved = pet ? await tamagoshiService.configure(userId, { name }) : await tamagoshiService.activate(userId);
       populate(saved);
       if (!pet) {
-        await referralService.getMine().catch(() => {});
-        const rewarded = await tamagoshiService.get(userId);
+        const rewarded = await tamagoshiService.sync(userId).catch(() => saved);
         if (rewarded) setPet(rewarded);
       }
       if (pet) Alert.alert('Salvo', 'Nome do Tamagoshi atualizado.');
@@ -73,7 +70,7 @@ export default function TamagoshiScreen() {
           <CompanionAvatar size={64} catalogVersion={pet.catalogVersion ?? 1} seed={pet.seed} mood={status.mood} sleeping={status.sleeping} />
           <View style={styles.petSummary}>
             <Text style={[styles.petName, { color: colors.text }]} numberOfLines={1}>{tamagoshiDisplayName(pet.name, authService.getUser()?.name)}</Text>
-            <Text style={[styles.body, { color: colors.muted }]}>Saúde {status.health}/100{status.sleeping ? ' · Dormindo' : ''}</Text>
+            <Text style={[styles.body, { color: colors.muted }]}>{status.points} pontos no mês{status.sleeping ? ' · Dormindo' : ''}</Text>
           </View>
         </View>
         <Text style={[styles.label, { color: colors.text }]}>Nome</Text>
@@ -84,8 +81,9 @@ export default function TamagoshiScreen() {
         <Text style={[styles.body, { color: colors.muted }]}>Cuide dele com uma leitura por dia. Sono automático: 22h às 6h.</Text>
       </>}
       <TouchableOpacity accessibilityRole="button" disabled={saving} style={[styles.button, { backgroundColor: colors.blueDark, opacity: saving ? 0.6 : 1 }]} onPress={submit}><Text style={styles.buttonText}>{saving ? 'Salvando…' : pet ? 'Salvar' : 'Ativar meu Tamagoshi'}</Text></TouchableOpacity>
+      <TouchableOpacity accessibilityRole="button" onPress={() => router.push('/tamagoshi-ranking')} style={{ paddingVertical: 12 }}><Text style={{ color: colors.blueDark, fontWeight: '600', fontSize: 15 }}>Ver ranking do mês</Text></TouchableOpacity>
       <TouchableOpacity accessibilityRole="button" onPress={() => router.push('/invite-friends')} style={{ paddingVertical: 12 }}><Text style={{ color: colors.blueDark, fontWeight: '600', fontSize: 15 }}>Convidar amigos</Text></TouchableOpacity>
-      <Text style={[styles.footnote, { color: colors.muted }]}>Cuidados salvos neste aparelho.</Text>
+      <Text style={[styles.footnote, { color: colors.muted }]}>Pontuação zera no dia 1º de cada mês.</Text>
     </ScrollView>}
   </SafeAreaView>;
 }

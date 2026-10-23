@@ -36,6 +36,10 @@ test.group('Invitations', () => {
     try {
       const unauthorized = await client.get('/referrals/me')
       unauthorized.assertStatus(401)
+      await client
+        .post('/tamagoshi/activate')
+        .header('Authorization', authorization)
+        .json({ name: 'Pipo', seed: 42, catalogVersion: 2 })
       const first = await client.get('/referrals/me').header('Authorization', authorization)
       first.assertStatus(200)
       const invitation = first.body().data
@@ -84,6 +88,8 @@ test.group('Invitations', () => {
       assert.equal(awarded.body().data.confirmedInvites, 1)
       assert.equal(awarded.body().data.pendingInvites, 0)
       assert.equal(awarded.body().data.totalHealthPoints, 5)
+      const petPoints = await client.get('/tamagoshi').header('Authorization', authorization)
+      assert.equal(petPoints.body().data.score.points, 5)
       await client.post('/auth/verify-email').json({ email, code })
       await client
         .post('/auth/register')

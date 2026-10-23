@@ -1,3 +1,4 @@
+import pointsService from '#services/tamagoshi_points_service'
 import User from '#models/user'
 import db from '@adonisjs/lucid/services/db'
 import { INVITE_HEALTH_REWARD } from '#controllers/referrals_controller'
@@ -195,11 +196,25 @@ export default class AuthController {
           .where('user_id', user.id)
           .where('used', false)
           .update({ used: true })
-        await trx
+        const referral = await trx
           .from('user_referrals')
           .where('referred_user_id', user.id)
           .whereNull('rewarded_at')
-          .update({ rewarded_at: DateTime.now().toSQL({ includeOffset: false }) })
+          .first()
+        if (referral) {
+          await trx
+            .from('user_referrals')
+            .where('id', referral.id)
+            .whereNull('rewarded_at')
+            .update({ rewarded_at: DateTime.now().toSQL({ includeOffset: false }) })
+          await pointsService.award(
+            referral.referrer_id,
+            'invite',
+            DateTime.utc(),
+            referral.id,
+            trx
+          )
+        }
       })
 
       return response.ok(genericResponse)

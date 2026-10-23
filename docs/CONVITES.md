@@ -1,4 +1,4 @@
-# Convites e bônus de saúde
+# Convites e pontos mensais
 
 Cada conta possui um código permanente de 12 caracteres e um link público. O menu do perfil contém **Convidar amigos**, com compartilhamento nativo e cópia do código. A tela de cuidados do Tamagoshi também abre essa opção.
 
@@ -10,7 +10,7 @@ Cada conta possui um código permanente de 12 caracteres e um link público. O m
 - O cadastro por link preenche o campo, e o código pendente é preservado localmente até o envio do cadastro.
 - O código precisa existir e pertencer a uma conta confirmada.
 - O vínculo só é criado no primeiro cadastro. Contas existentes, inclusive a do próprio convidador, não recebem um novo vínculo em tentativas de cadastro posteriores.
-- A recompensa é de **5 pontos de saúde para quem convidou**, após a nova conta confirmar o e-mail. Compartilhar ou clicar no link não concede pontos.
+- A recompensa é de **5 pontos para quem convidou**, após a nova conta confirmar o e-mail. Compartilhar ou clicar no link não concede pontos.
 - A confirmação usa transação, bloqueio de usuário e atualização condicional. Repetir ou concorrer confirmações não gera um segundo bônus.
 
 ## Persistência
@@ -24,7 +24,9 @@ O histórico de pontos liberados permanece se a conta convidada for excluída. C
 
 `GET /referrals/me` exige autenticação e retorna apenas os totais da própria conta, sem dados pessoais dos convidados. `GET /invite/:code` é uma página pública com limitação de requisições e não revela o nome/e-mail do convidador.
 
-O Tamagoshi consulta os totais do servidor ao abrir os cuidados, a tela de convite ou a tela inicial. O contador local `claimedInvitePoints` consome somente a diferença ainda não recebida e impede duplicação em consultas simultâneas. A saúde continua limitada a 100: excedentes não ficam disponíveis para recuperar saúde novamente depois. Antes da ativação, os pontos continuam guardados no servidor. A saúde em si permanece local ao aparelho, como no restante do Tamagoshi.
+Os pontos entram no ranking no mês da confirmação do e-mail, seguindo `America/Recife`, e não têm limite de 100. A API mantém o evento único por convite e devolve `month`, `monthlyConfirmedInvites` e `monthlyPoints` no resumo de convites. O campo antigo `totalHealthPoints` continua disponível apenas para compatibilidade com versões anteriores do aplicativo.
+
+O cliente sincroniza o placar do Tamagoshi diretamente do servidor, sem converter totais de convites em bônus locais. A virada do mês não reaplica convites antigos. Ao ativar o Tamagoshi, convites já confirmados no mesmo mês também são recuperados, sem duplicação. Confirmações de meses anteriores não geram pontos no mês atual.
 
 ## Publicação
 

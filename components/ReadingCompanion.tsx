@@ -2,15 +2,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { AccessibilityInfo, Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import authService, { API_URL } from '../services/AuthService';
+import authService from '../services/AuthService';
 import type { ReadingPlan, ReadingPlanDay } from '../types';
-import { CompanionQuizResult, getCompanion } from '../utils/readingCompanion';
+import { getCompanion } from '../utils/readingCompanion';
 import CompanionAvatar from './CompanionAvatar';
 import tamagoshiService from '../services/TamagoshiService';
-import referralService from '../services/ReferralService';
 import { TAMAGOSHI_REWARDS, Tamagoshi, tamagoshiDisplayName, tamagoshiStatus } from '../utils/tamagoshi';
 
-export default function ReadingCompanion({ userId, days }: {
+export default function ReadingCompanion({ userId }: {
   userId: number; plan: ReadingPlan | null; days: ReadingPlanDay[];
 }) {
   const router = useRouter();
@@ -52,38 +51,20 @@ export default function ReadingCompanion({ userId, days }: {
   }, [enabled, reducedMotion, tipOpacity]));
 
   useFocusEffect(useCallback(() => {
-    const controller = new AbortController();
     let active = true;
-    const timeout = setTimeout(() => controller.abort(), 10000);
     (async () => {
       try {
         const savedPet = await tamagoshiService.get(userId);
         if (active) setPetData(savedPet);
-        if (!savedPet) return;
-        void referralService.getMine().then(async () => {
-          const rewardedPet = await tamagoshiService.get(userId);
-          if (active) setPetData(rewardedPet);
-        }).catch(() => {});
-        await tamagoshiService.record(userId, 'reading', days.filter(day => day.isCompleted && day.completedDate).map(day => day.completedDate!));
-        const token = authService.getToken();
-        if (!token || authService.getUser()?.id !== userId) throw new Error('Sessão indisponível');
-        const response = await fetch(`${API_URL}/quiz-results/me`, {
-          headers: { Authorization: `Bearer ${token}` }, signal: controller.signal,
-        });
-        if (!response.ok) throw new Error('Questionários indisponíveis');
-        const data = await response.json();
-        if (!data.success || !Array.isArray(data.results)) throw new Error('Resposta inválida');
-        await tamagoshiService.record(userId, 'quiz', data.results.map((result: CompanionQuizResult) => result.lastCompletedAt ?? result.createdAt));
-        const updated = await tamagoshiService.get(userId);
-        if (active) setPetData(updated);
+        const synchronized = await tamagoshiService.sync(userId).catch(() => savedPet);
+        if (active) setPetData(synchronized);
+        if (!synchronized) return;
       } catch {
-        // Keep the locally stored health available when the network is offline.
-      } finally {
-        clearTimeout(timeout);
+        // Keep the last server-confirmed monthly score available offline.
       }
     })();
-    return () => { active = false; clearTimeout(timeout); controller.abort(); };
-  }, [userId, days]));
+    return () => { active = false;  };
+  }, [userId]));
 
   useFocusEffect(useCallback(() => {
     const timer = setInterval(() => setClock(new Date()), 60000);
@@ -114,8 +95,8 @@ export default function ReadingCompanion({ userId, days }: {
   const moodLabels = { joyful: 'Radiante', happy: 'Feliz', hopeful: 'Esperançoso', sleepy: 'Precisando de cuidado', curious: 'Curioso' };
   const feeling = status.sleeping ? 'Dormindo' : moodLabels[status.mood];
   const tips = [
-    status.readToday ? `Leitura concluída: +${TAMAGOSHI_REWARDS.reading} de saúde hoje.` : `Leia 1 capítulo e conquiste +${TAMAGOSHI_REWARDS.reading} de saúde por dia.`,
-    status.quizToday ? `Questionário concluído: +${TAMAGOSHI_REWARDS.quiz} de saúde hoje.` : `Faça um questionário: +${TAMAGOSHI_REWARDS.quiz} de saúde por dia.`,
+    status.readingConfirmed ? `Leitura concluída: +${TAMAGOSHI_REWARDS.reading} pontos hoje.` : status.readToday ? 'Leitura salva · conecte-se hoje para pontuar.' : `Leia 1 capítulo e conquiste +${TAMAGOSHI_REWARDS.reading} pontos por dia.`,
+    status.quizConfirmed ? `Questionário concluído: +${TAMAGOSHI_REWARDS.quiz} pontos hoje.` : `Faça um questionário: +${TAMAGOSHI_REWARDS.quiz} pontos por dia.`,
     'Descanso automático: das 22h às 6h.',
   ];
   return (
@@ -123,7 +104,7 @@ export default function ReadingCompanion({ userId, days }: {
       style={styles.container}
       onPress={() => router.push('/tamagoshi')}
       accessibilityRole="button"
-      accessibilityLabel={`${pet.species} ${displayName}, ${feeling.toLowerCase()}. Saúde ${status.health} de 100. Leitura: até ${TAMAGOSHI_REWARDS.reading} pontos por dia. Questionário: até ${TAMAGOSHI_REWARDS.quiz} pontos por dia. Ver cuidados do Tamagoshi`}
+      accessibilityLabel={`${pet.species} ${displayName}, ${feeling.toLowerCase()}. ${status.points} pontos neste mês. Leitura: até ${TAMAGOSHI_REWARDS.reading} pontos por dia. Questionário: até ${TAMAGOSHI_REWARDS.quiz} pontos por dia. Ver pontos do Tamagoshi`}
     >
       <View style={styles.row}>
       <View style={styles.petStage} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
@@ -136,8 +117,8 @@ export default function ReadingCompanion({ userId, days }: {
         <Text style={styles.mood} numberOfLines={1}>{feeling}</Text>
       </View>
       <View style={styles.health}>
-        <Text style={styles.healthLabel}>Saúde</Text>
-        <Text style={styles.healthValue}>{status.health}/100</Text>
+        <Text style={styles.healthLabel}>Pontos</Text>
+        <Text style={styles.healthValue}>{status.points}</Text>
       </View>
       <Ionicons name="chevron-forward" size={18} color="#496271" />
       </View>

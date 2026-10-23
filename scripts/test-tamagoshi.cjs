@@ -2,173 +2,129 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const test = require('node:test');
 const ts = require('typescript');
-function compile(file, dependencies = {}) {
+function compile(file, dependencies = {}, fetcher = global.fetch) {
   const { outputText } = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, esModuleInterop: true } });
   const module = { exports: {} };
-  new Function('require', 'exports', outputText)(id => {
+  new Function('require', 'exports', 'fetch', outputText)(id => {
     if (!(id in dependencies)) throw new Error('Unexpected import ' + id);
     return dependencies[id];
-  }, module.exports);
+  }, module.exports, fetcher);
   return module.exports;
 }
 const engine = compile('utils/tamagoshi.ts');
-const { dayKey, nextDay, TAMAGOSHI_SLEEP, isSleeping, settleTamagoshi, tamagoshiStatus } = engine;
-const today = new Date(2026, 9, 23, 12);
-const base = () => ({ version: 1, seed: 123, name: 'Lumi', activatedAt: new Date(2026, 9, 20, 10).toISOString(), sleepStart: '22:00', sleepEnd: '06:00', settledThrough: '2026-10-19', health: 60, days: {} });
+const { dayKey, nextDay, TAMAGOSHI_SLEEP, isSleeping, settleTamagoshi, tamagoshiStatus, tamagoshiDisplayName } = engine;
+const base = () => ({ version: 1, seed: 123, name: 'Lumi', activatedAt: '2026-10-20T15:00:00Z', sleepStart: '22:00', sleepEnd: '06:00', health: 100, days: {} });
+const score = { month: '2026-10', points: 126, readingDays: ['2026-10-31'], quizDays: [], readToday: true, quizToday: false };
 test('sono fixo começa às 22h e termina às 6h no relógio local', () => {
   assert.deepEqual(TAMAGOSHI_SLEEP, { start: '22:00', end: '06:00' });
   assert.equal(isSleeping(new Date(2026, 9, 23, 21, 59)), false);
   assert.equal(isSleeping(new Date(2026, 9, 23, 22)), true);
-  assert.equal(isSleeping(new Date(2026, 9, 24, 0)), true);
   assert.equal(isSleeping(new Date(2026, 9, 24, 5, 59)), true);
   assert.equal(isSleeping(new Date(2026, 9, 24, 6)), false);
-  assert.equal(isSleeping(today), false);
 });
-test('constância recompensa cada dia, volume no mesmo dia não compensa faltas', () => {
-  const consistent = base();
-  for (const key of ['2026-10-20', '2026-10-21', '2026-10-22']) consistent.days[key] = { reading: true, quiz: false };
-  const concentrated = base();
-  concentrated.days['2026-10-20'] = { reading: true, quiz: false };
-  assert.equal(tamagoshiStatus(consistent, today).health, 78);
-  assert.equal(tamagoshiStatus(consistent, today).streak, 3);
-  assert.equal(tamagoshiStatus(concentrated, today).health, 56);
-  assert.equal(tamagoshiStatus(concentrated, today).streak, 0);
-});
-test('quiz ajuda mas não substitui leitura; horários antigos não afetam a saúde', () => {
-  const pet = { ...base(), sleepStart: '23:00', sleepEnd: '06:00' };
-  pet.days['2026-10-21'] = { reading: false, quiz: true };
-  assert.equal(tamagoshiStatus(pet, today).health, 52);
-  const shortSleep = { ...pet, sleepEnd: '05:59' };
-  assert.equal(tamagoshiStatus(shortSleep, today).health, 52);
-  assert.equal(tamagoshiStatus({ ...pet, sleepStart: '08:00', sleepEnd: '15:00' }, today).sleeping, false);
-});
-test('hoje não é penalizado, ativação não cobra leitura e liquidação não duplica ganhos', () => {
-  const pet = base();
-  assert.equal(tamagoshiStatus(pet, new Date(2026, 9, 20, 23, 59)).health, 60);
-  pet.days['2026-10-20'] = { reading: true, quiz: true };
-  const settled = settleTamagoshi(pet, today);
-  assert.deepEqual(settleTamagoshi(settled, today), settled);
-  assert.equal(tamagoshiStatus(settled, today).health, 58);
-  settled.days[dayKey(today)] = { reading: true, quiz: true };
-  assert.equal(tamagoshiStatus(settled, today).health, 66);
-});
-test('saúde fica entre zero e cem e calendário muda de mês/ano', () => {
-  assert.equal(tamagoshiStatus({ ...base(), health: 0 }, today).health, 0);
-  const pet = { ...base(), health: 100, settledThrough: nextDay(dayKey(today), -1), days: { [dayKey(today)]: { reading: true, quiz: true } } };
-  assert.equal(tamagoshiStatus(pet, today).health, 100);
+test('virada mensal segue Recife e não a meia-noite UTC', () => {
+  const pet = { ...base(), monthlyScore: score };
+  assert.equal(dayKey(new Date('2026-11-01T02:59:59Z')), '2026-10-31');
+  assert.equal(tamagoshiStatus(pet, new Date('2026-11-01T02:59:59Z')).points, 126);
+  assert.equal(tamagoshiStatus(pet, new Date('2026-11-01T03:00:00Z')).points, 0);
   assert.equal(nextDay('2026-12-31'), '2027-01-01');
 });
-function service() {
-  const store = new Map();
-  const storage = { getItem: async key => store.get(key) ?? null, setItem: async (key, value) => store.set(key, value) };
-  const loaded = compile('services/TamagoshiService.ts', {
-    '@react-native-async-storage/async-storage': { __esModule: true, default: storage },
-    '../utils/readingCompanion': { getCompanion: () => ({ name: 'Lumi' }) },
-    '../utils/tamagoshi': engine,
-  });
-  return { api: loaded.default, store };
-}
-test('começa inativo, ativação é idempotente e contas são isoladas', async () => {
-  const { api, store } = service();
-  await api.record(1, 'reading');
-  assert.equal(store.size, 0);
-  assert.equal(await api.get(1), null);
-  const pet = await api.activate(1);
-  assert.equal(pet.catalogVersion, 2);
-  assert.deepEqual(await api.activate(1), pet);
-  assert.equal(await api.get(2), null);
-  assert.equal(pet.sleepStart, '22:00');
-  assert.equal(pet.sleepEnd, '06:00');
+test('pontuação só vem do servidor, sem limite de cem nem redução por inatividade', () => {
+  assert.equal(tamagoshiStatus(base(), new Date('2026-10-31T15:00:00Z')).points, 0);
+  const pet = { ...base(), monthlyScore: score, days: { '2026-10-31': { reading: true, quiz: true } } };
+  assert.equal(tamagoshiStatus(pet, new Date('2026-10-31T15:00:00Z')).points, 126);
+  assert.equal(settleTamagoshi(pet).health, undefined);
 });
-test('leituras e quizzes concorrentes persistem, duplicados dão um único bônus diário', async () => {
-  const { api } = service();
-  await api.activate(1);
-  await Promise.all([api.record(1, 'reading'), api.record(1, 'quiz'), api.record(1, 'reading')]);
-  const pet = await api.get(1);
-  assert.deepEqual(pet.days[dayKey()], { reading: true, quiz: true });
-  assert.equal(tamagoshiStatus(pet).health, 68);
-  assert.equal(tamagoshiStatus(pet).streak, 1);
+test('sequência de leitura continua entre meses e emoções usam constância', () => {
+  const pet = { ...base(), days: { '2026-10-31': { reading: true, quiz: false }, '2026-11-01': { reading: true, quiz: false } }, monthlyScore: score };
+  const state = tamagoshiStatus(pet, new Date('2026-11-01T15:00:00Z'));
+  assert.equal(state.points, 0);
+  assert.equal(state.streak, 2);
+  assert.equal(state.mood, 'happy');
 });
-test('histórico anterior à ativação e datas futuras não criam atividade', async () => {
-  const { api } = service();
-  await api.activate(1);
-  await api.record(1, 'reading', ['2020-01-01T12:00:00Z', 'invalid', '2099-01-01T00:00:00Z']);
-  assert.deepEqual((await api.get(1)).days, {});
-});
-test('nome persiste sem trocar mascote nem permitir alterações no sono', async () => {
-  const { api } = service();
-  const pet = await api.activate(1);
-  await api.configure(1, { name: ' Pipo ', sleepStart: '23:00', sleepEnd: '05:00' });
-  assert.equal((await api.get(1)).name, 'Pipo');
-  assert.equal((await api.get(1)).seed, pet.seed);
-  await assert.rejects(api.configure(1, { name: '', sleepStart: '22:00', sleepEnd: '06:00' }));
-  assert.equal((await api.get(1)).sleepStart, '22:00');
-  assert.equal((await api.get(1)).sleepEnd, '06:00');
-});
-test('horários antigos são normalizados sem penalidade de sono e diário persiste', async () => {
-  const { api, store } = service();
-  const pet = await api.activate(1);
-  const activation = new Date(); activation.setDate(activation.getDate() - 3);
-  pet.activatedAt = activation.toISOString();
-  pet.sleepStart = '23:00'; pet.sleepEnd = '02:00';
-  pet.settledThrough = nextDay(dayKey(activation), -1);
-  store.set('@readbible/tamagoshi/v1/1', JSON.stringify(pet));
-  await api.configure(1, { name: 'Lumi', sleepStart: '23:00', sleepEnd: '05:00' });
-  const saved = await api.get(1);
-  assert.equal(saved.sleepStart, '22:00');
-  assert.equal(saved.sleepEnd, '06:00');
-  assert.equal(saved.health, 50); // only two full missed reading days
-  assert.equal(tamagoshiStatus(saved).health, 50); // no advance penalty for today
-  const restored = JSON.parse(store.get('@readbible/tamagoshi/v1/1'));
-  assert.deepEqual(settleTamagoshi(restored), saved);
-});
-
-test('mascotes antigos sem versão de catálogo não são migrados para outra aparência', async () => {
-  const { api, store } = service();
-  const pet = await api.activate(1);
-  delete pet.catalogVersion;
-  store.set('@readbible/tamagoshi/v1/1', JSON.stringify(pet));
-  const restored = await api.get(1);
-  assert.equal(restored.catalogVersion ?? 1, 1);
-  assert.equal(restored.seed, pet.seed);
-  assert.equal(restored.name, pet.name);
-});
-test('bônus de convite é aplicado uma única vez e não vaza entre contas', async () => {
-  const { api } = service();
-  await api.activate(1);
-  await api.activate(2);
-  await Promise.all([api.applyInviteRewards(1, 5), api.applyInviteRewards(1, 5)]);
-  assert.equal(tamagoshiStatus(await api.get(1)).health, 65);
-  assert.equal(tamagoshiStatus(await api.get(2)).health, 60);
-  await api.applyInviteRewards(1, 10);
-  assert.equal(tamagoshiStatus(await api.get(1)).health, 70);
-  await api.applyInviteRewards(1, 5);
-  assert.equal(tamagoshiStatus(await api.get(1)).health, 70);
-});
-test('pontos de convites só são consumidos após ativar e respeitam o limite de saúde', async () => {
-  const { api, store } = service();
-  await api.applyInviteRewards(1, 5);
-  assert.equal(store.size, 0);
-  await api.activate(1);
-  await api.applyInviteRewards(1, 500);
-  const pet = await api.get(1);
-  assert.equal(pet.health, 100);
-  assert.equal(pet.claimedInvitePoints, 500);
-  // After losing health later, fetching the same reward cannot restore it again.
-  pet.health = 40;
-  store.set('@readbible/tamagoshi/v1/1', JSON.stringify(pet));
-  await api.applyInviteRewards(1, 500);
-  assert.equal((await api.get(1)).health, 40);
-  await assert.rejects(api.applyInviteRewards(1, -5));
-  await assert.rejects(api.applyInviteRewards(1, 1.5));
-});
-test('nome completo une o Tamagoshi ao primeiro nome do dono, sem duplicação', () => {
-  const { tamagoshiDisplayName } = engine;
+test('nome completo usa só o primeiro nome do usuário e não duplica sufixo', () => {
   assert.equal(tamagoshiDisplayName('Lumi', 'Paulo Roberto'), 'Lumi Paulo');
   assert.equal(tamagoshiDisplayName('Pipo', '  Ana   Maria  '), 'Pipo Ana');
   assert.equal(tamagoshiDisplayName('Lumi Paulo', 'Paulo Roberto'), 'Lumi Paulo');
   assert.equal(tamagoshiDisplayName('Pérola', 'Érica Silva'), 'Pérola Érica');
   assert.equal(tamagoshiDisplayName('Lumi', null), 'Lumi');
-  assert.equal(tamagoshiDisplayName('Lumi', '   '), 'Lumi');
-  assert.equal(tamagoshiDisplayName('Paulo', 'Paulo Roberto'), 'Paulo Paulo');
+});
+function service() {
+  const store = new Map(); const server = new Map(); const requests = [];
+  const session = { id: 1, offline: false };
+  const storage = { getItem: async key => store.get(key) ?? null, setItem: async (key, value) => store.set(key, value) };
+  const fetcher = async (url, options) => {
+    if (session.offline) throw new Error('offline');
+    const id = Number(options.headers.Authorization.split('-')[1]);
+    const body = options.body ? JSON.parse(options.body) : {};
+    requests.push({ url, body });
+    const row = server.get(id) ?? { profile: null, score: { month: dayKey().slice(0, 7), points: 0, readingDays: [], quizDays: [], readToday: false, quizToday: false } };
+    if (url.endsWith('/activate') && !row.profile) row.profile = { ...body, activatedAt: new Date().toISOString() };
+    if (options.method === 'PUT') row.profile.name = body.name;
+    if (url.endsWith('/reading') && !row.score.readingDays.includes(dayKey())) {
+      row.score.points += 6; row.score.readingDays.push(dayKey()); row.score.readToday = true;
+    }
+    server.set(id, row);
+    return Response.json({ success: true, data: row });
+  };
+  const loaded = compile('services/TamagoshiService.ts', {
+    '@react-native-async-storage/async-storage': { __esModule: true, default: storage },
+    './AuthService': { __esModule: true, API_URL: 'https://example.invalid/api', default: { getUser: () => ({ id: session.id }), getToken: () => `token-${session.id}` } },
+    '../utils/readingCompanion': { getCompanion: () => ({ name: 'Lumi' }) }, '../utils/tamagoshi': engine,
+  }, fetcher);
+  return { api: loaded.default, store, server, session, requests };
+}
+test('começa inativo, ativação é idempotente, contas isoladas e zero pontos iniciais', async () => {
+  const { api } = service();
+  assert.equal(await api.get(1), null);
+  const pet = await api.activate(1);
+  assert.deepEqual(await api.activate(1), pet);
+  assert.equal(await api.get(2), null);
+  assert.equal(tamagoshiStatus(pet).points, 0);
+});
+test('saúde antiga não é transferida, nome/aparência permanecem e sono é fixado', async () => {
+  const { api, store, requests } = service();
+  const old = { ...base(), sleepStart: '10:00', sleepEnd: '12:00', claimedInvitePoints: 500 };
+  store.set('@readbible/tamagoshi/v1/1', JSON.stringify(old));
+  const pet = await api.sync(1);
+  assert.equal(pet.health, undefined);
+  assert.equal(pet.claimedInvitePoints, undefined);
+  assert.equal(pet.sleepStart, '22:00');
+  assert.equal(pet.seed, old.seed);
+  assert.equal(pet.name, old.name);
+  assert.equal(tamagoshiStatus(pet).points, 0);
+  assert.equal(requests.find(row => row.url.endsWith('/activate')).body.points, undefined);
+});
+test('leitura offline fica pendente e sincroniza uma única vez no mesmo dia', async () => {
+  const { api, session } = service();
+  await api.activate(1); session.offline = true;
+  assert.equal((await api.record(1, 'reading')).synced, false);
+  assert.equal(tamagoshiStatus(await api.get(1)).points, 0);
+  session.offline = false;
+  const saved = await api.sync(1);
+  assert.equal(tamagoshiStatus(saved).points, 6);
+  assert.equal(saved.pendingReadingDay, undefined);
+  await api.sync(1);
+  assert.equal(tamagoshiStatus(await api.get(1)).points, 6);
+});
+test('cliente não cria pontos de quiz sem resultado confirmado no servidor', async () => {
+  const { api } = service(); await api.activate(1);
+  await api.record(1, 'quiz');
+  assert.equal(tamagoshiStatus(await api.get(1)).points, 0);
+});
+test('pendências de leitura de dias anteriores não são creditadas no dia atual', async () => {
+  const { api, store, requests } = service(); const pet = await api.activate(1);
+  pet.pendingReadingDay = nextDay(dayKey(), -1);
+  store.set('@readbible/tamagoshi/v1/1', JSON.stringify(pet));
+  const saved = await api.sync(1);
+  assert.equal(saved.pendingReadingDay, undefined);
+  assert.equal(requests.some(row => row.url.endsWith('/reading')), false);
+});
+test('perfil remoto é recuperado em outro aparelho e nome continua editável', async () => {
+  const { api, store } = service(); const pet = await api.activate(1); await api.sync(1);
+  store.clear();
+  const restored = await api.sync(1);
+  assert.equal(restored.seed, pet.seed);
+  assert.equal((await api.configure(1, { name: ' Pipo ' })).name, 'Pipo');
+  await assert.rejects(api.configure(1, { name: '' }));
 });

@@ -26,7 +26,10 @@ export default function CompleteChapterButton({ chapterKey, dark = false }: { ch
     const userId = authService.getUser()?.id;
     if (!userId) return;
     setSaving(true);
-    try { await tamagoshiService.record(userId, 'reading'); setDone(true); }
+    try {
+      const result = await tamagoshiService.record(userId, 'reading'); setDone(true);
+      if (!result.synced) Alert.alert('Leitura salva', 'Conecte-se à internet ainda hoje para sincronizar os pontos do ranking.');
+    }
     catch { Alert.alert('Não foi possível registrar', 'Tente novamente para guardar a leitura de hoje.'); }
     finally { setSaving(false); }
   }}>

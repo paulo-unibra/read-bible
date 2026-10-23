@@ -1,3 +1,4 @@
+import { POINTS, scorePeriod } from '#services/tamagoshi_points_service'
 import User from '#models/user'
 import db from '@adonisjs/lucid/services/db'
 import type { HttpContext } from '@adonisjs/core/http'
@@ -5,7 +6,7 @@ import env from '#start/env'
 import { randomBytes } from 'node:crypto'
 import { DateTime } from 'luxon'
 
-export const INVITE_HEALTH_REWARD = 5
+export const INVITE_HEALTH_REWARD = POINTS.invite
 
 export default class ReferralsController {
   async me({ auth, response }: HttpContext) {
@@ -22,6 +23,15 @@ export default class ReferralsController {
       })
       return generated
     })
+    const period = scorePeriod()
+    const monthly = await db
+      .from('user_referrals')
+      .where('referrer_id', user.id)
+      .where('rewarded_at', '>=', period.start)
+      .where('rewarded_at', '<', period.end)
+      .count('* as count')
+      .sum('reward_points as points')
+      .first()
     const confirmed = await db
       .from('user_referrals')
       .where('referrer_id', user.id)
@@ -44,6 +54,9 @@ export default class ReferralsController {
         inviteUrl: `${base}/invite/${code}`,
         confirmedInvites: Number(confirmed?.count || 0),
         pendingInvites: Number(pending?.count || 0),
+        month: period.month,
+        monthlyConfirmedInvites: Number(monthly?.count || 0),
+        monthlyPoints: Number(monthly?.points || 0),
         totalHealthPoints: Number(confirmed?.points || 0),
         rewardPerInvite: INVITE_HEALTH_REWARD,
       },
@@ -69,6 +82,6 @@ body{margin:0;background:#f4f9fc;color:#203947;font:17px/1.6 system-ui,sans-seri
 <main><h1>Uma leitura por dia. Uma jornada juntos.</h1><p>Você recebeu um convite para conhecer a Bíblia em Foco. No cadastro, informe este código opcional:</p>
 <code>${code}</code><a class="open" href="readbible://auth?mode=register&amp;invite=${code}">Abrir no aplicativo</a>
 <p>Ainda não tem o app? Instale, crie sua conta e digite o código acima.</p><nav><a href="https://play.google.com/store/apps/details?id=com.readbible.app">Baixar para Android</a><a href="https://apps.apple.com/app/id6758371735">Baixar para iPhone</a></nav>
-<small>Após a confirmação do seu e-mail, quem convidou recebe ${INVITE_HEALTH_REWARD} pontos de saúde no Tamagoshi. O limite de saúde é 100.</small></main></html>`)
+<small>Após a confirmação do seu e-mail, quem convidou recebe ${INVITE_HEALTH_REWARD} pontos no Tamagoshi no mês da confirmação.</small></main></html>`)
   }
 }
