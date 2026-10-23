@@ -1,4 +1,4 @@
-import Constants from "expo-constants";
+import { isRunningInExpoGo } from "expo";
 import React, { useEffect, useState } from "react";
 import { Platform, Text, View } from "react-native";
 
@@ -9,7 +9,7 @@ let BannerAdSize: any = null;
 let TestIds: any = null;
 
 // Verifica se está rodando em ambiente nativo (não Expo Go)
-const isExpoGo = Constants.appOwnership === "expo";
+const isExpoGo = isRunningInExpoGo();
 
 // Tenta importar AdMob apenas se não estiver no Expo Go
 if (!isExpoGo) {

@@ -18,7 +18,7 @@ import { useTheme } from "../hooks/theme-context";
 import bibleBrainService, { VideoBible } from "../services/BibleBrainService";
 import DatabaseService from "../services/DatabaseService";
 import AdBanner from "../components/AdBanner";
-import { USFM_BOOKS } from "./usfm-books";
+import { USFM_BOOKS } from "../constants/usfm-books";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const CARD_WIDTH = (SCREEN_WIDTH - 48) / 3.5;

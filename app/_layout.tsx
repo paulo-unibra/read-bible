@@ -39,7 +39,6 @@ export default function RootLayout() {
           <Stack.Screen name="reading-plans" options={bottomNavScreenOptions} />
           <Stack.Screen name="settings" />
           <Stack.Screen name="quiz" />
-          <Stack.Screen name="login" />
           <Stack.Screen name="ranking" />
           <Stack.Screen name="auth" />
           <Stack.Screen name="forgot-password" />

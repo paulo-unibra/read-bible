@@ -17,7 +17,7 @@ import { useTheme } from "../hooks/theme-context";
 import bibleBrainService from "../services/BibleBrainService";
 import AdBanner from "../components/AdBanner";
 import DatabaseService from "../services/DatabaseService";
-import { USFM_BOOKS } from "./usfm-books";
+import { USFM_BOOKS } from "../constants/usfm-books";
 
 interface BookChapter {
   bookId: string;

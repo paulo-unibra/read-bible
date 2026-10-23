@@ -1,10 +1,11 @@
 // Serviço de inicialização do AdMob
 // Funciona apenas em production build, não em Expo Go
 import Constants from 'expo-constants';
+import { isRunningInExpoGo } from 'expo';
 
 export async function initializeAds() {
   // Verifica se está rodando em Expo Go
-  const isExpoGo = Constants.appOwnership === 'expo';
+  const isExpoGo = isRunningInExpoGo();
   
   console.log('[AdMob] Tentando inicializar...', {
     isExpoGo,
