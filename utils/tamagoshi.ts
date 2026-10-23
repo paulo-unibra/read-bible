@@ -3,6 +3,7 @@ import type { CompanionMood } from './readingCompanion';
 export interface TamagoshiDay { reading: boolean; quiz: boolean }
 export interface Tamagoshi {
   version: 1;
+  catalogVersion?: 1 | 2;
   activatedAt: string;
   seed: number;
   name: string;

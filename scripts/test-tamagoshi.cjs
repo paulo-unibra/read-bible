@@ -74,6 +74,7 @@ test('começa inativo, ativação é idempotente e contas são isoladas', async 
   assert.equal(store.size, 0);
   assert.equal(await api.get(1), null);
   const pet = await api.activate(1);
+  assert.equal(pet.catalogVersion, 2);
   assert.deepEqual(await api.activate(1), pet);
   assert.equal(await api.get(2), null);
   assert.equal(sleepMinutes(pet.sleepStart, pet.sleepEnd), 480);
@@ -115,4 +116,15 @@ test('trocar horário não recalcula os dias passados e reiniciar preserva o di�
   assert.equal(tamagoshiStatus(saved).health, 50); // no advance penalty for today
   const restored = JSON.parse(store.get('@readbible/tamagoshi/v1/1'));
   assert.deepEqual(settleTamagoshi(restored), saved);
+});
+
+test('mascotes antigos sem versão de catálogo não são migrados para outra aparência', async () => {
+  const { api, store } = service();
+  const pet = await api.activate(1);
+  delete pet.catalogVersion;
+  store.set('@readbible/tamagoshi/v1/1', JSON.stringify(pet));
+  const restored = await api.get(1);
+  assert.equal(restored.catalogVersion ?? 1, 1);
+  assert.equal(restored.seed, pet.seed);
+  assert.equal(restored.name, pet.name);
 });

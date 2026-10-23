@@ -30,7 +30,7 @@ class TamagoshiService {
       const existing = await this.read(userId);
       if (existing) return existing;
       const seed = Math.floor(Math.random() * 2147483647);
-      const pet: Tamagoshi = { version: 1, seed, name: getCompanion(seed).name,
+      const pet: Tamagoshi = { version: 1, catalogVersion: 2, seed, name: getCompanion(seed).name,
         activatedAt: new Date().toISOString(), sleepStart: '22:00', sleepEnd: '06:00',
         settledThrough: nextDay(dayKey(), -1), health: 60, days: {} };
       await AsyncStorage.setItem(this.key(userId), JSON.stringify(pet));

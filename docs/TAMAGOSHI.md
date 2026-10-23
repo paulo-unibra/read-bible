@@ -33,3 +33,9 @@ npx expo export --platform android --output-dir /tmp/readbible-tamagoshi
 ```
 
 Os testes cobrem fronteiras do sono, constância versus volume, limites de saúde, dia atual/ativação, idempotência, isolamento de contas, escrita concorrente, datas inválidas e validação de configurações.
+
+## Catálogo de companheiros
+
+São 50 nomes e aparências iniciais, distribuídos em dez espécies (cinco por espécie): gato, coelho, urso, pintinho, raposa, cachorro, panda, coala, sapo e pinguim. Cada opção possui nome e combinação de espécie/cor únicos, além de detalhes específicos de orelhas e rosto.
+
+Novas ativações usam `catalogVersion: 2`. Mascotes antigos sem esse campo continuam no catálogo original de quatro opções (`catalogVersion: 1`), preservando a aparência vinculada à semente, o nome escolhido e os cuidados. A seleção usa uma semente persistida e inclui todas as 50 opções.

@@ -64,7 +64,7 @@ export default function TamagoshiScreen() {
     </View>
     {loading ? <ActivityIndicator style={styles.loading} color={colors.blue} /> : error ? <Text style={[styles.body, styles.content, { color: colors.danger }]}>Não foi possível carregar seu Tamagoshi. Volte e tente novamente.</Text> : <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       {pet && status ? <>
-        <View style={styles.pet}><CompanionAvatar seed={pet.seed} mood={status.mood} sleeping={status.sleeping} /><Text style={[styles.petName, { color: colors.text }]}>{pet.name}</Text><Text style={[styles.body, { color: colors.muted }]}>{status.sleeping ? `Dormindo até ${pet.sleepEnd}` : 'Acordado para acompanhar sua jornada'}</Text></View>
+        <View style={styles.pet}><CompanionAvatar catalogVersion={pet.catalogVersion ?? 1} seed={pet.seed} mood={status.mood} sleeping={status.sleeping} /><Text style={[styles.petName, { color: colors.text }]}>{pet.name}</Text><Text style={[styles.body, { color: colors.muted }]}>{status.sleeping ? `Dormindo até ${pet.sleepEnd}` : 'Acordado para acompanhar sua jornada'}</Text></View>
         <View style={[styles.health, { borderColor: colors.line }]}>
           <Text style={[styles.healthValue, { color: colors.text }]}>Saúde {status.health}/100</Text>
           <Text style={[styles.body, { color: colors.muted }]}>{status.streak} {status.streak === 1 ? 'dia seguido' : 'dias seguidos'} de leitura</Text>

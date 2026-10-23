@@ -18,7 +18,7 @@ export default function ReadingCompanion({ userId, plan, days }: {
   const [loading, setLoading] = useState(true);
   const [reducedMotion, setReducedMotion] = useState(true);
   const [bounce] = useState(() => new Animated.Value(0));
-  const pet = getCompanion(petData?.seed ?? userId);
+  const pet = getCompanion(petData?.seed ?? userId, petData?.catalogVersion ?? 1);
   const state = getCompanionState(plan, days, results);
   const status = petData ? tamagoshiStatus(petData, clock) : null;
   const mood = status?.mood;
@@ -87,7 +87,7 @@ export default function ReadingCompanion({ userId, plan, days }: {
       <View style={styles.top}>
         <View style={styles.petStage} accessible accessibilityLabel={`${pet.species} ${petData.name}, ${status.sleeping ? "dormindo" : moodLabels[status.mood].toLowerCase()}`}>
           <Animated.View style={{ transform: [{ translateY: bounce }] }}>
-            <CompanionAvatar seed={petData.seed} mood={status.mood} sleeping={status.sleeping} />
+            <CompanionAvatar catalogVersion={petData.catalogVersion ?? 1} seed={petData.seed} mood={status.mood} sleeping={status.sleeping} />
           </Animated.View>
         </View>
         <View style={styles.copy}>

@@ -12,7 +12,7 @@ function load(file) {
   new Function('require', 'module', 'exports', outputText)((id) => load(id.replace('./', '')), module, module.exports);
   return module.exports;
 }
-const { getCompanion, getCompanionState } = load('readingCompanion');
+const { companions, getCompanion, getCompanionState } = load('readingCompanion');
 const now = new Date(2026, 9, 23, 12);
 const plan = { startDate: '2026-10-18', totalDays: 440, completedDays: 5 };
 const quiz = { createdAt: now.toISOString(), correctAnswers: 8, totalQuestions: 10 };
@@ -20,9 +20,21 @@ test('refazer um quiz antigo conta como atividade recente', () => {
   const repeated = { ...quiz, createdAt: '2026-02-24T23:55:15Z', lastCompletedAt: now.toISOString() };
   assert.match(getCompanionState(plan, [], [repeated], now).quizText, /1 questionário em 7 dias/);
 });
-test('companheiro estável por conta, com distribuição entre os quatro mascotes', () => {
+test('catálogo possui 50 nomes e aparências, todos alcançáveis', () => {
+  assert.equal(companions.length, 50);
+  assert.equal(new Set(companions.map(pet => pet.name)).size, 50);
+  assert.equal(new Set(companions.map(pet => `${pet.kind}:${pet.color}`)).size, 50);
+  assert.equal(new Set(companions.map(pet => pet.kind)).size, 10);
+  assert.equal(new Set(Array.from({ length: 10000 }, (_, i) => getCompanion(i).name)).size, 50);
   assert.deepEqual(getCompanion(42), getCompanion(42));
-  assert.equal(new Set(Array.from({ length: 100 }, (_, i) => getCompanion(i).name)).size, 4);
+});
+test('catálogo original preserva os quatro mascotes existentes', () => {
+  const legacy = ['Pipo', 'Lumi', 'Nino', 'Tito'];
+  for (let seed = 0; seed < 100; seed++) {
+    let hash = 2166136261;
+    for (const char of `readbible-companion-v1:${seed}`) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
+    assert.equal(getCompanion(seed, 1).name, legacy[(hash >>> 0) % 4]);
+  }
 });
 test('leitura e questionários mudam o humor sem esconder atraso', () => {
   assert.equal(getCompanionState(plan, [], [], now).mood, 'happy');
