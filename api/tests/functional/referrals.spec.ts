@@ -64,6 +64,20 @@ test.group('Invitations', () => {
         .post('/auth/register')
         .json({ name: 'New Reader', email, password, inviteCode: invitation.code.toLowerCase() })
       register.assertStatus(202)
+      const registeredUser = await User.findByOrFail('email', email)
+      const newbornPet = await db
+        .from('tamagoshi_profiles')
+        .where('user_id', registeredUser.id)
+        .first()
+      assert.isDefined(newbornPet)
+      assert.isFalse(registeredUser.emailVerified)
+      const newbornPoints = await db
+        .from('tamagoshi_points')
+        .where('user_id', registeredUser.id)
+        .count('* as total')
+        .first()
+      assert.equal(Number(newbornPoints!.total), 0)
+
       const pending = await client.get('/referrals/me').header('Authorization', authorization)
       assert.equal(pending.body().data.pendingInvites, 1)
       assert.equal(pending.body().data.totalHealthPoints, 0)
@@ -71,6 +85,13 @@ test.group('Invitations', () => {
         .post('/auth/register')
         .json({ name: 'No Invitation', email: noCodeEmail, password })
       optional.assertStatus(202)
+      const registeredWithoutInvite = await User.findByOrFail('email', noCodeEmail)
+      const optionalPet = await db
+        .from('tamagoshi_profiles')
+        .where('user_id', registeredWithoutInvite.id)
+        .first()
+      assert.isDefined(optionalPet)
+
       const code = codes.get(email)
       assert.isDefined(code)
       const badVerification = await client

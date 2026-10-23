@@ -9,7 +9,7 @@ import pointsService, { scorePeriod } from '#services/tamagoshi_points_service'
 import { DateTime } from 'luxon'
 
 test.group('Tamagoshi monthly points', () => {
-  test('activation starts at zero and ignores pre-activation activity on every sync', async ({
+  test('current-month activity is recovered retroactively without duplicate awards', async ({
     client,
     assert,
   }) => {
@@ -28,7 +28,7 @@ test.group('Tamagoshi monthly points', () => {
       cloudStorageUrl: null,
     })
     try {
-      const before = DateTime.utc().minus({ minutes: 5 })
+      const before = DateTime.now().setZone('America/Recife').startOf('month').toUTC()
       const result = await QuizResult.create({
         userId: user.id,
         quizId: quiz.id,
@@ -39,7 +39,7 @@ test.group('Tamagoshi monthly points', () => {
         updatedAt: before,
       })
       const plan = await ReadingPlan.create({
-        createdAt: DateTime.utc().minus({ minutes: 10 }),
+        createdAt: before,
         userId: user.id,
         name: 'Existing readings',
         type: 'custom',
@@ -68,13 +68,11 @@ test.group('Tamagoshi monthly points', () => {
         .header('Authorization', auth)
         .json({ name: 'Lumi', seed: 42, catalogVersion: 2 })
       activation.assertStatus(200)
-      assert.equal(activation.body().data.score.points, 0)
-      for (const source of ['reading', 'quiz', 'invite'] as const)
-        await pointsService.award(user.id, source, before, 123)
+      assert.equal(activation.body().data.score.points, 18)
       for (let i = 0; i < 2; i++) {
         const summary = await client.get('/tamagoshi').header('Authorization', auth)
-        assert.equal(summary.body().data.score.points, 0)
-        assert.deepEqual(summary.body().data.score.readingHistory, [])
+        assert.equal(summary.body().data.score.points, 18)
+        assert.deepEqual(summary.body().data.score.readingHistory, [scorePeriod(before).day])
       }
       // Repeating an old quiz after activation is new activity, worth two points.
       await db
@@ -82,9 +80,15 @@ test.group('Tamagoshi monthly points', () => {
         .where('id', result.id)
         .update({ updated_at: DateTime.utc().startOf('second').toSQL({ includeOffset: false }) })
       const after = await client.get('/tamagoshi').header('Authorization', auth)
-      assert.equal(after.body().data.score.points, 2)
+      assert.equal(
+        after.body().data.score.points,
+        18 + (scorePeriod(before).day === scorePeriod().day ? 0 : 2)
+      )
       const again = await client.get('/tamagoshi').header('Authorization', auth)
-      assert.equal(again.body().data.score.points, 2)
+      assert.equal(
+        again.body().data.score.points,
+        18 + (scorePeriod(before).day === scorePeriod().day ? 0 : 2)
+      )
     } finally {
       await user.delete()
       await quiz.delete()
@@ -111,7 +115,7 @@ test.group('Tamagoshi monthly points', () => {
       const plans: ReadingPlan[] = []
       for (let i = 0; i < 2; i++) {
         const plan = await ReadingPlan.create({
-          createdAt: DateTime.utc().minus({ minutes: 10 }),
+          createdAt: DateTime.utc().minus({ months: 1 }),
           userId: user.id,
           name: 'Reading plan',
           type: 'custom',
@@ -275,15 +279,17 @@ test.group('Tamagoshi monthly points', () => {
         .count('* as count')
         .first()
       assert.equal(Number(count!.count), 1)
-      // Reset: the next authenticated access creates a new empty pet, without old plan bonuses.
+      // A previous-month plan is not credited again when a pet is recreated.
       await db.from('tamagoshi_profiles').where('user_id', user.id).delete()
       await db
         .from('reading_plans')
         .where('user_id', user.id)
         .update({
-          created_at: DateTime.utc().minus({ minutes: 1 }).toSQL({ includeOffset: false }),
+          created_at: DateTime.utc().minus({ months: 1 }).toSQL({ includeOffset: false }),
         })
-      const [reset, concurrentReset] = await Promise.all([0, 1].map(() => client.get('/tamagoshi').header('Authorization', auth)))
+      const [reset, concurrentReset] = await Promise.all(
+        [0, 1].map(() => client.get('/tamagoshi').header('Authorization', auth))
+      )
       assert.deepEqual(reset.body().data.profile, concurrentReset.body().data.profile)
       assert.isNotNull(reset.body().data.profile)
       assert.equal(reset.body().data.score.points, 0)
@@ -345,7 +351,7 @@ test.group('Tamagoshi monthly points', () => {
       await pointsService.award(users[1].id, 'quiz')
       const ranking = await client.get('/tamagoshi/ranking').header('Authorization', auth[0])
       ranking.assertStatus(200)
-      assert.equal(ranking.body().data.entries[0].name, 'Nino Ana')
+      assert.equal(ranking.body().data.entries[0].name, 'Nino')
       assert.equal(ranking.body().data.entries[0].points, 8)
       assert.equal(ranking.body().data.own.position, 2)
       // The reset boundary is midnight Recife, not midnight UTC.
@@ -399,7 +405,7 @@ test.group('Tamagoshi monthly points', () => {
       const token = await User.accessTokens.create(user)
       const auth = `Bearer ${token.value!.release()}`
       const plan = await ReadingPlan.create({
-        createdAt: DateTime.utc().minus({ minutes: 10 }),
+        createdAt: DateTime.utc().minus({ months: 1 }),
         userId: user.id,
         name: 'Test',
         type: 'custom',

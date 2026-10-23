@@ -8,7 +8,7 @@ import { getFocusColors } from '../constants/design';
 import authService from '../services/AuthService';
 import DatabaseService from '../services/DatabaseService';
 import tamagoshiService, { MonthlyRanking } from '../services/TamagoshiService';
-import { dayKey } from '../utils/tamagoshi';
+import { dayKey, isTamagoshiPodium } from '../utils/tamagoshi';
 
 export default function TamagoshiRankingScreen() {
   const router = useRouter();
@@ -44,6 +44,19 @@ export default function TamagoshiRankingScreen() {
     return () => { active = false; };
   }, [attempt, router]));
   const monthLabel = data ? new Date(`${data.month}-15T12:00:00Z`).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric', timeZone: 'America/Recife' }) : '';
+  const podium = data?.entries.filter(item => isTamagoshiPodium(item.position)) ?? [];
+  const remaining = data?.entries.filter(item => !isTamagoshiPodium(item.position)) ?? [];
+  const renderEntry = (item: MonthlyRanking['entries'][number], onPodium = false) => <View
+    key={item.userId}
+    accessible
+    accessibilityLabel={`${item.position}º lugar, ${item.name}, ${item.points} pontos${onPodium ? ', pódio' : ''}`}
+    style={[styles.entry, { borderColor: colors.line }, onPodium && styles.podiumEntry,
+      onPodium && { backgroundColor: item.position === 1 ? (dark ? '#302919' : '#FFF8E6') : colors.surface }]}>
+    <Text style={[styles.position, { color: onPodium ? colors.blueDark : colors.muted }, onPodium && styles.podiumPosition]}>{item.position}º</Text>
+    <CompanionAvatar size={40} seed={item.seed} catalogVersion={item.catalogVersion} mood={onPodium ? 'joyful' : 'happy'} />
+    <Text style={[styles.name, { color: colors.text }]} numberOfLines={2}>{item.name}</Text>
+    <Text style={[styles.points, { color: colors.text }]}>{item.points}</Text>
+  </View>;
   return <SafeAreaView style={[styles.screen, { backgroundColor: colors.screen }]}>
     <View style={[styles.header, { borderBottomColor: colors.line }]}>
       <TouchableOpacity style={styles.back} accessibilityRole="button" accessibilityLabel="Voltar" onPress={() => router.back()}><Ionicons name="arrow-back" size={24} color={colors.text} /></TouchableOpacity>
@@ -59,12 +72,17 @@ export default function TamagoshiRankingScreen() {
         <Text style={[styles.subtitle, { color: colors.muted }]}>Zera no dia 1º · horário de Recife</Text>
         <Text style={[styles.own, { color: colors.blueDark }]}>{data.own.position ? `Você: ${data.own.position}º lugar · ` : 'Você: '}{data.own.points} pontos</Text>
       </View>
-      <FlatList data={data.entries} keyExtractor={item => String(item.userId)} contentContainerStyle={styles.list} renderItem={({ item }) => <View style={[styles.entry, { borderColor: colors.line }]}>
-        <Text style={[styles.position, { color: colors.muted }]}>{item.position}º</Text>
-        <CompanionAvatar size={40} seed={item.seed} catalogVersion={item.catalogVersion} mood="happy" />
-        <Text style={[styles.name, { color: colors.text }]} numberOfLines={2}>{item.name}</Text>
-        <Text style={[styles.points, { color: colors.text }]}>{item.points}</Text>
-      </View>} ListEmptyComponent={<Text style={[styles.empty, { color: colors.muted }]}>Nenhuma pontuação neste mês. Conclua uma leitura para começar.</Text>}
+      <FlatList data={remaining} keyExtractor={item => String(item.userId)} contentContainerStyle={styles.list}
+        renderItem={({ item }) => renderEntry(item)}
+        ListHeaderComponent={podium.length ? <View>
+          <View style={styles.podiumHeading}>
+            <Ionicons name="trophy-outline" size={20} color={colors.blueDark} />
+            <Text style={[styles.podiumTitle, { color: colors.text }]}>Pódio · 1º ao 5º lugar</Text>
+          </View>
+          <View style={[styles.podiumGroup, { borderColor: colors.line }]}>{podium.map(item => renderEntry(item, true))}</View>
+          {remaining.length > 0 && <Text style={[styles.classificationTitle, { color: colors.muted }]}>Classificação</Text>}
+        </View> : undefined}
+        ListEmptyComponent={data.entries.length === 0 ? <Text style={[styles.empty, { color: colors.muted }]}>Nenhuma pontuação neste mês. Crie um plano ou conclua uma leitura para começar.</Text> : undefined}
         ListFooterComponent={data.hasMore ? <TouchableOpacity accessibilityRole="button" disabled={loadingMore} style={styles.retry} onPress={async () => {
           if (loadingMore) return;
           setLoadingMore(true);
@@ -77,4 +95,4 @@ export default function TamagoshiRankingScreen() {
     </>}
   </SafeAreaView>;
 }
-const styles = StyleSheet.create({ screen: { flex: 1 }, header: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12, borderBottomWidth: 1 }, back: { minHeight: 44, minWidth: 44, justifyContent: 'center' }, title: { flex: 1, fontSize: 19, fontWeight: '700' }, summary: { padding: 24, gap: 6 }, month: { fontSize: 22, fontWeight: '700', textTransform: 'none' }, subtitle: { fontSize: 13 }, own: { marginTop: 10, fontSize: 16, fontWeight: '600' }, list: { paddingHorizontal: 24, paddingBottom: 32 }, entry: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 14, borderBottomWidth: 1 }, position: { width: 32, fontSize: 14 }, name: { flex: 1, fontSize: 15 }, points: { fontSize: 18, fontWeight: '700' }, notice: { padding: 24 }, retry: { paddingVertical: 18, minHeight: 48 }, empty: { fontSize: 15, lineHeight: 23, paddingVertical: 24 } });
+const styles = StyleSheet.create({ screen: { flex: 1 }, header: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12, borderBottomWidth: 1 }, back: { minHeight: 44, minWidth: 44, justifyContent: 'center' }, title: { flex: 1, fontSize: 19, fontWeight: '700' }, summary: { padding: 24, gap: 6 }, month: { fontSize: 22, fontWeight: '700', textTransform: 'none' }, subtitle: { fontSize: 13 }, own: { marginTop: 10, fontSize: 16, fontWeight: '600' }, list: { paddingHorizontal: 24, paddingBottom: 32 }, entry: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 14, borderBottomWidth: 1 }, position: { width: 32, fontSize: 14 }, name: { flex: 1, minWidth: 0, fontSize: 15 }, points: { fontSize: 18, fontWeight: '700' }, notice: { padding: 24 }, retry: { paddingVertical: 18, minHeight: 48 }, empty: { fontSize: 15, lineHeight: 23, paddingVertical: 24 }, podiumHeading: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }, podiumTitle: { fontSize: 15, fontWeight: '600' }, podiumGroup: { borderWidth: 1, borderRadius: 16, overflow: 'hidden', marginBottom: 20 }, podiumEntry: { paddingHorizontal: 12 }, podiumPosition: { fontWeight: '700' }, classificationTitle: { fontSize: 14, fontWeight: '600', marginBottom: 4 } });

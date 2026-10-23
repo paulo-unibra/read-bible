@@ -52,13 +52,17 @@ test('sequência de leitura continua entre meses e emoções usam constância', 
   assert.equal(state.streak, 2);
   assert.equal(state.mood, 'happy');
 });
-test('nome completo usa só o primeiro nome do usuário e não duplica sufixo', () => {
-  assert.equal(tamagoshiDisplayName('Lumi', 'Paulo Roberto'), 'Lumi Paulo');
-  assert.equal(tamagoshiDisplayName('Pipo', '  Ana   Maria  '), 'Pipo Ana');
-  assert.equal(tamagoshiDisplayName('Lumi Paulo', 'Paulo Roberto'), 'Lumi Paulo');
-  assert.equal(tamagoshiDisplayName('Pérola', 'Érica Silva'), 'Pérola Érica');
-  assert.equal(tamagoshiDisplayName('Lumi', null), 'Lumi');
+test('nome do Tamagoshi não inclui automaticamente o nome do usuário', () => {
+  assert.equal(tamagoshiDisplayName('Lumi'), 'Lumi');
+  assert.equal(tamagoshiDisplayName('  Pingo  '), 'Pingo');
+  assert.equal(tamagoshiDisplayName('Estrela   do Mar'), 'Estrela do Mar');
+  assert.equal(tamagoshiDisplayName('Lumi Paulo'), 'Lumi Paulo'); // Preserve an explicitly chosen name.
 });
+test('pódio contém exatamente as posições de um a cinco', () => {
+  for (const position of [1, 2, 3, 4, 5]) assert.equal(engine.isTamagoshiPodium(position), true);
+  for (const position of [0, -1, 6, 25, 1.5, NaN]) assert.equal(engine.isTamagoshiPodium(position), false);
+});
+
 function service() {
   const store = new Map(); const server = new Map(); const requests = [];
   const session = { id: 1, offline: false };

@@ -72,6 +72,7 @@ export default class AuthController {
           },
           { client: trx }
         )
+        await pointsService.ensureProfile(created.id, trx)
         if (invitation && invitation.user_id !== created.id) {
           await trx.table('user_referrals').insert({
             referrer_id: invitation.user_id,

@@ -1,10 +1,10 @@
 # Tamagoshi: pontuação mensal
 
-O Tamagoshi começa ativo por padrão e com zero pontos. No primeiro acesso autenticado, a API gera automaticamente nome e aparência; acessos simultâneos preservam um único perfil. O menu do perfil mostra Configurar Tamagoshi para editar o nome, convidar amigos e abrir o ranking. O nome exibido combina o nome-base com o primeiro nome do usuário, como **Lumi Paulo**.
+O Tamagoshi é gerado e ativado automaticamente na mesma transação que cria a conta, antes da confirmação de e-mail. Contas novas começam com zero pontos. Contas existentes sem Tamagoshi recebem um perfil no primeiro acesso autenticado; acessos simultâneos preservam um único perfil. O menu do perfil mostra Configurar Tamagoshi para editar o nome, convidar amigos e abrir o ranking. O nome exibido é somente o nome do Tamagoshi, como **Lumi**, e pode ser editado pelo usuário. O nome real do usuário não é acrescentado.
 
 ## Pontos e ranking
 
-- Plano criado com Tamagoshi ativo: **10 pontos por plano**, sem duplicar na sincronização. Excluir o plano retira o bônus. Planos anteriores à ativação não pontuam.
+- Plano criado com Tamagoshi ativo: **10 pontos por plano**, sem duplicar na sincronização. Excluir o plano retira o bônus. Planos válidos criados no mês corrente também entram no retroativo.
 - Leitura confirmada: **6 pontos por dia**, independentemente da quantidade de capítulos ou planos.
 - Desmarcar a última leitura concluída de uma data retira os 6 pontos daquele dia e atualiza a constância/expressão. Excluir um plano também retira créditos que dependam apenas dele. Outra leitura válida do mesmo dia mantém o crédito, inclusive capítulo livre confirmado separadamente. Pontos de quizzes e convites permanecem.
 - Questionário concluído e validado pela API: **2 pontos por dia**, independentemente das tentativas ou questionários.
@@ -13,13 +13,13 @@ O Tamagoshi começa ativo por padrão e com zero pontos. No primeiro acesso aute
 - O ranking exige login e considera apenas Tamagoshis ativados com pontos no mês corrente. Empates são ordenados pelo ID da conta para garantir paginação estável.
 - A pontuação reinicia em **todo dia 1º, às 00:00 de America/Recife**. O filtro mensal é aplicado no servidor, sem depender do app aberto ou de tarefa agendada. O histórico dos meses anteriores é preservado.
 
-O ranking mostra a lista paginada, o mês e a própria posição/pontuação, mesmo fora da página atual. Fica disponível em **Configurar Tamagoshi → Ver ranking do mês**, separado do antigo ranking de quizzes.
+O ranking mostra a lista paginada, o mês e a própria posição/pontuação, mesmo fora da página atual. Fica disponível em **Configurar Tamagoshi → Ver ranking do mês**, separado do antigo ranking de quizzes. As posições de **1º a 5º** formam o pódio; os demais aparecem na classificação, sem duplicar os participantes do pódio.
 
 ## Registro e sincronização
 
 A API mantém `tamagoshi_profiles` e um livro de eventos em `tamagoshi_points`. Cada usuário possui uma entrada única por fonte e dia (leitura/quiz), ou por convite confirmado/plano criado. O cliente nunca informa valores de pontos ou meses para ganhar pontuação. O registro de leitura é uma confirmação do usuário, limitada ao dia atual do servidor. O app exige conexão para participar do ranking.
 
-A conclusão da leitura do plano, do quiz e do convite registra pontos dentro da transação original. O Tamagoshi começa com zero pontos. Ao sincronizar, apenas atividades confirmadas no servidor no mês corrente e realizadas desde a ativação são recuperadas, sem duplicação. Leituras, questionários e convites anteriores à criação não pontuam. Saúde antiga e histórico exclusivamente local não são convertidos em pontos.
+A conclusão da leitura do plano, do quiz e do convite registra pontos dentro da transação original. A pontuação considera atividades válidas desde o dia 1º do mês corrente no horário de Recife, mesmo quando anteriores à criação do Tamagoshi. A recuperação é idempotente e inclui leitura, quiz, convites confirmados e bônus de planos válidos. Contas existentes podem receber pontos retroativos; contas recém-cadastradas não possuem atividades anteriores e começam zeradas. Saúde antiga e histórico exclusivamente local não são convertidos em pontos.
 
 A migração `1793200000001_track_free_reading_points` distingue confirmação de capítulo livre de conclusão de plano. O app não registra conclusão de plano como capítulo livre. Ao desmarcar, a API reconcilia os créditos na mesma transação; na sincronização também remove créditos sem leitura que os sustente. `readingHistory` substitui o histórico local de constância, incluindo meses anteriores, para que leituras removidas não mantenham a expressão feliz. Planos excluídos são preservados para auditoria, mas suas leituras não entram na recuperação nem na validação de pontos.
 

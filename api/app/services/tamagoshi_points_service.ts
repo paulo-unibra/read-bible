@@ -23,10 +23,11 @@ function dateOf(value: Date | string) {
     : DateTime.fromSQL(value, { zone: 'utc' })
 }
 class TamagoshiPointsService {
-  async ensureProfile(userId: number) {
-    const existing = await db.from('tamagoshi_profiles').where('user_id', userId).first()
+  async ensureProfile(userId: number, transaction?: TransactionClientContract) {
+    const client = transaction || db
+    const existing = await client.from('tamagoshi_profiles').where('user_id', userId).first()
     if (existing) return existing
-    return db.transaction(async (trx) => {
+    const create = async (trx: TransactionClientContract) => {
       await User.query({ client: trx }).where('id', userId).forUpdate().firstOrFail()
       const profile = await trx.from('tamagoshi_profiles').where('user_id', userId).first()
       if (profile) return profile
@@ -36,7 +37,8 @@ class TamagoshiPointsService {
         activated_at: DateTime.utc().startOf('second').toSQL({ includeOffset: false }),
       })
       return trx.from('tamagoshi_profiles').where('user_id', userId).first()
-    })
+    }
+    return transaction ? create(transaction) : db.transaction(create)
   }
   async award(
     userId: number,
@@ -47,7 +49,7 @@ class TamagoshiPointsService {
   ) {
     const client = trx || db
     const profile = await client.from('tamagoshi_profiles').where('user_id', userId).first()
-    if (!profile || at < dateOf(profile.activated_at)) return
+    if (!profile) return
     const period = scorePeriod(at)
     try {
       await client.table('tamagoshi_points').insert({
@@ -128,11 +130,8 @@ class TamagoshiPointsService {
   async backfill(userId: number, now: DateTime = DateTime.utc()) {
     const profile = await db.from('tamagoshi_profiles').where('user_id', userId).first()
     if (!profile) return
-    const activatedAt = dateOf(profile.activated_at)
     const period = scorePeriod(now)
-    const since = DateTime.max(activatedAt, dateOf(period.start))
-      .toUTC()
-      .toSQL({ includeOffset: false })!
+    const since = period.start
     const quizzes = await db
       .from('quiz_results')
       .where('user_id', userId)
@@ -180,13 +179,7 @@ class TamagoshiPointsService {
       if (!item.at) continue
       const at = dateOf(item.at)
       const key = `${item.source}:${scorePeriod(at).day}`
-      if (
-        !at.isValid ||
-        at < activatedAt ||
-        at > now ||
-        scorePeriod(at).month !== period.month ||
-        seen.has(key)
-      )
+      if (!at.isValid || at > now || scorePeriod(at).month !== period.month || seen.has(key))
         continue
       seen.add(key)
       await this.award(userId, item.source, at)

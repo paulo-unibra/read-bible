@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { AccessibilityInfo, Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import authService from '../services/AuthService';
 import type { ReadingPlan, ReadingPlanDay } from '../types';
 import { getCompanion } from '../utils/readingCompanion';
 import CompanionAvatar from './CompanionAvatar';
@@ -95,8 +94,7 @@ export default function ReadingCompanion({ userId }: {
   }, [bounce, reducedMotion, mood, sleeping]));
 
   if (!petData || !status) return null;
-  const owner = authService.getUser();
-  const displayName = tamagoshiDisplayName(petData.name, owner?.id === userId ? owner.name : null);
+  const displayName = tamagoshiDisplayName(petData.name);
   const moodLabels = { joyful: 'Radiante', happy: 'Feliz', hopeful: 'Esperançoso', sleepy: 'Precisando de cuidado', curious: 'Curioso' };
   const feeling = status.sleeping ? 'Dormindo' : moodLabels[status.mood];
   const tips = [

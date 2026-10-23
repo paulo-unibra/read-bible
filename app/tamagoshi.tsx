@@ -67,7 +67,7 @@ export default function TamagoshiScreen() {
         <View style={styles.pet}>
           <CompanionAvatar size={64} catalogVersion={pet.catalogVersion ?? 1} seed={pet.seed} mood={status.mood} sleeping={status.sleeping} />
           <View style={styles.petSummary}>
-            <Text style={[styles.petName, { color: colors.text }]} numberOfLines={1}>{tamagoshiDisplayName(pet.name, authService.getUser()?.name)}</Text>
+            <Text style={[styles.petName, { color: colors.text }]} numberOfLines={1}>{tamagoshiDisplayName(pet.name)}</Text>
             <Text style={[styles.body, { color: colors.muted }]}>{status.points} pontos no mês{status.sleeping ? ' · Dormindo' : ''}</Text>
           </View>
         </View>

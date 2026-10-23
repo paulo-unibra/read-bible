@@ -1055,7 +1055,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   todayDayLabel: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: "700",
     color: "#333",
     flexShrink: 1,
@@ -1100,11 +1100,11 @@ const styles = StyleSheet.create({
   },
   readingTitle: {
     flex: 1,
-    fontSize: 19,
+    fontSize: 18,
     color: "#666",
   },
   progressLabel: {
-    fontSize: 15,
+    fontSize: 14,
     color: "#666",
     marginBottom: 9,
   },
@@ -1130,7 +1130,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#248BE0",
   },
   completedButton: { backgroundColor: "#43A047" },
-  completeButtonText: { fontSize: 17, fontWeight: "700", color: "#fff" },
+  completeButtonText: { fontSize: 16, fontWeight: "700", color: "#fff" },
   modeSection: { paddingHorizontal: 16, paddingTop: 36 },
   modeTitle: {
     fontSize: 22,

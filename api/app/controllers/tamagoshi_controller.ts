@@ -90,32 +90,22 @@ export default class TamagoshiController {
     const ranked = await db
       .from(base().as('totals'))
       .join('tamagoshi_profiles as pet', 'pet.user_id', 'totals.user_id')
-      .join('users', 'users.id', 'totals.user_id')
       .select(
         'totals.user_id',
         'totals.points',
         'pet.name as pet_name',
         'pet.seed',
-        'pet.catalog_version',
-        'users.full_name'
+        'pet.catalog_version'
       )
       .orderBy('totals.points', 'desc')
       .orderBy('totals.user_id', 'asc')
       .offset((page - 1) * 25)
       .limit(26)
     const entries = ranked.slice(0, 25).map((row, i) => {
-      const firstName =
-        String(row.full_name || '')
-          .trim()
-          .split(/\s+/)[0] || ''
-      const baseName = String(row.pet_name).trim()
-      const alreadyNamed =
-        baseName.includes(' ') &&
-        baseName.toLocaleLowerCase('pt-BR').endsWith(` ${firstName.toLocaleLowerCase('pt-BR')}`)
       return {
         position: (page - 1) * 25 + i + 1,
         userId: row.user_id,
-        name: alreadyNamed ? baseName : `${baseName} ${firstName}`.trim(),
+        name: String(row.pet_name).trim().replace(/\s+/g, ' '),
         seed: row.seed,
         catalogVersion: row.catalog_version,
         points: Number(row.points),
