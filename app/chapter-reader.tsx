@@ -3497,39 +3497,41 @@ ${deepLink}`;
         transparent
         onRequestClose={() => setBibleSelectorVisible(false)}
       >
-        <View style={styles.modalOverlay}>
+        <View style={[styles.bibleVersionOverlay, { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 }]}>
           <View
             style={[
-              styles.selectorModal,
+              styles.bibleVersionPanel,
               isDark && { backgroundColor: "#1e1e1e" },
             ]}
           >
             <View
               style={[
-                styles.modalHeader,
+                styles.bibleVersionHeader,
                 isDark && {
                   backgroundColor: "#1d1d1d",
                   borderBottomColor: "#2b2b2b",
                 },
               ]}
             >
-              <View style={styles.modalHeaderLeft}>
+              <View style={styles.bibleVersionHeading}>
                 <Text
-                  style={[styles.modalTitle, isDark && { color: "#e0e0e0" }]}
+                  style={[styles.bibleVersionTitle, isDark && { color: "#e0e0e0" }]}
                 >
                   Escolher Versão da Bíblia
                 </Text>
               </View>
-              <View style={styles.modalHeaderActions}>
+              <View style={styles.bibleVersionActions}>
                 <TouchableOpacity
-                  style={styles.refreshButton}
+                  style={styles.bibleVersionIcon}
                   onPress={forceOpenBibleSelector}
+                  accessibilityRole="button" accessibilityLabel="Atualizar versões"
                 >
                   <Ionicons name="refresh" size={20} color={iconColor} />
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={styles.closeButton}
+                  style={styles.bibleVersionIcon}
                   onPress={() => setBibleSelectorVisible(false)}
+                  accessibilityRole="button" accessibilityLabel="Fechar versões"
                 >
                   <Ionicons name="close" size={24} color={iconColor} />
                 </TouchableOpacity>
@@ -3538,7 +3540,8 @@ ${deepLink}`;
 
             <ScrollView
               showsVerticalScrollIndicator={false}
-              style={styles.modalScrollContent}
+              style={styles.bibleVersionScroll}
+              contentContainerStyle={{ paddingBottom: 20 }}
             >
               {/* Indicador de carregamento */}
               {availableBibles.length === 0 &&
@@ -3555,7 +3558,7 @@ ${deepLink}`;
 
               {/* Bíblias Baixadas */}
               {availableBibles.length > 0 && (
-                <View style={styles.modalSection}>
+                <View style={styles.bibleVersionSection}>
                   <Text
                     style={[
                       styles.modalSectionTitle,
@@ -3571,7 +3574,7 @@ ${deepLink}`;
                       <View
                         key={item.id}
                         style={[
-                          styles.bibleCard,
+                          styles.bibleVersionCard,
                           isDark && {
                             backgroundColor: "#2d2d2d",
                             borderColor: "#404040",
@@ -3583,13 +3586,14 @@ ${deepLink}`;
                         ]}
                       >
                         <TouchableOpacity
-                          style={styles.bibleCardContent}
+                          accessibilityRole="radio" accessibilityState={{ checked: selected }}
+                          style={styles.bibleVersionContent}
                           onPress={() => selectBible(item)}
                         >
-                          <View style={styles.bibleInfo}>
+                          <View style={styles.bibleVersionInfo}>
                             <Text
                               style={[
-                                styles.bibleName,
+                                styles.bibleVersionName,
                                 isDark && { color: "#e0e0e0" },
                                 selected && {
                                   color: isDark ? "#90caf9" : "#1976d2",
@@ -3601,7 +3605,7 @@ ${deepLink}`;
                             </Text>
                             <Text
                               style={[
-                                styles.bibleDetails,
+                                styles.bibleVersionDetails,
                                 isDark && { color: "#b0b0b0" },
                               ]}
                             >
@@ -3629,7 +3633,7 @@ ${deepLink}`;
                         {availableBibles.length > 1 && !selected && (
                           <TouchableOpacity
                             style={[
-                              styles.deleteButton,
+                              styles.bibleVersionDelete,
                               isDark && { backgroundColor: "#d32f2f" },
                             ]}
                             onPress={() => handleDeleteBible(item)}
@@ -3645,7 +3649,7 @@ ${deepLink}`;
 
               {/* Bíblias Disponíveis para Download */}
               {availableDriveBibles.length > 0 && (
-                <View style={styles.modalSection}>
+                <View style={styles.bibleVersionSection}>
                   <Text
                     style={[
                       styles.modalSectionTitle,
@@ -3672,18 +3676,18 @@ ${deepLink}`;
                         <View
                           key={driveFile.id}
                           style={[
-                            styles.bibleCard,
+                            styles.bibleVersionCard,
                             isDark && {
                               backgroundColor: "#2d2d2d",
                               borderColor: "#404040",
                             },
                           ]}
                         >
-                          <View style={styles.bibleCardContent}>
-                            <View style={styles.bibleInfo}>
+                          <View style={styles.bibleVersionContent}>
+                            <View style={styles.bibleVersionInfo}>
                               <Text
                                 style={[
-                                  styles.bibleName,
+                                  styles.bibleVersionName,
                                   isDark && { color: "#e0e0e0" },
                                 ]}
                               >
@@ -3691,24 +3695,17 @@ ${deepLink}`;
                               </Text>
                               <Text
                                 style={[
-                                  styles.bibleDetails,
+                                  styles.bibleVersionDetails,
                                   isDark && { color: "#b0b0b0" },
                                 ]}
                               >
-                                `${formatBibleAbbreviation(bibleInfo.abbreviation)}$
-                                {driveFile.size
-                                  ? ` • ${(
-                                      parseInt(driveFile.size) /
-                                      1024 /
-                                      1024
-                                    ).toFixed(1)} MB`
-                                  : ""}
-                                `
+                                {formatBibleAbbreviation(bibleInfo.abbreviation)}
+                                {driveFile.size ? ` • ${(Number(driveFile.size) / 1024 / 1024).toFixed(1)} MB` : ''}
                               </Text>
                             </View>
                           </View>
 
-                          <View style={styles.bibleActions}>
+                          <View style={styles.bibleVersionAction}>
                             {isDownloadingThis ? (
                               <View style={styles.downloadingContainer}>
                                 <ActivityIndicator
@@ -3735,7 +3732,7 @@ ${deepLink}`;
                             ) : (
                               <TouchableOpacity
                                 style={[
-                                  styles.downloadButton,
+                                  styles.bibleVersionDownload,
                                   isDark && { backgroundColor: "#2196F3" },
                                 ]}
                                 onPress={() => {
@@ -4252,6 +4249,24 @@ ${deepLink}`;
 }
 
 const styles = StyleSheet.create({
+  bibleVersionOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 16 },
+  bibleVersionPanel: { width: '100%', maxWidth: 560, height: '85%', borderRadius: 16, overflow: 'hidden', backgroundColor: '#fff' },
+  bibleVersionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#e3e7e9', backgroundColor: '#fff' },
+  bibleVersionHeading: { flex: 1, minWidth: 0 },
+  bibleVersionTitle: { fontSize: 18, lineHeight: 24, fontWeight: '700', color: '#202326' },
+  bibleVersionActions: { flexDirection: 'row', alignItems: 'center', flexShrink: 0 },
+  bibleVersionIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  bibleVersionScroll: { flex: 1, minHeight: 0 },
+  bibleVersionSection: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 4 },
+  bibleVersionCard: { flexDirection: 'row', alignItems: 'center', paddingRight: 8, borderWidth: 1, borderColor: '#e3e7e9', borderRadius: 12, marginBottom: 10, backgroundColor: '#fff' },
+  bibleVersionContent: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, minHeight: 72 },
+  bibleVersionInfo: { flex: 1, minWidth: 0 },
+  bibleVersionName: { fontSize: 15, lineHeight: 22, fontWeight: '600', color: '#202326', marginBottom: 4 },
+  bibleVersionDetails: { fontSize: 13, lineHeight: 19, color: '#687077' },
+  bibleVersionAction: { paddingHorizontal: 4, flexShrink: 0 },
+  bibleVersionDownload: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: '#0879b6' },
+  bibleVersionDelete: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: '#B5221F' },
+
   container: {
     flex: 1,
     backgroundColor: "#f5f5f5",
