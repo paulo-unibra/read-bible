@@ -1682,22 +1682,17 @@ export default function ChapterReaderScreen() {
     }
   };
 
-  const toggleVerseHighlight = () => {
-    if (!verseHighlighted) {
-      // Mostrar seletor de cores
-      setShowColorPicker(true);
-    } else {
-      // Remover destaque
-      if (selectedVerseForOptions) {
-        const verseKey = `${selectedVerseForOptions.bookId}-${selectedVerseForOptions.chapterNumber}-${selectedVerseForOptions.verseNumber}`;
-        const newHighlights = { ...verseHighlights };
-        delete newHighlights[verseKey];
-        saveVerseHighlights(newHighlights);
-      }
-      setVerseHighlighted(false);
-      setSelectedHighlightColor(null);
-      setShowColorPicker(false);
-    }
+  const toggleVerseHighlight = () => setShowColorPicker(true);
+
+  const removeVerseHighlight = async () => {
+    if (!selectedVerseForOptions) return;
+    const verseKey = `${selectedVerseForOptions.bookId}-${selectedVerseForOptions.chapterNumber}-${selectedVerseForOptions.verseNumber}`;
+    const newHighlights = { ...verseHighlights };
+    delete newHighlights[verseKey];
+    await saveVerseHighlights(newHighlights);
+    setVerseHighlighted(false);
+    setSelectedHighlightColor(null);
+    setShowColorPicker(false);
   };
 
   const handleColorSelect = async (color: string) => {
@@ -3832,7 +3827,7 @@ ${deepLink}`;
                     { color: isDark ? "#e0e0e0" : "#666" },
                   ]}
                 >
-                  {verseHighlighted ? "Remover" : "Destacar"}
+                  Destacar
                 </Text>
               </TouchableOpacity>
 
@@ -3988,6 +3983,12 @@ ${deepLink}`;
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.colorOptionsContainer}
                 >
+                  <TouchableOpacity style={styles.colorOption} accessibilityRole="button" accessibilityLabel="Remover destaque" onPress={removeVerseHighlight}>
+                    <View style={[styles.colorCircle, { backgroundColor: isDark ? '#242a2e' : '#fff', borderColor: isDark ? '#687077' : '#cbd2d7' }]}>
+                      <View style={{ width: 32, height: 3, borderRadius: 2, backgroundColor: isDark ? '#ff9290' : '#B5221F', transform: [{ rotate: '-45deg' }] }} />
+                    </View>
+                    <Text style={[styles.colorLabel, { color: isDark ? '#ccc' : '#666' }]}>Sem destaque</Text>
+                  </TouchableOpacity>
                   {highlightColors.map((item) => (
                     <TouchableOpacity
                       key={item.id}
@@ -4009,7 +4010,7 @@ ${deepLink}`;
                           { color: isDark ? "#ccc" : "#666" },
                         ]}
                       >
-                        {item.label} {selectedHighlightColor}
+                        {item.label}
                       </Text>
                     </TouchableOpacity>
                   ))}
