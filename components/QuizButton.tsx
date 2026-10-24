@@ -1,12 +1,8 @@
+import Alert from '../services/AppFeedback';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-    ActivityIndicator,
-    Alert,
-    StyleSheet,
-    TouchableOpacity,
-} from 'react-native';
+import { ActivityIndicator, StyleSheet, TouchableOpacity } from 'react-native';
 import QuizService from '../services/QuizService';
 
 interface QuizButtonProps {

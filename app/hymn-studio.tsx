@@ -1,21 +1,10 @@
+import Alert from '../services/AppFeedback';
 import { Ionicons } from "@expo/vector-icons";
 import Slider from "@react-native-community/slider";
 import { Audio } from "expo-av";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  BackHandler,
-  LayoutChangeEvent,
-  PanResponder,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { ActivityIndicator, BackHandler, LayoutChangeEvent, PanResponder, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from "react-native-safe-area-context";
 import HymnAudioMixer from "../components/HymnAudioMixer";
 import DatabaseService from "../services/DatabaseService";

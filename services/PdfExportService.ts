@@ -1,6 +1,7 @@
+import Alert from './AppFeedback';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import { Alert } from 'react-native';
+
 import { ReadingPlan, TodayReading } from './AuthService';
 
 interface DayReading {

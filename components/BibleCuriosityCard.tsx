@@ -1,15 +1,10 @@
+import Alert from '../services/AppFeedback';
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
 import React, { useEffect, useRef, useState } from "react";
-import {
-    Alert,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
-} from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import QRCode from "react-native-qrcode-svg";
 import ViewShot from "react-native-view-shot";
 import authService from "../services/AuthService";

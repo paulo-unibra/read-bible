@@ -1,5 +1,6 @@
+import Alert from './AppFeedback';
 import { Directory, File, Paths } from "expo-file-system";
-import { Alert } from "react-native";
+
 import DatabaseService from "./DatabaseService";
 
 const HARPA_DIR = new Directory(Paths.document, "harpa");

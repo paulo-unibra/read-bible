@@ -1,6 +1,7 @@
+import Alert from '../services/AppFeedback';
 import { useFocusEffect } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import { Alert, Text, TouchableOpacity } from 'react-native';
+import { Text, TouchableOpacity } from 'react-native';
 import authService from '../services/AuthService';
 import tamagoshiService from '../services/TamagoshiService';
 import { dayKey } from '../utils/tamagoshi';

@@ -1,3 +1,4 @@
+import FeedbackHost from '../components/FeedbackHost';
 import {
   DarkTheme,
   DefaultTheme,
@@ -54,6 +55,7 @@ export default function RootLayout() {
             options={{ presentation: "modal" }}
           />
         </Stack>
+        <FeedbackHost />
         <StatusBar style={userTheme === "dark" ? "light" : "dark"} />
       </ThemeProvider>
     </ThemeProviderCustom>

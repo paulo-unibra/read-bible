@@ -1,18 +1,10 @@
+import Alert from '../services/AppFeedback';
 import CompleteChapterButton from "../components/CompleteChapterButton";
 import tamagoshiService from "../services/TamagoshiService";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
-} from "react-native";
+import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from "react-native-safe-area-context";
 import { IntroductionRenderer } from "../components/IntroductionRenderer";
 import authService, { TodayReading } from "../services/AuthService";

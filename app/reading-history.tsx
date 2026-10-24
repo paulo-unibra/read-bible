@@ -1,7 +1,8 @@
+import Alert from '../services/AppFeedback';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import authService, { ReadingPlan } from '../services/AuthService';
 import DatabaseService from '../services/DatabaseService';
 
