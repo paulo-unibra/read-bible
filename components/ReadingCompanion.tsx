@@ -30,13 +30,13 @@ export default function ReadingCompanion({ userId }: {
     let transition: Animated.CompositeAnimation | undefined;
     const timer = setInterval(() => {
       if (reducedMotion) {
-        setTipIndex(index => (index + 1) % 3);
+        setTipIndex(index => (index + 1) % 4);
         return;
       }
       transition = Animated.timing(tipOpacity, { toValue: 0, duration: 300, useNativeDriver: true });
       transition.start(({ finished }) => {
         if (!finished || !active) return;
-        setTipIndex(index => (index + 1) % 3);
+        setTipIndex(index => (index + 1) % 4);
         transition = Animated.timing(tipOpacity, { toValue: 1, duration: 450, useNativeDriver: true });
         transition.start();
       });
@@ -100,7 +100,7 @@ export default function ReadingCompanion({ userId }: {
   const tips = [
     status.readingConfirmed ? `Leitura concluída: +${TAMAGOSHI_REWARDS.reading} pontos hoje.` : status.readToday ? 'Leitura salva · conecte-se hoje para pontuar.' : `Leia 1 capítulo e conquiste +${TAMAGOSHI_REWARDS.reading} pontos por dia.`,
     status.quizConfirmed ? `Questionário concluído: +${TAMAGOSHI_REWARDS.quiz} pontos hoje.` : `Faça um questionário: +${TAMAGOSHI_REWARDS.quiz} pontos por dia.`,
-    `Convide uma pessoa: +${TAMAGOSHI_REWARDS.invite} pontos após confirmar o cadastro.`,
+    `Convite confirmado: +${TAMAGOSHI_REWARDS.invite} pontos.`,
     'Descanso automático: das 22h às 6h.',
   ];
   return (
@@ -134,7 +134,7 @@ export default function ReadingCompanion({ userId }: {
 const styles = StyleSheet.create({
   container: { marginHorizontal: 16, marginTop: 8, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#DCE6E8' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 72 },
-  tip: { color: '#496271', fontSize: 12, lineHeight: 17, minHeight: 34, marginTop: 2 },
+  tip: { color: '#496271', fontSize: 12, lineHeight: 17, height: 34, marginTop: 2 },
   petStage: { width: 68, alignItems: 'center' },
   copy: { flex: 1, minWidth: 0 },
   title: { fontSize: 16, lineHeight: 22, fontWeight: '700', color: '#203947' },
