@@ -41,8 +41,8 @@ let lastPlayed = 0;
 const listeners = new Set<() => void>();
 export function onReadingVoice(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; }
 export const hasRecentReadingVoice = () => Date.now() - lastPlayed < 12000;
-export function playReadingVoice(event: keyof typeof sources): void {
-  if (AppState.currentState !== 'active' || current !== null) return;
+export function playReadingVoice(event: keyof typeof sources): boolean {
+  if (AppState.currentState !== 'active' || current !== null) return false;
   try {
     listeners.forEach(listener => listener());
     const player = createAudioPlayer(event === 'reading' ? nextReading() : sources[event]);
@@ -52,8 +52,9 @@ export function playReadingVoice(event: keyof typeof sources): void {
       if ((status.didJustFinish || status.error) && current === player) { current = null; player.remove(); }
     });
     player.play();
-  } catch { try { current?.remove(); } catch {} current = null; }
+    return true;
+  } catch { try { current?.remove(); } catch {} current = null; return false; }
 }
 AppState.addEventListener('change', state => {
-  if (state !== 'active') { try { current?.remove(); } catch {} current = null; }
+  if (state !== 'active') { try { current?.remove(); } catch {} current = null; return false; }
 });

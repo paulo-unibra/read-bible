@@ -1,4 +1,4 @@
-import { playReadingVoice } from '../services/ReadingVoice';
+import { playInviteVoice } from '../services/InviteVoice';
 import Alert from '../services/AppFeedback';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
@@ -28,7 +28,7 @@ export default function InviteFriendsScreen() {
         await authService.init();
         if (!authService.isAuthenticated()) { router.replace('/auth?mode=login'); return; }
         const [data, theme] = await Promise.all([referralService.getMine(), DatabaseService.getSetting('theme')]);
-        if (active) { setSummary(data); setDark(theme === 'dark'); playReadingVoice('invite'); }
+        if (active) { setSummary(data); setDark(theme === 'dark'); const userId = authService.getUser()?.id; if (userId != null) void playInviteVoice(userId, () => active); }
       } catch { if (active) setError(true); }
       finally { if (active) setLoading(false); }
     })();
