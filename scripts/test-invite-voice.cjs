@@ -8,7 +8,7 @@ function setup() {
  function load() {
   const exports = {};
   const code = ts.transpileModule(fs.readFileSync('services/InviteVoice.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;
-  new Function('exports','require','Date',code)(exports,id=>id.includes('async-storage')?{default:storage}:{playReadingVoice:()=>{calls++;return allowed;}},{now:()=>now});
+  new Function('exports','require','Date',code)(exports,id=>id.includes('async-storage')?{__esModule:true,default:storage}:{playReadingVoice:()=>{calls++;return allowed;}},{now:()=>now});
   return exports.playInviteVoice;
  }
  return {load,advance:n=>now+=n,calls:()=>calls,setAllowed:v=>allowed=v};
