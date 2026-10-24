@@ -967,7 +967,7 @@ const styles = StyleSheet.create({
   },
   todaySection: {
     paddingHorizontal: 16,
-    paddingTop: 25,
+    paddingTop: 20,
   },
   planFinishedNotice: {
     flexDirection: "row",
@@ -1131,9 +1131,9 @@ const styles = StyleSheet.create({
   },
   completedButton: { backgroundColor: "#43A047" },
   completeButtonText: { fontSize: 16, fontWeight: "700", color: "#fff" },
-  modeSection: { paddingHorizontal: 16, paddingTop: 36 },
+  modeSection: { paddingHorizontal: 16, paddingTop: 26 },
   modeTitle: {
-    fontSize: 22,
+    fontSize: 19,
     fontWeight: "700",
     color: "#333",
     marginBottom: 18,
