@@ -2686,6 +2686,7 @@ ${deepLink}`;
         ) : currentChapter === 0 ? (
           /* Introduction View */
           <ScrollView
+            key={`intro-${bibleId}-${currentBookId}`}
             style={[styles.versesList, versesListBg]}
             contentContainerStyle={[
               styles.introductionContent,
@@ -2741,6 +2742,7 @@ ${deepLink}`;
         ) : (
           /* Normal Verses List */
           <FlatList
+            key={`chapter-${bibleId}-${currentBookId}-${currentChapter}`}
             ref={versesListRef}
             data={verses}
             renderItem={renderVerse}
