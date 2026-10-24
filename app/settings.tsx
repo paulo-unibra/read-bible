@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { FocusRadius, getFocusColors, getFocusShadow } from '../constants/design';
+import { getFocusColors } from '../constants/design';
 import authService from '../services/AuthService';
 import DatabaseService from '../services/DatabaseService';
 import googleDriveService from '../services/GoogleDriveService';
@@ -22,10 +22,6 @@ export default function SettingsScreen() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [notificationTime, setNotificationTime] = useState('08:00');
   const { setTheme: setGlobalTheme } = useThemeCustom();
-
-  useEffect(() => {
-    loadSettings();
-  }, []);
 
   const loadSettings = async () => {
     try {
@@ -60,6 +56,12 @@ export default function SettingsScreen() {
       Alert.alert('Erro', 'Falha ao carregar configurações');
     }
   };
+
+  useEffect(() => {
+    // Settings update only after the asynchronous database reads complete.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadSettings();
+  }, []);
 
   const saveSetting = async (key: string, value: string) => {
     try {
@@ -97,20 +99,11 @@ export default function SettingsScreen() {
   }, [fontSize]);
 
   const focus = getFocusColors(isDark);
-  const focusShadow = getFocusShadow(isDark);
   const colors = {
     bg: focus.screen,
-    headerBg: focus.screen,
-    sectionBg: focus.screen,
     border: focus.line,
-    cardBorder: focus.line,
     textPrimary: focus.text,
     textSecondary: focus.muted,
-    accent: focus.blue,
-    selectedBg: focus.blue,
-    dangerBg: isDark ? '#3a1f1f' : '#fff5f5',
-    dangerBorder: focus.danger,
-    dangerText: focus.danger,
   } as const;
 
   const handleNotificationToggle = async (enabled: boolean) => {
@@ -282,346 +275,103 @@ export default function SettingsScreen() {
 
 
 
+  const accent = isDark ? focus.blueDark : '#076B9D';
+  const heading = (title: string) => <Text accessibilityRole="header" style={[styles.sectionTitle, { color: colors.textPrimary, fontSize: applyFontScale(17) }]}>{title}</Text>;
+  const actionRow = (label: string, icon: React.ComponentProps<typeof Ionicons>['name'], onPress: () => void, destructive = false) => (
+    <TouchableOpacity accessibilityRole="button" onPress={onPress} style={[styles.actionRow, { borderBottomColor: colors.border }]}>
+      <Ionicons name={icon} size={21} color={destructive ? (isDark ? '#ff9290' : '#B5221F') : accent} />
+      <Text style={[styles.rowLabel, { color: destructive ? (isDark ? '#ff9290' : '#B5221F') : colors.textPrimary, fontSize: applyFontScale(15) }]}>{label}</Text>
+      <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+    </TouchableOpacity>
+  );
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
-      <View style={[styles.header, { backgroundColor: colors.headerBg, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+      <View style={[styles.header, { borderBottomColor: colors.border }]}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Voltar" onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary, fontSize: applyFontScale(20) }]}>Configurações</Text>
+        <Text accessibilityRole="header" style={[styles.headerTitle, { color: colors.textPrimary, fontSize: applyFontScale(19) }]}>Configurações</Text>
       </View>
-
-      <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 40 }}>
-        {/* Bible Selection */}
-        <View style={[styles.section, { backgroundColor: colors.sectionBg }, focusShadow]}>
-          <Text style={[styles.sectionTitle, { color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Bíblia Preferida</Text>
-          <Text style={[styles.sectionDescription, { color: colors.textSecondary }] }>
-            Selecione a versão da Bíblia que será usada por padrão
-          </Text>
-          
-          {bibles.length > 0 ? (
-            <View style={styles.optionsContainer}>
-              {bibles.map(bible => (
-                <TouchableOpacity
-                  key={bible.id}
-                  style={[
-                    styles.option,
-                    {
-                      borderColor: colors.cardBorder,
-                      backgroundColor: colors.sectionBg,
-                    },
-                    selectedBibleId === bible.id && {
-                      backgroundColor: colors.selectedBg,
-                      borderColor: colors.selectedBg,
-                    }
-                  ]}
-                  onPress={() => handleBibleChange(bible.id)}
-                >
-                  <View style={styles.optionContent}>
-                    <Text style={[
-                      styles.optionTitle,
-                      { color: colors.textPrimary, fontSize: applyFontScale(16) },
-                      selectedBibleId === bible.id && { color: '#fff' }
-                    ]}>
-                      {bible.name}
-                    </Text>
-                    <Text style={[
-                      styles.optionSubtitle,
-                      { color: colors.textSecondary, fontSize: applyFontScale(14) },
-                      selectedBibleId === bible.id && { color: '#fff' }
-                    ]}>
-                     {formatBibleAbbreviation(bible.abbreviation)}
-                    </Text>
-                  </View>
-                  {selectedBibleId === bible.id && (
-                    <Ionicons name="checkmark-circle" size={24} color={isDark ? '#fff' : '#fff'} />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </View>
-          ) : (
-            <Text style={[styles.noBiblesText, { color: colors.textSecondary }]}>
-              Nenhuma Bíblia baixada. Vá para &quot;Gerenciar Bíblias&quot; para baixar uma versão.
-            </Text>
-          )}
-        </View>
-
-        {/* Font Size */}
-        <View style={[styles.section, { backgroundColor: colors.sectionBg }, focusShadow]}>
-          <Text style={[styles.sectionTitle, { color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Tamanho da Fonte</Text>
-          <View style={styles.optionsContainer}>
-            {[
-              { key: 'small', label: 'Pequena' },
-              { key: 'medium', label: 'Média' },
-              { key: 'large', label: 'Grande' }
-            ].map(option => (
-              <TouchableOpacity
-                key={option.key}
-                style={[
-                  styles.option,
-                  { borderColor: colors.cardBorder, backgroundColor: colors.sectionBg },
-                  fontSize === option.key && { backgroundColor: colors.selectedBg, borderColor: colors.selectedBg }
-                ]}
-                onPress={() => handleFontSizeChange(option.key as any)}
-              >
-                <Text style={[
-                  styles.optionTitle,
-                  { color: colors.textPrimary, fontSize: applyFontScale(16) },
-                  fontSize === option.key && { color: '#fff' }
-                ]}>
-                  {option.label}
-                </Text>
-                {fontSize === option.key && (
-                  <Ionicons name="checkmark-circle" size={24} color="#fff" />
-                )}
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* Theme */}
-        <View style={[styles.section, { backgroundColor: colors.sectionBg }, focusShadow]}>
-          <Text style={[styles.sectionTitle, { color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Tema</Text>
-          <View style={styles.optionsContainer}>
-            {[
-              { key: 'light', label: 'Claro' },
-              { key: 'dark', label: 'Escuro' }
-            ].map(option => (
-              <TouchableOpacity
-                key={option.key}
-                style={[
-                  styles.option,
-                  { borderColor: colors.cardBorder, backgroundColor: colors.sectionBg },
-                  theme === option.key && { backgroundColor: colors.selectedBg, borderColor: colors.selectedBg }
-                ]}
-                onPress={() => handleThemeChange(option.key as any)}
-              >
-                <Text style={[
-                  styles.optionTitle,
-                  { color: colors.textPrimary, fontSize: applyFontScale(16) },
-                  theme === option.key && { color: '#fff' }
-                ]}>
-                  {option.label}
-                </Text>
-                {theme === option.key && (
-                  <Ionicons name="checkmark-circle" size={24} color="#fff" />
-                )}
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* Notifications */}
-        <View style={[styles.section, { backgroundColor: colors.sectionBg }, focusShadow]}>
-          <Text style={[styles.sectionTitle, { color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Notificações Diárias</Text>
-          <View style={styles.switchContainer}>
-            <Text style={[styles.switchLabel, { color: colors.textPrimary, fontSize: applyFontScale(16) }]}>Receber lembretes diários</Text>
-            <Switch
-              value={notificationsEnabled}
-              onValueChange={handleNotificationToggle}
-              trackColor={{ false: '#ddd', true: '#2196F3' }}
-              thumbColor={notificationsEnabled ? '#fff' : '#f4f3f4'}
-            />
-          </View>
-          
-          {notificationsEnabled && (
-            <TouchableOpacity style={styles.timeSelector} onPress={handleTimeChange}>
-              <Text style={[styles.timeLabel, { color: colors.textPrimary, fontSize: applyFontScale(16) }]}>Horário da notificação</Text>
-              <View style={styles.timeValue}>
-                <Text style={[styles.timeText, { color: colors.accent, fontSize: applyFontScale(16) }]}>{notificationTime}</Text>
-                <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.section}>
+          {heading('Bíblia preferida')}
+          <Text style={[styles.description, { color: colors.textSecondary }]}>Versão usada por padrão nas leituras.</Text>
+          {bibles.length ? <View style={styles.options}>{bibles.map(bible => {
+            const selected = selectedBibleId === bible.id;
+            return <TouchableOpacity key={bible.id} accessibilityRole="radio" accessibilityState={{ checked: selected }} onPress={() => handleBibleChange(bible.id)} style={[styles.bibleOption, { backgroundColor: selected ? focus.blueSoft : focus.surface, borderColor: selected ? accent : colors.border }]}>
+              <View style={styles.optionCopy}>
+                <Text style={[styles.optionTitle, { color: colors.textPrimary, fontSize: applyFontScale(15) }]}>{bible.name}</Text>
+                <Text style={[styles.abbreviation, { color: selected ? accent : colors.textSecondary }]}>{formatBibleAbbreviation(bible.abbreviation)}</Text>
               </View>
-            </TouchableOpacity>
-          )}
+              <Ionicons name={selected ? 'radio-button-on' : 'radio-button-off'} size={22} color={selected ? accent : colors.textSecondary} />
+            </TouchableOpacity>;
+          })}</View> : <View style={[styles.empty, { backgroundColor: focus.surface }]}>
+            <Text style={[styles.description, { color: colors.textSecondary }]}>Nenhuma Bíblia baixada.</Text>
+            <TouchableOpacity accessibilityRole="button" onPress={() => router.push('/bible-manager')} style={styles.downloadButton}><Text style={[styles.linkText, { color: accent }]}>Gerenciar Bíblias</Text><Ionicons name="arrow-forward" size={18} color={accent} /></TouchableOpacity>
+          </View>}
         </View>
-
-        {/* Account Management */}
-        <View style={[styles.section, { backgroundColor: colors.sectionBg }, focusShadow]}>
-          <Text style={[styles.sectionTitle, { color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Conta</Text>
-          
-          <TouchableOpacity 
-            style={[styles.dangerButton, { backgroundColor: colors.dangerBg, borderColor: colors.dangerBorder, marginBottom: 12 }]} 
-            onPress={handleDeleteReadingPlan}
-          >
-            <Ionicons name="book-outline" size={24} color={colors.dangerText} />
-            <Text style={[styles.dangerButtonText, { color: colors.dangerText, fontSize: applyFontScale(16) }]}>Excluir Plano de Leitura</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[styles.dangerButton, { backgroundColor: colors.dangerBg, borderColor: colors.dangerBorder, marginBottom: 12 }]} 
-            onPress={handleLogout}
-          >
-            <Ionicons name="log-out-outline" size={24} color={colors.dangerText} />
-            <Text style={[styles.dangerButtonText, { color: colors.dangerText, fontSize: applyFontScale(16) }]}>Sair da Conta</Text>
-          </TouchableOpacity>
+        <View style={styles.section}>
+          {heading('Tamanho da fonte')}
+          <View style={[styles.segments, { backgroundColor: focus.surface }]}>{([
+            { key: 'small', label: 'Pequena', size: 14 }, { key: 'medium', label: 'Média', size: 16 }, { key: 'large', label: 'Grande', size: 18 },
+          ] as const).map(option => <TouchableOpacity key={option.key} accessibilityRole="radio" accessibilityState={{ checked: fontSize === option.key }} onPress={() => handleFontSizeChange(option.key)} style={[styles.segment, fontSize === option.key && { backgroundColor: focus.blueSoft, borderColor: accent }]}>
+            <Text style={[styles.segmentText, { fontSize: applyFontScale(option.size), color: fontSize === option.key ? accent : colors.textSecondary }]}>{option.label}</Text>
+          </TouchableOpacity>)}</View>
         </View>
-
-        {/* Data Management */}
-        <View style={[styles.section, { backgroundColor: colors.sectionBg }, focusShadow]}>
-          <Text style={[styles.sectionTitle, { color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Gerenciar Dados</Text>
-          <TouchableOpacity style={[styles.dangerButton, { backgroundColor: colors.dangerBg, borderColor: colors.dangerBorder }]} onPress={clearAllData}>
-            <Ionicons name="trash-outline" size={24} color={colors.dangerText} />
-            <Text style={[styles.dangerButtonText, { color: colors.dangerText, fontSize: applyFontScale(16) }]}>Limpar Todos os Dados</Text>
-          </TouchableOpacity>
+        <View style={styles.section}>
+          {heading('Tema')}
+          <View style={[styles.segments, { backgroundColor: focus.surface }]}>{([
+            { key: 'light', label: 'Claro', icon: 'sunny-outline' }, { key: 'dark', label: 'Escuro', icon: 'moon-outline' },
+          ] as const).map(option => <TouchableOpacity key={option.key} accessibilityRole="radio" accessibilityState={{ checked: theme === option.key }} onPress={() => handleThemeChange(option.key)} style={[styles.segment, theme === option.key && { backgroundColor: focus.blueSoft, borderColor: accent }]}>
+            <Ionicons name={option.icon} size={19} color={theme === option.key ? accent : colors.textSecondary} /><Text style={[styles.segmentText, { color: theme === option.key ? accent : colors.textSecondary, fontSize: applyFontScale(15) }]}>{option.label}</Text>
+          </TouchableOpacity>)}</View>
         </View>
-
-        {/* App Info */}
-        <View style={[styles.section, { backgroundColor: colors.sectionBg }, focusShadow]}>
-          <Text style={[styles.sectionTitle, { color: colors.textPrimary, fontSize: applyFontScale(18) }]}>Sobre o App</Text>
-          <View style={styles.infoContainer}>
-            <Text style={[styles.infoText, { color: colors.textSecondary }]}>{`Bíblia em Foco v1.0.5`}</Text>
-            <Text style={[styles.infoText, { color: colors.textSecondary }]}>Aplicativo para estudo da Bíblia</Text>
-            <Text style={[styles.infoText, { color: colors.textSecondary }]}>com planos de leitura organizados</Text>
+        <View style={styles.section}>
+          {heading('Lembretes de leitura')}
+          <View style={styles.switchRow}>
+            <Text style={[styles.rowLabel, { color: colors.textPrimary, fontSize: applyFontScale(15) }]}>Receber lembretes diários</Text>
+            <Switch accessibilityLabel="Receber lembretes diários" value={notificationsEnabled} onValueChange={handleNotificationToggle} trackColor={{ false: colors.border, true: accent }} thumbColor="#fff" />
           </View>
+          {notificationsEnabled && <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Horário da notificação: ${notificationTime}. Alterar horário`} style={[styles.actionRow, { borderBottomColor: colors.border }]} onPress={handleTimeChange}>
+            <Ionicons name="time-outline" size={21} color={accent} /><Text style={[styles.rowLabel, { color: colors.textPrimary, fontSize: applyFontScale(15) }]}>Horário</Text><Text style={[styles.linkText, { color: accent }]}>{notificationTime}</Text><Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+          </TouchableOpacity>}
+        </View>
+        <View style={styles.section}>
+          {heading('Conta e dados')}
+          {actionRow('Sair da conta', 'log-out-outline', handleLogout)}
+          {actionRow('Excluir plano de leitura', 'book-outline', handleDeleteReadingPlan, true)}
+          {actionRow('Limpar todos os dados', 'trash-outline', clearAllData, true)}
+        </View>
+        <View style={[styles.footer, { borderTopColor: colors.border }]}>
+          <Text style={[styles.footerName, { color: colors.textPrimary }]}>Bíblia em Foco v1.0.5</Text>
+          <Text style={[styles.footerText, { color: colors.textSecondary }]}>Estudo da Bíblia e planos de leitura organizados.</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#333',
-  },
-  content: {
-    flex: 1,
-  },
-  section: {
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    marginTop: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 20,
-    borderRadius: FocusRadius.lg,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-  },
-  sectionDescription: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 16,
-  },
-  optionsContainer: {
-    gap: 8,
-  },
-  option: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: FocusRadius.sm,
-  },
-  selectedOption: {
-    backgroundColor: '#2196F3',
-    borderColor: '#2196F3',
-  },
-  optionContent: {
-    flex: 1,
-  },
-  optionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-  },
-  optionSubtitle: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 2,
-  },
-  selectedOptionText: {
-    color: '#fff',
-  },
-  noBiblesText: {
-    fontSize: 14,
-    color: '#666',
-    fontStyle: 'italic',
-    textAlign: 'center',
-    paddingVertical: 20,
-  },
-  switchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-  },
-  switchLabel: {
-    fontSize: 16,
-    color: '#333',
-  },
-  timeSelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-    marginTop: 12,
-  },
-  timeLabel: {
-    fontSize: 16,
-    color: '#333',
-  },
-  timeValue: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  timeText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2196F3',
-    marginRight: 8,
-  },
-  dangerButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#f44336',
-    borderRadius: FocusRadius.sm,
-    backgroundColor: '#fff5f5',
-  },
-  dangerButtonText: {
-    fontSize: 16,
-    color: '#f44336',
-    marginLeft: 12,
-  },
-  infoContainer: {
-    alignItems: 'center',
-    paddingVertical: 16,
-  },
-  infoText: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 4,
-  },
+  container: { flex: 1 },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, gap: 8 },
+  backButton: { width: 44, minHeight: 44, justifyContent: 'center' },
+  headerTitle: { fontWeight: '700', flex: 1 },
+  content: { padding: 20, paddingBottom: 40, maxWidth: 600, width: '100%', alignSelf: 'center' },
+  section: { marginBottom: 28 },
+  sectionTitle: { fontWeight: '700', marginBottom: 12 },
+  description: { fontSize: 14, lineHeight: 21, marginBottom: 12 },
+  options: { gap: 8 },
+  bibleOption: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 12, borderWidth: 1, minHeight: 64 },
+  optionCopy: { flex: 1, minWidth: 0 }, optionTitle: { fontWeight: '600', lineHeight: 23 },
+  abbreviation: { fontSize: 13, marginTop: 2 },
+  segments: { flexDirection: 'row', padding: 4, borderRadius: 12, gap: 4 },
+  segment: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 12, paddingHorizontal: 4, minHeight: 48, borderRadius: 9, borderWidth: 1, borderColor: 'transparent' },
+  segmentText: { fontWeight: '600', textAlign: 'center', flexShrink: 1 },
+  switchRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48 },
+  rowLabel: { flex: 1, lineHeight: 23 },
+  actionRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 16, minHeight: 56, borderBottomWidth: StyleSheet.hairlineWidth },
+  empty: { padding: 16, borderRadius: 12 },
+  downloadButton: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 },
+  linkText: { fontSize: 14, fontWeight: '600' },
+  footer: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 20, gap: 6 },
+  footerName: { fontSize: 13, fontWeight: '600' }, footerText: { fontSize: 12, lineHeight: 18 },
 });
