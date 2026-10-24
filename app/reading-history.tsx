@@ -164,6 +164,15 @@ export default function ReadingHistoryScreen() {
   };
 
   const handleToggleReading = async (dayReading: DayReadings) => {
+    const firstPendingDay = history.reduce<number | null>((first, reading) => {
+      if (reading.isCompleted) return first;
+      return first === null ? reading.day : Math.min(first, reading.day);
+    }, null);
+    if (!dayReading.isCompleted && firstPendingDay !== null && dayReading.day > firstPendingDay) {
+      Alert.alert('Leitura pendente', `Conclua primeiro a leitura do dia ${firstPendingDay}.`);
+      return;
+    }
+
     const action = dayReading.isCompleted ? 'desmarcar' : 'marcar';
     const actionTitle = dayReading.isCompleted ? 'Desmarcar Leitura' : 'Marcar Leitura';
     
