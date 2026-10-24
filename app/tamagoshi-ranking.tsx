@@ -8,7 +8,7 @@ import { getFocusColors } from '../constants/design';
 import authService from '../services/AuthService';
 import DatabaseService from '../services/DatabaseService';
 import tamagoshiService, { MonthlyRanking } from '../services/TamagoshiService';
-import { dayKey, isTamagoshiPodium } from '../utils/tamagoshi';
+import { dayKey, isTamagoshiPodium, Tamagoshi, tamagoshiDisplayName } from '../utils/tamagoshi';
 
 export default function TamagoshiRankingScreen() {
   const router = useRouter();
@@ -18,6 +18,7 @@ export default function TamagoshiRankingScreen() {
   const [attempt, setAttempt] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
   const [dark, setDark] = useState(false);
+  const [ownPet, setOwnPet] = useState<Tamagoshi | null>(null);
   const colors = getFocusColors(dark);
   const loadedMonth = data?.month;
   useFocusEffect(useCallback(() => {
@@ -35,9 +36,9 @@ export default function TamagoshiRankingScreen() {
         await authService.init();
         const userId = authService.getUser()?.id;
         if (userId == null) { router.replace('/auth?mode=login'); return; }
-        await tamagoshiService.sync(userId);
+        const pet = await tamagoshiService.sync(userId);
         const [result, theme] = await Promise.all([tamagoshiService.ranking(), DatabaseService.getSetting('theme')]);
-        if (active) { setData(result); setDark(theme === 'dark'); }
+        if (active) { setData(result); setOwnPet(pet); setDark(theme === 'dark'); }
       } catch { if (active) setError(true); }
       finally { if (active) setLoading(false); }
     })();
@@ -46,15 +47,23 @@ export default function TamagoshiRankingScreen() {
   const monthLabel = data ? new Date(`${data.month}-15T12:00:00Z`).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric', timeZone: 'America/Recife' }) : '';
   const podium = data?.entries.filter(item => isTamagoshiPodium(item.position)) ?? [];
   const remaining = data?.entries.filter(item => !isTamagoshiPodium(item.position)) ?? [];
+  const ownUserId = authService.getUser()?.id;
+  const ownBackground = dark ? '#142D3E' : '#EAF6FE';
+  const ownForeground = dark ? colors.blueDark : '#076B9D';
   const renderEntry = (item: MonthlyRanking['entries'][number], onPodium = false) => <View
     key={item.userId}
     accessible
-    accessibilityLabel={`${item.position}º lugar, ${item.name}, ${item.points} pontos${onPodium ? ', pódio' : ''}`}
+    accessibilityLabel={`${item.userId === ownUserId ? 'Seu Tamagoshi, ' : ''}${item.position}º lugar, ${item.name}, ${item.points} pontos${onPodium ? ', pódio' : ''}`}
     style={[styles.entry, { borderColor: colors.line }, onPodium && styles.podiumEntry,
-      onPodium && { backgroundColor: item.position === 1 ? (dark ? '#302919' : '#FFF8E6') : colors.surface }]}>
-    <Text style={[styles.position, { color: onPodium ? colors.blueDark : colors.muted }, onPodium && styles.podiumPosition]}>{item.position}º</Text>
+      onPodium && { backgroundColor: item.position === 1 ? (dark ? '#302919' : '#FFF8E6') : colors.surface },
+      item.userId === ownUserId && { backgroundColor: ownBackground },
+      item.userId === ownUserId && !onPodium && styles.ownEntry]}>
+    <Text style={[styles.position, { color: item.userId === ownUserId ? ownForeground : onPodium ? colors.blueDark : colors.muted }, onPodium && styles.podiumPosition]}>{item.position}º</Text>
     <CompanionAvatar size={40} seed={item.seed} catalogVersion={item.catalogVersion} mood={onPodium ? 'joyful' : 'happy'} />
-    <Text style={[styles.name, { color: colors.text }]} numberOfLines={2}>{item.name}</Text>
+    <View style={styles.nameColumn}>
+      <Text style={[styles.name, { color: item.userId === ownUserId ? ownForeground : colors.text }, item.userId === ownUserId && styles.ownName]} numberOfLines={2}>{item.name}</Text>
+      {item.userId === ownUserId && <Text style={[styles.ownCaption, { color: ownForeground }]}>Seu Tamagoshi</Text>}
+    </View>
     <Text style={[styles.points, { color: colors.text }]}>{item.points}</Text>
   </View>;
   return <SafeAreaView style={[styles.screen, { backgroundColor: colors.screen }]}>
@@ -70,7 +79,15 @@ export default function TamagoshiRankingScreen() {
       <View style={styles.summary}>
         <Text style={[styles.month, { color: colors.text }]}>{monthLabel}</Text>
         <Text style={[styles.subtitle, { color: colors.muted }]}>Zera no dia 1º · horário de Recife</Text>
-        <Text style={[styles.own, { color: colors.blueDark }]}>{data.own.position ? `Você: ${data.own.position}º lugar · ` : 'Você: '}{data.own.points} pontos</Text>
+        {ownPet ? <View accessible accessibilityLabel={`Seu Tamagoshi, ${ownPet.name}, ${data.own.position ? `${data.own.position}º lugar, ` : ''}${data.own.points} pontos`}
+          style={[styles.ownCard, { backgroundColor: ownBackground }]}>
+          <CompanionAvatar size={48} seed={ownPet.seed} catalogVersion={ownPet.catalogVersion ?? 1} mood="happy" />
+          <View style={styles.nameColumn}>
+            <Text style={[styles.ownCaption, { color: ownForeground }]}>Seu Tamagoshi</Text>
+            <Text style={[styles.ownPetName, { color: colors.text }]} numberOfLines={2}>{tamagoshiDisplayName(ownPet.name)}</Text>
+            <Text style={[styles.subtitle, { color: ownForeground }]}>{data.own.position ? `${data.own.position}º lugar · ` : ''}{data.own.points} pontos</Text>
+          </View>
+        </View> : <Text style={[styles.own, { color: colors.blueDark }]}>{data.own.position ? `Você: ${data.own.position}º lugar · ` : 'Você: '}{data.own.points} pontos</Text>}
       </View>
       <FlatList data={remaining} keyExtractor={item => String(item.userId)} contentContainerStyle={styles.list}
         renderItem={({ item }) => renderEntry(item)}
@@ -95,4 +112,4 @@ export default function TamagoshiRankingScreen() {
     </>}
   </SafeAreaView>;
 }
-const styles = StyleSheet.create({ screen: { flex: 1 }, header: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12, borderBottomWidth: 1 }, back: { minHeight: 44, minWidth: 44, justifyContent: 'center' }, title: { flex: 1, fontSize: 19, fontWeight: '700' }, summary: { padding: 24, gap: 6 }, month: { fontSize: 22, fontWeight: '700', textTransform: 'none' }, subtitle: { fontSize: 13 }, own: { marginTop: 10, fontSize: 16, fontWeight: '600' }, list: { paddingHorizontal: 24, paddingBottom: 32 }, entry: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 14, borderBottomWidth: 1 }, position: { width: 32, fontSize: 14 }, name: { flex: 1, minWidth: 0, fontSize: 15 }, points: { fontSize: 18, fontWeight: '700' }, notice: { padding: 24 }, retry: { paddingVertical: 18, minHeight: 48 }, empty: { fontSize: 15, lineHeight: 23, paddingVertical: 24 }, podiumHeading: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }, podiumTitle: { fontSize: 15, fontWeight: '600' }, podiumGroup: { borderWidth: 1, borderRadius: 16, overflow: 'hidden', marginBottom: 20 }, podiumEntry: { paddingHorizontal: 12 }, podiumPosition: { fontWeight: '700' }, classificationTitle: { fontSize: 14, fontWeight: '600', marginBottom: 4 } });
+const styles = StyleSheet.create({ screen: { flex: 1 }, header: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12, borderBottomWidth: 1 }, back: { minHeight: 44, minWidth: 44, justifyContent: 'center' }, title: { flex: 1, fontSize: 19, fontWeight: '700' }, summary: { padding: 24, gap: 6 }, month: { fontSize: 22, fontWeight: '700', textTransform: 'none' }, subtitle: { fontSize: 13 }, own: { marginTop: 10, fontSize: 16, fontWeight: '600' }, list: { paddingHorizontal: 24, paddingBottom: 32 }, entry: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 14, borderBottomWidth: 1 }, position: { width: 32, fontSize: 14 }, name: { fontSize: 15 }, points: { fontSize: 18, fontWeight: '700' }, notice: { padding: 24 }, retry: { paddingVertical: 18, minHeight: 48 }, empty: { fontSize: 15, lineHeight: 23, paddingVertical: 24 }, podiumHeading: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }, podiumTitle: { fontSize: 15, fontWeight: '600' }, podiumGroup: { borderWidth: 1, borderRadius: 16, overflow: 'hidden', marginBottom: 20 }, podiumEntry: { paddingHorizontal: 12 }, podiumPosition: { fontWeight: '700' }, classificationTitle: { fontSize: 14, fontWeight: '600', marginBottom: 4 }, nameColumn: { flex: 1, minWidth: 0, gap: 3 }, ownName: { fontWeight: '700' }, ownCaption: { fontSize: 12, fontWeight: '600' }, ownCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 12, marginTop: 10 }, ownPetName: { fontSize: 16, fontWeight: '700' }, ownEntry: { paddingHorizontal: 12, borderRadius: 12, marginVertical: 4 } });

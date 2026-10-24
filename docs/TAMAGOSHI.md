@@ -13,7 +13,7 @@ O Tamagoshi é gerado e ativado automaticamente na mesma transação que cria a 
 - O ranking exige login e considera apenas Tamagoshis ativados com pontos no mês corrente. Empates são ordenados pelo ID da conta para garantir paginação estável.
 - A pontuação reinicia em **todo dia 1º, às 00:00 de America/Recife**. O filtro mensal é aplicado no servidor, sem depender do app aberto ou de tarefa agendada. O histórico dos meses anteriores é preservado.
 
-O ranking mostra a lista paginada, o mês e a própria posição/pontuação, mesmo fora da página atual. Fica disponível em **Configurar Tamagoshi → Ver ranking do mês**, separado do antigo ranking de quizzes. As posições de **1º a 5º** formam o pódio; os demais aparecem na classificação, sem duplicar os participantes do pódio.
+O ranking mostra a lista paginada, o mês e a própria posição/pontuação, mesmo fora da página atual. Fica disponível em **Configurar Tamagoshi → Ver ranking do mês**, separado do antigo ranking de quizzes. As posições de **1º a 5º** formam o pódio; os demais aparecem na classificação, sem duplicar os participantes do pódio. O Tamagoshi da própria conta fica destacado com a indicação Seu Tamagoshi; avatar, nome, posição e pontos também aparecem no topo, mesmo fora da página carregada.
 
 ## Registro e sincronização
 
