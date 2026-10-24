@@ -44,7 +44,7 @@ export function nextDay(key: string, offset = 1) {
 }
 export const TAMAGOSHI_SLEEP = { start: '22:00', end: '06:00' } as const;
 export function isSleeping(now = new Date()) { return now.getHours() >= 22 || now.getHours() < 6; }
-export const TAMAGOSHI_REWARDS = { reading: 6, quiz: 2 } as const;
+export const TAMAGOSHI_REWARDS = { reading: 6, quiz: 2, invite: 10 } as const;
 export function settleTamagoshi(pet: Tamagoshi): Tamagoshi {
   const updated = { ...pet, sleepStart: TAMAGOSHI_SLEEP.start, sleepEnd: TAMAGOSHI_SLEEP.end };
   delete updated.health;

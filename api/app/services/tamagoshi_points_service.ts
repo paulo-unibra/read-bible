@@ -5,7 +5,7 @@ import type { TransactionClientContract } from '@adonisjs/lucid/types/database'
 import { DateTime } from 'luxon'
 
 export const SCORE_ZONE = 'America/Recife'
-export const POINTS = { reading: 6, quiz: 2, invite: 5, plan: 10 } as const
+export const POINTS = { reading: 6, quiz: 2, invite: 10, plan: 10 } as const
 export type PointSource = keyof typeof POINTS
 export function scorePeriod(now: DateTime = DateTime.utc()) {
   const local = now.setZone(SCORE_ZONE)

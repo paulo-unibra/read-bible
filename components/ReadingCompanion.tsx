@@ -100,6 +100,7 @@ export default function ReadingCompanion({ userId }: {
   const tips = [
     status.readingConfirmed ? `Leitura concluída: +${TAMAGOSHI_REWARDS.reading} pontos hoje.` : status.readToday ? 'Leitura salva · conecte-se hoje para pontuar.' : `Leia 1 capítulo e conquiste +${TAMAGOSHI_REWARDS.reading} pontos por dia.`,
     status.quizConfirmed ? `Questionário concluído: +${TAMAGOSHI_REWARDS.quiz} pontos hoje.` : `Faça um questionário: +${TAMAGOSHI_REWARDS.quiz} pontos por dia.`,
+    `Convide uma pessoa: +${TAMAGOSHI_REWARDS.invite} pontos após confirmar o cadastro.`,
     'Descanso automático: das 22h às 6h.',
   ];
   return (

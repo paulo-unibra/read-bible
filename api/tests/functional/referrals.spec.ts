@@ -108,9 +108,9 @@ test.group('Invitations', () => {
       const awarded = await client.get('/referrals/me').header('Authorization', authorization)
       assert.equal(awarded.body().data.confirmedInvites, 1)
       assert.equal(awarded.body().data.pendingInvites, 0)
-      assert.equal(awarded.body().data.totalHealthPoints, 5)
+      assert.equal(awarded.body().data.totalHealthPoints, 10)
       const petPoints = await client.get('/tamagoshi').header('Authorization', authorization)
-      assert.equal(petPoints.body().data.score.points, 5)
+      assert.equal(petPoints.body().data.score.points, 10)
       await client.post('/auth/verify-email').json({ email, code })
       await client
         .post('/auth/register')
@@ -120,7 +120,7 @@ test.group('Invitations', () => {
         .post('/auth/register')
         .json({ name: 'Inviter', email: inviter.email, password, inviteCode: invitation.code })
       const unchanged = await client.get('/referrals/me').header('Authorization', authorization)
-      assert.equal(unchanged.body().data.totalHealthPoints, 5)
+      assert.equal(unchanged.body().data.totalHealthPoints, 10)
       assert.equal(unchanged.body().data.confirmedInvites, 1)
       const optionalUser = await User.findByOrFail('email', noCodeEmail)
       assert.isNull(
