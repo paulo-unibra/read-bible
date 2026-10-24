@@ -2559,7 +2559,7 @@ ${deepLink}`;
           ) : null}
         </View>
 
-        <View style={styles.headerActions}>
+        <View style={[styles.headerActions, { flex: 1, minWidth: 0, justifyContent: 'flex-end', alignItems: 'center' }]}>
           {selectionMode && selectedVerses.size > 0 && (
             <TouchableOpacity
               onPress={clearSelection}
@@ -2582,10 +2582,13 @@ ${deepLink}`;
           </TouchableOpacity>
           <TouchableOpacity
             onPress={openBookSelector}
-            style={styles.headerButton}
+            style={[styles.bookNameSelector, { backgroundColor: focus.blueSoft }]}
             disabled={isInitialLoading}
+            accessibilityRole="button"
+            accessibilityLabel={`Selecionar livro. Atual: ${book?.name || 'Livro'}`}
           >
-            <Ionicons name="library" size={24} color={iconColor} />
+            <Text numberOfLines={1} style={[styles.bookNameSelectorText, { color: isDark ? focus.blueDark : '#076B9D' }]}>{book?.name || 'Livro'}</Text>
+            <Ionicons name="chevron-down" size={16} color={isDark ? focus.blueDark : '#076B9D'} />
           </TouchableOpacity>
         </View>
       </View>
@@ -4173,6 +4176,8 @@ ${deepLink}`;
 }
 
 const styles = StyleSheet.create({
+  bookNameSelector: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexShrink: 1, minWidth: 0, minHeight: 44, paddingHorizontal: 12, marginLeft: 8, borderRadius: 12, gap: 6 },
+  bookNameSelectorText: { fontSize: 14, fontWeight: '600', flexShrink: 1 },
   bibleVersionOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 16 },
   bibleVersionPanel: { width: '100%', maxWidth: 560, height: '85%', borderRadius: 16, overflow: 'hidden', backgroundColor: '#fff' },
   bibleVersionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#e3e7e9', backgroundColor: '#fff' },
