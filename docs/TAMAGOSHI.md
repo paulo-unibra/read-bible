@@ -42,3 +42,9 @@ Sono automático fixo **22:00–06:00 no relógio local**, sem configuração. A
 Todos exigem autenticação. Publicar a API e aplicar `1793200000000_create_tamagoshi_points` antes de usar os endpoints em produção.
 
 Testes: `scripts/test-tamagoshi.cjs`, `scripts/test-referral-service.cjs` e os testes funcionais da API `tamagoshi_points`, `public_quiz_security` e `referrals`. Os funcionais usam um MySQL temporário, nunca produção.
+
+## Contas existentes: geração em lote
+
+`scripts/backfill-existing-tamagoshis.cjs --bundle` gera uma rotina de manutenção independente usando o catálogo e o serviço de pontuação deste checkout. Execute o arquivo gerado a partir do diretório da API para usar suas dependências e ambiente. Sem `--apply`, ele apenas informa quantos perfis faltam.
+
+Com `--apply`, a rotina cria somente os perfis ausentes, em transações de 25 contas, e recupera os pontos válidos do mês corrente. Perfis existentes não são alterados. Mantém um arquivo restrito em `../backups` (ou `READBIBLE_BACKUP_DIR`) com os IDs planejados e confirmados, registra `tamagoshi.bulk_create` na auditoria e confere a cobertura ao terminar. Repetir a execução não duplica perfis nem pontos. Essa manutenção não publica a API.
