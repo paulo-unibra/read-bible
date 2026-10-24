@@ -13,7 +13,7 @@ O Tamagoshi é gerado e ativado automaticamente na mesma transação que cria a 
 - O ranking exige login e considera apenas Tamagoshis ativados com pontos no mês corrente. Empates são ordenados pelo ID da conta para garantir paginação estável.
 - A pontuação reinicia em **todo dia 1º, às 00:00 de America/Recife**. O filtro mensal é aplicado no servidor, sem depender do app aberto ou de tarefa agendada. O histórico dos meses anteriores é preservado.
 
-O ranking mostra a lista paginada, o mês e a própria posição/pontuação, mesmo fora da página atual. Fica disponível em **Configurar Tamagoshi → Ver ranking do mês**, separado do antigo ranking de quizzes. As posições de **1º a 5º** formam o pódio; os demais aparecem na classificação, sem duplicar os participantes do pódio. O Tamagoshi da própria conta fica destacado com a indicação Seu Tamagoshi; avatar, nome, posição e pontos também aparecem no topo, mesmo fora da página carregada.
+O ranking mostra os cinco participantes do pódio e carrega a classificação em blocos de 10, pelo botão Ver mais 10. O mês e a própria posição/pontuação permanecem disponíveis, mesmo fora da página atual. Fica disponível em **Configurar Tamagoshi → Ver ranking do mês**, separado do antigo ranking de quizzes. As posições de **1º a 5º** formam o pódio; os demais aparecem na classificação, sem duplicar os participantes do pódio. O Tamagoshi da própria conta fica destacado com a indicação Seu Tamagoshi; avatar, nome, posição e pontos também aparecem no topo, mesmo fora da página carregada.
 
 ## Registro e sincronização
 
@@ -37,7 +37,7 @@ Sono automático fixo **22:00–06:00 no relógio local**, sem configuração. A
 - `POST /tamagoshi/activate`: ativação idempotente.
 - `PUT /tamagoshi`: alteração do nome.
 - `POST /tamagoshi/reading`: confirmação da leitura no dia atual.
-- `GET /tamagoshi/ranking?page=1`: classificação mensal paginada.
+- `GET /tamagoshi/ranking?page=1`: primeira resposta com pódio (até 5) e até 10 participantes da classificação; páginas seguintes trazem até 10 posições, sem repetir o pódio. `hasMore` indica se há próxima página.
 
 Todos exigem autenticação. Publicar a API e aplicar `1793200000000_create_tamagoshi_points` antes de usar os endpoints em produção.
 

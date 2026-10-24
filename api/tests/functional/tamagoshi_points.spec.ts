@@ -299,6 +299,87 @@ test.group('Tamagoshi monthly points', () => {
     }
   })
 
+  test('ranking returns the podium plus ten entries, then ten per page without duplicates', async ({
+    client,
+    assert,
+  }) => {
+    const users = await User.createMany(
+      Array.from({ length: 27 }, (_, i) => ({
+        fullName: `Pagination ${i}`,
+        email: `ranking-page-${Date.now()}-${i}@example.invalid`,
+        password: 'TemporaryTest12345',
+        emailVerified: true,
+      }))
+    )
+    try {
+      const now = DateTime.utc().startOf('second')
+      const period = scorePeriod(now)
+      await db.table('tamagoshi_profiles').insert(
+        users.map((user, i) => ({
+          user_id: user.id,
+          seed: i,
+          name: `Pet ${i}`,
+          catalog_version: 2,
+          activated_at: now.toSQL({ includeOffset: false }),
+        }))
+      )
+      await db.table('tamagoshi_points').insert(
+        users.map((user) => ({
+          user_id: user.id,
+          source: 'quiz',
+          event_key: period.day,
+          points: 2,
+          score_month: period.month,
+          score_day: period.day,
+          earned_at: now.toSQL({ includeOffset: false }),
+        }))
+      )
+      const token = await User.accessTokens.create(users[26])
+      const auth = `Bearer ${token.value!.release()}`
+      const pages = []
+      for (let page = 1; page <= 4; page++) {
+        const response = await client
+          .get(`/tamagoshi/ranking?page=${page}`)
+          .header('Authorization', auth)
+        response.assertStatus(200)
+        pages.push(response.body().data)
+      }
+      assert.deepEqual(
+        pages.map((page) => page.entries.length),
+        [15, 10, 2, 0]
+      )
+      assert.deepEqual(
+        pages.map((page) => page.hasMore),
+        [true, true, false, false]
+      )
+      assert.deepEqual(
+        pages[0].entries.map((row: { position: number }) => row.position),
+        Array.from({ length: 15 }, (_, i) => i + 1)
+      )
+      assert.deepEqual(
+        pages[1].entries.map((row: { position: number }) => row.position),
+        Array.from({ length: 10 }, (_, i) => i + 16)
+      )
+      assert.deepEqual(
+        pages[2].entries.map((row: { position: number }) => row.position),
+        [26, 27]
+      )
+      assert.deepEqual(
+        pages.flatMap((page) => page.entries.map((row: { userId: number }) => row.userId)),
+        users.map((user) => user.id)
+      )
+      assert.equal(pages[0].own.position, 27)
+      assert.equal(pages[0].own.points, 2)
+    } finally {
+      await User.query()
+        .whereIn(
+          'id',
+          users.map((user) => user.id)
+        )
+        .delete()
+    }
+  })
+
   test('authenticated daily points, concurrency, ranking, monthly reset and no score cap', async ({
     client,
     assert,

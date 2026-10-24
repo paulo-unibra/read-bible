@@ -19,6 +19,7 @@ export default function TamagoshiRankingScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [dark, setDark] = useState(false);
   const [ownPet, setOwnPet] = useState<Tamagoshi | null>(null);
+  const [loadMoreError, setLoadMoreError] = useState(false);
   const colors = getFocusColors(dark);
   const loadedMonth = data?.month;
   useFocusEffect(useCallback(() => {
@@ -29,7 +30,7 @@ export default function TamagoshiRankingScreen() {
   }, [loadedMonth]));
   useFocusEffect(useCallback(() => {
     let active = true;
-    setLoading(true); setError(false);
+    setLoading(true); setError(false); setLoadMoreError(false);
     if (attempt > 0) setData(null);
     (async () => {
       try {
@@ -89,7 +90,7 @@ export default function TamagoshiRankingScreen() {
           </View>
         </View> : <Text style={[styles.own, { color: colors.blueDark }]}>{data.own.position ? `Você: ${data.own.position}º lugar · ` : 'Você: '}{data.own.points} pontos</Text>}
       </View>
-      <FlatList data={remaining} keyExtractor={item => String(item.userId)} contentContainerStyle={styles.list}
+      <FlatList initialNumToRender={10} maxToRenderPerBatch={10} data={remaining} keyExtractor={item => String(item.userId)} contentContainerStyle={styles.list}
         renderItem={({ item }) => renderEntry(item)}
         ListHeaderComponent={podium.length ? <View>
           <View style={styles.podiumHeading}>
@@ -103,12 +104,15 @@ export default function TamagoshiRankingScreen() {
         ListFooterComponent={data.hasMore ? <TouchableOpacity accessibilityRole="button" disabled={loadingMore} style={styles.retry} onPress={async () => {
           if (loadingMore) return;
           setLoadingMore(true);
+          setLoadMoreError(false);
           try {
             const next = await tamagoshiService.ranking(data.page + 1);
-            setData(previous => previous && previous.month === next.month ? { ...next, entries: [...previous.entries, ...next.entries] } : next);
-          } catch { setError(true); }
+            if (next.month !== data.month) { setAttempt(value => value + 1); return; }
+            setData(previous => previous && previous.month === next.month && previous.page + 1 === next.page
+              ? { ...next, entries: [...previous.entries, ...next.entries] } : previous);
+          } catch { setLoadMoreError(true); }
           finally { setLoadingMore(false); }
-        }}><Text style={{ color: colors.blueDark }}>{loadingMore ? 'Carregando…' : 'Ver mais'}</Text></TouchableOpacity> : undefined} />
+        }}><Text style={{ color: colors.blueDark }}>{loadingMore ? 'Carregando…' : loadMoreError ? 'Falha ao carregar. Tentar novamente' : 'Ver mais 10'}</Text></TouchableOpacity> : undefined} />
     </>}
   </SafeAreaView>;
 }

@@ -80,6 +80,10 @@ export default class TamagoshiController {
   async ranking({ auth, request, response }: HttpContext) {
     const period = scorePeriod()
     const page = Math.max(1, Math.min(1000, Number.parseInt(request.input('page', '1')) || 1))
+    const pageSize = 10
+    const podiumSize = 5
+    const offset = page === 1 ? 0 : podiumSize + (page - 1) * pageSize
+    const limit = page === 1 ? podiumSize + pageSize : pageSize
     const base = () =>
       db
         .from('tamagoshi_points')
@@ -99,11 +103,11 @@ export default class TamagoshiController {
       )
       .orderBy('totals.points', 'desc')
       .orderBy('totals.user_id', 'asc')
-      .offset((page - 1) * 25)
-      .limit(26)
-    const entries = ranked.slice(0, 25).map((row, i) => {
+      .offset(offset)
+      .limit(limit + 1)
+    const entries = ranked.slice(0, limit).map((row, i) => {
       return {
-        position: (page - 1) * 25 + i + 1,
+        position: offset + i + 1,
         userId: row.user_id,
         name: String(row.pet_name).trim().replace(/\s+/g, ' '),
         seed: row.seed,
@@ -130,7 +134,7 @@ export default class TamagoshiController {
       data: {
         month: period.month,
         entries,
-        hasMore: ranked.length > 25,
+        hasMore: ranked.length > limit,
         page,
         own: { points: own.points, position },
         resetsAt: DateTime.now()
