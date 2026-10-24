@@ -44,7 +44,7 @@ export default function FeedbackHost() {
     </View>
     {requiresAction && <View style={[styles.actions, { borderTopColor: colors.line }]}>{item.buttons.map((button, index) => <Pressable key={index} accessibilityRole="button" style={({ pressed }) => [styles.action, { opacity: pressed ? 0.6 : 1 }]} onPress={() => { feedbackStore.dismiss(item.id); button.onPress?.(); }}><Text style={[styles.actionText, { color: button.style === 'destructive' ? (theme === 'dark' ? '#ff9290' : '#B5221F') : button.style === 'cancel' ? colors.muted : theme === 'dark' ? colors.blueDark : '#076B9D' }]}>{button.text || 'OK'}</Text></Pressable>)}</View>}
   </Animated.View>;
-  return requiresAction ? <Modal transparent visible animationType="fade" onRequestClose={dismiss} statusBarTranslucent><View style={styles.backdrop}><View style={styles.dialog}>{content}</View></View></Modal> : <View pointerEvents="box-none" style={[styles.overlay, { top: insets.top + 12 }]} accessibilityLiveRegion="polite">{content}</View>;
+  return requiresAction ? <Modal transparent visible animationType="fade" onRequestClose={dismiss} statusBarTranslucent><View style={styles.backdrop}><View style={styles.dialog}>{content}</View></View></Modal> : <View pointerEvents="box-none" style={[styles.overlay, { top: insets.top + 96 }]} accessibilityLiveRegion="polite">{content}</View>;
 }
 const styles = StyleSheet.create({
   overlay: { position: 'absolute', left: 16, right: 16, alignItems: 'center', zIndex: 10000, elevation: 20 },
