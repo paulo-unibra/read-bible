@@ -3677,151 +3677,32 @@ ${deepLink}`;
                 </View>
               )}
 
-              {apiBibles.some(bible => !availableBibles.some(local => local.id === bible.bibleId)) && <View style={styles.bibleVersionSection}>
-                <Text style={[styles.modalSectionTitle, isDark && { color: '#e0e0e0' }]}>Versões da API</Text>
-                {[...apiBibles].filter(bible => !availableBibles.some(local => local.id === bible.bibleId)).sort((a, b) => resourceScore(b.hasText, b.hasAudio) - resourceScore(a.hasText, a.hasAudio) || Number(b.hasAudio) - Number(a.hasAudio) || a.name.localeCompare(b.name, 'pt-BR')).map(bible => <View key={bible.bibleId} style={[styles.bibleVersionCard, isDark && { backgroundColor: '#2d2d2d', borderColor: '#404040' }]}>
-                  <View style={styles.bibleVersionContent}><View style={styles.bibleVersionInfo}>
-                    <Text style={[styles.bibleVersionName, isDark && { color: '#e0e0e0' }]}>{bible.name}</Text>
-                    <Text style={[styles.bibleVersionDetails, isDark && { color: '#b0b0b0' }]}>{bible.languageName}</Text>
-                    {resources(bible.hasText, bible.hasAudio)}
-                  </View></View>
-                  <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Adicionar ${bible.name}`} disabled={!!downloading} onPress={() => addApiBible(bible)} style={styles.bibleVersionDownload}>
-                    {downloading === bible.bibleId ? <ActivityIndicator color="#fff" /> : <Ionicons name="download-outline" size={20} color="#fff" />}
-                  </TouchableOpacity>
-                </View>)}
-              </View>}
-              {/* Bíblias Disponíveis para Download */}
-              {availableDriveBibles.length > 0 && (
-                <View style={styles.bibleVersionSection}>
-                  <Text
-                    style={[
-                      styles.modalSectionTitle,
-                      isDark && { color: "#e0e0e0" },
-                    ]}
-                  >
-                    Disponíveis para Download (
-                    {
-                      availableDriveBibles.filter((df) => !isDownloaded(df))
-                        .length
-                    }
-                    )
-                  </Text>
-
-                  {[...availableDriveBibles].sort((a, b) => Number(hasDriveAudio(b.name)) - Number(hasDriveAudio(a.name)) || a.name.localeCompare(b.name, 'pt-BR'))
-                    .filter((driveFile) => !isDownloaded(driveFile))
-                    .map((driveFile) => {
-                      const bibleInfo = googleDriveService.parseBibleInfo(
-                        driveFile.name,
-                      );
-                      const isDownloadingThis = downloading === driveFile.id;
-
-                      return (
-                        <View
-                          key={driveFile.id}
-                          style={[
-                            styles.bibleVersionCard,
-                            isDark && {
-                              backgroundColor: "#2d2d2d",
-                              borderColor: "#404040",
-                            },
-                          ]}
-                        >
-                          <View style={styles.bibleVersionContent}>
-                            <View style={styles.bibleVersionInfo}>
-                              <Text
-                                style={[
-                                  styles.bibleVersionName,
-                                  isDark && { color: "#e0e0e0" },
-                                ]}
-                              >
-                                {bibleInfo.name}
-                              </Text>
-                              <Text
-                                style={[
-                                  styles.bibleVersionDetails,
-                                  isDark && { color: "#b0b0b0" },
-                                ]}
-                              >
-                                {formatBibleAbbreviation(bibleInfo.abbreviation)}
-                                {driveFile.size ? ` • ${(Number(driveFile.size) / 1024 / 1024).toFixed(1)} MB` : ''}
-                              </Text>
-                              {resources(true, hasDriveAudio(driveFile.name))}
-                            </View>
-                          </View>
-
-                          <View style={styles.bibleVersionAction}>
-                            {isDownloadingThis ? (
-                              <View style={styles.downloadingContainer}>
-                                <ActivityIndicator
-                                  color="#2196F3"
-                                  size="small"
-                                />
-                                <TouchableOpacity
-                                  style={[
-                                    styles.cancelButton,
-                                    isDark && { backgroundColor: "#d32f2f" },
-                                  ]}
-                                  onPress={() => {
-                                    setDownloading(null);
-                                    Alert.alert("Info", "Download cancelado");
-                                  }}
-                                >
-                                  <Ionicons
-                                    name="close"
-                                    size={14}
-                                    color="#fff"
-                                  />
-                                </TouchableOpacity>
-                              </View>
-                            ) : (
-                              <TouchableOpacity
-                                style={[
-                                  styles.bibleVersionDownload,
-                                  isDark && { backgroundColor: "#2196F3" },
-                                ]}
-                                onPress={() => {
-                                  console.log(
-                                    "📱 DOWNLOAD BUTTON PRESSED for:",
-                                    driveFile.id,
-                                    driveFile.name,
-                                  );
-                                  console.log(
-                                    "🔍 handleDownloadBible function exists:",
-                                    typeof handleDownloadBible,
-                                  );
-                                  handleDownloadBible(driveFile);
-                                }}
-                              >
-                                <Ionicons
-                                  name="download"
-                                  size={18}
-                                  color="#fff"
-                                />
-                              </TouchableOpacity>
-                            )}
-                          </View>
-                        </View>
-                      );
-                    })}
-
-                  {/* Mensagem quando não há bíblias para download */}
-                  {availableDriveBibles.filter((df) => !isDownloaded(df))
-                    .length === 0 && (
-                    <View style={styles.emptyState}>
-                      <Ionicons
-                        name="checkmark-circle"
-                        size={48}
-                        color="#4CAF50"
-                      />
-                      <Text
-                        style={[styles.emptyText, isDark && { color: "#999" }]}
-                      >
-                        Todas as bíblias disponíveis já foram baixadas
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              )}
+              {(() => {
+                const items = [
+                  ...apiBibles.filter(bible => !availableBibles.some(local => local.id === bible.bibleId)).map(bible => ({
+                    key: `api-${bible.bibleId}`, id: bible.bibleId, name: bible.name, details: bible.languageName,
+                    hasText: bible.hasText, hasAudio: bible.hasAudio, download: () => addApiBible(bible),
+                  })),
+                  ...availableDriveBibles.filter(file => !isDownloaded(file)).map(file => {
+                    const info = googleDriveService.parseBibleInfo(file.name);
+                    return { key: `drive-${file.id}`, id: file.id, name: info.name, details: formatBibleAbbreviation(info.abbreviation),
+                      hasText: true, hasAudio: hasDriveAudio(file.name), download: () => handleDownloadBible(file) };
+                  }),
+                ].sort((a, b) => resourceScore(b.hasText, b.hasAudio) - resourceScore(a.hasText, a.hasAudio) || Number(b.hasAudio) - Number(a.hasAudio) || a.name.localeCompare(b.name, 'pt-BR'));
+                return items.length > 0 ? <View style={styles.bibleVersionSection}>
+                  <Text style={[styles.modalSectionTitle, isDark && { color: '#e0e0e0' }]}>Disponíveis para download ({items.length})</Text>
+                  {items.map(item => <View key={item.key} style={[styles.bibleVersionCard, isDark && { backgroundColor: '#2d2d2d', borderColor: '#404040' }]}>
+                    <View style={styles.bibleVersionContent}><View style={styles.bibleVersionInfo}>
+                      <Text style={[styles.bibleVersionName, isDark && { color: '#e0e0e0' }]}>{item.name}</Text>
+                      <Text style={[styles.bibleVersionDetails, isDark && { color: '#b0b0b0' }]}>{item.details}</Text>
+                      {resources(item.hasText, item.hasAudio)}
+                    </View></View>
+                    <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Adicionar ${item.name}`} disabled={!!downloading} onPress={item.download} style={styles.bibleVersionDownload}>
+                      {downloading === item.id ? <ActivityIndicator color="#fff" /> : <Ionicons name="download-outline" size={20} color="#fff" />}
+                    </TouchableOpacity>
+                  </View>)}
+                </View> : null;
+              })()}
 
               {/* Estado vazio quando não há bíblias */}
               {!catalogLoading && availableBibles.length === 0 && availableDriveBibles.length === 0 && apiBibles.length === 0 && (
