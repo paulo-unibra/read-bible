@@ -1,3 +1,4 @@
+import { playReadingVoice } from '../services/ReadingVoice';
 import Alert from '../services/AppFeedback';
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -177,6 +178,7 @@ export default function SelectPlanTemplateScreen() {
         );
       }
 
+      playReadingVoice('planCreated');
       console.log("✅ [select-plan-template] Plano criado com sucesso!");
 
       Alert.alert("Sucesso! 🎉", "Plano de leitura criado com sucesso!", [

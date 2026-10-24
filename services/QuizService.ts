@@ -1,3 +1,4 @@
+import { playReadingVoice } from './ReadingVoice';
 import tamagoshiService from './TamagoshiService';
 import authService from './AuthService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -378,6 +379,7 @@ class QuizService {
       }
 
       const result = await response.json();
+      if (!result.alreadyRecorded) playReadingVoice('quiz');
       const companionUserId = authService.getUser()?.id;
       if (result.success && companionUserId != null) await tamagoshiService.record(companionUserId, 'quiz').catch(() => {});
       console.log('[QuizService] Result submitted successfully:', result);

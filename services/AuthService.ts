@@ -1,3 +1,4 @@
+import { playReadingVoice } from './ReadingVoice';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 
@@ -803,6 +804,7 @@ class AuthService {
    */
   async completeDay(day: number): Promise<any> {
     try {
+      const before = await this.getActivePlan();
       console.log("Chamando completeDay com day:", day);
       const response = await fetch(`${API_URL}/reading-plans/complete`, {
         method: "POST",
@@ -813,7 +815,16 @@ class AuthService {
         body: JSON.stringify({ day }),
       });
 
-      return await response.json();
+      const result = await response.json();
+      if (result.success && result.message !== 'Este dia já estava concluído.') {
+        const plan = before.success ? before.data?.plan : null;
+        const dateParts = plan?.startDate?.split('T')[0].split('-').map(Number);
+        const start = dateParts ? new Date(dateParts[0], dateParts[1] - 1, dateParts[2]) : null;
+        const now = new Date();
+        const due = start ? Math.min(plan?.totalDays ?? 0, Math.max(0, Math.round((Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) - Date.UTC(start.getFullYear(), start.getMonth(), start.getDate())) / 86400000))) : 0;
+        playReadingVoice(result.data?.isCompleted ? 'planCompleted' : due > 0 && day === due ? 'caughtUp' : 'reading');
+      }
+      return result;
     } catch (error) {
       console.error("Erro ao completar dia:", error);
       return {
