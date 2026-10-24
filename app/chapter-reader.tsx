@@ -1,3 +1,5 @@
+import bibleBrainService from '../services/BibleBrainService';
+import type { BibleBrainBible } from '../types';
 import Alert from '../services/AppFeedback';
 import CompleteChapterButton from "../components/CompleteChapterButton";
 import { Ionicons } from "@expo/vector-icons";
@@ -118,6 +120,8 @@ export default function ChapterReaderScreen() {
 
   // Bible selector modal state
   const [bibleSelectorVisible, setBibleSelectorVisible] = useState(false);
+  const [apiBibles, setApiBibles] = useState<BibleBrainBible[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(false);
   const [availableBibles, setAvailableBibles] = useState<Bible[]>([]);
   const [availableDriveBibles, setAvailableDriveBibles] = useState<DriveFile[]>(
     [],
@@ -824,31 +828,54 @@ export default function ChapterReaderScreen() {
 
   // Função alternativa para forçar a abertura do modal
   const forceOpenBibleSelector = async () => {
-    console.log("forceOpenBibleSelector called - forcing modal open");
-
-    // Criar uma bíblia básica se não houver dados
-    const basicBible = {
-      id: bibleId || "basic",
-      abbreviation: bibleAbbrev || "BEP",
-      name: "Bíblia Atual",
-      description: "Versão atualmente em uso",
-      fileName: "",
-      isDownloaded: true,
-    };
-
-    setAvailableBibles([basicBible]);
     setBibleSelectorVisible(true);
-
-    // Tentar carregar bíblias do Drive em background
+    setCatalogLoading(true);
+    const results = await Promise.allSettled([
+      DatabaseService.getBibles(),
+      googleDriveService.listBibleFiles(),
+      (async () => {
+        const catalog: BibleBrainBible[] = [];
+        let page = 1;
+        let lastPage = 1;
+        do {
+          const result = await bibleBrainService.listBibles({ page, perPage: 100 });
+          catalog.push(...result.data);
+          lastPage = Number(result.meta?.lastPage ?? result.meta?.last_page ?? 1);
+          page++;
+        } while (page <= lastPage);
+        return catalog;
+      })(),
+    ]);
+    if (results[0].status === 'fulfilled') setAvailableBibles(results[0].value);
+    if (results[1].status === 'fulfilled') setAvailableDriveBibles(results[1].value);
+    if (results[2].status === 'fulfilled') setApiBibles(results[2].value);
+    setCatalogLoading(false);
+    if (results.some(result => result.status === 'rejected')) Alert.alert('Catálogo incompleto', 'Não foi possível carregar algumas versões. Toque em atualizar para tentar novamente.');
+  };
+  const resources = (text: boolean, audio: boolean) => <View style={{ flexDirection: 'row', gap: 12, marginTop: 6 }}>
+    {text && <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><Ionicons name="document-text-outline" size={16} color={iconColor} /><Text style={{ color: iconColor, fontSize: 12 }}>Texto</Text></View>}
+    {audio && <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><Ionicons name="volume-high-outline" size={16} color={iconColor} /><Text style={{ color: iconColor, fontSize: 12 }}>Áudio</Text></View>}
+  </View>;
+  const hasDriveAudio = (name: string) => /\bARC\b|ALMEIDA REVISTA E CORRIGIDA/i.test(name);
+  const resourceScore = (text: boolean, audio: boolean) => Number(text) + Number(audio);
+  const addApiBible = async (bible: BibleBrainBible) => {
+    if (downloading) return;
+    setDownloading(bible.bibleId);
     try {
-      console.log("Loading Drive bibles...");
-      const driveFiles = await googleDriveService.listBibleFiles();
-      console.log("Found Drive bibles:", driveFiles.length);
-      setAvailableDriveBibles(driveFiles);
-    } catch (error) {
-      console.log("Failed to load Drive bibles:", error);
-      setAvailableDriveBibles([]);
-    }
+      let ready = bible;
+      if (bible.hasText && bible.packageStatus !== 'ready') ready = await bibleBrainService.requestPackage(bible.bibleId);
+      if ((bible.hasText && ready.packageStatus !== 'ready') || (!bible.hasText && bible.audioPackageStatus !== 'ready')) {
+        Alert.alert('Preparando versão', 'Esta versão ainda está sendo preparada. Atualize a lista em instantes.');
+        return;
+      }
+      const fileName = `${bible.bibleId}.${bible.hasText ? 'db' : 'audio'}`;
+      if (bible.hasText) await bibleBrainService.downloadPackage(bible.bibleId, fileName);
+      const local: Bible = { id: bible.bibleId, name: bible.name, abbreviation: bible.bibleId, fileName, isDownloaded: true, source: 'biblebrain', downloadDate: new Date().toISOString() };
+      await DatabaseService.saveBible(local);
+      setAvailableBibles(await DatabaseService.getBibles());
+      await selectBible(local);
+    } catch { Alert.alert('Erro', 'Não foi possível adicionar esta versão. Tente novamente.'); }
+    finally { setDownloading(null); }
   };
 
   const navigateChapter = async (
@@ -3544,8 +3571,7 @@ ${deepLink}`;
               contentContainerStyle={{ paddingBottom: 20 }}
             >
               {/* Indicador de carregamento */}
-              {availableBibles.length === 0 &&
-                availableDriveBibles.length === 0 && (
+              {catalogLoading && (
                   <View style={styles.centerContent}>
                     <ActivityIndicator size="large" color="#2196F3" />
                     <Text
@@ -3568,7 +3594,10 @@ ${deepLink}`;
                     Bíblias Baixadas ({availableBibles.length})
                   </Text>
 
-                  {availableBibles.map((item) => {
+                  {[...availableBibles].sort((a, b) => {
+                    const info = (item: Bible) => { const api = apiBibles.find(v => v.bibleId === item.id); return api ? resourceScore(api.hasText, api.hasAudio) : resourceScore(!item.fileName.endsWith('.audio'), hasDriveAudio(item.name + ' ' + item.abbreviation)); };
+                    return info(b) - info(a) || a.name.localeCompare(b.name, 'pt-BR');
+                  }).map((item) => {
                     const selected = item.id === bibleId;
                     return (
                       <View
@@ -3619,6 +3648,7 @@ ${deepLink}`;
                                 </Text>
                               )}
                             </Text>
+                            {(() => { const api = apiBibles.find(v => v.bibleId === item.id); return resources(api ? api.hasText : !item.fileName.endsWith('.audio'), api ? api.hasAudio : item.fileName.endsWith('.audio') || hasDriveAudio(item.name + ' ' + item.abbreviation)); })()}
                           </View>
 
                           {selected && (
@@ -3647,6 +3677,19 @@ ${deepLink}`;
                 </View>
               )}
 
+              {apiBibles.some(bible => !availableBibles.some(local => local.id === bible.bibleId)) && <View style={styles.bibleVersionSection}>
+                <Text style={[styles.modalSectionTitle, isDark && { color: '#e0e0e0' }]}>Versões da API</Text>
+                {[...apiBibles].filter(bible => !availableBibles.some(local => local.id === bible.bibleId)).sort((a, b) => resourceScore(b.hasText, b.hasAudio) - resourceScore(a.hasText, a.hasAudio) || Number(b.hasAudio) - Number(a.hasAudio) || a.name.localeCompare(b.name, 'pt-BR')).map(bible => <View key={bible.bibleId} style={[styles.bibleVersionCard, isDark && { backgroundColor: '#2d2d2d', borderColor: '#404040' }]}>
+                  <View style={styles.bibleVersionContent}><View style={styles.bibleVersionInfo}>
+                    <Text style={[styles.bibleVersionName, isDark && { color: '#e0e0e0' }]}>{bible.name}</Text>
+                    <Text style={[styles.bibleVersionDetails, isDark && { color: '#b0b0b0' }]}>{bible.languageName}</Text>
+                    {resources(bible.hasText, bible.hasAudio)}
+                  </View></View>
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Adicionar ${bible.name}`} disabled={!!downloading} onPress={() => addApiBible(bible)} style={styles.bibleVersionDownload}>
+                    {downloading === bible.bibleId ? <ActivityIndicator color="#fff" /> : <Ionicons name="download-outline" size={20} color="#fff" />}
+                  </TouchableOpacity>
+                </View>)}
+              </View>}
               {/* Bíblias Disponíveis para Download */}
               {availableDriveBibles.length > 0 && (
                 <View style={styles.bibleVersionSection}>
@@ -3664,7 +3707,7 @@ ${deepLink}`;
                     )
                   </Text>
 
-                  {availableDriveBibles
+                  {[...availableDriveBibles].sort((a, b) => Number(hasDriveAudio(b.name)) - Number(hasDriveAudio(a.name)) || a.name.localeCompare(b.name, 'pt-BR'))
                     .filter((driveFile) => !isDownloaded(driveFile))
                     .map((driveFile) => {
                       const bibleInfo = googleDriveService.parseBibleInfo(
@@ -3702,6 +3745,7 @@ ${deepLink}`;
                                 {formatBibleAbbreviation(bibleInfo.abbreviation)}
                                 {driveFile.size ? ` • ${(Number(driveFile.size) / 1024 / 1024).toFixed(1)} MB` : ''}
                               </Text>
+                              {resources(true, hasDriveAudio(driveFile.name))}
                             </View>
                           </View>
 
@@ -3780,8 +3824,7 @@ ${deepLink}`;
               )}
 
               {/* Estado vazio quando não há bíblias */}
-              {availableBibles.length === 0 &&
-                availableDriveBibles.length === 0 && (
+              {!catalogLoading && availableBibles.length === 0 && availableDriveBibles.length === 0 && apiBibles.length === 0 && (
                   <View style={styles.emptyState}>
                     <Ionicons
                       name="book-outline"
