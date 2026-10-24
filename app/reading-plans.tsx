@@ -1,3 +1,4 @@
+import PlanGreeting from '../components/PlanGreeting';
 import Alert from '../services/AppFeedback';
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -605,6 +606,7 @@ export default function ReadingPlansScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {userId !== null && selectedPlan && planDays.length > 0 && <PlanGreeting userId={userId} plan={selectedPlan} days={planDays} />}
       {renderHeader()}
       <AdBanner />
 
