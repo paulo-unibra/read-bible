@@ -1,5 +1,33 @@
 import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
 import { AppState } from 'react-native';
+const readingVariations: number[] = [
+  require('../assets/falas_leituras/leitura_concluida_1.mp3'),
+  require('../assets/falas_leituras/leitura_concluida_2.mp3'),
+  require('../assets/falas_leituras/leitura_concluida_3.mp3'),
+  require('../assets/falas_leituras/leitura_concluida_4.mp3'),
+  require('../assets/falas_leituras/leitura_concluida_5.mp3'),
+  require('../assets/falas_leituras/leitura_concluida_6.mp3'),
+  require('../assets/falas_leituras/leitura_concluida_7.mp3'),
+  require('../assets/falas_leituras/leitura_concluida_8.mp3'),
+  require('../assets/falas_leituras/leitura_concluida_9.mp3'),
+  require('../assets/falas_leituras/leitura_concluida_10.mp3'),
+];
+let readingBag: number[] = [];
+let previousReading: number | undefined;
+function nextReading(): number {
+  if (!readingBag.length) {
+    readingBag = [...readingVariations];
+    for (let i = readingBag.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [readingBag[i], readingBag[j]] = [readingBag[j], readingBag[i]];
+    }
+    if (readingBag[readingBag.length - 1] === previousReading) {
+      [readingBag[0], readingBag[readingBag.length - 1]] = [readingBag[readingBag.length - 1], readingBag[0]];
+    }
+  }
+  previousReading = readingBag.pop()!;
+  return previousReading;
+}
 const sources = {
   reading: require('../assets/falas_leituras/mais_uma_leitura_concluida.mp3'),
   caughtUp: require('../assets/falas_leituras/plano_em_dia.mp3'),
@@ -18,7 +46,7 @@ export function playReadingVoice(event: keyof typeof sources): void {
   try {
     listeners.forEach(listener => listener());
     current?.remove();
-    const player = createAudioPlayer(sources[event]);
+    const player = createAudioPlayer(event === 'reading' ? nextReading() : sources[event]);
     current = player;
     lastPlayed = Date.now();
     player.addListener('playbackStatusUpdate', status => {
