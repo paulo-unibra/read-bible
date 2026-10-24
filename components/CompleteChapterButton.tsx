@@ -4,6 +4,7 @@ import React, { useCallback, useState } from 'react';
 import { Text, TouchableOpacity } from 'react-native';
 import authService from '../services/AuthService';
 import tamagoshiService from '../services/TamagoshiService';
+import readingPlanService from '../services/ReadingPlanService';
 import { dayKey } from '../utils/tamagoshi';
 
 export default function CompleteChapterButton({ chapterKey, dark = false }: { chapterKey: string; dark?: boolean }) {
@@ -12,11 +13,12 @@ export default function CompleteChapterButton({ chapterKey, dark = false }: { ch
   const [saving, setSaving] = useState(false);
   useFocusEffect(useCallback(() => {
     let active = true;
+    setEnabled(false);
     if (!chapterKey) { setEnabled(false); return; }
     const userId = authService.getUser()?.id;
     if (!userId) { setEnabled(false); return; }
-    const refresh = () => tamagoshiService.get(userId).then(pet => {
-      if (active) { setEnabled(Boolean(pet)); setDone(Boolean(pet?.days[dayKey()]?.reading)); }
+    const refresh = () => Promise.all([tamagoshiService.get(userId), readingPlanService.getActivePlans()]).then(([pet, plans]) => {
+      if (active) { setEnabled(Boolean(pet) && plans.length === 0); setDone(Boolean(pet?.days[dayKey()]?.reading)); }
     }).catch(() => { if (active) setEnabled(false); });
     refresh();
     const timer = setInterval(refresh, 60000);
@@ -28,6 +30,7 @@ export default function CompleteChapterButton({ chapterKey, dark = false }: { ch
     if (!userId) return;
     setSaving(true);
     try {
+      if ((await readingPlanService.getActivePlans()).length > 0) { setEnabled(false); return; }
       const result = await tamagoshiService.record(userId, 'reading'); setDone(true);
       if (!result.synced) Alert.alert('Leitura salva', 'Conecte-se à internet ainda hoje para sincronizar os pontos do ranking.');
     }
