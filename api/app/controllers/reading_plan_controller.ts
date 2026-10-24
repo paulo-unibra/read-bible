@@ -727,6 +727,17 @@ export default class ReadingPlanController {
           return { error: 'Leitura não encontrada', status: 404 as const }
         }
 
+        const earlierPending = await ReadingProgress.query({ client: trx })
+          .where('reading_plan_id', plan.id)
+          .where('day', '<', requestedDay)
+          .where('is_completed', false)
+          .orderBy('day', 'asc')
+          .first()
+
+        if (earlierPending) {
+          return { error: `Conclua primeiro a leitura do dia ${earlierPending.day}.`, status: 400 as const }
+        }
+
         const now = DateTime.now()
         let chaptersCompleted = 0
         let newlyCompletedReadings = 0

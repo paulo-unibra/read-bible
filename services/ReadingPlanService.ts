@@ -970,6 +970,14 @@ export class ReadingPlanService {
       throw new Error("Dia de leitura não encontrado");
     }
 
+    const earlierPending = await db.getFirstAsync(
+      "SELECT dayNumber FROM reading_plan_days WHERE planId = ? AND dayNumber < ? AND isCompleted = 0 ORDER BY dayNumber LIMIT 1",
+      [day.planId, day.dayNumber],
+    );
+    if (earlierPending) {
+      throw new Error(`Conclua primeiro a leitura do dia ${earlierPending.dayNumber}.`);
+    }
+
     console.log(
       "💾 [markDayAsCompleted] Marcando dia como concluído no banco...",
     );

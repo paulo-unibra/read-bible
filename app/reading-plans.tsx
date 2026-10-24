@@ -213,6 +213,11 @@ export default function ReadingPlansScreen() {
   };
 
   const markDayAsCompleted = async (day: ReadingPlanDay) => {
+    const next = getNextPlanReading(planDays);
+    if (next && day.dayNumber > next.dayNumber) {
+      Alert.alert("Leitura pendente", `Conclua primeiro a leitura do dia ${next.dayNumber}.`);
+      return;
+    }
     if (isMarkingComplete) return;
     setIsMarkingComplete(true);
     try {
@@ -224,7 +229,7 @@ export default function ReadingPlansScreen() {
       Alert.alert("Parabéns!", "Leitura marcada como concluída! 🎉");
     } catch (error) {
       console.error("Error marking day as completed:", error);
-      Alert.alert("Erro", "Falha ao marcar dia como concluído");
+      Alert.alert("Erro", error instanceof Error ? error.message : "Falha ao marcar dia como concluído");
     } finally {
       setIsMarkingComplete(false);
     }
