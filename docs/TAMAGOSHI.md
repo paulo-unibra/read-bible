@@ -13,7 +13,7 @@ O Tamagoshi é gerado e ativado automaticamente na mesma transação que cria a 
 - O ranking exige login e considera apenas Tamagoshis ativados com pontos no mês corrente. Empates são ordenados pelo ID da conta para garantir paginação estável.
 - A pontuação reinicia em **todo dia 1º, às 00:00 de America/Recife**. O filtro mensal é aplicado no servidor, sem depender do app aberto ou de tarefa agendada. O histórico dos meses anteriores é preservado.
 
-O ranking mostra os cinco participantes do pódio e carrega a classificação em blocos de 10, pelo botão Ver mais 10. O mês e a própria posição/pontuação permanecem disponíveis, mesmo fora da página atual. Fica disponível em **Configurar Tamagoshi → Ver ranking do mês**, separado do antigo ranking de quizzes. As posições de **1º a 5º** formam o pódio; os demais aparecem na classificação, sem duplicar os participantes do pódio. O Tamagoshi da própria conta fica destacado com a indicação Seu Tamagoshi; avatar, nome, posição e pontos também aparecem no topo, mesmo fora da página carregada.
+O ranking mostra os cinco participantes do pódio e carrega a classificação em blocos de 10, automaticamente ao se aproximar do fim da lista (lazy loading). Requisições simultâneas são bloqueadas e, se houver falha, a lista permanece visível com uma opção de tentar novamente. O mês e a própria posição/pontuação permanecem disponíveis, mesmo fora da página atual. Fica disponível em **Configurar Tamagoshi → Ver ranking do mês**, separado do antigo ranking de quizzes. As posições de **1º a 5º** formam o pódio; os demais aparecem na classificação, sem duplicar os participantes do pódio. O Tamagoshi da própria conta fica destacado com a indicação Seu Tamagoshi; avatar, nome, posição e pontos também aparecem no topo, mesmo fora da página carregada.
 
 ## Registro e sincronização
 
@@ -41,7 +41,7 @@ Sono automático fixo **22:00–06:00 no relógio local**, sem configuração. A
 
 Todos exigem autenticação. Publicar a API e aplicar `1793200000000_create_tamagoshi_points` antes de usar os endpoints em produção.
 
-Testes: `scripts/test-tamagoshi.cjs`, `scripts/test-referral-service.cjs` e os testes funcionais da API `tamagoshi_points`, `public_quiz_security` e `referrals`. Os funcionais usam um MySQL temporário, nunca produção.
+Testes: `scripts/test-ranking-loading.cjs`, `scripts/test-tamagoshi.cjs`, `scripts/test-referral-service.cjs` e os testes funcionais da API `tamagoshi_points`, `public_quiz_security` e `referrals`. Os funcionais usam um MySQL temporário, nunca produção.
 
 ## Contas existentes: geração em lote
 

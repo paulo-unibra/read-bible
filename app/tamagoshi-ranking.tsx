@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import CompanionAvatar from '../components/CompanionAvatar';
@@ -20,6 +20,9 @@ export default function TamagoshiRankingScreen() {
   const [dark, setDark] = useState(false);
   const [ownPet, setOwnPet] = useState<Tamagoshi | null>(null);
   const [loadMoreError, setLoadMoreError] = useState(false);
+  const requestVersion = useRef(0);
+  const nextPageRequest = useRef<symbol | null>(null);
+  const paginationFailed = useRef(false);
   const colors = getFocusColors(dark);
   const loadedMonth = data?.month;
   useFocusEffect(useCallback(() => {
@@ -30,6 +33,10 @@ export default function TamagoshiRankingScreen() {
   }, [loadedMonth]));
   useFocusEffect(useCallback(() => {
     let active = true;
+    requestVersion.current++;
+    nextPageRequest.current = null;
+    paginationFailed.current = false;
+    setLoadingMore(false);
     setLoading(true); setError(false); setLoadMoreError(false);
     if (attempt > 0) setData(null);
     (async () => {
@@ -43,8 +50,34 @@ export default function TamagoshiRankingScreen() {
       } catch { if (active) setError(true); }
       finally { if (active) setLoading(false); }
     })();
-    return () => { active = false; };
+    return () => { active = false; requestVersion.current++; nextPageRequest.current = null; };
   }, [attempt, router]));
+  const loadNextPage = async (retry = false) => {
+    if (!data || loading || !data.hasMore || nextPageRequest.current || (paginationFailed.current && !retry)) return;
+    const ticket = Symbol('ranking page');
+    const version = requestVersion.current;
+    nextPageRequest.current = ticket;
+    paginationFailed.current = false;
+    setLoadingMore(true);
+    setLoadMoreError(false);
+    try {
+      const next = await tamagoshiService.ranking(data.page + 1);
+      if (version !== requestVersion.current || nextPageRequest.current !== ticket) return;
+      if (next.month !== data.month) { setAttempt(value => value + 1); return; }
+      setData(previous => previous && previous.month === next.month && previous.page + 1 === next.page
+        ? { ...next, entries: [...previous.entries, ...next.entries] } : previous);
+    } catch {
+      if (version === requestVersion.current && nextPageRequest.current === ticket) {
+        paginationFailed.current = true;
+        setLoadMoreError(true);
+      }
+    } finally {
+      if (nextPageRequest.current === ticket) {
+        nextPageRequest.current = null;
+        setLoadingMore(false);
+      }
+    }
+  };
   const monthLabel = data ? new Date(`${data.month}-15T12:00:00Z`).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric', timeZone: 'America/Recife' }) : '';
   const podium = data?.entries.filter(item => isTamagoshiPodium(item.position)) ?? [];
   const remaining = data?.entries.filter(item => !isTamagoshiPodium(item.position)) ?? [];
@@ -91,6 +124,8 @@ export default function TamagoshiRankingScreen() {
         </View> : <Text style={[styles.own, { color: colors.blueDark }]}>{data.own.position ? `Você: ${data.own.position}º lugar · ` : 'Você: '}{data.own.points} pontos</Text>}
       </View>
       <FlatList initialNumToRender={10} maxToRenderPerBatch={10} data={remaining} keyExtractor={item => String(item.userId)} contentContainerStyle={styles.list}
+        onEndReached={() => { void loadNextPage(); }}
+        onEndReachedThreshold={0.35}
         renderItem={({ item }) => renderEntry(item)}
         ListHeaderComponent={podium.length ? <View>
           <View style={styles.podiumHeading}>
@@ -101,18 +136,11 @@ export default function TamagoshiRankingScreen() {
           {remaining.length > 0 && <Text style={[styles.classificationTitle, { color: colors.muted }]}>Classificação</Text>}
         </View> : undefined}
         ListEmptyComponent={data.entries.length === 0 ? <Text style={[styles.empty, { color: colors.muted }]}>Nenhuma pontuação neste mês. Crie um plano ou conclua uma leitura para começar.</Text> : undefined}
-        ListFooterComponent={data.hasMore ? <TouchableOpacity accessibilityRole="button" disabled={loadingMore} style={styles.retry} onPress={async () => {
-          if (loadingMore) return;
-          setLoadingMore(true);
-          setLoadMoreError(false);
-          try {
-            const next = await tamagoshiService.ranking(data.page + 1);
-            if (next.month !== data.month) { setAttempt(value => value + 1); return; }
-            setData(previous => previous && previous.month === next.month && previous.page + 1 === next.page
-              ? { ...next, entries: [...previous.entries, ...next.entries] } : previous);
-          } catch { setLoadMoreError(true); }
-          finally { setLoadingMore(false); }
-        }}><Text style={{ color: colors.blueDark }}>{loadingMore ? 'Carregando…' : loadMoreError ? 'Falha ao carregar. Tentar novamente' : 'Ver mais 10'}</Text></TouchableOpacity> : undefined} />
+        ListFooterComponent={loadingMore ? <View style={styles.retry}>
+          <ActivityIndicator accessibilityLabel="Carregando mais participantes" color={colors.blue} />
+        </View> : loadMoreError && data.hasMore ? <TouchableOpacity accessibilityRole="button" style={styles.retry} onPress={() => { void loadNextPage(true); }}>
+          <Text style={{ color: colors.blueDark }}>Não foi possível carregar mais. Tentar novamente</Text>
+        </TouchableOpacity> : undefined} />
     </>}
   </SafeAreaView>;
 }
