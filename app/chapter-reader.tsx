@@ -130,6 +130,10 @@ export default function ChapterReaderScreen() {
   // const [downloadProgress, setDownloadProgress] = useState<string>("");
 
   // Book selector modal state
+  const [pickerChapter, setPickerChapter] = useState<number | null>(null);
+  const [pickerVerses, setPickerVerses] = useState<Verse[]>([]);
+  const [pickerLoading, setPickerLoading] = useState(false);
+  const [pickerTarget, setPickerTarget] = useState<{ bookId: number; chapter: number; verse: number } | null>(null);
   const [bookSelectorVisible, setBookSelectorVisible] = useState(false);
   const [availableBooks, setAvailableBooks] = useState<Book[]>([]);
 
@@ -1189,6 +1193,7 @@ export default function ChapterReaderScreen() {
   };
 
   const openBookSelector = async () => {
+    setSelectedBookInModal(null); setPickerChapter(null); setPickerVerses([]);
     try {
       const books = await bibleReaderService.getBooks(bibleId);
       console.log("[DEBUG] Livros carregados:", books.length);
@@ -2483,6 +2488,13 @@ ${deepLink}`;
     );
   };
 
+  useEffect(() => {
+    if (!pickerTarget || chapterLoading || currentBookId !== pickerTarget.bookId || currentChapter !== pickerTarget.chapter) return;
+    const index = verses.findIndex(verse => verse.bookId === pickerTarget.bookId && verse.chapterNumber === pickerTarget.chapter && verse.verseNumber === pickerTarget.verse);
+    if (index < 0) return;
+    const timer = setTimeout(() => { versesListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.15 }); setPickerTarget(null); }, 200);
+    return () => clearTimeout(timer);
+  }, [pickerTarget, verses, chapterLoading, currentBookId, currentChapter]);
   const renderSearchResult = ({ item }: { item: SearchResult }) => (
     <TouchableOpacity
       style={styles.searchResultContainer}
@@ -2499,6 +2511,7 @@ ${deepLink}`;
 
   const selectBookInModal = async (selectedBook: Book) => {
     setSelectedBookInModal(selectedBook);
+    setPickerChapter(null); setPickerVerses([]);
     setLoadingChapters(true);
     try {
       const chapters = await bibleReaderService.getChapters(
@@ -2989,195 +3002,30 @@ ${deepLink}`;
         </SafeAreaView>
       </Modal>
 
-      {/* Book Selector Modal (agora inclui capítulos) */}
-      <Modal
-        visible={bookSelectorVisible}
-        animationType="fade"
-        transparent
-        onRequestClose={() => setBookSelectorVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View
-            style={[
-              styles.selectorModal,
-              isDark && { backgroundColor: "#1e1e1e" },
-            ]}
-          >
-            <View
-              style={[
-                styles.modalHeader,
-                isDark && {
-                  backgroundColor: "#1d1d1d",
-                  borderBottomColor: "#2b2b2b",
-                },
-              ]}
-            >
-              <Text style={[styles.modalTitle, isDark && { color: "#e0e0e0" }]}>
-                Escolher Livro e Capítulo
-              </Text>
-              <TouchableOpacity onPress={() => setBookSelectorVisible(false)}>
-                <Ionicons name="close" size={24} color={iconColor} />
-              </TouchableOpacity>
+      {/* Book, chapter and verse selector */}
+      <Modal visible={bookSelectorVisible} animationType="fade" transparent onRequestClose={() => setBookSelectorVisible(false)}>
+        <View style={[styles.bibleVersionOverlay, { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 }]}>
+          <View style={[styles.bibleVersionPanel, { backgroundColor: focus.screen }]}>
+            <View style={[styles.bibleVersionHeader, { backgroundColor: focus.screen, borderBottomColor: focus.line }]}>
+              <Text style={[styles.bibleVersionTitle, { color: focus.text, flex: 1 }]}>Escolher</Text>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Fechar seleção" style={styles.bibleVersionIcon} onPress={() => setBookSelectorVisible(false)}><Ionicons name="close" size={24} color={iconColor} /></TouchableOpacity>
             </View>
-
-            <View style={styles.booksContainer}>
-              {/* Coluna dos Livros */}
-              <View style={styles.booksColumn}>
-                <Text
-                  style={[styles.columnTitle, isDark && { color: "#e0e0e0" }]}
-                >
-                  Livros
-                </Text>
-                <FlatList
-                  data={availableBooks}
-                  keyExtractor={(item) => item.id.toString()}
-                  showsVerticalScrollIndicator={true}
-                  style={styles.booksList}
-                  renderItem={({ item }) => {
-                    console.log("[DEBUG] Renderizando livro:", item.name);
-                    const selected = item.id === selectedBookInModal?.id;
-                    return (
-                      <TouchableOpacity
-                        style={[
-                          styles.selectorItem,
-                          isDark && { borderBottomColor: "#2a2a2a" },
-                          selected &&
-                            (isDark
-                              ? { backgroundColor: "#263850" }
-                              : styles.selectedSelectorItem),
-                        ]}
-                        onPress={() => selectBookInModal(item)}
-                      >
-                        <View style={styles.selectorItemContent}>
-                          <Text
-                            style={[
-                              styles.selectorItemTitle,
-                              isDark && { color: "#e0e0e0" },
-                              selected &&
-                                (isDark
-                                  ? { color: "#90caf9", fontWeight: "600" }
-                                  : styles.selectedSelectorItemTitle),
-                            ]}
-                          >
-                            {item.name}
-                          </Text>
-                        </View>
-                        {selected && (
-                          <Ionicons
-                            name="checkmark"
-                            size={24}
-                            color={isDark ? "#90caf9" : "#2196F3"}
-                          />
-                        )}
-                      </TouchableOpacity>
-                    );
-                  }}
-                />
-              </View>
-
-              {/* Coluna dos Capítulos */}
-              <View style={styles.chaptersColumn}>
-                <Text
-                  style={[styles.columnTitle, isDark && { color: "#e0e0e0" }]}
-                >
-                  Capítulos{" "}
-                  {selectedBookInModal ? `- ${selectedBookInModal.name}` : ""}
-                </Text>
-
-                {loadingChapters ? (
-                  <View style={styles.loadingChapters}>
-                    <ActivityIndicator size="small" color="#2196F3" />
-                    <Text
-                      style={[
-                        styles.loadingText,
-                        isDark && { color: "#b0b0b0" },
-                      ]}
-                    >
-                      Carregando capítulos...
-                    </Text>
-                  </View>
-                ) : selectedBookInModal ? (
-                  <FlatList
-                    data={chaptersForSelectedBook}
-                    keyExtractor={(item) => item.toString()}
-                    showsVerticalScrollIndicator={true}
-                    contentContainerStyle={styles.chaptersGrid}
-                    renderItem={({ item: chapterNumber }) => {
-                      const isCurrentChapter =
-                        selectedBookInModal.id === currentBookId &&
-                        chapterNumber === currentChapter;
-                      return (
-                        <TouchableOpacity
-                          style={[
-                            styles.chapterNumberItem,
-                            isDark && { backgroundColor: "#2a2a2a" },
-                            isCurrentChapter && styles.currentChapterItem,
-                          ]}
-                          onPress={() => {
-                            console.log("=== MODAL CHAPTER CLICK ===");
-                            console.log("Capítulo clicado:", chapterNumber);
-                            console.log(
-                              "Livro do modal:",
-                              selectedBookInModal.id,
-                              selectedBookInModal.name,
-                            );
-                            console.log("Livro atual:", currentBookId);
-                            console.log("Capítulo atual:", currentChapter);
-                            console.log(
-                              "É o mesmo livro?",
-                              selectedBookInModal.id === currentBookId,
-                            );
-                            console.log(
-                              "É o mesmo capítulo?",
-                              chapterNumber === currentChapter,
-                            );
-
-                            setBookSelectorVisible(false);
-                            // Se o livro selecionado for diferente do atual, mudamos o livro ANTES de navegar
-                            if (selectedBookInModal.id !== currentBookId) {
-                              console.log("🔄 Trocando livro ANTES...");
-                              selectBook(selectedBookInModal);
-                            }
-                            // Agora navegamos para o capítulo (já com o livro correto)
-                            console.log(
-                              "📍 Navegando para capítulo:",
-                              chapterNumber,
-                            );
-                            navigateToChapter(
-                              chapterNumber,
-                              selectedBookInModal,
-                            );
-                          }}
-                        >
-                          <Text
-                            style={[
-                              styles.chapterNumberText,
-                              isDark && { color: "#e0e0e0" },
-                              isCurrentChapter && styles.currentChapterText,
-                            ]}
-                          >
-                            {chapterNumber === 0 ? "Intro" : chapterNumber}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    }}
-                  />
-                ) : (
-                  <View style={styles.emptyChapters}>
-                    <Ionicons
-                      name="book-outline"
-                      size={48}
-                      color={isDark ? "#555" : "#ccc"}
-                    />
-                    <Text
-                      style={[styles.emptyText, isDark && { color: "#b0b0b0" }]}
-                    >
-                      Selecione um livro para ver os capítulos
-                    </Text>
-                  </View>
-                )}
-              </View>
+            <View style={styles.referenceSteps}>
+              <TouchableOpacity accessibilityRole="button" onPress={() => { setSelectedBookInModal(null); setPickerChapter(null); }} style={styles.referenceStep}><Text style={{ color: focus.blueDark, fontWeight: '600' }}>{selectedBookInModal?.name || 'Livro'}</Text></TouchableOpacity>
+              <Ionicons name="chevron-forward" size={16} color={focus.muted} />
+              <TouchableOpacity accessibilityRole="button" disabled={!selectedBookInModal} onPress={() => setPickerChapter(null)} style={styles.referenceStep}><Text style={{ color: focus.blueDark }}>{pickerChapter === null ? 'Capítulo' : pickerChapter === 0 ? 'Intro' : pickerChapter}</Text></TouchableOpacity>
+              <Ionicons name="chevron-forward" size={16} color={focus.muted} /><Text style={{ color: focus.muted }}>Versículo</Text>
             </View>
+            {!selectedBookInModal ? <FlatList data={availableBooks} keyExtractor={item => String(item.id)} renderItem={({ item }) => <TouchableOpacity accessibilityRole="button" onPress={() => selectBookInModal(item)} style={[styles.referenceBook, { borderBottomColor: focus.line }]}><Text style={{ color: focus.text, fontSize: 16, flex: 1 }}>{item.name}</Text><Ionicons name="chevron-forward" size={18} color={focus.muted} /></TouchableOpacity>} /> : loadingChapters || pickerLoading ? <View style={styles.centerContent}><ActivityIndicator color={focus.blueDark} /></View> : pickerChapter === null ? <FlatList key="chapters" data={chaptersForSelectedBook} numColumns={4} contentContainerStyle={styles.referenceGrid} keyExtractor={item => String(item)} renderItem={({ item }) => <TouchableOpacity accessibilityRole="button" accessibilityLabel={item === 0 ? 'Introdução' : `Capítulo ${item}`} style={[styles.referenceNumber, { backgroundColor: focus.surface }]} onPress={async () => {
+              if (item === 0) { setBookSelectorVisible(false); navigateToChapter(0, selectedBookInModal); return; }
+              setPickerLoading(true);
+              try { const items = await bibleReaderService.getVerses(bibleId, selectedBookInModal.id, item); setPickerVerses(items); setPickerChapter(item); }
+              catch { Alert.alert('Erro', 'Não foi possível carregar os versículos. Tente novamente.'); }
+              finally { setPickerLoading(false); }
+            }}><Text style={{ color: focus.text, fontSize: 16 }}>{item === 0 ? 'Intro' : item}</Text></TouchableOpacity>} /> : <>
+              <TouchableOpacity accessibilityRole="button" style={styles.referenceBook} onPress={() => { setBookSelectorVisible(false); navigateToChapter(pickerChapter, selectedBookInModal); }}><Text style={{ color: focus.blueDark, fontWeight: '600' }}>Abrir capítulo completo</Text></TouchableOpacity>
+              <FlatList key="verses" data={pickerVerses} numColumns={4} contentContainerStyle={styles.referenceGrid} keyExtractor={item => String(item.verseNumber)} renderItem={({ item }) => <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Versículo ${item.verseNumber}`} style={[styles.referenceNumber, { backgroundColor: focus.surface }]} onPress={() => { setPickerTarget({ bookId: selectedBookInModal.id, chapter: pickerChapter, verse: item.verseNumber }); setBookSelectorVisible(false); navigateToChapter(pickerChapter, selectedBookInModal); }}><Text style={{ color: focus.text, fontSize: 16 }}>{item.verseNumber}</Text></TouchableOpacity>} />
+            </>}
           </View>
         </View>
       </Modal>
@@ -4176,6 +4024,11 @@ ${deepLink}`;
 }
 
 const styles = StyleSheet.create({
+  referenceSteps: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, gap: 6, flexWrap: 'wrap', paddingVertical: 8 },
+  referenceStep: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 },
+  referenceBook: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, minHeight: 52, borderBottomWidth: StyleSheet.hairlineWidth },
+  referenceGrid: { padding: 12 },
+  referenceNumber: { flex: 1, margin: 4, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 10, maxWidth: '25%' },
   bookNameSelector: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexShrink: 1, minWidth: 0, minHeight: 44, paddingHorizontal: 12, marginLeft: 8, borderRadius: 12, gap: 6 },
   bookNameSelectorText: { fontSize: 14, fontWeight: '600', flexShrink: 1 },
   bibleVersionOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 16 },
