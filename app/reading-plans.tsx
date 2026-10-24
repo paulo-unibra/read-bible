@@ -6,7 +6,6 @@ import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
 import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import AdBanner from "../components/AdBanner";
 import TamagoshiMenuOption from "../components/TamagoshiMenuOption";
 import tamagoshiService from "../services/TamagoshiService";
 import ReadingCompanion from "../components/ReadingCompanion";
@@ -532,7 +531,6 @@ export default function ReadingPlansScreen() {
     return (
       <SafeAreaView style={styles.container}>
         {renderHeader()}
-        <AdBanner />
         <View style={styles.emptyState}>
           <ActivityIndicator size="large" color="#2196F3" />
           <Text style={styles.loadingText}>Carregando plano de leitura...</Text>
@@ -546,7 +544,6 @@ export default function ReadingPlansScreen() {
     return (
       <SafeAreaView style={styles.container}>
         {renderHeader()}
-        <AdBanner />
 
         <ScrollView
           style={styles.content}
@@ -608,7 +605,6 @@ export default function ReadingPlansScreen() {
     <SafeAreaView style={styles.container}>
       {userId !== null && selectedPlan && planDays.length > 0 && <PlanGreeting userId={userId} plan={selectedPlan} days={planDays} />}
       {renderHeader()}
-      <AdBanner />
 
       {plans.length === 0 ? (
         <ScrollView contentContainerStyle={styles.contentInner}>
