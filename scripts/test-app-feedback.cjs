@@ -8,14 +8,14 @@ function fresh() {
   new Function('exports', output)(exports);
   return exports;
 }
-test('queues messages without losing confirmations or executing actions', () => {
+test('replaces a toast immediately with a confirmation without executing actions', () => {
   const { default: feedback, feedbackStore: store } = fresh();
   let called = 0;
   const buttons = [{ text: 'Cancelar', style: 'cancel' }, { text: 'Excluir', onPress: () => called++ }];
   feedback.alert('Aviso', 'Primeira mensagem');
   const first = store.current();
   feedback.alert('Excluir plano', 'Confirmar?', buttons, { cancelable: false });
-  assert.equal(store.current(), first);
+  assert.notEqual(store.current(), first);
   store.dismiss(first.id);
   assert.equal(store.current().title, 'Excluir plano');
   assert.equal(store.current().buttons, buttons);
@@ -33,8 +33,22 @@ test('notifies subscribers and safely ignores repeated dismissal', () => {
   store.dismiss(id);
   store.dismiss(id);
   assert.equal(store.current(), null);
-  assert.equal(events, 3);
+  assert.equal(events, 2);
   unsubscribe();
   feedback.alert('Outra');
-  assert.equal(events, 3);
+  assert.equal(events, 2);
+});
+
+test('a new toast replaces a confirmation and stale timers cannot dismiss it', () => {
+  const { default: feedback, feedbackStore: store } = fresh();
+  let actions = 0;
+  feedback.alert('Excluir?', '', [{ text: 'Excluir', onPress: () => actions++ }], { onDismiss: () => actions++ });
+  const oldId = store.current().id;
+  feedback.alert('Leitura pendente', 'Conclua o dia anterior.');
+  const latest = store.current();
+  store.dismiss(oldId);
+  assert.equal(store.current(), latest);
+  assert.equal(actions, 0);
+  store.dismiss(latest.id);
+  assert.equal(store.current(), null);
 });
