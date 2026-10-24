@@ -1,3 +1,4 @@
+import { audioGuideSettings } from '../services/AudioGuideSettings';
 import FeedbackHost from '../components/FeedbackHost';
 import {
   DarkTheme,
@@ -17,6 +18,7 @@ export default function RootLayout() {
   const [userTheme, setUserTheme] = useState<"light" | "dark">("light");
   
   useEffect(() => {
+    void audioGuideSettings.load();
     (async () => {
       const theme = await DatabaseService.getSetting("theme");
       if (theme === "dark" || theme === "light") setUserTheme(theme);

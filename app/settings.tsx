@@ -1,3 +1,4 @@
+import { audioGuideSettings } from '../services/AudioGuideSettings';
 import Alert from '../services/AppFeedback';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -15,6 +16,8 @@ import { useThemeCustom } from '../hooks/theme-context';
 import { formatBibleAbbreviation } from '../utils/bibleAbbreviation';
 export default function SettingsScreen() {
   const router = useRouter();
+  const [audioGuides, setAudioGuides] = useState(false);
+  const [savingAudioGuides, setSavingAudioGuides] = useState(false);
   const [bibles, setBibles] = useState<Bible[]>([]);
   const [selectedBibleId, setSelectedBibleId] = useState<string>('');
   const [fontSize, setFontSize] = useState<'small' | 'medium' | 'large'>('medium');
@@ -25,6 +28,7 @@ export default function SettingsScreen() {
 
   const loadSettings = async () => {
     try {
+      setAudioGuides(await audioGuideSettings.load());
       await DatabaseService.init();
       
       // Load available bibles
@@ -325,6 +329,18 @@ export default function SettingsScreen() {
           ] as const).map(option => <TouchableOpacity key={option.key} accessibilityRole="radio" accessibilityState={{ checked: theme === option.key }} onPress={() => handleThemeChange(option.key)} style={[styles.segment, theme === option.key && { backgroundColor: focus.blueSoft, borderColor: accent }]}>
             <Ionicons name={option.icon} size={19} color={theme === option.key ? accent : colors.textSecondary} /><Text style={[styles.segmentText, { color: theme === option.key ? accent : colors.textSecondary, fontSize: applyFontScale(15) }]}>{option.label}</Text>
           </TouchableOpacity>)}</View>
+        </View>
+        <View style={styles.section}>
+          {heading('Guias de áudio')}
+          <View style={styles.switchRow}>
+            <Text style={[styles.rowLabel, { color: colors.textPrimary, fontSize: applyFontScale(15) }]}>Ouvir orientações e incentivos</Text>
+            <Switch accessibilityLabel="Guias de áudio" value={audioGuides} disabled={savingAudioGuides} trackColor={{ false: colors.border, true: accent }} thumbColor="#fff" onValueChange={async value => {
+              setSavingAudioGuides(true);
+              try { await audioGuideSettings.setEnabled(value); setAudioGuides(value); }
+              catch { Alert.alert('Erro', 'Não foi possível salvar a preferência de áudio.'); }
+              finally { setSavingAudioGuides(false); }
+            }} />
+          </View>
         </View>
         <View style={styles.section}>
           {heading('Lembretes de leitura')}

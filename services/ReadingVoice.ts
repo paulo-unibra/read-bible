@@ -1,3 +1,4 @@
+import { audioGuideSettings } from './AudioGuideSettings';
 import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
 import { AppState } from 'react-native';
 const readingVariations: number[] = [
@@ -42,7 +43,7 @@ const listeners = new Set<() => void>();
 export function onReadingVoice(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; }
 export const hasRecentReadingVoice = () => Date.now() - lastPlayed < 12000;
 export function playReadingVoice(event: keyof typeof sources): boolean {
-  if (AppState.currentState !== 'active' || current !== null) return false;
+  if (!audioGuideSettings.isEnabled() || AppState.currentState !== 'active' || current !== null) return false;
   try {
     listeners.forEach(listener => listener());
     const player = createAudioPlayer(event === 'reading' ? nextReading() : sources[event]);
@@ -57,4 +58,8 @@ export function playReadingVoice(event: keyof typeof sources): boolean {
 }
 AppState.addEventListener('change', state => {
   if (state !== 'active') { try { current?.remove(); } catch {} current = null; return false; }
+});
+
+audioGuideSettings.subscribe(() => {
+  if (!audioGuideSettings.isEnabled()) { try { current?.remove(); } catch {} current = null; }
 });

@@ -1,5 +1,5 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const ts=require('typescript');
-function setup(){let state={currentState:'active',addEventListener:()=>{}};const players=[];const exports={};const code=ts.transpileModule(fs.readFileSync('services/ReadingVoice.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;new Function('exports','require',code)(exports,id=>id==='react-native'?{AppState:state}:id==='expo-audio'?{createAudioPlayer:(source)=>{const p={source,play(){this.played=true},remove(){this.removed=true},addListener(_,fn){this.finish=fn}};players.push(p);return p}}:id);return{exports,players,state}}
+function setup(enabled=true){let state={currentState:'active',addEventListener:()=>{}};const players=[];const exports={};const code=ts.transpileModule(fs.readFileSync('services/ReadingVoice.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;new Function('exports','require',code)(exports,id=>id.includes('AudioGuideSettings')?{audioGuideSettings:{isEnabled:()=>enabled,subscribe:()=>{}}}:id==='react-native'?{AppState:state}:id==='expo-audio'?{createAudioPlayer:(source)=>{const p={source,play(){this.played=true},remove(){this.removed=true},addListener(_,fn){this.finish=fn}};players.push(p);return p}}:id);return{exports,players,state}}
 test('keeps current voice and ignores repeated actions until it finishes',()=>{
  const {exports:v,players}=setup();
  v.playReadingVoice('reading');
@@ -29,3 +29,5 @@ test('playback failure releases the lock for a later action',()=>{
  v.playReadingVoice('reading');players[0].finish({error:'failed'});
  v.playReadingVoice('quiz');assert.equal(players.length,2);
 });
+
+test('disabled guides never create a player',()=>{const {exports:v,players}=setup(false);assert.equal(v.playReadingVoice('reading'),false);assert.equal(v.playReadingVoice('invite'),false);assert.equal(players.length,0)});

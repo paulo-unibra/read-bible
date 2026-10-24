@@ -1,3 +1,4 @@
+import { audioGuideSettings } from '../services/AudioGuideSettings';
 import { hasRecentReadingVoice, onReadingVoice } from '../services/ReadingVoice';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAudioPlayer } from 'expo-audio';
@@ -23,8 +24,10 @@ export default function PlanGreeting({ userId, plan, days }: { userId: number; p
   useFocusEffect(useCallback(() => {
     let active = true;
     const key = greetingDayKey(userId);
+    const stopOnDisable = audioGuideSettings.subscribe(() => { if (!audioGuideSettings.isEnabled()) player.pause(); });
     const stopGreeting = onReadingVoice(() => player.pause());
     (async () => {
+      if (!(await audioGuideSettings.load()) || !active) return;
       if (claimed.has(key) || AppState.currentState !== 'active') return;
       claimed.add(key);
       try {
@@ -32,13 +35,13 @@ export default function PlanGreeting({ userId, plan, days }: { userId: number; p
         if (!active || seen) { if (!seen) claimed.delete(key); return; }
         // Persist before playback so refreshes cannot repeat the greeting.
         await AsyncStorage.setItem(key, '1');
-        if (!active || hasRecentReadingVoice()) return;
+        if (!active || !audioGuideSettings.isEnabled() || hasRecentReadingVoice()) return;
         player.replace(clips[planGreeting(plan, days)]);
         player.play();
       } catch { claimed.delete(key); }
     })();
     const subscription = AppState.addEventListener('change', state => { if (state !== 'active') player.pause(); });
-    return () => { active = false; stopGreeting(); subscription.remove(); player.pause(); };
+    return () => { active = false; stopOnDisable(); stopGreeting(); subscription.remove(); player.pause(); };
   }, [userId, plan, days, player]));
   return null;
 }
