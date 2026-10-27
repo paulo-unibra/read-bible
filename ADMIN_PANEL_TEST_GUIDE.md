@@ -42,8 +42,10 @@ node ace create:admin
 ```
 
 Isso criará um usuário com as credenciais:
-- **Email**: `admin@readbible.com`
-- **Senha**: `Admin@123`
+- **Email**: o valor configurado em `BOOTSTRAP_ADMIN_EMAIL`
+- **Senha**: a senha fornecida em `BOOTSTRAP_ADMIN_PASSWORD` (não exibida pelo comando)
+
+Defina `BOOTSTRAP_ADMIN_EMAIL` e `BOOTSTRAP_ADMIN_PASSWORD` apenas no ambiente do terminal antes de executar o comando. Use uma senha única com pelo menos 12 caracteres.
 
 Se o usuário já existir, o comando irá apenas atribuir a role de Administrador.
 
@@ -87,8 +89,8 @@ O painel estará disponível em: `http://localhost:5173`
 1. Acesse `http://localhost:5173`
 2. Você será redirecionado para `/login`
 3. Digite as credenciais:
-   - **Email**: `admin@readbible.com`
-   - **Senha**: `Admin@123`
+   - **Email**: o valor configurado em `BOOTSTRAP_ADMIN_EMAIL`
+   - **Senha**: a senha escolhida durante o provisionamento
 4. Clique em "Entrar"
 
 **Resultado Esperado:**
@@ -178,8 +180,8 @@ await user.related('roles').attach([userRole.id])
 curl -X POST http://localhost:3333/admin/login \
   -H "Content-Type: application/json" \
   -d '{
-    "email": "admin@readbible.com",
-    "password": "Admin@123"
+    "email": "admin@example.com",
+    "password": "<senha-configurada-no-ambiente>"
   }'
 ```
 
@@ -189,7 +191,7 @@ curl -X POST http://localhost:3333/admin/login \
   "token": "oat_...",
   "user": {
     "id": 1,
-    "email": "admin@readbible.com",
+    "email": "admin@example.com",
     "fullName": "Administrador Sistema",
     "roles": [
       {
@@ -221,7 +223,7 @@ curl -X GET http://localhost:3333/admin/me \
 ```json
 {
   "id": 1,
-  "email": "admin@readbible.com",
+  "email": "admin@example.com",
   "fullName": "Administrador Sistema",
   "roles": [...],
   "permissions": [...]

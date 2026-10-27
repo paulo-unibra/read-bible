@@ -57,8 +57,8 @@
 **Request:**
 ```json
 {
-  "email": "admin@readbible.com",
-  "password": "Admin@123"
+  "email": "admin@example.com",
+  "password": "<senha-configurada-no-ambiente>"
 }
 ```
 
@@ -71,7 +71,7 @@
   "token": "oat_...",
   "user": {
     "id": 1,
-    "email": "admin@readbible.com",
+    "email": "admin@example.com",
     "fullName": "Administrador Sistema",
     "roles": [...],
     "permissions": [...]
@@ -101,9 +101,7 @@ npm install               # First time only
 npm run dev
 ```
 
-**Admin Credentials:**
-- Email: `admin@readbible.com`
-- Password: `Admin@123`
+**Admin Credentials:** Set `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD` in the local shell before running `node ace create:admin`. No default credentials are configured.
 
 ## Admin Panel Details
 
@@ -157,4 +155,3 @@ admin/
 - Configure environment variables with real credentials
 - Test endpoint with sample Bible text
 - Integrate with mobile app
-

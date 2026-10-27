@@ -19,6 +19,7 @@ expo-env.d.ts
 *.mobileprovision
 *.keystore
 keystore.properties
+credentials.json
 
 # Metro
 .metro-health-check*

@@ -12,6 +12,7 @@ expo-env.d.ts
 *.mobileprovision
 *.keystore
 keystore.properties
+credentials.json
 .metro-health-check*
 npm-debug.*
 yarn-debug.*
@@ -29,6 +30,8 @@ app-example
 .git/
 .playwright-mcp/
 fastlane-mcp/
+*.apk
+*.aab
 
 .aws/
 .codex/

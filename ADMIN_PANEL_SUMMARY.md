@@ -43,7 +43,7 @@ Painel administrativo web completo com sistema de autenticação baseado em role
 #### 6. Commands
 - **create:admin** (`/api/commands/create_admin_user.ts`):
   - Comando CLI para criar usuário administrador de teste
-  - Credenciais padrão: `admin@readbible.com` / `Admin@123`
+  - Requer `BOOTSTRAP_ADMIN_EMAIL` e `BOOTSTRAP_ADMIN_PASSWORD` definidos no ambiente da execução
 
 ### Frontend (React + Vite)
 
@@ -264,9 +264,7 @@ admin/
 
 Siga o guia detalhado em: **`ADMIN_PANEL_TEST_GUIDE.md`**
 
-Credenciais de teste:
-- **Email**: `admin@readbible.com`
-- **Senha**: `Admin@123`
+Credenciais de teste: configure `BOOTSTRAP_ADMIN_EMAIL` e `BOOTSTRAP_ADMIN_PASSWORD` no ambiente local; não há credenciais padrão.
 
 ## 📝 Notas Técnicas
 
