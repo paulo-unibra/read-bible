@@ -6,7 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, FlatList, Modal, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, Modal, Pressable, ScrollView, Share, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import {
     SafeAreaView,
     useSafeAreaInsets,
@@ -145,7 +145,7 @@ export default function ChapterReaderScreen() {
   const [isViewOnlyMode, setIsViewOnlyMode] = useState(false);
   const [isNotePrivate, setIsNotePrivate] = useState(true);
   const [textSelection, setTextSelection] = useState({ start: 0, end: 0 });
-  const noteInputRef = useRef<TextInput>(null);
+  const noteInputRef = useRef<React.ComponentRef<typeof TextInput>>(null);
 
   // Verse notes tracking
   const [verseNotes, setVerseNotes] = useState<Map<string, string>>(new Map());
@@ -179,6 +179,8 @@ export default function ChapterReaderScreen() {
     "small" | "medium" | "large"
   >("medium");
   const [readerTheme, setReaderTheme] = useState<"light" | "dark">("light");
+  const [followAudio, setFollowAudio] = useState(false);
+  const [savingFollowAudio, setSavingFollowAudio] = useState(false);
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
 
   // Verse options bottom sheet state
@@ -212,11 +214,13 @@ export default function ChapterReaderScreen() {
         const settings = await DatabaseService.getMultipleSettings([
           "fontSize",
           "theme",
+          "followAudio",
         ]);
         const fs = settings.fontSize as "small" | "medium" | "large" | null;
         const th = settings.theme as "light" | "dark" | null;
         if (fs) setReaderFontSize(fs);
         if (th) setReaderTheme(th);
+        setFollowAudio(settings.followAudio === "true");
       } catch (e) {
         console.warn("Falha ao carregar preferências de leitura", e);
       }
@@ -266,6 +270,21 @@ export default function ChapterReaderScreen() {
 
   const openSettings = () => setSettingsModalVisible(true);
   const closeSettings = () => setSettingsModalVisible(false);
+  const saveFollowAudio = async (enabled: boolean) => {
+    if (savingFollowAudio) return;
+    const previous = followAudio;
+    setFollowAudio(enabled);
+    setSavingFollowAudio(true);
+    try {
+      await DatabaseService.saveSetting("followAudio", String(enabled));
+    } catch (error) {
+      setFollowAudio(previous);
+      console.error("Erro salvando acompanhamento do áudio:", error);
+      Alert.alert("Erro", "Falha ao salvar preferência de acompanhamento do áudio");
+    } finally {
+      setSavingFollowAudio(false);
+    }
+  };
   const saveSettings = async (
     fs: "small" | "medium" | "large",
     theme: "light" | "dark",
@@ -735,7 +754,7 @@ export default function ChapterReaderScreen() {
   }, [currentBookId, currentChapter]);
 
   useEffect(() => {
-    if (currentNarratedVerse && verses.length > 0 && versesListRef.current) {
+    if (followAudio && currentNarratedVerse && verses.length > 0 && versesListRef.current) {
       const index = verses.findIndex(v => v.verseNumber === currentNarratedVerse);
       if (index >= 0) {
         try {
@@ -749,7 +768,7 @@ export default function ChapterReaderScreen() {
         }
       }
     }
-  }, [currentNarratedVerse, verses]);
+  }, [followAudio, currentNarratedVerse, verses]);
 
   // Monitorar mudanças no estado do modal da Bíblia
   useEffect(() => {
@@ -2374,7 +2393,7 @@ ${deepLink}`;
       });
     }
 
-    const isBeingNarrated = currentNarratedVerse === item.verseNumber;
+    const isBeingNarrated = followAudio && currentNarratedVerse === item.verseNumber;
 
     const highlightColor = verseHighlights[favoriteKey];
 
@@ -3743,6 +3762,23 @@ ${deepLink}`;
                   </Text>
                 </TouchableOpacity>
               ))}
+            </View>
+            <View style={{ flexDirection: "row", alignItems: "center", marginTop: 18, gap: 12 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.settingsSectionLabel, { color: isDark ? "#ddd" : "#333" }]}>
+                  Acompanhar versículo pelo áudio
+                </Text>
+                <Text style={{ color: isDark ? "#bbb" : "#666", fontSize: 13 }}>
+                  Destaca o versículo narrado e rola a leitura automaticamente.
+                </Text>
+              </View>
+              <Switch
+                value={followAudio}
+                onValueChange={saveFollowAudio}
+                disabled={savingFollowAudio}
+                accessibilityLabel="Acompanhar versículo pelo áudio"
+                trackColor={{ true: focus.blue }}
+              />
             </View>
             <View style={styles.settingsFooter}>
               <TouchableOpacity
