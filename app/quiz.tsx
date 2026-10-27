@@ -1,7 +1,7 @@
 import Alert from '../services/AppFeedback';
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useTheme } from "@react-navigation/native";
+import { useTheme } from "expo-router/react-navigation";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Animated, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -15,6 +15,7 @@ import QuizService, {
   Quiz,
   QuizResult,
   QuizSession,
+  VerifiedQuizResult,
 } from "../services/QuizService";
 import RankingService from "../services/RankingService";
 
@@ -39,6 +40,8 @@ export default function QuizScreen() {
   const [questionStartTime, setQuestionStartTime] = useState(Date.now());
   const timerRef = React.useRef<number | null>(null);
   const [rankingRegistered, setRankingRegistered] = useState(false);
+  const [verifiedScore, setVerifiedScore] = useState<VerifiedQuizResult | null>(null);
+  const [submissionError, setSubmissionError] = useState(false);
 
   // Animações
   const [timerAnimation] = useState(new Animated.Value(1));
@@ -150,8 +153,6 @@ export default function QuizScreen() {
                 questionId: cq.id,
                 pergunta: cq.pergunta,
                 respostaEscolhida: "",
-                respostaCorreta: cq.respostaCorreta,
-                correct: false,
                 timeSpent,
               };
               const isLast =
@@ -232,45 +233,44 @@ export default function QuizScreen() {
   // Registrar entrada de ranking quando resultados mostrados
   useEffect(() => {
     if (showResult && session && !rankingRegistered) {
-      // Calcular estatísticas
-      const score = QuizService.calculateScore(session);
-      
-      // Registrar no ranking local (sem autenticação)
-      try {
-        RankingService.addEntry({
-          userId: 'anonymous-user',
-          bookId: bookId,
-          chapter: chapterNumber,
-          quizName: session.quiz.name,
-          correct: score.correct,
-          total: score.total,
-          percentage: score.percentage,
-          totalTimeMs: score.totalTime,
-          averageTimeMs: score.averageTime,
-        });
-      } catch (e) {
-        console.warn("Falha ao registrar ranking local", e);
-      }
-
-      // Enviar resultado para o backend (requer autenticação)
+      setRankingRegistered(true);
       const submitResult = async () => {
         try {
-          await QuizService.submitQuizResult(
+          const result = await QuizService.submitQuizResult(
             bookId,
             chapterNumber,
-            score.correct,
-            score.total,
-            Math.round(score.totalTime / 1000), // converter ms para segundos
-            bibleVersion
+            session.results.map((answer) => ({
+              questionId: answer.questionId,
+              answer: answer.respostaEscolhida,
+            })),
+            QuizService.calculateElapsedTime(session),
+            bibleVersion || 'ARC'
           );
-          console.log('[QuizScreen] Resultado enviado ao backend');
+          if (!result) throw new Error('Não foi possível confirmar o resultado');
+
+          setVerifiedScore(result);
+          if (!result.alreadyRecorded) {
+            RankingService.addEntry({
+              userId: 'authenticated-user',
+              bookId,
+              chapter: chapterNumber,
+              quizName: session.quiz.name,
+              correct: result.correctAnswers,
+              total: result.totalQuestions,
+              percentage: result.score,
+              totalTimeMs: result.timeSeconds * 1000,
+              averageTimeMs:
+                result.totalQuestions > 0
+                  ? (result.timeSeconds * 1000) / result.totalQuestions
+                  : 0,
+            });
+          }
         } catch (error) {
           console.warn('[QuizScreen] Erro ao enviar resultado:', error);
+          setSubmissionError(true);
         }
       };
       submitResult();
-      
-      setRankingRegistered(true);
     }
   }, [showResult, session, rankingRegistered, bookId, chapterNumber, bibleVersion]);
 
@@ -285,14 +285,10 @@ export default function QuizScreen() {
     const currentQuestion =
       session.quiz.questions[session.currentQuestionIndex];
     const timeSpent = Date.now() - questionStartTime;
-    const isCorrect = answer === currentQuestion.respostaCorreta;
-
     const result: QuizResult = {
       questionId: currentQuestion.id,
       pergunta: currentQuestion.pergunta,
       respostaEscolhida: answer,
-      respostaCorreta: currentQuestion.respostaCorreta,
-      correct: isCorrect,
       timeSpent,
     };
 
@@ -342,6 +338,9 @@ export default function QuizScreen() {
       setSession(QuizService.createQuizSession(quiz));
       setSelectedAnswer(null);
       setShowResult(false);
+      setRankingRegistered(false);
+      setVerifiedScore(null);
+      setSubmissionError(false);
       setTimeLeft(30);
       setQuestionStartTime(Date.now());
       progressAnimation.setValue(0);
@@ -349,21 +348,10 @@ export default function QuizScreen() {
   };
 
   const getAnswerStyle = (answer: string) => {
-    if (!selectedAnswer || !session) return styles.answerButton;
-    const currentQuestion =
-      session.quiz.questions[session.currentQuestionIndex];
-    if (answer === selectedAnswer) {
-      return answer === currentQuestion.respostaCorreta
-        ? styles.answerButtonCorrect
-        : styles.answerButtonWrong;
+    if (selectedAnswer === answer) {
+      return [styles.answerButton, styles.answerButtonSelected]
     }
-    if (
-      selectedAnswer !== currentQuestion.respostaCorreta &&
-      answer === currentQuestion.respostaCorreta
-    ) {
-      return styles.answerButtonCorrect;
-    }
-    return styles.answerButtonDisabled;
+    return styles.answerButton
   };
 
   if (loading) {
@@ -402,7 +390,46 @@ export default function QuizScreen() {
   }
 
   if (showResult) {
-    const score = QuizService.calculateScore(session);
+    if (!verifiedScore && !submissionError) {
+      return (
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+          <View style={styles.centerContent}>
+            <ActivityIndicator size="large" color={theme.tint} />
+            <Text style={[styles.loadingText, { color: theme.text }]}>Confirmando resultado...</Text>
+          </View>
+        </SafeAreaView>
+      );
+    }
+
+    if (!verifiedScore) {
+      return (
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+          <View style={styles.centerContent}>
+            <Text style={[styles.loadingText, { color: theme.text }]}>Não foi possível confirmar sua pontuação.</Text>
+            <TouchableOpacity
+              style={[styles.finishButton, { backgroundColor: theme.tint }]}
+              onPress={() => {
+                setSubmissionError(false);
+                setRankingRegistered(false);
+              }}
+            >
+              <Text style={styles.finishButtonText}>Tentar novamente</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      );
+    }
+
+    const score = {
+      correct: verifiedScore.correctAnswers,
+      total: verifiedScore.totalQuestions,
+      percentage: verifiedScore.score,
+      totalTime: verifiedScore.timeSeconds * 1000,
+      averageTime:
+        verifiedScore.totalQuestions > 0
+          ? (verifiedScore.timeSeconds * 1000) / verifiedScore.totalQuestions
+          : 0,
+    };
     const message = QuizService.getPerformanceMessage(score.percentage);
     const wrong = score.total - score.correct;
 
@@ -447,7 +474,9 @@ export default function QuizScreen() {
           </View>
 
           <Text style={[styles.messageText, { color: theme.text }]}>
-            {message}
+            {verifiedScore.alreadyRecorded
+              ? 'Mostrando a pontuação registrada na sua primeira tentativa.'
+              : message}
           </Text>
 
           <View style={styles.statsContainer}>
@@ -516,8 +545,6 @@ export default function QuizScreen() {
     Math.max(0, session.quiz.questions.length - 1)
   );
   const currentQuestion = session.quiz.questions[safeIndex];
-  const correctCount = session.results.filter((r) => r.correct).length;
-  const wrongCount = session.results.filter((r) => !r.correct).length;
   const progress =
     ((session.currentQuestionIndex + 1) / session.quiz.questions.length) * 100;
 
@@ -553,8 +580,7 @@ export default function QuizScreen() {
             {quiz.name}
           </Text>
           <View style={styles.inlineCounts}>
-            <Text style={styles.correctCount}>✔ {correctCount}</Text>
-            <Text style={styles.wrongCount}>✖ {wrongCount}</Text>
+            <Text style={styles.progressText}>{session.results.length} respondidas</Text>
           </View>
         </View>
         <View style={styles.progressBar}>
@@ -648,26 +674,6 @@ export default function QuizScreen() {
             <Text style={[styles.answerText, { color: theme.text }]}>
               {answer}
             </Text>
-            {selectedAnswer && answer === selectedAnswer && (
-              <Ionicons
-                name={
-                  answer === currentQuestion.respostaCorreta
-                    ? "checkmark-circle"
-                    : "close-circle"
-                }
-                size={24}
-                color={
-                  answer === currentQuestion.respostaCorreta
-                    ? "#4CAF50"
-                    : "#f44336"
-                }
-              />
-            )}
-            {selectedAnswer &&
-              selectedAnswer !== currentQuestion.respostaCorreta &&
-              answer === currentQuestion.respostaCorreta && (
-                <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
-              )}
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -854,6 +860,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
+  },
+  answerButtonSelected: {
+    backgroundColor: '#e3f2fd',
+    borderColor: '#2196F3',
   },
   answerButtonCorrect: {
     backgroundColor: "#e8f5e8",

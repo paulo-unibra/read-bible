@@ -10,7 +10,6 @@ interface Question {
   id: string;
   pergunta: string;
   alternativas: string[];
-  respostaCorreta: string;
 }
 
 interface Quiz {
@@ -23,9 +22,15 @@ interface QuizResult {
   questionId: string;
   pergunta: string;
   respostaEscolhida: string;
-  respostaCorreta: string;
-  correct: boolean;
   timeSpent: number;
+}
+
+export interface VerifiedQuizResult {
+  correctAnswers: number;
+  totalQuestions: number;
+  score: number;
+  timeSeconds: number;
+  alreadyRecorded?: boolean;
 }
 
 interface QuizSession {
@@ -242,14 +247,10 @@ class QuizService {
     timeSpent: number
   ): QuizSession {
     const currentQuestion = session.quiz.questions[session.currentQuestionIndex];
-    const isCorrect = answer === currentQuestion.respostaCorreta;
-
     const result: QuizResult = {
       questionId: currentQuestion.id,
       pergunta: currentQuestion.pergunta,
       respostaEscolhida: answer,
-      respostaCorreta: currentQuestion.respostaCorreta,
-      correct: isCorrect,
       timeSpent,
     };
 
@@ -265,26 +266,9 @@ class QuizService {
     };
   }
 
-  calculateScore(session: QuizSession): {
-    correct: number;
-    total: number;
-    percentage: number;
-    totalTime: number;
-    averageTime: number;
-  } {
-    const correct = session.results.filter(r => r.correct).length;
-    const total = session.results.length;
-    const percentage = total > 0 ? Math.round((correct / total) * 100) : 0;
+  calculateElapsedTime(session: QuizSession): number {
     const totalTime = session.results.reduce((sum, r) => sum + r.timeSpent, 0);
-    const averageTime = total > 0 ? Math.round(totalTime / total) : 0;
-
-    return {
-      correct,
-      total,
-      percentage,
-      totalTime,
-      averageTime,
-    };
+    return Math.max(0, Math.round(totalTime / 1000));
   }
 
   getPerformanceMessage(percentage: number): string {
@@ -327,8 +311,6 @@ class QuizService {
         (q: any) => q.chapter === chapter && q.bookName === bookName
       );
 
-      console.log('[QuizService] Quiz encontrado:', quiz);
-
       return quiz?.id || null;
     } catch (error) {
       console.error('[QuizService] Error fetching quiz ID:', error);
@@ -339,24 +321,23 @@ class QuizService {
   async submitQuizResult(
     bookId: number,
     chapter: number,
-    correctAnswers: number,
-    totalQuestions: number,
+    answers: { questionId: string; answer: string }[],
     timeSeconds: number,
     bibleVersion: string = 'ARC'
-  ): Promise<void> {
+  ): Promise<VerifiedQuizResult | null> {
     try {
       const token = await AsyncStorage.getItem('@auth_token');
 
       if (!token) {
         console.warn('[QuizService] No token found, skipping result submission');
-        return;
+        return null;
       }
 
       // Buscar quizId do backend
       const quizId = await this.getQuizId(bookId, chapter, bibleVersion);
       if (!quizId) {
         console.warn('[QuizService] Quiz not found in database, skipping result submission');
-        return;
+        return null;
       }
 
       const response = await fetch(`${API_URL}/quiz-results`, {
@@ -367,8 +348,7 @@ class QuizService {
         },
         body: JSON.stringify({
           quizId,
-          correctAnswers,
-          totalQuestions,
+          answers,
           timeSeconds,
         }),
       });
@@ -379,13 +359,22 @@ class QuizService {
       }
 
       const result = await response.json();
+      if (!result.success || !result.result) {
+        throw new Error('Resposta inválida ao confirmar pontuação');
+      }
       if (!result.alreadyRecorded) playReadingVoice('quiz');
       const companionUserId = authService.getUser()?.id;
-      if (result.success && companionUserId != null) await tamagoshiService.record(companionUserId, 'quiz').catch(() => {});
-      console.log('[QuizService] Result submitted successfully:', result);
+      if (companionUserId != null) await tamagoshiService.record(companionUserId, 'quiz').catch(() => {});
+      return {
+        correctAnswers: result.result.correctAnswers,
+        totalQuestions: result.result.totalQuestions,
+        score: result.result.score,
+        timeSeconds: result.result.timeSeconds ?? timeSeconds,
+        alreadyRecorded: Boolean(result.alreadyRecorded),
+      };
     } catch (error) {
       console.error('[QuizService] Error submitting quiz result:', error);
-      // Não lançar erro para não quebrar a experiência do usuário
+      throw error;
     }
   }
 }
