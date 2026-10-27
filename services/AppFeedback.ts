@@ -8,6 +8,11 @@ const emit = () => listeners.forEach(listener => listener());
 export const feedbackStore = {
   subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; },
   current: () => visible,
+  clear() {
+    if (!visible) return;
+    visible = null;
+    emit();
+  },
   dismiss(id: number) {
     if (visible?.id !== id) return;
     visible = null;

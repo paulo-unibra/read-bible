@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useEffect, useState, useSyncExternalStore } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useGlobalSearchParams, usePathname } from 'expo-router';
 import { AccessibilityInfo, Animated, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getFocusColors } from '../constants/design';
@@ -7,6 +8,16 @@ import { useThemeCustom } from '../hooks/theme-context';
 import { feedbackStore } from '../services/AppFeedback';
 
 export default function FeedbackHost() {
+  const pathname = usePathname();
+  const params = useGlobalSearchParams();
+  const screenKey = JSON.stringify([pathname, Object.keys(params).sort().map(key => [key, params[key]])]);
+  const previousScreen = useRef(screenKey);
+  useLayoutEffect(() => {
+    if (previousScreen.current === screenKey) return;
+    previousScreen.current = screenKey;
+    // Navigation must never run confirmation actions or dismissal callbacks.
+    feedbackStore.clear();
+  }, [screenKey]);
   const item = useSyncExternalStore(feedbackStore.subscribe, feedbackStore.current, () => null);
   const { theme } = useThemeCustom();
   const colors = getFocusColors(theme === 'dark');

@@ -8,6 +8,25 @@ function fresh() {
   new Function('exports', output)(exports);
   return exports;
 }
+test('navigation clears toasts and confirmations without running their callbacks', () => {
+  const { default: feedback, feedbackStore: store } = fresh();
+  let actions = 0;
+  let events = 0;
+  store.subscribe(() => events++);
+  feedback.alert('Confirmar', 'Mensagem', [{ text: 'Sim', onPress: () => actions++ }], { onDismiss: () => actions++ });
+  const oldId = store.current().id;
+  store.clear();
+  assert.equal(store.current(), null);
+  assert.equal(actions, 0);
+  assert.equal(events, 2);
+  store.clear();
+  assert.equal(events, 2);
+  feedback.alert('Mensagem da nova tela');
+  store.dismiss(oldId);
+  assert.equal(store.current().title, 'Mensagem da nova tela');
+  store.clear();
+  assert.equal(store.current(), null);
+});
 test('replaces a toast immediately with a confirmation without executing actions', () => {
   const { default: feedback, feedbackStore: store } = fresh();
   let called = 0;
