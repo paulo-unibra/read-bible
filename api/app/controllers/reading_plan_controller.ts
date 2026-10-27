@@ -7,6 +7,8 @@ import db from '@adonisjs/lucid/services/db'
 import { DateTime } from 'luxon'
 import { getAnnualReadingPeriod } from '../utils/annual_reading_period.js'
 import { BIBLE_VERSES_PER_CHAPTER, getVersesInRange } from '../utils/bible_verses_per_chapter.js'
+import { isPlanScheduleComplete } from '#utils/plan_schedule_completion'
+import { getPlanCompletion } from '#utils/plan_completion'
 
 function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, (character) => {
@@ -94,6 +96,27 @@ const BIBLE_STRUCTURE = [
 ]
 
 export default class ReadingPlanController {
+  private async findBlockingActivePlan(userId: number) {
+    const plans = await ReadingPlan.query()
+      .where('user_id', userId)
+      .where('is_active', true)
+      .whereNull('deleted_at')
+      .preload('progress')
+
+    for (const plan of plans) {
+      if (
+        !isPlanScheduleComplete(plan.totalDays, plan.progress) &&
+        !getPlanCompletion(plan.totalChapters, plan.progress)
+      ) return plan
+    }
+    // Retain the completed plans and their readings for history and certificates.
+    for (const plan of plans) {
+      plan.isActive = false
+      await plan.save()
+    }
+    return null
+  }
+
   /**
    * Criar plano de leitura anual
    */
@@ -102,11 +125,7 @@ export default class ReadingPlanController {
       const user = auth.user!
 
       // Verificar se já existe um plano ativo
-      const existingPlan = await ReadingPlan.query()
-        .where('user_id', user.id)
-        .where('is_active', true)
-        .whereNull('deleted_at')
-        .first()
+      const existingPlan = await this.findBlockingActivePlan(user.id)
 
       if (existingPlan) {
         return response.conflict({
@@ -228,11 +247,7 @@ export default class ReadingPlanController {
 
       // Verificar se já existe um plano ativo
       console.log('🔍 [API] Verificando planos ativos existentes...')
-      const existingPlan = await ReadingPlan.query()
-        .where('user_id', user.id)
-        .where('is_active', true)
-        .whereNull('deleted_at')
-        .first()
+      const existingPlan = await this.findBlockingActivePlan(user.id)
 
       if (existingPlan) {
         console.log('⚠️ [API] Usuário já possui plano ativo:', existingPlan.id)
@@ -416,11 +431,7 @@ export default class ReadingPlanController {
 
       // Verificar se já existe um plano ativo
       console.log('🔍 [API] Verificando planos ativos existentes...')
-      const existingPlan = await ReadingPlan.query()
-        .where('user_id', user.id)
-        .where('is_active', true)
-        .whereNull('deleted_at')
-        .first()
+      const existingPlan = await this.findBlockingActivePlan(user.id)
 
       if (existingPlan) {
         console.log('⚠️ [API] Usuário já possui plano ativo:', existingPlan.id)

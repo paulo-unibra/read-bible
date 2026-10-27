@@ -1,7 +1,8 @@
 import Alert from '../services/AppFeedback';
+import ProfileAchievements from '../components/ProfileAchievements';
 import TamagoshiMenuOption from "../components/TamagoshiMenuOption";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import React, { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -24,13 +25,14 @@ interface UserStats {
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const { editName } = useLocalSearchParams<{ editName?: string }>();
   const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState("");
   const [userEmail, setUserEmail] = useState("");
   const [userProfilePicture, setUserProfilePicture] = useState<string | null>(null);
   const [stats, setStats] = useState<UserStats | null>(null);
   const [theme, setTheme] = useState<"light" | "dark">("light");
-  const [showEditModal, setShowEditModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(editName === "certificate");
   const [newName, setNewName] = useState("");
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -43,6 +45,7 @@ export default function ProfileScreen() {
   useEffect(() => {
     loadProfile();
   }, []);
+
 
   useEffect(() => {
     setProfileImageLoadError(false);
@@ -227,8 +230,8 @@ export default function ProfileScreen() {
   };
 
   const handleSaveName = async () => {
-    if (!newName.trim()) {
-      Alert.alert("Atenção", "Digite um nome válido");
+    if (newName.trim().length < 3 || newName.trim().length > 100) {
+      Alert.alert("Atenção", "Digite seu nome com 3 a 100 caracteres.");
       return;
     }
 
@@ -248,7 +251,7 @@ export default function ProfileScreen() {
       Alert.alert("Sucesso", "Nome atualizado com sucesso!");
     } catch (error) {
       console.error("Erro ao salvar nome:", error);
-      Alert.alert("Erro", "Não foi possível atualizar o nome");
+      Alert.alert("Erro", error instanceof Error ? error.message : "Não foi possível atualizar o nome");
     } finally {
       setSaving(false);
     }
@@ -572,6 +575,8 @@ export default function ProfileScreen() {
 
         {authService.getUser()?.id != null && <TamagoshiMenuOption userId={authService.getUser()!.id} dark={isDark} />}
 
+        {authService.getUser()?.id != null && <ProfileAchievements dark={isDark} />}
+
         {/* Reading Status */}
         {stats && stats.readingStatus !== "sem-plano" && (
           <View style={[styles.statusCard, { backgroundColor: colors.card }]}>
@@ -768,13 +773,18 @@ export default function ProfileScreen() {
                   { color: colors.textPrimary, fontSize: applyFontScale(18) },
                 ]}
               >
-                Editar Nome
+                {editName === "certificate" ? "Nome no certificado" : "Editar Nome"}
               </Text>
               <TouchableOpacity onPress={() => setShowEditModal(false)}>
                 <Ionicons name="close" size={24} color={colors.textPrimary} />
               </TouchableOpacity>
             </View>
 
+            {editName === "certificate" && (
+              <Text style={{ color: colors.textSecondary, lineHeight: 21, marginBottom: 16 }}>
+                Confira seu nome completo antes de concluir o plano. Esta alteração também atualiza seu perfil.
+              </Text>
+            )}
             <TextInput
               style={[
                 styles.input,
@@ -786,6 +796,9 @@ export default function ProfileScreen() {
                 },
               ]}
               value={newName}
+              maxLength={100}
+              autoCapitalize="words"
+              accessibilityLabel="Nome completo para o certificado"
               onChangeText={setNewName}
               placeholder="Digite seu nome"
               placeholderTextColor={colors.textSecondary}

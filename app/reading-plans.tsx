@@ -1,24 +1,29 @@
 import PlanGreeting from '../components/PlanGreeting';
+import CertificateNameReminder from '../components/CertificateNameReminder';
+import { useThemeCustom } from '../hooks/theme-context';
 import Alert from '../services/AppFeedback';
 import { Ionicons } from "@expo/vector-icons";
-import * as ImagePicker from "expo-image-picker";
 import { useFocusEffect, useRouter } from "expo-router";
-import React, { useCallback, useState } from "react";
+import { useCallback, useState } from "react";
 import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import TamagoshiMenuOption from "../components/TamagoshiMenuOption";
-import tamagoshiService from "../services/TamagoshiService";
-import ReadingCompanion from "../components/ReadingCompanion";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import FocusBottomNav, {
   FOCUS_BOTTOM_NAV_HEIGHT,
 } from "../components/FocusBottomNav";
+import ReadingCompanion from "../components/ReadingCompanion";
+import TamagoshiMenuOption from "../components/TamagoshiMenuOption";
 import authService, { API_URL } from "../services/AuthService";
 import readingPlanService from "../services/ReadingPlanService";
+import tamagoshiService from "../services/TamagoshiService";
 import { ReadingPlan, ReadingPlanDay } from "../types";
 import { getNextPlanReading } from "../utils/nextPlanReading";
 import { getReadingPlanLateDays } from "../utils/readingPlanStatus";
 
 export default function ReadingPlansScreen() {
+  const { theme: certificateTheme } = useThemeCustom();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [plans, setPlans] = useState<ReadingPlan[]>([]);
@@ -32,8 +37,9 @@ export default function ReadingPlansScreen() {
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
   const [profileImageUrlIndex, setProfileImageUrlIndex] = useState(0);
   const [profileImageLoadError, setProfileImageLoadError] = useState(false);
-  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
-  const [accountMenu, setAccountMenu] = useState<"account" | "photo" | "logout" | null>(null);
+  const [accountMenu, setAccountMenu] = useState<
+    "account" | "logout" | null
+  >(null);
 
   // Reload plans when screen comes into focus
   useFocusEffect(
@@ -49,7 +55,7 @@ export default function ReadingPlansScreen() {
       const authenticated = authService.isAuthenticated();
       const user = authService.getUser();
       setIsAuthenticated(authenticated);
-      setUserId(authenticated ? user?.id ?? null : null);
+      setUserId(authenticated ? (user?.id ?? null) : null);
       setUserName(
         authenticated ? user?.name?.trim().split(/\s+/)[0] || "Usuário" : "",
       );
@@ -61,62 +67,6 @@ export default function ReadingPlansScreen() {
       }
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const openImageSource = async (source: "camera" | "library") => {
-    try {
-      const permission =
-        source === "camera"
-          ? await ImagePicker.requestCameraPermissionsAsync()
-          : await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permission.granted) {
-        Alert.alert(
-          "Permissão necessária",
-          source === "camera"
-            ? "Precisamos de acesso à câmera para tirar uma foto."
-            : "Precisamos de acesso à galeria para selecionar uma foto.",
-        );
-        return;
-      }
-
-      const options: ImagePicker.ImagePickerOptions = {
-        mediaTypes: ["images"],
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      };
-      const result =
-        source === "camera"
-          ? await ImagePicker.launchCameraAsync(options)
-          : await ImagePicker.launchImageLibraryAsync(options);
-      if (result.canceled || !result.assets[0]) return;
-
-      const asset = result.assets[0];
-      setIsUploadingPhoto(true);
-      const extension = asset.uri.split(".").pop() || "jpg";
-      const upload = await authService.uploadProfilePicture(
-        asset.uri,
-        asset.mimeType || "image/jpeg",
-        `profile_${Date.now()}.${extension}`,
-      );
-      if (!upload.success) {
-        Alert.alert(
-          "Erro",
-          upload.message || "Não foi possível atualizar a foto",
-        );
-        return;
-      }
-      setProfilePicture(
-        authService.getUser()?.profilePicture || upload.profilePicture || null,
-      );
-      setProfileImageUrlIndex(0);
-      setProfileImageLoadError(false);
-    } catch (error) {
-      console.error("Erro ao atualizar foto de perfil:", error);
-      Alert.alert("Erro", "Não foi possível atualizar a foto de perfil");
-    } finally {
-      setIsUploadingPhoto(false);
     }
   };
 
@@ -248,7 +198,13 @@ export default function ReadingPlansScreen() {
 
   const getTodayReading = () => getNextPlanReading(planDays);
   const isPlanScheduleCompleted = Boolean(
-    selectedPlan && planDays.length > 0 && planDays.every((day) => day.isCompleted),
+    selectedPlan &&
+    (selectedPlan.isCompleted ||
+      selectedPlan.completedDays >= selectedPlan.totalDays ||
+      ((selectedPlan.totalChapters ?? 0) > 0 &&
+        (selectedPlan.completedChapters ?? 0) >= (selectedPlan.totalChapters ?? 0))) &&
+    planDays.length > 0 &&
+    planDays.every((day) => day.isCompleted),
   );
 
   const getReadingSummary = (day: ReadingPlanDay) =>
@@ -293,9 +249,11 @@ export default function ReadingPlansScreen() {
       `${Math.min(100, Math.max(0, progressPercent))}%` as const;
     const totalDays = selectedPlan?.totalDays || 0;
     const readingSummary = getReadingSummary(item);
-    const lateDays = selectedPlan ? getReadingPlanLateDays(selectedPlan, planDays) : 0;
+    const lateDays = selectedPlan
+      ? getReadingPlanLateDays(selectedPlan, planDays)
+      : 0;
     const isLate = lateDays > 0;
-    const statusColor = isLate ? "#C2410C" : item.isCompleted ? "#43A047" : "#55616A";
+    const statusColor = isLate ? "#C2410C" : "#43A047";
 
     return (
       <View style={styles.readingCard}>
@@ -304,9 +262,19 @@ export default function ReadingPlansScreen() {
             Leitura de Hoje - Dia {item.dayNumber}/{totalDays || "-"}
           </Text>
           <View style={styles.statusPill}>
-            <Ionicons name={isLate ? "alert-circle" : item.isCompleted ? "checkmark-circle" : "time-outline"} size={18} color={statusColor} />
+            <Ionicons
+              name={
+                isLate ? "alert-circle" : "checkmark-circle"
+              }
+              size={18}
+              color={statusColor}
+            />
             <Text style={[styles.statusPillText, { color: statusColor }]}>
-              {isLate ? `Atrasado · ${lateDays} ${lateDays === 1 ? "dia" : "dias"}` : item.isCompleted ? "Concluída" : "Pendente"}
+              {isLate
+                ? `Atrasado · ${lateDays} ${lateDays === 1 ? "dia" : "dias"}`
+                : item.isCompleted
+                  ? "Concluída"
+                  : "Em dia"}
             </Text>
           </View>
         </View>
@@ -364,11 +332,6 @@ export default function ReadingPlansScreen() {
     }
   };
 
-  const chooseImageSource = (source: "camera" | "library") => {
-    setAccountMenu(null);
-    setTimeout(() => { void openImageSource(source); }, 250);
-  };
-
   const renderMenuOption = (
     icon: keyof typeof Ionicons.glyphMap,
     title: string,
@@ -381,11 +344,21 @@ export default function ReadingPlansScreen() {
       onPress={onPress}
       accessibilityRole="button"
     >
-      <View style={[styles.menuOptionIcon, destructive && styles.menuDangerIcon]}>
-        <Ionicons name={icon} size={22} color={destructive ? "#D64545" : "#248BE0"} />
+      <View
+        style={[styles.menuOptionIcon, destructive && styles.menuDangerIcon]}
+      >
+        <Ionicons
+          name={icon}
+          size={22}
+          color={destructive ? "#D64545" : "#248BE0"}
+        />
       </View>
       <View style={styles.menuOptionText}>
-        <Text style={[styles.menuOptionTitle, destructive && styles.menuDangerText]}>{title}</Text>
+        <Text
+          style={[styles.menuOptionTitle, destructive && styles.menuDangerText]}
+        >
+          {title}
+        </Text>
         <Text style={styles.menuOptionSubtitle}>{subtitle}</Text>
       </View>
       <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
@@ -405,11 +378,18 @@ export default function ReadingPlansScreen() {
           onPress={() => setAccountMenu(null)}
           accessibilityLabel="Fechar opções da conta"
         />
-        <View style={[styles.menuSheet, { paddingBottom: Math.max(24, insets.bottom + 16) }]}>
+        <View
+          style={[
+            styles.menuSheet,
+            { paddingBottom: Math.max(24, insets.bottom + 16) },
+          ]}
+        >
           <View style={styles.menuHandle} />
           <View style={styles.menuHeading}>
             <View style={styles.menuAvatar}>
-              {accountMenu === "account" && profilePictureUrl && !profileImageLoadError ? (
+              {accountMenu === "account" &&
+              profilePictureUrl &&
+              !profileImageLoadError ? (
                 <Image
                   source={{ uri: profilePictureUrl }}
                   style={styles.menuAvatarImage}
@@ -417,7 +397,11 @@ export default function ReadingPlansScreen() {
                 />
               ) : (
                 <Ionicons
-                  name={accountMenu === "photo" ? "camera-outline" : accountMenu === "logout" ? "log-out-outline" : "person-circle-outline"}
+                  name={
+                    accountMenu === "logout"
+                      ? "log-out-outline"
+                      : "person-circle-outline"
+                  }
                   size={32}
                   color="#248BE0"
                 />
@@ -425,14 +409,12 @@ export default function ReadingPlansScreen() {
             </View>
             <View style={styles.menuHeadingText}>
               <Text style={styles.menuTitle}>
-                {accountMenu === "photo" ? "Alterar foto" : accountMenu === "logout" ? "Sair da conta?" : `Olá, ${userName}`}
+                {accountMenu === "logout" ? "Sair da conta?" : `Olá, ${userName}`}
               </Text>
               <Text style={styles.menuSubtitle}>
-                {accountMenu === "photo"
-                  ? "Escolha como deseja atualizar sua foto"
-                  : accountMenu === "logout"
-                    ? "Você poderá entrar novamente quando quiser."
-                    : "Gerencie sua conta"}
+                {accountMenu === "logout"
+                  ? "Você poderá entrar novamente quando quiser."
+                  : "Gerencie sua conta"}
               </Text>
             </View>
             <TouchableOpacity
@@ -446,18 +428,28 @@ export default function ReadingPlansScreen() {
 
           {accountMenu === "account" && (
             <View style={styles.menuOptions}>
-              {renderMenuOption("camera-outline", "Alterar foto", "Câmera ou galeria", () => setAccountMenu("photo"))}
-              {userId !== null && <TamagoshiMenuOption userId={userId} onOpen={() => setAccountMenu(null)} />}
-              {renderMenuOption("log-out-outline", "Sair", "Encerrar sessão neste aparelho", () => setAccountMenu("logout"), true)}
-            </View>
-          )}
-          {accountMenu === "photo" && (
-            <View style={styles.menuOptions}>
-              {renderMenuOption("camera-outline", "Câmera", "Tirar uma nova foto", () => chooseImageSource("camera"))}
-              {renderMenuOption("images-outline", "Galeria", "Escolher uma foto existente", () => chooseImageSource("library"))}
-              <TouchableOpacity style={styles.menuBack} onPress={() => setAccountMenu("account")}>
-                <Text style={styles.menuBackText}>Voltar</Text>
-              </TouchableOpacity>
+              {renderMenuOption(
+                "person-circle-outline",
+                "Meu Perfil",
+                "Seus dados, foto, certificados e medalhas",
+                () => {
+                  setAccountMenu(null);
+                  router.push("/profile");
+                },
+              )}
+              {userId !== null && (
+                <TamagoshiMenuOption
+                  userId={userId}
+                  onOpen={() => setAccountMenu(null)}
+                />
+              )}
+              {renderMenuOption(
+                "log-out-outline",
+                "Sair",
+                "Encerrar sessão neste aparelho",
+                () => setAccountMenu("logout"),
+                true,
+              )}
             </View>
           )}
           {accountMenu === "logout" && (
@@ -468,7 +460,10 @@ export default function ReadingPlansScreen() {
               >
                 <Text style={styles.menuBackText}>Cancelar</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.menuLogoutButton} onPress={handleLogout}>
+              <TouchableOpacity
+                style={styles.menuLogoutButton}
+                onPress={handleLogout}
+              >
                 <Text style={styles.menuLogoutText}>Sair da conta</Text>
               </TouchableOpacity>
             </View>
@@ -504,16 +499,14 @@ export default function ReadingPlansScreen() {
         )}
         <TouchableOpacity
           onPress={handleAvatarPress}
-          disabled={isLoading || isUploadingPhoto}
+          disabled={isLoading}
           style={styles.avatarButton}
           accessibilityRole="button"
           accessibilityLabel={
             isAuthenticated ? "Opções da conta" : "Entrar na conta"
           }
         >
-          {isUploadingPhoto ? (
-            <ActivityIndicator size="small" color="#2196F3" />
-          ) : profilePictureUrl && !profileImageLoadError ? (
+          {profilePictureUrl && !profileImageLoadError ? (
             <Image
               source={{ uri: profilePictureUrl }}
               style={styles.avatarImage}
@@ -603,24 +596,31 @@ export default function ReadingPlansScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {userId !== null && selectedPlan && planDays.length > 0 && <PlanGreeting userId={userId} plan={selectedPlan} days={planDays} />}
+      {!isLoading && userId !== null && selectedPlan && planDays.length > 0 && <PlanGreeting userId={userId} plan={selectedPlan} days={planDays} />}
       {renderHeader()}
 
       {plans.length === 0 ? (
         <ScrollView contentContainerStyle={styles.contentInner}>
-          {userId !== null && <ReadingCompanion key={userId} userId={userId} plan={null} days={[]} />}
+          {userId !== null && (
+            <ReadingCompanion
+              key={userId}
+              userId={userId}
+              plan={null}
+              days={[]}
+            />
+          )}
           <View style={styles.emptyState}>
-          <Ionicons name="calendar-outline" size={64} color="#ccc" />
-          <Text style={styles.emptyTitle}>Nenhum Plano Ativo</Text>
-          <Text style={styles.emptyText}>
-            Crie seu primeiro plano de leitura para começar
-          </Text>
-          <TouchableOpacity
-            style={styles.createFirstPlanButton}
-            onPress={() => router.push("/select-plan-template")}
-          >
-            <Text style={styles.createFirstPlanButtonText}>Criar Plano</Text>
-          </TouchableOpacity>
+            <Ionicons name="calendar-outline" size={64} color="#ccc" />
+            <Text style={styles.emptyTitle}>Nenhum Plano Ativo</Text>
+            <Text style={styles.emptyText}>
+              Crie seu primeiro plano de leitura para começar
+            </Text>
+            <TouchableOpacity
+              style={styles.createFirstPlanButton}
+              onPress={() => router.push("/select-plan-template")}
+            >
+              <Text style={styles.createFirstPlanButtonText}>Criar Plano</Text>
+            </TouchableOpacity>
           </View>
         </ScrollView>
       ) : (
@@ -630,15 +630,40 @@ export default function ReadingPlansScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* Today's Reading */}
-          {userId !== null && <ReadingCompanion key={userId} userId={userId} plan={selectedPlan} days={planDays} />}
+          <CertificateNameReminder plan={selectedPlan} days={planDays} dark={certificateTheme === 'dark'} />
+          {userId !== null && (
+            <ReadingCompanion
+              key={userId}
+              userId={userId}
+              plan={selectedPlan}
+              days={planDays}
+            />
+          )}
           {isPlanScheduleCompleted && (
             <View style={styles.planFinishedNotice}>
-              <Ionicons name="checkmark-done-circle" size={26} color="#24834A" />
+              <Ionicons
+                name="checkmark-done-circle"
+                size={26}
+                color="#24834A"
+              />
               <View style={styles.pendingCopy}>
-                <Text style={styles.planFinishedTitle}>Leituras concluídas</Text>
+                <Text style={styles.planFinishedTitle}>
+                  Leituras concluídas
+                </Text>
                 <Text style={styles.pendingDescription}>
                   Todas as leituras disponíveis deste plano foram concluídas.
                 </Text>
+                <TouchableOpacity
+                  style={styles.chooseAnotherPlanButton}
+                  onPress={() => router.push("/select-plan-template")}
+                  accessibilityRole="button"
+                  accessibilityLabel="Escolher outro plano para reiniciar a leitura"
+                >
+                  <Ionicons name="refresh-outline" size={20} color="#fff" />
+                  <Text style={styles.createFirstPlanButtonText}>
+                    Escolher outro plano
+                  </Text>
+                </TouchableOpacity>
               </View>
             </View>
           )}
@@ -653,7 +678,9 @@ export default function ReadingPlansScreen() {
             <View style={styles.planFinishedNotice}>
               <Ionicons name="time-outline" size={25} color="#B7791F" />
               <View style={styles.pendingCopy}>
-                <Text style={styles.planFinishedTitle}>Leitura de hoje indisponível</Text>
+                <Text style={styles.planFinishedTitle}>
+                  Leitura de hoje indisponível
+                </Text>
                 <Text style={styles.pendingDescription}>
                   Não encontramos leituras disponíveis para este plano.
                 </Text>
@@ -743,7 +770,12 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     marginBottom: 24,
   },
-  menuHeading: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 22 },
+  menuHeading: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 22,
+  },
   menuAvatar: {
     width: 52,
     height: 52,
@@ -1022,6 +1054,18 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#9A6700",
   },
+  chooseAnotherPlanButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: "#248BE0",
+  },
   pendingCopy: { flex: 1 },
   pendingDayHeading: {
     fontSize: 14,
@@ -1118,18 +1162,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 10,
+    gap: 1,
     borderRadius: 10,
     backgroundColor: "#248BE0",
   },
   completedButton: { backgroundColor: "#43A047" },
   completeButtonText: { fontSize: 16, fontWeight: "700", color: "#fff" },
-  modeSection: { paddingHorizontal: 16, paddingTop: 26 },
+  modeSection: { paddingHorizontal: 16, paddingTop: 16 },
   modeTitle: {
     fontSize: 19,
     fontWeight: "700",
     color: "#333",
-    marginBottom: 18,
+    marginBottom: 12,
   },
   modeCard: {
     flexDirection: "row",
@@ -1154,6 +1198,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#F2F3F4",
   },
   modeDescription: { flex: 1 },
-  modeCardTitle: { fontSize: 19, fontWeight: "700", color: "#333" },
+  modeCardTitle: { fontSize: 16, fontWeight: "700", color: "#333" },
   modeSubtitle: { fontSize: 14, color: "#666", marginTop: 4 },
 });

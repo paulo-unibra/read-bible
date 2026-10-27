@@ -205,40 +205,31 @@ class AuthService {
    * Atualizar nome do usuário
    */
   async updateUserName(name: string): Promise<void> {
-    try {
-      if (!this.user) {
-        throw new Error("Usuário não autenticado");
-      }
-
-      if (name.includes("@")) {
-        throw new Error("O nome não pode ser um email");
-      }
-
-      // Atualizar localmente
-      this.user.name = name;
-      await AsyncStorage.setItem("@auth_user", JSON.stringify(this.user));
-
-      // Tentar atualizar no backend (se disponível)
-      if (this.token) {
-        try {
-          await fetch(`${API_URL}/auth/profile`, {
-            method: "PUT",
-            headers: {
-              Authorization: `Bearer ${this.token}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ name }),
-          });
-        } catch (error) {
-          console.log(
-            "Backend não disponível, nome atualizado apenas localmente",
-          );
-        }
-      }
-    } catch (error) {
-      console.error("Erro ao atualizar nome:", error);
-      throw error;
+    const normalizedName = name.trim();
+    const user = this.user;
+    const token = this.token;
+    if (!user) throw new Error("Usuário não autenticado");
+    if (normalizedName.length < 3 || normalizedName.length > 100 || normalizedName.includes("@")) {
+      throw new Error("Informe um nome de 3 a 100 caracteres, sem endereço de email.");
     }
+    let savedName = normalizedName;
+    if (token) {
+      const response = await fetch(`${API_URL}/auth/profile`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ name: normalizedName }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "Não foi possível salvar seu nome no servidor. Tente novamente.");
+      }
+      savedName = result.data?.name || normalizedName;
+    }
+    if (this.user?.id !== user.id || this.token !== token) {
+      throw new Error("A sessão mudou. Entre novamente para atualizar seu nome.");
+    }
+    this.user = { ...user, name: savedName };
+    await AsyncStorage.setItem("@auth_user", JSON.stringify(this.user));
   }
 
   /**

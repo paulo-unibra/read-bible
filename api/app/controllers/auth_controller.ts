@@ -389,13 +389,15 @@ export default class AuthController {
           return sum + (reading.end_chapter - reading.start_chapter + 1)
         }, 0)
 
-        // Calcular dias únicos completados
+        // Um dia só está concluído quando todas as suas leituras foram feitas.
         const completedDaysSet = new Set(completedReadings.map((r: any) => r.day))
+        for (const reading of planReadings) {
+          if (!reading.is_completed) completedDaysSet.delete(reading.day)
+        }
         const completedDays = completedDaysSet.size
 
-        // Calcular total de dias do plano
-        const totalDaysSet = new Set(planReadings.map((r: any) => r.day))
-        const totalDays = totalDaysSet.size
+        // As leituras são geradas em lotes; a duração vem do plano completo.
+        const totalDays = activePlan.totalDays
 
         // Calcular streaks (sequência de dias consecutivos)
         const { currentStreak, longestStreak } = this.calculateStreaks(planReadings)
