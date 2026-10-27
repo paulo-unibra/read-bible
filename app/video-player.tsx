@@ -307,7 +307,7 @@ const styles = StyleSheet.create({
   videoContainer: { width: "100%", aspectRatio: 16 / 9 },
   video: { width: "100%", height: "100%" },
   thumbnail: { width: "100%", height: "100%", resizeMode: "cover" },
-  thumbnailOverlay: { ...StyleSheet.absoluteFillObject, resizeMode: "cover", zIndex: 1 },
+  thumbnailOverlay: { ...StyleSheet.absoluteFill, resizeMode: "cover", zIndex: 1 },
   placeholderVideo: {
     width: "100%", height: "100%",
     justifyContent: "center", alignItems: "center",

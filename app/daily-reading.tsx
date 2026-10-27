@@ -49,7 +49,7 @@ interface Note {
 
 export default function DailyReadingScreen() {
   const params = useLocalSearchParams();
-  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollViewRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const [chapters, setChapters] = useState<ChapterContent[]>([]);
   const [loading, setLoading] = useState(true);
   const [theme, setTheme] = useState<"light" | "dark">("light");

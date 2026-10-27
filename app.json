@@ -7,17 +7,16 @@
     "icon": "./assets/images/icon-v2.png",
     "scheme": "readbible",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.readbible.app",
-      "config": {
-        "googleMobileAdsAppId": "ca-app-pub-5942901200629242~1274274321"
-      },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSMicrophoneUsageDescription": "Permitir o uso do microfone para gravar sua voz nos hinos da Harpa.",
-        "UIBackgroundModes": ["audio"]
+        "UIBackgroundModes": [
+          "audio"
+        ],
+        "NSPhotoLibraryAddUsageDescription": "Permitir salvar o certificado de leitura na galeria de fotos."
       }
     },
     "android": {
@@ -29,11 +28,7 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "config": {
-        "googleMobileAdsAppId": "ca-app-pub-5942901200629242~1274274321"
-      },
       "permissions": [
         "INTERNET",
         "CAMERA",

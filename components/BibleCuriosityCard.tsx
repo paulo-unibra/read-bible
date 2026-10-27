@@ -6,7 +6,7 @@ import * as Sharing from "expo-sharing";
 import React, { useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import QRCode from "react-native-qrcode-svg";
-import ViewShot from "react-native-view-shot";
+import ViewShot, { type ViewShotRef } from "react-native-view-shot";
 import authService from "../services/AuthService";
 import type { BibleCuriosity } from "../services/BibleCuriosityService";
 import bibleCuriosityService from "../services/BibleCuriosityService";
@@ -39,7 +39,7 @@ export default function BibleCuriosityCard({
   const [sharesCount, setSharesCount] = useState(curiosity.sharesCount || 0);
   const [isLoading, setIsLoading] = useState(false);
   const [showFooter, setShowFooter] = useState(false);
-  const viewShotRef = useRef<ViewShot>(null);
+  const viewShotRef = useRef<ViewShotRef>(null);
   const router = useRouter();
 
   // Verificar se o usuário está autenticado

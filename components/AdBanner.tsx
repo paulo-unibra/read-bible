@@ -1,9 +1,10 @@
 import { isRunningInExpoGo } from "expo";
 import React, { useEffect, useState } from "react";
 import { Platform, Text, View } from "react-native";
+import { isAdMobAvailable } from "../services/AdService";
 
-// Componente placeholder que carrega o AdMob apenas em production build
-// Em Expo Go, mostra mensagem informativa
+// Carrega AdMob apenas em builds com o módulo nativo instalado.
+// Nos demais ambientes, mostra um placeholder.
 let BannerAd: any = null;
 let BannerAdSize: any = null;
 let TestIds: any = null;
@@ -11,13 +12,13 @@ let TestIds: any = null;
 // Verifica se está rodando em ambiente nativo (não Expo Go)
 const isExpoGo = isRunningInExpoGo();
 
-// Tenta importar AdMob apenas se não estiver no Expo Go
-if (!isExpoGo) {
+// Evita avaliar o SDK, que usa getEnforcing(), se o módulo nativo não existe.
+if (isAdMobAvailable()) {
   try {
     const AdMobModule = require("react-native-google-mobile-ads");
-    BannerAd = AdMobModule.BannerAd;
-    BannerAdSize = AdMobModule.BannerAdSize;
-    TestIds = AdMobModule.TestIds;
+    BannerAd = AdMobModule?.BannerAd;
+    BannerAdSize = AdMobModule?.BannerAdSize;
+    TestIds = AdMobModule?.TestIds;
   } catch (error) {
     console.log(
       "[AdBanner] Módulo AdMob não disponível - será carregado em production build",

@@ -1,4 +1,4 @@
-import { Audio } from "expo-av";
+import { AudioModule, RecordingPresets, requestRecordingPermissionsAsync, type AudioRecorder } from "expo-audio";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 
@@ -27,31 +27,44 @@ class HymnRecordingService {
   }
 
   async requestPermissions(): Promise<boolean> {
-    const permission = await Audio.requestPermissionsAsync();
+    const permission = await requestRecordingPermissionsAsync();
     return permission.granted;
   }
 
-  async startRecording(): Promise<Audio.Recording> {
+  async startRecording(): Promise<AudioRecorder> {
     const hasPermission = await this.requestPermissions();
     if (!hasPermission) {
       throw new Error("Permissão do microfone negada");
     }
 
-    const recording = new Audio.Recording();
-    await recording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-    await recording.startAsync();
+    // Native constructors are exposed at runtime by expo-audio's default module.
+    // eslint-disable-next-line import/namespace
+    const { AudioRecorder: NativeAudioRecorder } = AudioModule;
+    const recording = new NativeAudioRecorder(RecordingPresets.HIGH_QUALITY);
+    try {
+      await recording.prepareToRecordAsync();
+      recording.record();
+    } catch (error) {
+      recording.release();
+      throw error;
+    }
 
     return recording;
   }
 
   async stopAndSaveRecording(
-    recording: Audio.Recording,
+    recording: AudioRecorder,
     hymnNumber: number,
     timingOffsetMs: number = 0,
   ): Promise<LocalHymnRecording> {
-    await recording.stopAndUnloadAsync();
-    const status = await recording.getStatusAsync();
-    const sourceUri = recording.getURI();
+    const durationMs = recording.getStatus().durationMillis;
+    let sourceUri: string | null;
+    try {
+      await recording.stop();
+      sourceUri = recording.uri;
+    } finally {
+      recording.release();
+    }
 
     if (!sourceUri) {
       throw new Error("Não foi possível obter o arquivo da gravação");
@@ -64,8 +77,6 @@ class HymnRecordingService {
     const extension = extensionMatch
       ? extensionMatch[0].replace("?", "")
       : ".m4a";
-    const durationMs =
-      "durationMillis" in status ? status.durationMillis || 0 : 0;
 
     const normalizedTimingOffsetMs = Number.isFinite(timingOffsetMs)
       ? Math.max(-2000, Math.min(2000, Math.round(timingOffsetMs)))

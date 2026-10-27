@@ -4,7 +4,15 @@
     "appVersionSource": "remote"
   },
   "build": {
+    "beta": {
+      "extends": "production",
+      "credentialsSource": "local",
+      "android": {
+        "buildType": "app-bundle"
+      }
+    },
     "development": {
+      "node": "22.23.2",
       "developmentClient": true,
       "distribution": "internal",
       "env": {
@@ -12,18 +20,21 @@
       }
     },
     "preview": {
+      "node": "22.23.2",
       "distribution": "internal",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://bibliafoco.com.br/api"
       }
     },
     "production": {
+      "node": "22.23.2",
       "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_API_URL": "https://bibliafoco.com.br/api"
       }
     },
     "apk": {
+      "node": "22.23.2",
       "android": {
         "buildType": "apk"
       },
@@ -33,10 +44,19 @@
     }
   },
   "submit": {
+    "beta": {
+      "android": {
+        "serviceAccountKeyPath": "/home/paulo-trabalho/.config/google-play-developer-mcp/service-account.json",
+        "track": "beta"
+      }
+    },
     "production": {
       "android": {
         "serviceAccountKeyPath": "/home/paulo-trabalho/.config/google-play-developer-mcp/service-account.json",
         "track": "production"
+      },
+      "ios": {
+        "ascAppId": "6758371735"
       }
     }
   }

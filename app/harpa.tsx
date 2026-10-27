@@ -418,7 +418,6 @@ export default function HarpaScreen() {
         <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
           <StatusBar
             barStyle={isDark ? "light-content" : "dark-content"}
-            backgroundColor={colors.headerBg}
           />
           <View
             style={[
@@ -457,7 +456,6 @@ export default function HarpaScreen() {
       <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
         <StatusBar
           barStyle={isDark ? "light-content" : "dark-content"}
-          backgroundColor={colors.headerBg}
         />
         <View
           style={[

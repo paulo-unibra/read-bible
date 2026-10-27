@@ -1,7 +1,7 @@
 import Alert from '../services/AppFeedback';
 import { Ionicons } from "@expo/vector-icons";
 import Slider from "@react-native-community/slider";
-import { Audio } from "expo-av";
+import { setAudioModeAsync, type AudioMode, type AudioRecorder } from "expo-audio";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, BackHandler, LayoutChangeEvent, PanResponder, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -31,20 +31,20 @@ const DRAG_PX_PER_MS = 0.12;
 const DRAG_WAVEFORM_WIDTH = 180;
 const TRACK_OFFSET_ROUND_STEP = 10;
 
-const PLAYBACK_AUDIO_MODE = {
-  allowsRecordingIOS: false,
-  playsInSilentModeIOS: true,
-  staysActiveInBackground: true,
-  shouldDuckAndroid: true,
-  playThroughEarpieceAndroid: false,
+const PLAYBACK_AUDIO_MODE: Partial<AudioMode> = {
+  allowsRecording: false,
+  playsInSilentMode: true,
+  shouldPlayInBackground: true,
+  interruptionMode: "duckOthers",
+  shouldRouteThroughEarpiece: false,
 };
 
-const RECORDING_AUDIO_MODE = {
-  allowsRecordingIOS: true,
-  playsInSilentModeIOS: true,
-  staysActiveInBackground: true,
-  shouldDuckAndroid: true,
-  playThroughEarpieceAndroid: false,
+const RECORDING_AUDIO_MODE: Partial<AudioMode> = {
+  allowsRecording: true,
+  playsInSilentMode: true,
+  shouldPlayInBackground: true,
+  interruptionMode: "duckOthers",
+  shouldRouteThroughEarpiece: false,
 };
 
 const formatTime = (millis: number) => {
@@ -264,7 +264,7 @@ export default function HymnStudioScreen() {
   const recordingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
     null,
   );
-  const recordingRef = useRef<Audio.Recording | null>(null);
+  const recordingRef = useRef<AudioRecorder | null>(null);
   const recordingStartedAtRef = useRef(0);
   const masterTimerStartRef = useRef(0);
   const stopPlaybackRef = useRef<(() => Promise<void>) | null>(null);
@@ -313,7 +313,7 @@ export default function HymnStudioScreen() {
   };
 
   const setStudioAudioMode = async (recordingEnabled: boolean) => {
-    await Audio.setAudioModeAsync(
+    await setAudioModeAsync(
       recordingEnabled ? RECORDING_AUDIO_MODE : PLAYBACK_AUDIO_MODE,
     );
   };
@@ -697,6 +697,10 @@ export default function HymnStudioScreen() {
       Alert.alert("Erro na gravacao", message);
       return false;
     } finally {
+      recordingRef.current = null;
+      clearRecordingInterval();
+      setIsRecording(false);
+      setRecordingElapsed(0);
       setIsBusy(false);
     }
   };
@@ -713,7 +717,8 @@ export default function HymnStudioScreen() {
     }
 
     if (recordingRef.current) {
-      await recordingRef.current.stopAndUnloadAsync().catch(() => {});
+      await recordingRef.current.stop().catch(() => {});
+      recordingRef.current.release();
       recordingRef.current = null;
     }
 
@@ -1189,7 +1194,6 @@ export default function HymnStudioScreen() {
       <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}> 
         <StatusBar
           barStyle={isDark ? "light-content" : "dark-content"}
-          backgroundColor={colors.headerBg}
         />
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color={colors.accent} />
@@ -1206,7 +1210,6 @@ export default function HymnStudioScreen() {
       <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}> 
         <StatusBar
           barStyle={isDark ? "light-content" : "dark-content"}
-          backgroundColor={colors.headerBg}
         />
         <View style={[styles.header, { backgroundColor: colors.headerBg }]}> 
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -1230,7 +1233,6 @@ export default function HymnStudioScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
       <StatusBar
         barStyle={isDark ? "light-content" : "dark-content"}
-        backgroundColor={colors.headerBg}
       />
 
       <View

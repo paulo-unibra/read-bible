@@ -24,9 +24,16 @@ module.exports = ({ config }) => {
         },
       ],
       "./plugins/withAndroidManifestFix",
+      "./plugins/withWorkManagerProguardFix",
       "./plugins/withSQLiteFix",
       "expo-video",
-      "expo-audio",
+      [
+        "expo-audio",
+        {
+          microphonePermission: "Permitir o uso do microfone para gravar sua voz nos hinos da Harpa.",
+          enableBackgroundPlayback: true,
+        },
+      ],
     ],
   };
 };

@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import Slider from "@react-native-community/slider";
-import { Audio } from "expo-av";
+import { setAudioModeAsync } from "expo-audio";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -52,7 +52,7 @@ export default function HymnViewerScreen() {
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
   const [showMixer, setShowMixer] = useState(false);
-  const playbackInterval = useRef<NodeJS.Timeout | null>(null);
+  const playbackInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const masterTimerStart = useRef<number>(0); // Timer mestre para sincronização
   const lastSyncTime = useRef<number>(0); // Última vez que sincronizou
 
@@ -88,11 +88,11 @@ export default function HymnViewerScreen() {
       loadAudio();
 
       // Configurar modo de áudio
-      Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: true,
-        shouldDuckAndroid: true,
+      setAudioModeAsync({
+        allowsRecording: false,
+        playsInSilentMode: true,
+        shouldPlayInBackground: true,
+        interruptionMode: "duckOthers",
       });
     }
 
@@ -666,7 +666,6 @@ export default function HymnViewerScreen() {
       <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
         <StatusBar
           barStyle={isDark ? "light-content" : "dark-content"}
-          backgroundColor={colors.headerBg}
         />
         <View
           style={[
@@ -713,7 +712,6 @@ export default function HymnViewerScreen() {
       <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
         <StatusBar
           barStyle={isDark ? "light-content" : "dark-content"}
-          backgroundColor={colors.headerBg}
         />
         <View
           style={[
@@ -771,7 +769,6 @@ export default function HymnViewerScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
       <StatusBar
         barStyle={isDark ? "light-content" : "dark-content"}
-        backgroundColor={colors.headerBg}
       />
       <View
         style={[

@@ -1,4 +1,4 @@
-import { Audio } from "expo-av";
+import HymnSound from "./HymnSound";
 import Constants from "expo-constants";
 import hymnCacheService from "./HymnCacheService";
 
@@ -27,7 +27,7 @@ export interface HymnAudioTrack {
   instrument: string; // 'voz', 'teclado', etc.
   fileId: string;
   downloadUrl: string;
-  sound?: Audio.Sound;
+  sound?: HymnSound;
   volume: number; // 0 a 1
   isMuted: boolean;
   isLoaded: boolean;
@@ -187,9 +187,9 @@ class HymnAudioService {
    * PRIORIDADE 3: Download direto do Google Drive
    *
    * @param track - Track com URL do arquivo local ou remoto
-   * @returns Audio.Sound carregado ou null em caso de erro
+   * @returns HymnSound carregado ou null em caso de erro
    */
-  async loadTrack(track: HymnAudioTrack): Promise<Audio.Sound | null> {
+  async loadTrack(track: HymnAudioTrack): Promise<HymnSound | null> {
     try {
       console.log(`📥 [HymnAudioService] Carregando: ${track.instrument}...`);
 
@@ -198,7 +198,7 @@ class HymnAudioService {
         track.downloadUrl.startsWith("content://");
 
       if (isLocalUri) {
-        const { sound } = await Audio.Sound.createAsync(
+        const { sound } = await HymnSound.createAsync(
           { uri: track.downloadUrl },
           {
             shouldPlay: false,
@@ -226,7 +226,7 @@ class HymnAudioService {
           );
 
           try {
-            const { sound } = await Audio.Sound.createAsync(
+            const { sound } = await HymnSound.createAsync(
               { uri: cacheStatus.localPath },
               {
                 shouldPlay: false,
@@ -259,7 +259,7 @@ class HymnAudioService {
       console.log(`🌊 [HymnAudioService] Carregando via backend: ${streamUrl}`);
 
       try {
-        const { sound } = await Audio.Sound.createAsync(
+        const { sound } = await HymnSound.createAsync(
           { uri: streamUrl },
           {
             shouldPlay: false,
@@ -280,7 +280,7 @@ class HymnAudioService {
 
         const downloadUrl = `https://drive.google.com/uc?export=download&id=${track.fileId}`;
 
-        const { sound } = await Audio.Sound.createAsync(
+        const { sound } = await HymnSound.createAsync(
           { uri: downloadUrl },
           {
             shouldPlay: false,
@@ -307,7 +307,7 @@ class HymnAudioService {
    * Aguarda até que um áudio esteja totalmente carregado e pronto
    */
   async waitForAudioReady(
-    sound: Audio.Sound,
+    sound: HymnSound,
     instrument: string,
     maxWaitMs: number = 5000,
   ): Promise<boolean> {

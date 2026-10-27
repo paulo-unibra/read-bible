@@ -1,9 +1,26 @@
 // Serviço de inicialização do AdMob
-// Funciona apenas em production build, não em Expo Go
+// Requer um build nativo com o SDK AdMob, não disponível no Expo Go
 import Constants from 'expo-constants';
 import { isRunningInExpoGo } from 'expo';
+import { Platform, TurboModuleRegistry } from 'react-native';
+
+export function isAdMobAvailable() {
+  if (
+    (Platform.OS !== 'android' && Platform.OS !== 'ios') ||
+    isRunningInExpoGo()
+  ) {
+    return false;
+  }
+
+  // get() retorna null sem lançar o erro de getEnforcing() usado pelo SDK.
+  return TurboModuleRegistry.get('RNGoogleMobileAdsModule') != null;
+}
 
 export async function initializeAds() {
+  if (Platform.OS !== 'android' && Platform.OS !== 'ios') {
+    return;
+  }
+
   // Verifica se está rodando em Expo Go
   const isExpoGo = isRunningInExpoGo();
   
@@ -19,8 +36,18 @@ export async function initializeAds() {
   }
 
   try {
-    // Importa dinamicamente para evitar erro em Expo Go
-    const mobileAds = require('react-native-google-mobile-ads').default;
+    if (!isAdMobAvailable()) {
+      console.log('[AdMob] Módulo nativo ausente neste build; anúncios desativados.');
+      return;
+    }
+
+    // Só importa o SDK quando o módulo já existe no binário nativo.
+    const mobileAds = require('react-native-google-mobile-ads')?.default;
+
+    if (typeof mobileAds !== 'function') {
+      console.warn('[AdMob] SDK indisponível neste build. Use um build nativo com react-native-google-mobile-ads.');
+      return;
+    }
     
     const adapterStatuses = await mobileAds().initialize();
     
@@ -29,8 +56,7 @@ export async function initializeAds() {
     
     return adapterStatuses;
   } catch (error) {
-    console.error('[AdMob] ❌ Erro ao inicializar:', error);
-    throw error;
+    console.warn('[AdMob] Não foi possível inicializar os anúncios; o app continuará sem AdMob:', error);
   }
 }
 
